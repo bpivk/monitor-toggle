@@ -154,3 +154,7 @@ No USER-SETUP.md generated — no external service configuration required, only 
 ---
 *Phase: 02-foundations-gui-shell*
 *Completed: 2026-07-24*
+
+## Self-Check: PASSED
+
+All 16 created files verified present on disk (`RigToggle.sln`, 4 csproj files, 6 Core models, 5 Core interfaces). All 3 commits (`db45a0e`, `703aaf0`, `bdfbedf`) verified present in `git log`.
