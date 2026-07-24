@@ -12,10 +12,12 @@
 // The admin fallback path is documented separately (plan 01-02 FALLBACK.md) and
 // is always run manually from a SEPARATE elevated terminal, never from here.
 
+using System.Drawing;
 using System.Text.Json;
 using System.Threading;
 using WindowsDisplayAPI;
 using WindowsDisplayAPI.DisplayConfig;
+using WindowsDisplayAPI.Exceptions;
 using System.Windows.Forms;
 
 if (args.Length == 0)
@@ -33,6 +35,9 @@ switch (args[0])
     case "--disable":
         return RunDisable(args);
 
+    case "--disable-primary":
+        return RunDisablePrimary(args);
+
     case "--verify":
         RunVerify();
         return 0;
@@ -47,6 +52,7 @@ static void PrintUsage()
     Console.WriteLine("Usage:");
     Console.WriteLine("  MonitorDetachSpike --list");
     Console.WriteLine("  MonitorDetachSpike --disable <index>");
+    Console.WriteLine("  MonitorDetachSpike --disable-primary <index>");
     Console.WriteLine("  MonitorDetachSpike --verify");
 }
 
@@ -120,6 +126,122 @@ static int RunDisable(string[] args)
 
     PathInfo.ApplyPathInfos(originalActivePaths, allowChanges: true);
     Console.WriteLine($"Restore applied. Screen.AllScreens.Length is now {Screen.AllScreens.Length}.");
+
+    return 0;
+}
+
+static int RunDisablePrimary(string[] args)
+{
+    // RESEARCH Pattern 1 (Assumption A1): repositioning-aware primary removal.
+    // The naive --disable approach (drop the target path, apply the rest
+    // unchanged) throws PathChangeException when the target is the GDI primary,
+    // because Windows requires a surviving display at (0,0) and PathInfo.Position
+    // has no public setter to reposition one there first. This mode reconstructs
+    // every survivor via the public PathInfo constructor, shifted by a uniform
+    // delta so exactly one lands at (0,0).
+    PathInfo[] originalActivePaths = PathInfo.GetActivePaths(virtualModeAware: false);
+
+    if (args.Length < 2 || !int.TryParse(args[1], out int targetIndex) ||
+        targetIndex < 0 || targetIndex >= originalActivePaths.Length)
+    {
+        int upperBound = originalActivePaths.Length - 1;
+        Console.WriteLine(
+            $"ERROR: invalid --disable-primary index; valid range is 0..{upperBound} " +
+            $"(there are {originalActivePaths.Length} active display paths). " +
+            "Run --list first to see valid indices.");
+        return 1;
+    }
+
+    PathInfo targetPath = originalActivePaths[targetIndex];
+    string? targetDevicePath = targetPath.TargetsInfo.FirstOrDefault()?.DisplayTarget.DevicePath;
+
+    PathInfo[] survivors = originalActivePaths.Where(p => p != targetPath).ToArray();
+
+    if (survivors.Length == 0)
+    {
+        Console.WriteLine("ERROR: cannot remove the only active display path (survivors.Length == 0).");
+        return 1;
+    }
+
+    PathInfo[] rebuilt;
+    if (targetPath.IsGDIPrimary)
+    {
+        // Shift ALL survivors by the same delta (not just survivors[0]) so their
+        // relative layout (left/right/above/below) is preserved (Pitfall 1).
+        Point promoted = survivors[0].Position;
+        var delta = new Point(-promoted.X, -promoted.Y);
+
+        rebuilt = survivors
+            .Select(p => new PathInfo(
+                p.DisplaySource,
+                new Point(p.Position.X + delta.X, p.Position.Y + delta.Y),
+                p.Resolution,
+                p.PixelFormat,
+                p.TargetsInfo))
+            .ToArray();
+
+        Console.WriteLine(
+            $"Target is GDI primary. Shifting {survivors.Length} survivor(s) by delta " +
+            $"({delta.X},{delta.Y}) so one lands at (0,0).");
+    }
+    else
+    {
+        rebuilt = survivors;
+        Console.WriteLine("Target is not GDI primary; applying survivors unchanged.");
+    }
+
+    Console.WriteLine("Applying reduced+repositioned topology...");
+    try
+    {
+        PathInfo.ApplyPathInfos(rebuilt, allowChanges: true, saveToDatabase: false, forceModeEnumeration: false);
+    }
+    catch (PathChangeException ex)
+    {
+        Console.WriteLine($"FAIL: ApplyPathInfos threw {ex.GetType().FullName}: {ex.Message}");
+        Console.WriteLine("Assumption A1 did NOT hold for this hardware/index. Attempting restore of original topology...");
+        try
+        {
+            PathInfo.ApplyPathInfos(originalActivePaths, allowChanges: true);
+            Console.WriteLine("Restore after failure succeeded.");
+        }
+        catch (Exception restoreEx)
+        {
+            Console.WriteLine($"WARNING: restore-after-failure also threw {restoreEx.GetType().FullName}: {restoreEx.Message}");
+        }
+        return 1;
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"FAIL: ApplyPathInfos threw unexpected {ex.GetType().FullName}: {ex.Message}");
+        return 1;
+    }
+
+    Console.WriteLine("Applied. Verifying via PathInfo.GetActivePaths() (authoritative oracle, not Screen.AllScreens per D-04)...");
+
+    PathInfo[] activeAfter = PathInfo.GetActivePaths(virtualModeAware: false);
+    bool targetStillActive = activeAfter
+        .SelectMany(p => p.TargetsInfo)
+        .Any(t => t.DisplayTarget.DevicePath == targetDevicePath);
+    int primaryCountAfter = activeAfter.Count(p => p.IsGDIPrimary);
+
+    Console.WriteLine($"Target device path still active? {targetStillActive} (expect False)");
+    Console.WriteLine($"Exactly one GDI primary after apply? {primaryCountAfter == 1} (count={primaryCountAfter}, expect 1)");
+    Console.WriteLine($"[informational only, not the oracle] Screen.AllScreens.Length = {Screen.AllScreens.Length}");
+
+    // A2 probe: confirm the disabled monitor remains discoverable for restore-time
+    // re-attachment via GetAllPaths (includes inactive-but-connected paths).
+    PathInfo[] allPaths = PathInfo.GetAllPaths(virtualModeAware: false);
+    bool targetDiscoverableViaGetAllPaths = allPaths
+        .SelectMany(p => p.TargetsInfo)
+        .Any(t => t.DisplayTarget.DevicePath == targetDevicePath);
+    Console.WriteLine($"Target still discoverable via GetAllPaths (A2)? {targetDiscoverableViaGetAllPaths} (expect True)");
+
+    Console.WriteLine("Press Enter to RESTORE the original display topology...");
+    Console.ReadLine();
+
+    PathInfo.ApplyPathInfos(originalActivePaths, allowChanges: true);
+    int activeCountAfterRestore = PathInfo.GetActivePaths(virtualModeAware: false).Length;
+    Console.WriteLine($"Restore applied. Active path count is now {activeCountAfterRestore} (expected {originalActivePaths.Length}).");
 
     return 0;
 }
