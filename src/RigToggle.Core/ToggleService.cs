@@ -95,6 +95,16 @@ public sealed class ToggleService
     /// device-switch call, which is reserved for the rig-mode path only. Minimizes the
     /// companion app if running, then clears the snapshot last so IsInRigMode() flips
     /// back to false.
+    ///
+    /// Gap-closure 03-04 (AUDIO-02 recovery / APP-03 reachability, T-03-04-02): the
+    /// restore calls are wrapped in a try/catch that does not re-throw, because a partial
+    /// restore failure (e.g. a captured device is gone and the underlying controller
+    /// still throws after its own best-effort fallback) must never prevent
+    /// MinimizeIfRunning or the snapshot Clear below from running — otherwise the app
+    /// would be permanently stuck reporting Rig mode with no automatic recovery. This
+    /// try/catch is intentionally scoped to ToggleToNormalMode's restore block only;
+    /// ToggleToRigMode's forward SetDefault path is untouched and keeps bubbling
+    /// failures per D-04.
     /// </summary>
     public void ToggleToNormalMode()
     {
@@ -103,8 +113,17 @@ public sealed class ToggleService
 
         if (snapshot is not null)
         {
-            _monitorController.Restore(snapshot.Monitor);
-            _audioController.Restore(snapshot.Audio);
+            try
+            {
+                _monitorController.Restore(snapshot.Monitor);
+                _audioController.Restore(snapshot.Audio);
+            }
+            catch (Exception)
+            {
+                // Intentionally swallowed (gap-closure 03-04): MinimizeIfRunning and
+                // Clear below MUST still run so the app self-recovers to normal mode
+                // instead of getting stuck reporting Rig mode.
+            }
         }
 
         _appController.MinimizeIfRunning(settings.CompanionAppPath!);

@@ -16,13 +16,13 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Audio
 
 - [ ] **AUDIO-01**: User can switch the default audio output device to the configured rig speakers when toggling to rig mode
-- [ ] **AUDIO-02**: User can restore the exact previous default audio device (across all relevant audio roles) when toggling back to normal mode
+- [x] **AUDIO-02**: User can restore the exact previous default audio device (across all relevant audio roles) when toggling back to normal mode
 
 ### Companion App
 
 - [ ] **APP-01**: Toggling to rig mode launches the configured companion app if it isn't already running
 - [ ] **APP-02**: If the companion app is already running when toggling to rig mode, its window is brought to focus instead of launching a duplicate instance
-- [ ] **APP-03**: Toggling back to normal mode minimizes the companion app's window (best-effort — true close-without-kill only if the app itself supports it)
+- [x] **APP-03**: Toggling back to normal mode minimizes the companion app's window (best-effort — true close-without-kill only if the app itself supports it)
 
 ### Settings
 
@@ -89,10 +89,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DISPLAY-02 | Phase 4 | Pending |
 | DISPLAY-03 | Phase 4 | Pending |
 | AUDIO-01 | Phase 3 | Pending |
-| AUDIO-02 | Phase 3 | Pending |
+| AUDIO-02 | Phase 3 | Complete |
 | APP-01 | Phase 3 | Pending |
 | APP-02 | Phase 3 | Pending |
-| APP-03 | Phase 3 | Pending |
+| APP-03 | Phase 3 | Complete |
 | SETTINGS-01 | Phase 2 | Pending |
 | SETTINGS-02 | Phase 2 | Pending |
 | SETTINGS-03 | Phase 2 | Pending |

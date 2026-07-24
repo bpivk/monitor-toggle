@@ -30,13 +30,14 @@ public class ToggleServiceTests
     };
 
     private static (ToggleService Service, List<string> CallLog, InMemorySnapshotStore SnapshotStore) CreateService(
-        AppSettings? settings = null)
+        AppSettings? settings = null,
+        bool audioThrowsOnRestore = false)
     {
         var callLog = new List<string>();
         var settingsStore = new InMemorySettingsStore(settings ?? ConfiguredSettings);
         var snapshotStore = new InMemorySnapshotStore(callLog);
         var monitorController = new FakeMonitorController(callLog);
-        var audioController = new FakeAudioController(callLog);
+        var audioController = new FakeAudioController(callLog, throwOnRestore: audioThrowsOnRestore);
         var appController = new FakeAppController(callLog);
 
         var service = new ToggleService(settingsStore, snapshotStore, monitorController, audioController, appController);
@@ -105,6 +106,24 @@ public class ToggleServiceTests
 
         Assert.Contains(callLog, entry => entry.StartsWith("audio.Restore:"));
         Assert.DoesNotContain(callLog, entry => entry.StartsWith("audio.SetDefault"));
+    }
+
+    [Fact]
+    public void ToggleToNormalMode_StillMinimizesAndClears_WhenAudioRestoreThrows()
+    {
+        // Gap-closure 03-04 (T-03-04-02): a throwing audio Restore must not abort the
+        // rest of ToggleToNormalMode — MinimizeIfRunning (APP-03) and snapshot Clear must
+        // still run, and IsInRigMode() must still flip back to false, so the app never
+        // gets permanently stuck reporting Rig mode.
+        var (service, callLog, _) = CreateService(audioThrowsOnRestore: true);
+        service.ToggleToRigMode();
+        callLog.Clear();
+
+        service.ToggleToNormalMode();
+
+        Assert.Contains(callLog, entry => entry.StartsWith("app.MinimizeIfRunning:"));
+        Assert.Contains("snapshot.Clear", callLog);
+        Assert.False(service.IsInRigMode());
     }
 
     [Fact]
