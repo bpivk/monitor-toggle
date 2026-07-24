@@ -66,7 +66,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 03-01-PLAN.md — Per-role AudioState expansion (D-02), per-role CaptureState, defensive snapshot Load, test-double updates
 - [x] 03-02-PLAN.md — Verified IPolicyConfig COM interop + real SetDefault/Restore across all 3 roles with verify-and-throw (AUDIO-01/02)
 - [x] 03-03-PLAN.md — Real companion-app launch/focus/minimize via user32 P/Invoke + D-05 app-path preflight (APP-01/02/03)
-- [ ] 03-04-PLAN.md — Gap closure (VERIFICATION/CR-01): stale-ID fallback + per-role isolation in Restore, and ToggleToNormalMode exception isolation so minimize/clear always run (AUDIO-02, APP-03)
+- [x] 03-04-PLAN.md — Gap closure (VERIFICATION/CR-01): stale-ID fallback + per-role isolation in Restore, and ToggleToNormalMode exception isolation so minimize/clear always run (AUDIO-02, APP-03)
 
 ### Phase 4: Monitor Control (Production)
 **Goal**: Toggling reliably disables and re-enables the primary monitor at the true OS level, using the mechanism validated by Phase 1's spike, with an explicit safety confirmation before disabling.
@@ -100,6 +100,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Monitor-Disable Feasibility Spike | 2/2 | Complete   | 2026-07-24 |
 | 2. Foundations & GUI Shell | 5/5 | Complete   | 2026-07-24 |
-| 3. App & Audio Control | 3/4 | Gap closure | - |
+| 3. App & Audio Control | 4/4 | Complete   | 2026-07-24 |
 | 4. Monitor Control (Production) | 0/TBD | Not started | - |
 | 5. Orchestration, Full Toggle & Packaging | 0/TBD | Not started | - |
