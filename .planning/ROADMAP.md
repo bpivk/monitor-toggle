@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Monitor-Disable Feasibility Spike** - Prove true OS-level monitor disable works on the actual rig hardware before committing further (completed 2026-07-24)
 - [x] **Phase 2: Foundations & GUI Shell** - Settings, snapshot persistence, and full GUI wired against fake controllers (completed 2026-07-24)
 - [x] **Phase 3: App & Audio Control** - Real companion-app launch/focus and default audio device switching (completed 2026-07-24)
-- [ ] **Phase 4: Monitor Control (Production)** - Real primary-monitor disable/restore using the spike-validated mechanism
+- [x] **Phase 4: Monitor Control (Production)** - Real primary-monitor disable/restore using the spike-validated mechanism (completed 2026-07-24)
 - [ ] **Phase 5: Orchestration, Full Toggle & Packaging** - Wire all real adapters into the complete toggle flow and ship as a standalone .exe
 
 ## Phase Details
@@ -79,7 +79,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 4 plans
 - [x] 04-01-PLAN.md — De-risk: extend spike tool with repositioning-aware `--disable-primary` mode (RESEARCH Pattern 1) + rig re-test checkpoint resolving Assumption A1/A2 (DISPLAY-01/02)
 - [x] 04-02-PLAN.md — Reshape MonitorState into a full-topology JSON-serializable snapshot + no-param CaptureState + real full-topology capture + ripple to consumers/tests (DISPLAY-02)
-- [ ] 04-03-PLAN.md — Real CCD Disable (repositioning) + Restore (live-identity re-resolution), both verify-and-throw; end-to-end rig verification checkpoint (DISPLAY-01/02)
+- [x] 04-03-PLAN.md — Real CCD Disable (repositioning) + Restore (live-identity re-resolution), both verify-and-throw; end-to-end rig verification checkpoint (DISPLAY-01/02)
 - [x] 04-04-PLAN.md — DISPLAY-03 confirmation dialog (custom checkbox Form, "don't ask again" persisted flag with monitor-change reset) + MainForm/Settings wiring (DISPLAY-03)
 
 > Execution boundary: this Linux sandbox cannot build/run net10.0-windows code. Plans produce source only; DISPLAY-01/02/03 hardware behavior is gated on the USER running the app/spike on the rig PC (blocking human-verify checkpoints in Plans 01 and 03).
@@ -107,5 +107,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Monitor-Disable Feasibility Spike | 2/2 | Complete   | 2026-07-24 |
 | 2. Foundations & GUI Shell | 5/5 | Complete   | 2026-07-24 |
 | 3. App & Audio Control | 4/4 | Complete   | 2026-07-24 |
-| 4. Monitor Control (Production) | 3/4 | In Progress|  |
+| 4. Monitor Control (Production) | 4/4 | Complete   | 2026-07-24 |
 | 5. Orchestration, Full Toggle & Packaging | 0/TBD | Not started | - |

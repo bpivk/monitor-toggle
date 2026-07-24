@@ -66,7 +66,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- Moza Companion window sometimes doesn't come to the foreground after toggling to Rig Mode, even though the process is confirmed running (process launches/is detected correctly — `LaunchOrFocus`'s "already running" branch just doesn't reliably bring the window forward). Plausibly Win32's `SetForegroundWindow` restriction (fails silently when the calling process isn't itself in the foreground). Discovered during Phase 4 Plan 03 rig testing (2026-07-24) but is Phase 3 scope (APP-01/APP-02, already shipped) — not a Phase 4 blocker. Worth a small follow-up investigation in a future phase.
 
 ### Blockers/Concerns
 
