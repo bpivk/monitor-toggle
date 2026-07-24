@@ -95,7 +95,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. If any step of a toggle fails partway, the app reports which steps succeeded/failed and stops rather than silently continuing or auto-reverting
   5. Current mode (normal vs. rig) is correctly detected on app startup even after a crash or forced close while in rig mode
   6. The app is distributed as a standalone Windows .exe requiring no separate runtime install
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 05-01-PLAN.md — CORE-04 structured-result substrate: ToggleStepOutcome/ToggleStepResult/ToggleResult types + ToggleService refactor (stop-on-first-failure rig / isolate-and-continue normal) + test updates
+- [ ] 05-02-PLAN.md — CORE-04 UI: MainForm per-step checklist rendering + Windows build/test verification checkpoint
+- [ ] 05-03-PLAN.md — PACKAGING-01 self-contained single-file win-x64 publish profile + README + full rig round-trip & crash-recovery verification (CORE-01/02/03/05)
+
+> Execution boundary: this Linux sandbox cannot build/run/publish net10.0-windows code. Plans 01–03 produce source/config only; build, test, publish, the full toggle round-trip, and the CORE-05 kill-and-relaunch check are gated on the USER running them on the rig PC (blocking human-verify checkpoints in Plans 02 and 03).
 
 ## Progress
 
@@ -108,4 +113,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Foundations & GUI Shell | 5/5 | Complete   | 2026-07-24 |
 | 3. App & Audio Control | 4/4 | Complete   | 2026-07-24 |
 | 4. Monitor Control (Production) | 4/4 | Complete   | 2026-07-24 |
-| 5. Orchestration, Full Toggle & Packaging | 0/TBD | Not started | - |
+| 5. Orchestration, Full Toggle & Packaging | 0/3 | Not started | - |
