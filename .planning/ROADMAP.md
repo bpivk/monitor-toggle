@@ -29,7 +29,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. A secondary-monitor-launch scenario (e.g. the BeamNG-style self-minimize misbehavior) is resolved because the monitor is genuinely absent from Windows, not just visually secondary
   3. A documented go/no-go decision states which mechanism (SetDisplayConfig topology-path-removal, or a documented fallback) will be used in Phase 4
   4. Elevation requirements for the chosen mechanism are confirmed empirically on this machine
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 01-01-PLAN.md — Build the throwaway spike tool (net10.0-windows console: enumerate paths, CCD detach via WindowsDisplayAPI, dual-source verify, restore)
+- [ ] 01-02-PLAN.md — User-facing docs: SDK-install/build/run instructions, go/no-go results-capture template, and the separate admin pnputil fallback
+
+> Execution boundary: this Linux sandbox cannot build/run Windows code. Both plans produce source + docs only; Phase 1's go/no-go is gated on the USER running the tool on the rig PC and reporting results back.
 
 ### Phase 2: Foundations & GUI Shell
 **Goal**: User can open the app, configure every toggle setting, and have those settings persist — built against fake controllers so UX can be fully validated with zero hardware risk.
@@ -85,7 +89,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Monitor-Disable Feasibility Spike | 0/TBD | Not started | - |
+| 1. Monitor-Disable Feasibility Spike | 0/2 | Not started | - |
 | 2. Foundations & GUI Shell | 0/TBD | Not started | - |
 | 3. App & Audio Control | 0/TBD | Not started | - |
 | 4. Monitor Control (Production) | 0/TBD | Not started | - |
