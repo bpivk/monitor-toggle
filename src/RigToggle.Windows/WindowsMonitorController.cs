@@ -24,6 +24,17 @@ namespace RigToggle.Windows;
 /// </summary>
 public sealed class WindowsMonitorController : IMonitorController
 {
+    // In-process fast path (Program.cs constructs exactly one WindowsMonitorController
+    // for the app's entire lifetime — verified in the composition root). Caches the
+    // exact pre-mutation live PathInfo[] array captured at Disable()-time, so Restore()
+    // can replay it directly via the SAME mechanism already proven twice (Phase 1
+    // spike's GO, Plan 01's rig re-test GO: PathInfo.ApplyPathInfos(originalActivePaths,
+    // allowChanges: true)) instead of reconstructing from primitive snapshot values.
+    // Reconstruction-from-snapshot remains as the fallback ONLY for the rarer case
+    // where the process restarted between Disable() and Restore() (CORE-05 crash
+    // recovery), where no in-memory cache can possibly survive.
+    private PathInfo[]? _originalPathsCache;
+
     public IReadOnlyList<MonitorInfo> GetActiveMonitors()
     {
         PathInfo[] activePaths = PathInfo.GetActivePaths(virtualModeAware: false);
@@ -88,6 +99,11 @@ public sealed class WindowsMonitorController : IMonitorController
     public void Disable(string monitorDevicePath)
     {
         PathInfo[] currentPaths = PathInfo.GetActivePaths(virtualModeAware: false);
+
+        // Cache BEFORE any mutation, regardless of what happens below, so a retry-
+        // restore always has the true pre-disable topology available (in-process
+        // fast path — see field doc comment).
+        _originalPathsCache = currentPaths;
 
         PathInfo? targetPath = currentPaths.FirstOrDefault(p =>
             p.TargetsInfo.Any(t => t.DisplayTarget.DevicePath == monitorDevicePath));
@@ -157,6 +173,50 @@ public sealed class WindowsMonitorController : IMonitorController
     // (D-05).
     public void Restore(MonitorState previousState)
     {
+        // In-process fast path: if this exact WindowsMonitorController instance is
+        // still holding the pre-disable live PathInfo[] array (i.e. no process
+        // restart happened between Disable() and Restore()), replay it directly via
+        // the SAME mechanism already proven twice on this rig (Phase 1 spike GO,
+        // Plan 01 rig re-test GO) instead of reconstructing from primitive snapshot
+        // values — sidesteps every reconstruction pitfall (source assignment,
+        // OutputTechnology, mode-info shape) entirely, because nothing is rebuilt.
+        // Sanity-checked against previousState.Paths' device-path set before trusting
+        // it, so a mismatched/stale cache never gets silently applied.
+        if (_originalPathsCache is not null)
+        {
+            var cachedDevicePaths = _originalPathsCache
+                .SelectMany(p => p.TargetsInfo)
+                .Where(t => t.DisplayTarget.IsAvailable)
+                .Select(t => t.DisplayTarget.DevicePath)
+                .ToHashSet();
+            var expectedDevicePaths = previousState.Paths.Select(s => s.DevicePath).ToHashSet();
+
+            if (cachedDevicePaths.SetEquals(expectedDevicePaths))
+            {
+                PathInfo.ApplyPathInfos(_originalPathsCache, allowChanges: true);
+                _originalPathsCache = null;
+
+                PathInfo[] fastVerifyPaths = PathInfo.GetActivePaths(virtualModeAware: false);
+                PathInfo? fastRestoredTarget = fastVerifyPaths.FirstOrDefault(p =>
+                    p.TargetsInfo.Any(t => t.DisplayTarget.DevicePath == previousState.TargetDevicePath));
+                MonitorPathSnapshot fastExpectedSnap =
+                    previousState.Paths.First(s => s.DevicePath == previousState.TargetDevicePath);
+
+                if (fastRestoredTarget is null ||
+                    fastRestoredTarget.Position.X != fastExpectedSnap.PositionX ||
+                    fastRestoredTarget.Position.Y != fastExpectedSnap.PositionY ||
+                    fastRestoredTarget.IsGDIPrimary != fastExpectedSnap.IsPrimary)
+                {
+                    throw new InvalidOperationException(
+                        "Monitor restore did not reproduce the exact prior configuration. No further automatic recovery is attempted (D-05).");
+                }
+
+                return;
+            }
+        }
+
+        // Fallback (crash-recovery path only — no in-process cache survives a restart):
+        // reconstruct from the JSON-persisted primitive snapshot.
         PathInfo[] liveAllPaths = PathInfo.GetAllPaths(virtualModeAware: false);
 
         // Resolve every snapshot entry to its live match + live target first (two-pass),
@@ -276,6 +336,8 @@ public sealed class WindowsMonitorController : IMonitorController
             throw new InvalidOperationException(
                 "Monitor restore did not reproduce the exact prior configuration. No further automatic recovery is attempted (D-05).");
         }
+
+        _originalPathsCache = null;
     }
 
     // WindowsDisplayAPI's PathTargetInfo.OutputTechnology has no public constructor
