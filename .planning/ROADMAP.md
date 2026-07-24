@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Monitor-Disable Feasibility Spike** - Prove true OS-level monitor disable works on the actual rig hardware before committing further (completed 2026-07-24)
 - [x] **Phase 2: Foundations & GUI Shell** - Settings, snapshot persistence, and full GUI wired against fake controllers (completed 2026-07-24)
-- [ ] **Phase 3: App & Audio Control** - Real companion-app launch/focus and default audio device switching
+- [x] **Phase 3: App & Audio Control** - Real companion-app launch/focus and default audio device switching (completed 2026-07-24)
 - [ ] **Phase 4: Monitor Control (Production)** - Real primary-monitor disable/restore using the spike-validated mechanism
 - [ ] **Phase 5: Orchestration, Full Toggle & Packaging** - Wire all real adapters into the complete toggle flow and ship as a standalone .exe
 
@@ -64,7 +64,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. Toggling back to normal mode restores the exact previous default audio device across all relevant audio roles
 **Plans**: 3 plans
 - [x] 03-01-PLAN.md — Per-role AudioState expansion (D-02), per-role CaptureState, defensive snapshot Load, test-double updates
-- [ ] 03-02-PLAN.md — Verified IPolicyConfig COM interop + real SetDefault/Restore across all 3 roles with verify-and-throw (AUDIO-01/02)
+- [x] 03-02-PLAN.md — Verified IPolicyConfig COM interop + real SetDefault/Restore across all 3 roles with verify-and-throw (AUDIO-01/02)
 - [x] 03-03-PLAN.md — Real companion-app launch/focus/minimize via user32 P/Invoke + D-05 app-path preflight (APP-01/02/03)
 
 ### Phase 4: Monitor Control (Production)
@@ -99,6 +99,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Monitor-Disable Feasibility Spike | 2/2 | Complete   | 2026-07-24 |
 | 2. Foundations & GUI Shell | 5/5 | Complete   | 2026-07-24 |
-| 3. App & Audio Control | 2/3 | In Progress|  |
+| 3. App & Audio Control | 3/3 | Complete   | 2026-07-24 |
 | 4. Monitor Control (Production) | 0/TBD | Not started | - |
 | 5. Orchestration, Full Toggle & Packaging | 0/TBD | Not started | - |
