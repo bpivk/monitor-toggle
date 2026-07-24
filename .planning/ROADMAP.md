@@ -30,7 +30,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A documented go/no-go decision states which mechanism (SetDisplayConfig topology-path-removal, or a documented fallback) will be used in Phase 4
   4. Elevation requirements for the chosen mechanism are confirmed empirically on this machine
 **Plans**: 2 plans
-- [ ] 01-01-PLAN.md — Build the throwaway spike tool (net10.0-windows console: enumerate paths, CCD detach via WindowsDisplayAPI, dual-source verify, restore)
+- [x] 01-01-PLAN.md — Build the throwaway spike tool (net10.0-windows console: enumerate paths, CCD detach via WindowsDisplayAPI, dual-source verify, restore)
 - [ ] 01-02-PLAN.md — User-facing docs: SDK-install/build/run instructions, go/no-go results-capture template, and the separate admin pnputil fallback
 
 > Execution boundary: this Linux sandbox cannot build/run Windows code. Both plans produce source + docs only; Phase 1's go/no-go is gated on the USER running the tool on the rig PC and reporting results back.
@@ -89,7 +89,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Monitor-Disable Feasibility Spike | 0/2 | Not started | - |
+| 1. Monitor-Disable Feasibility Spike | 1/2 | In Progress|  |
 | 2. Foundations & GUI Shell | 0/TBD | Not started | - |
 | 3. App & Audio Control | 0/TBD | Not started | - |
 | 4. Monitor Control (Production) | 0/TBD | Not started | - |
