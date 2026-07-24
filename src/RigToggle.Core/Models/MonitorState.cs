@@ -2,8 +2,11 @@ namespace RigToggle.Core.Models;
 
 /// <summary>
 /// Captured monitor state at toggle-time, used to restore the exact prior configuration.
-/// Phase-2-minimal: stores only the target monitor's device path. Phase 4 may enrich this
-/// with the full DISPLAYCONFIG_PATH_INFO/MODE_INFO arrays needed for a true CCD restore
-/// (02-RESEARCH.md Pitfall 7 / Pattern 1).
+/// Phase-4 full-topology shape: one MonitorPathSnapshot per active display path present
+/// at capture time (not just the target), because Plan 03's repositioning-aware disable
+/// shifts every surviving path's coordinates — restore must undo that shift for every
+/// display, not just reactivate the disabled one (DISPLAY-02). TargetDevicePath names
+/// which entry is the configured monitor to disable, so Disable/Restore need no second
+/// settings read.
 /// </summary>
-public sealed record MonitorState(string MonitorDevicePath);
+public sealed record MonitorState(IReadOnlyList<MonitorPathSnapshot> Paths, string TargetDevicePath);

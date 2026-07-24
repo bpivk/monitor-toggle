@@ -93,7 +93,7 @@ public class JsonStoreTests : IDisposable
 
         Assert.False(store.Exists());
 
-        store.Save(new StateSnapshot(new MonitorState("\\\\?\\DISPLAY#PRIMARY"), new AudioState(new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"))));
+        store.Save(new StateSnapshot(new MonitorState(new List<MonitorPathSnapshot> { new("\\\\?\\DISPLAY#PRIMARY", "Primary Monitor", 0, 0, 1920, 1080, 0, 0, 0, 0, 60000UL, 0, true) }, "\\\\?\\DISPLAY#PRIMARY"), new AudioState(new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"))));
 
         Assert.True(store.Exists());
     }
@@ -103,7 +103,7 @@ public class JsonStoreTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "state.json");
         var store = new JsonSnapshotStore(path);
-        store.Save(new StateSnapshot(new MonitorState("\\\\?\\DISPLAY#PRIMARY"), new AudioState(new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"))));
+        store.Save(new StateSnapshot(new MonitorState(new List<MonitorPathSnapshot> { new("\\\\?\\DISPLAY#PRIMARY", "Primary Monitor", 0, 0, 1920, 1080, 0, 0, 0, 0, 60000UL, 0, true) }, "\\\\?\\DISPLAY#PRIMARY"), new AudioState(new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"))));
 
         store.Clear();
 
@@ -118,12 +118,12 @@ public class JsonStoreTests : IDisposable
 
         Assert.Null(store.Load());
 
-        var snapshot = new StateSnapshot(new MonitorState("\\\\?\\DISPLAY#PRIMARY"), new AudioState(new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device")));
+        var snapshot = new StateSnapshot(new MonitorState(new List<MonitorPathSnapshot> { new("\\\\?\\DISPLAY#PRIMARY", "Primary Monitor", 0, 0, 1920, 1080, 0, 0, 0, 0, 60000UL, 0, true) }, "\\\\?\\DISPLAY#PRIMARY"), new AudioState(new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device")));
         store.Save(snapshot);
 
         var loaded = store.Load();
         Assert.NotNull(loaded);
-        Assert.Equal(snapshot.Monitor.MonitorDevicePath, loaded!.Monitor.MonitorDevicePath);
+        Assert.Equal(snapshot.Monitor.TargetDevicePath, loaded!.Monitor.TargetDevicePath);
         Assert.Equal(snapshot.Audio.Console.DeviceId, loaded.Audio.Console.DeviceId);
         Assert.Equal(snapshot.Audio.Multimedia.DeviceId, loaded.Audio.Multimedia.DeviceId);
         Assert.Equal(snapshot.Audio.Communications.DeviceId, loaded.Audio.Communications.DeviceId);
@@ -144,5 +144,50 @@ public class JsonStoreTests : IDisposable
         var loaded = store.Load();
 
         Assert.Null(loaded);
+    }
+
+    [Fact]
+    public void SnapshotStore_MonitorState_RoundTripsAllPathFields()
+    {
+        // T-04-02-01 / RESEARCH Pitfall 4: proves the new full-topology MonitorState
+        // shape serializes and deserializes every field cleanly, for every path in the
+        // topology, not just a single entry.
+        var path = Path.Combine(_tempDir, "state.json");
+        var store = new JsonSnapshotStore(path);
+        var paths = new List<MonitorPathSnapshot>
+        {
+            new("\\\\?\\DISPLAY#PRIMARY", "Primary Monitor", 0, 0, 1920, 1080, 1, 2, 3, 4, 60000UL, 5, true),
+            new("\\\\?\\DISPLAY#RIG", "Rig Monitor", -1920, 240, 2560, 1440, 6, 7, 8, 9, 144000UL, 10, false),
+        };
+        var monitorState = new MonitorState(paths, "\\\\?\\DISPLAY#PRIMARY");
+        var audioRole = new AudioRoleState("device-id", "Fake Device");
+        var snapshot = new StateSnapshot(monitorState, new AudioState(audioRole, audioRole, audioRole));
+
+        store.Save(snapshot);
+        var loaded = store.Load();
+
+        Assert.NotNull(loaded);
+        Assert.Equal(monitorState.TargetDevicePath, loaded!.Monitor.TargetDevicePath);
+        Assert.Equal(paths.Count, loaded.Monitor.Paths.Count);
+
+        for (int i = 0; i < paths.Count; i++)
+        {
+            MonitorPathSnapshot expected = paths[i];
+            MonitorPathSnapshot actual = loaded.Monitor.Paths[i];
+
+            Assert.Equal(expected.DevicePath, actual.DevicePath);
+            Assert.Equal(expected.FriendlyName, actual.FriendlyName);
+            Assert.Equal(expected.PositionX, actual.PositionX);
+            Assert.Equal(expected.PositionY, actual.PositionY);
+            Assert.Equal(expected.ResolutionWidth, actual.ResolutionWidth);
+            Assert.Equal(expected.ResolutionHeight, actual.ResolutionHeight);
+            Assert.Equal(expected.PixelFormat, actual.PixelFormat);
+            Assert.Equal(expected.Rotation, actual.Rotation);
+            Assert.Equal(expected.Scaling, actual.Scaling);
+            Assert.Equal(expected.OutputTechnology, actual.OutputTechnology);
+            Assert.Equal(expected.FrequencyInMillihertz, actual.FrequencyInMillihertz);
+            Assert.Equal(expected.ScanLineOrdering, actual.ScanLineOrdering);
+            Assert.Equal(expected.IsPrimary, actual.IsPrimary);
+        }
     }
 }

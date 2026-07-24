@@ -63,7 +63,7 @@ public sealed class ToggleService
                 $"The companion app could not be found at '{settings.CompanionAppPath}'. Open Settings and reselect the companion app path before switching to Rig Mode.");
         }
 
-        var monitorState = _monitorController.CaptureState(settings.MonitorDevicePath!);
+        var monitorState = _monitorController.CaptureState();
         var audioState = _audioController.CaptureState();
 
         // Snapshot MUST be persisted before any mutation call (D-08/CORE-03 guarantee).
