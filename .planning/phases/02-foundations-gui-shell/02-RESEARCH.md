@@ -481,17 +481,19 @@ public sealed class AppSettings
 | A2 | `MMDeviceEnumerator.GetDevice(id)` throws (rather than returning null) for an unresolvable ID | Common Pitfalls (Pitfall 2) | Medium — if it instead returns `null`, a `try/catch`-only implementation would still work (catch block simply never triggers) as long as a null-check is *also* present; recommend implementing both a null-check and a catch block defensively so either behavior is handled correctly without needing to re-verify on a Windows machine first |
 | A3 | `%LocalAppData%\RigToggle\` is the correct base path for both `settings.json` and `state.json` (resolving the STACK.md/ARCHITECTURE.md discrepancy in favor of Local, not Roaming) | Architecture Patterns (Pattern 4), Common Pitfalls (Pitfall 4) | Low-Medium — purely a file-location choice with no functional impact on a single-machine tool either way; wrong choice just means an inconsistency with one of the two research docs, not a runtime bug |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Settings/snapshot base directory: `%LocalAppData%` vs `%APPDATA%`?**
    - What we know: `ARCHITECTURE.md` recommends `%LocalAppData%` for both files with an explicit single-machine rationale; `STACK.md` recommends `%APPDATA%` (roaming) for `settings.json` specifically, with no explicit rationale given for roaming over local.
    - What's unclear: which document the planner should treat as authoritative when they conflict — neither is marked as superseding the other, and this phase is the first one to actually write these files.
    - Recommendation: Use `%LocalAppData%\RigToggle\` for both `settings.json` and `state.json` (this document's Pattern 4). This is a low-stakes, easily-changed-later decision; flag to the user only if they have a specific reason to prefer roaming (e.g., planned future multi-machine sync, which is explicitly out of scope per `REQUIREMENTS.md`'s "Cloud sync / multi-device profile sync" exclusion — reinforcing that Local is the better-justified choice here).
+   - RESOLVED: Plan 02-02 (Task 1) commits to `%LocalAppData%\RigToggle\` as the base directory for both `settings.json` and `state.json`, and Plan 02-05 (Task 3, composition root) supplies those exact paths — Local chosen over Roaming per this Pattern 4 recommendation.
 
 2. **Does `GetDevice(id)` throw or return null for a missing endpoint ID, and what exception type?**
    - What we know: The COM-level call returns a failure `HRESULT` for a not-found ID; NAudio's managed wrapper's exact translation of that (exception type, or a null return) could not be confirmed by direct execution in this Linux-sandboxed research session.
    - What's unclear: the precise exception type (if any) to catch.
    - Recommendation: Implement defensively (both a preceding existence check where feasible and a broad `try/catch` around the resolve call — see Common Pitfalls Pitfall 2); treat "reopen Settings with a since-removed audio device" as an explicit manual test case once the app is buildable on the actual Windows rig, same pattern as Phase 1's human-verification loop.
+   - RESOLVED: Plan 02-03 (Windows audio adapter) implements `MMDeviceEnumerator.GetDevice` defensively — a null-check plus a broad `try/catch` around the resolve call — so it is correct whether NAudio throws or returns null; Plan 02-05 (Task 4, human-verify step 5) adds the since-removed-audio-device reopen as an explicit rig test case.
 
 ## Environment Availability
 
