@@ -159,7 +159,9 @@ public sealed class WindowsMonitorController : IMonitorController
     {
         PathInfo[] liveAllPaths = PathInfo.GetAllPaths(virtualModeAware: false);
 
-        var rebuilt = new List<PathInfo>();
+        // Resolve every snapshot entry to its live match + live target first (two-pass),
+        // before deciding source assignment below — order-independent.
+        var resolved = new List<(MonitorPathSnapshot Snap, PathInfo LiveMatch, PathTargetInfo LiveTarget)>();
         foreach (MonitorPathSnapshot snap in previousState.Paths)
         {
             // PathDisplayTarget.DevicePath throws TargetNotAvailableException when
@@ -184,6 +186,39 @@ public sealed class WindowsMonitorController : IMonitorController
             PathTargetInfo liveTarget = liveMatch.TargetsInfo.First(t =>
                 t.DisplayTarget.IsAvailable && t.DisplayTarget.DevicePath == snap.DevicePath);
 
+            resolved.Add((snap, liveMatch, liveTarget));
+        }
+
+        // MonitorPathSnapshot deliberately stores no source-slot identity (Plan 02 —
+        // stays JSON-primitive, no WindowsDisplayAPI reference in Core), so the source
+        // to reattach an INACTIVE target to must be re-derived here. Trusting the
+        // inactive target's own live-reported DisplaySource (from GetAllPaths) is NOT
+        // safe — observed live on the rig as PathChangeException ("Invalid paths
+        // information.") from SetDisplayConfig's validation, most likely because that
+        // reported source collided with the source the still-active survivor monitor
+        // is already using (two paths cannot legally share one source). Reserve every
+        // ACTIVE target's own (correct, currently-in-use) source first, then assign
+        // each INACTIVE target the first source not already reserved.
+        var usedSources = new HashSet<PathDisplaySource>(
+            resolved.Where(r => r.LiveTarget.IsPathActive).Select(r => r.LiveMatch.DisplaySource));
+        PathDisplaySource[] allSources = PathDisplaySource.GetDisplaySources();
+
+        var rebuilt = new List<PathInfo>();
+        foreach (var (snap, liveMatch, liveTarget) in resolved)
+        {
+            PathDisplaySource sourceToUse;
+            if (liveTarget.IsPathActive)
+            {
+                sourceToUse = liveMatch.DisplaySource;
+            }
+            else
+            {
+                sourceToUse = allSources.FirstOrDefault(s => !usedSources.Contains(s))
+                    ?? throw new InvalidOperationException(
+                        $"Cannot restore '{snap.FriendlyName}' ({snap.DevicePath}) — no free display source available.");
+                usedSources.Add(sourceToUse);
+            }
+
             var reconstructedTarget = new PathTargetInfo(
                 liveTarget.DisplayTarget,
                 snap.FrequencyInMillihertz,
@@ -192,14 +227,27 @@ public sealed class WindowsMonitorController : IMonitorController
                 (DisplayConfigScaling)snap.Scaling);
 
             rebuilt.Add(new PathInfo(
-                liveMatch.DisplaySource,
+                sourceToUse,
                 new Point(snap.PositionX, snap.PositionY),
                 new Size(snap.ResolutionWidth, snap.ResolutionHeight),
                 (DisplayConfigPixelFormat)snap.PixelFormat,
                 new[] { reconstructedTarget }));
         }
 
-        PathInfo.ApplyPathInfos(rebuilt.ToArray(), allowChanges: true);
+        try
+        {
+            PathInfo.ApplyPathInfos(rebuilt.ToArray(), allowChanges: true);
+        }
+        catch (WindowsDisplayAPI.Exceptions.PathChangeException ex)
+        {
+            // Extra diagnostic detail beyond the library's generic message, since
+            // ValidatePathInfos discards the underlying Win32 error code entirely —
+            // this is the best available signal if source assignment is still wrong.
+            string attempted = string.Join("; ", rebuilt.Select(p =>
+                $"{p.TargetsInfo.First().DisplayTarget.FriendlyName ?? "?"}@source={p.DisplaySource.SourceId} pos=({p.Position.X},{p.Position.Y})"));
+            throw new InvalidOperationException(
+                $"Monitor restore failed CCD validation: {ex.Message} Attempted topology: {attempted}", ex);
+        }
 
         // Pattern 4/D-03: verify-and-throw — confirm the configured target is present
         // again and matches its stored position/primary designation.
