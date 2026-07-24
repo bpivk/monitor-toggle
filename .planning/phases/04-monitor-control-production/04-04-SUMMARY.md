@@ -107,3 +107,12 @@ None - no external service configuration required.
 ---
 *Phase: 04-monitor-control-production*
 *Completed: 2026-07-24*
+
+## Self-Check: PASSED
+
+- FOUND: src/RigToggle.App/MonitorConfirmDialog.cs
+- FOUND: src/RigToggle.App/MonitorConfirmDialog.Designer.cs
+- FOUND: .planning/phases/04-monitor-control-production/04-04-SUMMARY.md
+- FOUND commit: 40a934d
+- FOUND commit: 3b3a67e
+- FOUND commit: bbcb501
