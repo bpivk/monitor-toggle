@@ -1,3 +1,4 @@
+using System.Linq;
 using RigToggle.Core;
 using RigToggle.Core.Abstractions;
 
@@ -16,17 +17,20 @@ namespace RigToggle.App
         private readonly ToggleService _toggleService;
         private readonly IAppController _appController;
         private readonly ISettingsStore _settingsStore;
+        private readonly IMonitorController _monitorController;
         private readonly Func<SettingsForm> _settingsFormFactory;
 
         public MainForm(
             ToggleService toggleService,
             IAppController appController,
             ISettingsStore settingsStore,
+            IMonitorController monitorController,
             Func<SettingsForm> settingsFormFactory)
         {
             _toggleService = toggleService ?? throw new ArgumentNullException(nameof(toggleService));
             _appController = appController ?? throw new ArgumentNullException(nameof(appController));
             _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
+            _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
             _settingsFormFactory = settingsFormFactory ?? throw new ArgumentNullException(nameof(settingsFormFactory));
 
             InitializeComponent();
@@ -79,6 +83,30 @@ namespace RigToggle.App
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
                         return;
+                    }
+
+                    // DISPLAY-03 / D-01 / D-02: informed-consent confirmation naming the
+                    // monitor about to be disabled, durably suppressible via "don't ask
+                    // again" and reset whenever Settings changes the configured monitor
+                    // (04-RESEARCH.md Pattern 5).
+                    var settings = _settingsStore.Load();
+                    if (!settings.SkipMonitorConfirmation)
+                    {
+                        var monitor = _monitorController.GetActiveMonitors()
+                            .FirstOrDefault(m => m.DevicePath == settings.MonitorDevicePath);
+                        string name = monitor?.FriendlyName ?? "the configured monitor";
+
+                        using var confirmDialog = new MonitorConfirmDialog(name);
+                        if (confirmDialog.ShowDialog(this) != DialogResult.OK)
+                        {
+                            return; // user cancelled — nothing mutated
+                        }
+
+                        if (confirmDialog.DontAskAgain)
+                        {
+                            settings.SkipMonitorConfirmation = true;
+                            _settingsStore.Save(settings);
+                        }
                     }
 
                     _toggleService.ToggleToRigMode();
