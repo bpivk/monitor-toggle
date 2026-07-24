@@ -289,17 +289,19 @@ dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -p:PublishProfi
 | A2 | Preflight-guard exceptions (unconfigured settings, missing companion app path) should stay exception-based rather than folding into `ToggleResult` | Common Pitfalls #4, Open Questions | Medium — if the planner decides otherwise, `MainForm`'s existing tested error messages for these two cases need to be re-plumbed through the checklist UI instead of the generic catch block; not a correctness risk, but a scope/effort risk if assumed away. |
 | A3 | `IncludeNativeLibrariesForSelfExtract=true` is safe/desirable given this project's specific (managed-only) dependency set | Common Pitfalls #2, Code Examples | Low — verified via official docs that the flag's effect is scoped to native runtime components; this project's actual P/Invoke/COM calls target OS-provided DLLs already present on any Windows machine, unaffected by this flag either way. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Do preflight-guard failures (unconfigured settings / missing companion app path) belong in the `ToggleResult` checklist, or stay as separately-thrown/caught exceptions?**
    - What we know: CONTEXT.md's D-01/D-02/D-03 describe the checklist in terms of the 3 mutation steps (Monitor/Audio/App); the preflight guards are structurally *before* any step runs and already have well-crafted, tested user-facing messages (WR-01, D-05 from Phase 3).
    - What's unclear: CONTEXT.md doesn't explicitly say whether "not attempted" should ever cover the *entire* toggle (i.e., zero steps even started) versus only steps after a failure within an attempted sequence.
    - Recommendation: Keep preflight guards exception-based (unchanged), scope `ToggleResult` strictly to the 3 mutation steps. This keeps existing tested messages/behavior stable and matches the literal wording of D-01 ("Monitor: ... / Audio: ... / App: ..."). Planner should make this decision explicit in the plan rather than leaving it implicit.
+   - **RESOLVED:** Implemented in `05-01-PLAN.md` Task 2 — preflight guards (`IsFullyConfigured`, `File.Exists(CompanionAppPath)`, corrupted-snapshot check) remain exception-based; `ToggleResult` scoped strictly to the 3 mutation steps.
 
 2. **Should the `.pubxml`'s `RuntimeIdentifier` gap (Pitfall 1) be fixed by moving `RuntimeIdentifier` into the `.csproj`, or by always documenting explicit `-r win-x64 --self-contained true` CLI flags?**
    - What we know: Both fixes work; moving it to the `.csproj` is more robust (works regardless of invocation method) but is a slightly bigger csproj-surface-area change than CONTEXT.md's D-07 literally described ("Publish configuration lives in a `PublishProfiles/win-x64.pubxml`").
    - What's unclear: Whether the user considers "RuntimeIdentifier lives in the csproj, not the pubxml" still compliant with D-07's spirit (it is a publish-relevant property, just placed where it actually works) or a deviation worth flagging back to them.
    - Recommendation: Put `RuntimeIdentifier` in the `.csproj` (Code Examples above) — it's the more robust fix and D-07's "or equivalent PropertyGroup" phrasing already anticipates PropertyGroup-based configuration as an acceptable alternative. Document the reasoning inline (comment) so it isn't mistaken for scope creep.
+   - **RESOLVED:** Implemented in `05-03-PLAN.md` Task 1 — `RuntimeIdentifier` placed in `RigToggle.App.csproj`'s `PropertyGroup` (not only the `.pubxml`), with an inline comment explaining the CLI-vs-VS-Publish-dialog gap that necessitates it.
 
 ## Environment Availability
 
