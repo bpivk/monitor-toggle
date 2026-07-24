@@ -41,7 +41,7 @@ WinForms measures `Padding`/`Margin`/control size in pixels (logical pixels unde
 | 2xl | 48px | Not used in Phase 2 |
 | 3xl | 64px | Not used in Phase 2 |
 
-Exceptions: Button minimum height is 32px (Settings/Cancel) and 40px (Main window's Toggle button, primary action gets extra height for prominence — still an 8px multiple). No other exceptions.
+Exceptions: Button minimum height is 32px (Settings Save/Discard) and 40px (Main window's Toggle button, primary action gets extra height for prominence — still an 8px multiple). No other exceptions.
 
 ---
 
@@ -69,7 +69,7 @@ Per D-02, no custom colors are introduced anywhere. All surfaces use `SystemColo
 | Dominant (60%) | `SystemColors.Control` | Form background on both Main window and Settings dialog |
 | Secondary (30%) | `SystemColors.Window` | Input surfaces: `TextBox` background, `ComboBox` dropdown list background |
 | Accent (10%) | `SystemColors.Highlight` (applied automatically by Windows, not set explicitly by app code) | Reserved for OS-native focus rectangle / selected-item highlight only — e.g. a focused `Button`'s default-button glow, a selected `ComboBox` item. Never manually assigned by app code. |
-| Destructive | not used in Phase 2 | No destructive actions exist in this phase's scope (Save/Cancel are non-destructive; the monitor-disable confirmation dialog is Phase 4's DISPLAY-03, out of scope here) |
+| Destructive | not used in Phase 2 | No destructive actions exist in this phase's scope (Save Settings/Discard Changes are non-destructive; the monitor-disable confirmation dialog is Phase 4's DISPLAY-03, out of scope here) |
 
 Accent reserved for: the OS's own focus/selection rendering only (Tab-focus rectangle on buttons, selected item in the three device ComboBoxes). The app never sets a custom accent color on any control.
 
@@ -94,12 +94,12 @@ Accent reserved for: the OS's own focus/selection rendering only (Tab-focus rect
 | Audio Devices field labels | "Normal:" / "Rig:" |
 | App path field placeholder (empty state) | "No file selected" (shown in the read-only path TextBox before Browse is used) |
 | App path Browse button | "Browse…" |
-| Empty state — no displays enumerated | "No displays detected." (shown in place of the Monitor ComboBox's item list; Save stays disabled) |
-| Empty state — no playback devices enumerated | "No audio devices detected." (shown in place of either Audio ComboBox's item list; Save stays disabled) |
+| Empty state — no displays enumerated | "No displays detected." (shown in place of the Monitor ComboBox's item list; Save Settings stays disabled) |
+| Empty state — no playback devices enumerated | "No audio devices detected." (shown in place of either Audio ComboBox's item list; Save Settings stays disabled) |
 | Error/stale state (D-10, any of the 4 fields) | "Previously selected {monitor / audio device / application} not found — please reselect." (substitute the bracketed noun per field; picker itself resets to unselected) |
-| Settings dialog primary action | "Save" |
-| Settings dialog secondary action | "Cancel" |
-| Unexpected toggle failure (Phase 2 fake-adapter exception, basic guard only — full partial-failure reporting is Phase 5's CORE-04) | Modal message box, title "Rig Toggle", body: "Something went wrong while toggling. No changes were applied." |
+| Settings dialog primary action | "Save Settings" |
+| Settings dialog secondary action | "Discard Changes" |
+| Unexpected toggle failure (Phase 2 fake-adapter exception, basic guard only — full partial-failure reporting is Phase 5's CORE-04) | Modal message box, title "Rig Toggle", body: "Something went wrong while toggling. No changes were applied. Try again, or check Settings." |
 | Destructive confirmation | None in Phase 2 — no destructive action exists in this phase's scope (the primary-monitor-disable confirmation dialog is Phase 4's DISPLAY-03; do not build it here) |
 
 ---
@@ -143,8 +143,8 @@ Not applicable. WinForms has no npm-style component registry or shadcn-equivalen
   2. **"Audio Devices"** — two labeled `ComboBox` rows, "Normal:" and "Rig:" (real enumerated endpoints via NAudio `MMDeviceEnumerator` per D-05), each with its own inline warning row
   3. **"Application Path"** — read-only `TextBox` showing the selected path + "Browse…" `Button` opening `OpenFileDialog` filtered to `*.exe` (D-06), with its own inline warning row
   - Each warning row = `ErrorProvider` glyph (anchored to the field) + plain-text `Label` below the field, shown only when D-10's stale-selection condition is true; hidden and collapsed (not just blank) otherwise
-- Bottom button row, right-aligned: **Save** (primary, `DialogResult.OK`) then 8px gap then **Cancel** (secondary, `DialogResult.Cancel`)
-- Save `Enabled = false` until monitor, both audio devices, and app path are all validly selected (D-12); re-evaluate on every relevant control's change event
+- Bottom button row, right-aligned: **Save Settings** (primary, `DialogResult.OK`) then 8px gap then **Discard Changes** (secondary, `DialogResult.Cancel`)
+- Save Settings `Enabled = false` until monitor, both audio devices, and app path are all validly selected (D-12); re-evaluate on every relevant control's change event
 - All three pickers re-enumerate on every `Form.Load` — no manual Refresh control exists (D-11)
 
 ---
@@ -152,8 +152,8 @@ Not applicable. WinForms has no npm-style component registry or shadcn-equivalen
 ## Interaction / DialogResult Flow
 
 - **Open Settings:** Main's "Settings…" click → `new SettingsForm().ShowDialog(this)` → Main input blocked until the dialog closes (D-03)
-- **Settings → Save:** validate all 3 fields → persist via `SettingsStore` → `DialogResult.OK` → dialog closes → Main takes no further action immediately (per `ARCHITECTURE.md`: settings changes apply on the *next* toggle, never mid-flight)
-- **Settings → Cancel / close box:** `DialogResult.Cancel` → dialog closes, in-memory edits discarded, nothing persisted
+- **Settings → Save Settings:** validate all 3 fields → persist via `SettingsStore` → `DialogResult.OK` → dialog closes → Main takes no further action immediately (per `ARCHITECTURE.md`: settings changes apply on the *next* toggle, never mid-flight)
+- **Settings → Discard Changes / close box:** `DialogResult.Cancel` → dialog closes, in-memory edits discarded, nothing persisted
 - **Main → Toggle click:** invokes `ToggleService.ToggleToRigMode()` / `ToggleToNormalMode()` synchronously against the real enumeration + fake mutation adapters (D-08, D-13); on success, updates the mode indicator (D-14, derived from snapshot-file presence) and the companion-app status line (D-15); on an unexpected exception from a fake adapter, show the basic failure message box defined in the Copywriting Contract above — full per-step partial-failure reporting (CORE-04) is explicitly out of scope for Phase 2 and belongs to Phase 5
 - **Stale device on Settings reopen:** if a previously-saved monitor/audio device/app path is no longer found among the freshly re-enumerated options, the corresponding picker opens **unselected** with its inline warning shown (D-10) — never silently keeps a stale ID, never shows a greyed-out stale entry
 
