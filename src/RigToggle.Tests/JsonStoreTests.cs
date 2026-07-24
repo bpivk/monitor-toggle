@@ -93,7 +93,7 @@ public class JsonStoreTests : IDisposable
 
         Assert.False(store.Exists());
 
-        store.Save(new StateSnapshot(new MonitorState("\\\\?\\DISPLAY#PRIMARY"), new AudioState("device-id")));
+        store.Save(new StateSnapshot(new MonitorState("\\\\?\\DISPLAY#PRIMARY"), new AudioState(new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"))));
 
         Assert.True(store.Exists());
     }
@@ -103,7 +103,7 @@ public class JsonStoreTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "state.json");
         var store = new JsonSnapshotStore(path);
-        store.Save(new StateSnapshot(new MonitorState("\\\\?\\DISPLAY#PRIMARY"), new AudioState("device-id")));
+        store.Save(new StateSnapshot(new MonitorState("\\\\?\\DISPLAY#PRIMARY"), new AudioState(new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"))));
 
         store.Clear();
 
@@ -118,12 +118,31 @@ public class JsonStoreTests : IDisposable
 
         Assert.Null(store.Load());
 
-        var snapshot = new StateSnapshot(new MonitorState("\\\\?\\DISPLAY#PRIMARY"), new AudioState("device-id"));
+        var snapshot = new StateSnapshot(new MonitorState("\\\\?\\DISPLAY#PRIMARY"), new AudioState(new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device"), new AudioRoleState("device-id", "Fake Device")));
         store.Save(snapshot);
 
         var loaded = store.Load();
         Assert.NotNull(loaded);
         Assert.Equal(snapshot.Monitor.MonitorDevicePath, loaded!.Monitor.MonitorDevicePath);
-        Assert.Equal(snapshot.Audio.DefaultDeviceId, loaded.Audio.DefaultDeviceId);
+        Assert.Equal(snapshot.Audio.Console.DeviceId, loaded.Audio.Console.DeviceId);
+        Assert.Equal(snapshot.Audio.Multimedia.DeviceId, loaded.Audio.Multimedia.DeviceId);
+        Assert.Equal(snapshot.Audio.Communications.DeviceId, loaded.Audio.Communications.DeviceId);
+    }
+
+    [Fact]
+    public void SnapshotStore_Load_OnMalformedFile_ReturnsNullInsteadOfThrowing()
+    {
+        // Simulates a corrupted/truncated or otherwise malformed state.json (e.g. an
+        // interrupted write, or a genuinely stale/incompatible shape from a prior
+        // schema) — Load must treat this as "no snapshot" = normal mode rather than
+        // crashing on startup (Open Question 1, T-03-01).
+        var path = Path.Combine(_tempDir, "state.json");
+        Directory.CreateDirectory(_tempDir);
+        File.WriteAllText(path, "{not valid json");
+        var store = new JsonSnapshotStore(path);
+
+        var loaded = store.Load();
+
+        Assert.Null(loaded);
     }
 }

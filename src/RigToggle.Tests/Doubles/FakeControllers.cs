@@ -58,7 +58,8 @@ public sealed class FakeAudioController : IAudioController
     public AudioState CaptureState()
     {
         _callLog.Add("audio.CaptureState");
-        return new AudioState(_capturedDefaultDeviceId);
+        var roleState = new AudioRoleState(_capturedDefaultDeviceId, null);
+        return new AudioState(roleState, roleState, roleState);
     }
 
     public void SetDefault(string deviceId)
@@ -68,7 +69,7 @@ public sealed class FakeAudioController : IAudioController
 
     public void Restore(AudioState previousState)
     {
-        _callLog.Add($"audio.Restore:{previousState.DefaultDeviceId}");
+        _callLog.Add($"audio.Restore:{previousState.Multimedia.DeviceId}");
     }
 }
 
