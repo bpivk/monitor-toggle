@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <!--
+      UseWindowsForms is enabled solely to unlock System.Windows.Forms.Screen.AllScreens
+      as an independent, second verification oracle for the display-detach check.
+      This does NOT make this a GUI app — it remains a plain console tool; a console
+      app can reference WinForms types purely for their static APIs.
+    -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Intentionally no elevation manifest element of any kind: this keeps the tool asInvoker (D-08) -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WindowsDisplayAPI" Version="1.3.0.13" />
+  </ItemGroup>
+
+</Project>
