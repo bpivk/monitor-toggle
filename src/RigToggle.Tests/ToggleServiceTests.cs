@@ -13,6 +13,11 @@ namespace RigToggle.Tests;
 /// </summary>
 public class ToggleServiceTests
 {
+    // ToggleToRigMode now preflight-checks File.Exists(CompanionAppPath) (D-05) — the
+    // happy-path fixture must point at a path that actually exists on the test host, so
+    // create a real (empty) temp file rather than the fictional Program Files path.
+    private static readonly string ExistingCompanionAppPath = Path.GetTempFileName();
+
     private static readonly AppSettings ConfiguredSettings = new()
     {
         MonitorDevicePath = "\\\\?\\DISPLAY#PRIMARY",
@@ -21,7 +26,7 @@ public class ToggleServiceTests
         NormalAudioDeviceName = "Headset",
         RigAudioDeviceId = "rig-device-id",
         RigAudioDeviceName = "Rig Speakers",
-        CompanionAppPath = @"C:\Program Files\Moza\MozaCompanion.exe",
+        CompanionAppPath = ExistingCompanionAppPath,
     };
 
     private static (ToggleService Service, List<string> CallLog, InMemorySnapshotStore SnapshotStore) CreateService(
@@ -100,5 +105,26 @@ public class ToggleServiceTests
 
         Assert.Contains(callLog, entry => entry.StartsWith("audio.Restore:"));
         Assert.DoesNotContain(callLog, entry => entry.StartsWith("audio.SetDefault"));
+    }
+
+    [Fact]
+    public void ToggleToRigMode_Throws_WhenCompanionAppPathDoesNotExist()
+    {
+        // AppSettings is a class, not a record — `with { ... }` does not compile here,
+        // so build a fresh object-initializer copy instead (D-05 regression, 03-PATTERNS.md).
+        var settings = new AppSettings
+        {
+            MonitorDevicePath = ConfiguredSettings.MonitorDevicePath,
+            MonitorFriendlyName = ConfiguredSettings.MonitorFriendlyName,
+            NormalAudioDeviceId = ConfiguredSettings.NormalAudioDeviceId,
+            NormalAudioDeviceName = ConfiguredSettings.NormalAudioDeviceName,
+            RigAudioDeviceId = ConfiguredSettings.RigAudioDeviceId,
+            RigAudioDeviceName = ConfiguredSettings.RigAudioDeviceName,
+            CompanionAppPath = @"C:\nonexistent\MozaCompanion.exe",
+        };
+        var (service, callLog, _) = CreateService(settings);
+
+        Assert.Throws<InvalidOperationException>(() => service.ToggleToRigMode());
+        Assert.DoesNotContain(callLog, entry => entry.StartsWith("snapshot.Save"));
     }
 }
