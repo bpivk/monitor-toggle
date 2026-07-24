@@ -76,7 +76,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   1. Toggling to rig mode disables the configured primary monitor at the OS level (true CCD-style disconnect, confirmed removed from display enumeration, not just powered off)
   2. Toggling back to normal mode re-enables the primary monitor restored to its exact prior configuration (position, primary designation, orientation)
   3. Before disabling the primary monitor, the app shows a confirmation dialog naming the monitor about to be disabled
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 04-01-PLAN.md — De-risk: extend spike tool with repositioning-aware `--disable-primary` mode (RESEARCH Pattern 1) + rig re-test checkpoint resolving Assumption A1/A2 (DISPLAY-01/02)
+- [ ] 04-02-PLAN.md — Reshape MonitorState into a full-topology JSON-serializable snapshot + no-param CaptureState + real full-topology capture + ripple to consumers/tests (DISPLAY-02)
+- [ ] 04-03-PLAN.md — Real CCD Disable (repositioning) + Restore (live-identity re-resolution), both verify-and-throw; end-to-end rig verification checkpoint (DISPLAY-01/02)
+- [ ] 04-04-PLAN.md — DISPLAY-03 confirmation dialog (custom checkbox Form, "don't ask again" persisted flag with monitor-change reset) + MainForm/Settings wiring (DISPLAY-03)
+
+> Execution boundary: this Linux sandbox cannot build/run net10.0-windows code. Plans produce source only; DISPLAY-01/02/03 hardware behavior is gated on the USER running the app/spike on the rig PC (blocking human-verify checkpoints in Plans 01 and 03).
 
 ### Phase 5: Orchestration, Full Toggle & Packaging
 **Goal**: The complete toggle — monitor, audio, and companion app together — works reliably in both directions from a single GUI action, survives a crash while in rig mode, reports partial failures honestly, and ships as a standalone .exe.
@@ -101,5 +107,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Monitor-Disable Feasibility Spike | 2/2 | Complete   | 2026-07-24 |
 | 2. Foundations & GUI Shell | 5/5 | Complete   | 2026-07-24 |
 | 3. App & Audio Control | 4/4 | Complete   | 2026-07-24 |
-| 4. Monitor Control (Production) | 0/TBD | Not started | - |
+| 4. Monitor Control (Production) | 0/4 | Not started | - |
 | 5. Orchestration, Full Toggle & Packaging | 0/TBD | Not started | - |
