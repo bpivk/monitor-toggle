@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!--
+      D-08 structural enforcement: RigToggle.Core has ZERO Windows API references.
+      Do NOT add a PackageReference to WindowsDisplayAPI or NAudio here, and do NOT
+      set UseWindowsForms — any such addition is a regression (02-RESEARCH.md line 101).
+    -->
+  </PropertyGroup>
+
+</Project>
