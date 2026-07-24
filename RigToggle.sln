@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RigToggle.App", "src\RigTog
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RigToggle.Tests", "src\RigToggle.Tests\RigToggle.Tests.csproj", "{B69E55AF-87E4-4C7F-8DEE-59604DAE6A1E}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RigToggle.Windows.Tests", "src\RigToggle.Windows.Tests\RigToggle.Windows.Tests.csproj", "{AEB4AE36-EB83-4697-B2EA-FF2C6FEC3E2B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{B69E55AF-87E4-4C7F-8DEE-59604DAE6A1E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B69E55AF-87E4-4C7F-8DEE-59604DAE6A1E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B69E55AF-87E4-4C7F-8DEE-59604DAE6A1E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AEB4AE36-EB83-4697-B2EA-FF2C6FEC3E2B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AEB4AE36-EB83-4697-B2EA-FF2C6FEC3E2B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AEB4AE36-EB83-4697-B2EA-FF2C6FEC3E2B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AEB4AE36-EB83-4697-B2EA-FF2C6FEC3E2B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

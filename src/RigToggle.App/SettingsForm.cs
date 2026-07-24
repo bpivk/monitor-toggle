@@ -163,7 +163,7 @@ namespace RigToggle.App
                     var match = items.FirstOrDefault(i => i.Id == savedId);
                     if (match is not null)
                     {
-                        combo.SelectedItem = new PickerItem(match.Id, match.DisplayLabel);
+                        combo.SelectedItem = match;
                     }
                     else
                     {
@@ -252,10 +252,19 @@ namespace RigToggle.App
             // display; preserve the prior value when the monitor is unchanged.
             bool monitorChanged = _settings.MonitorDevicePath != monitorItem.Id;
 
+            // MonitorFriendlyName is documented display-cache only — store the raw
+            // FriendlyName, not monitorItem.DisplayLabel, which carries the ComboBox's
+            // rendered "(Primary)" suffix and would permanently read "... (Primary)"
+            // even after the monitor stops being primary. Re-resolve from the live
+            // controller rather than trusting the picker's rendered label.
+            string rawMonitorFriendlyName = _monitorController.GetActiveMonitors()
+                .FirstOrDefault(m => m.DevicePath == monitorItem.Id)?.FriendlyName
+                ?? monitorItem.DisplayLabel;
+
             var settingsToSave = new AppSettings
             {
                 MonitorDevicePath = monitorItem.Id,
-                MonitorFriendlyName = monitorItem.DisplayLabel,
+                MonitorFriendlyName = rawMonitorFriendlyName,
                 NormalAudioDeviceId = audioNormalItem.Id,
                 NormalAudioDeviceName = audioNormalItem.DisplayLabel,
                 RigAudioDeviceId = audioRigItem.Id,

@@ -116,6 +116,19 @@ public sealed class WindowsMonitorController : IMonitorController
 
         PathInfo[] survivors = currentPaths.Where(p => p != targetPath).ToArray();
 
+        if (survivors.Length == 0)
+        {
+            // ApplyPathInfos would call ValidatePathInfos on an empty array and throw a
+            // generic PathChangeException("Invalid paths information.") with no
+            // indication of the actual cause (validation fails before any native
+            // mutation — this does NOT blank the screen, but the error is useless).
+            // Reachable in production: rig monitor unplugged/off, or a laptop with only
+            // its built-in display, when Switch to Rig Mode is pressed.
+            throw new InvalidOperationException(
+                $"Cannot disable '{monitorDevicePath}' — it is currently the only active " +
+                "display. Connect and enable another display before switching to Rig Mode.");
+        }
+
         PathInfo[] pathsToApply;
         if (targetPath.IsGDIPrimary && survivors.Length > 0)
         {
@@ -257,27 +270,23 @@ public sealed class WindowsMonitorController : IMonitorController
         // information.") from SetDisplayConfig's validation, most likely because that
         // reported source collided with the source the still-active survivor monitor
         // is already using (two paths cannot legally share one source). Reserve every
-        // ACTIVE target's own (correct, currently-in-use) source first, then assign
-        // each INACTIVE target the first source not already reserved.
+        // CURRENTLY ACTIVE path's source system-wide first (not just ones present in
+        // this restore's snapshot — a monitor plugged in after the snapshot was
+        // captured is still live and its source still off-limits), then assign each
+        // INACTIVE target the first source not already reserved.
         var usedSources = new HashSet<PathDisplaySource>(
-            resolved.Where(r => r.LiveTarget.IsPathActive).Select(r => r.LiveMatch.DisplaySource));
+            PathInfo.GetActivePaths(virtualModeAware: false).Select(p => p.DisplaySource));
         PathDisplaySource[] allSources = PathDisplaySource.GetDisplaySources();
 
         var rebuilt = new List<PathInfo>();
         foreach (var (snap, liveMatch, liveTarget) in resolved)
         {
-            PathDisplaySource sourceToUse;
-            if (liveTarget.IsPathActive)
-            {
-                sourceToUse = liveMatch.DisplaySource;
-            }
-            else
-            {
-                sourceToUse = allSources.FirstOrDefault(s => !usedSources.Contains(s))
-                    ?? throw new InvalidOperationException(
-                        $"Cannot restore '{snap.FriendlyName}' ({snap.DevicePath}) — no free display source available.");
-                usedSources.Add(sourceToUse);
-            }
+            PathDisplaySource sourceToUse = AssignSource(
+                liveTarget.IsPathActive,
+                liveMatch.DisplaySource,
+                usedSources,
+                allSources,
+                $"Cannot restore '{snap.FriendlyName}' ({snap.DevicePath})");
 
             var reconstructedTarget = new PathTargetInfo(
                 liveTarget.DisplayTarget,
@@ -348,7 +357,12 @@ public sealed class WindowsMonitorController : IMonitorController
     // constructor overload). Throws rather than silently leaving the wrong value if
     // the library's compiled field name ever changes, so a future failure here is
     // loud instead of silently reproducing this same bug.
-    private static void CopyOutputTechnology(PathTargetInfo target, DisplayConfigVideoOutputTechnology technology)
+    // Internal (not private) + tested directly (RigToggle.Windows.Tests, see
+    // InternalsVisibleTo below) — this is the one piece of Restore()'s reconstruction
+    // logic that's fully unit-testable without live display hardware, and a routine
+    // WindowsDisplayAPI package upgrade could silently reintroduce this exact bug
+    // (04-03 SUMMARY.md WR-05) if nothing catches it before the rig does.
+    internal static void CopyOutputTechnology(PathTargetInfo target, DisplayConfigVideoOutputTechnology technology)
     {
         var field = typeof(PathTargetInfo).GetField(
             "<OutputTechnology>k__BackingField",
@@ -361,5 +375,28 @@ public sealed class WindowsMonitorController : IMonitorController
         }
 
         field.SetValue(target, technology);
+    }
+
+    // Pure, testable extraction of Restore()'s fallback source-assignment rule (WR-02
+    // fix, pinned by RigToggle.Windows.Tests): an already-ACTIVE target keeps its own
+    // (correct, currently-in-use) source; an INACTIVE target gets the first source not
+    // already reserved in usedSources — mutating usedSources as sources are claimed, so
+    // sequential calls across multiple targets don't double-assign the same source.
+    internal static PathDisplaySource AssignSource(
+        bool isPathActive,
+        PathDisplaySource ownSource,
+        HashSet<PathDisplaySource> usedSources,
+        IReadOnlyList<PathDisplaySource> allSources,
+        string errorContext)
+    {
+        if (isPathActive)
+        {
+            return ownSource;
+        }
+
+        PathDisplaySource sourceToUse = allSources.FirstOrDefault(s => !usedSources.Contains(s))
+            ?? throw new InvalidOperationException($"{errorContext} — no free display source available.");
+        usedSources.Add(sourceToUse);
+        return sourceToUse;
     }
 }
