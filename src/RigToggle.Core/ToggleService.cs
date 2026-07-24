@@ -96,15 +96,17 @@ public sealed class ToggleService
     /// companion app if running, then clears the snapshot last so IsInRigMode() flips
     /// back to false.
     ///
-    /// Gap-closure 03-04 (AUDIO-02 recovery / APP-03 reachability, T-03-04-02): the
-    /// restore calls are wrapped in a try/catch that does not re-throw, because a partial
-    /// restore failure (e.g. a captured device is gone and the underlying controller
-    /// still throws after its own best-effort fallback) must never prevent
-    /// MinimizeIfRunning or the snapshot Clear below from running — otherwise the app
-    /// would be permanently stuck reporting Rig mode with no automatic recovery. This
-    /// try/catch is intentionally scoped to ToggleToNormalMode's restore block only;
-    /// ToggleToRigMode's forward SetDefault path is untouched and keeps bubbling
-    /// failures per D-04.
+    /// Monitor restore is NOT swallowed (04-CONTEXT.md D-05): a failed monitor restore
+    /// leaves the user's screen disabled, so the exception must bubble to MainForm's
+    /// existing handler, and the snapshot must survive the failure so a retry has the
+    /// exact prior state to restore from. Clearing the snapshot on a failed monitor
+    /// restore would silently and permanently discard the only copy of that state.
+    ///
+    /// Gap-closure 03-04 (AUDIO-02 recovery / APP-03 reachability, T-03-04-02): audio
+    /// restore keeps its original swallow-and-continue behavior — a genuinely-gone
+    /// audio device (unplugged) can never succeed on retry, so MinimizeIfRunning and
+    /// Clear must still run afterward instead of getting permanently stuck. This does
+    /// NOT apply to the monitor restore path above it.
     /// </summary>
     public void ToggleToNormalMode()
     {
@@ -113,16 +115,15 @@ public sealed class ToggleService
 
         if (snapshot is not null)
         {
+            _monitorController.Restore(snapshot.Monitor);
+
             try
             {
-                _monitorController.Restore(snapshot.Monitor);
                 _audioController.Restore(snapshot.Audio);
             }
             catch (Exception)
             {
-                // Intentionally swallowed (gap-closure 03-04): MinimizeIfRunning and
-                // Clear below MUST still run so the app self-recovers to normal mode
-                // instead of getting stuck reporting Rig mode.
+                // Intentionally swallowed (gap-closure 03-04): see class-level remarks.
             }
         }
 
