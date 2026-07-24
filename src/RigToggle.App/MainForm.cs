@@ -114,13 +114,17 @@ namespace RigToggle.App
 
                 RefreshUi();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 // Basic guard only (D-13/T-02-FAKEFAIL) — full per-step CORE-04 partial-failure
-                // reporting is out of scope until Phase 5.
+                // reporting is out of scope until Phase 5. Exception detail is included
+                // (not just a generic message) because this is a single-user diagnostic
+                // tool, not a hardened multi-user app — surfacing the real error is more
+                // useful than hiding it, especially for CCD-mutation failures that are
+                // otherwise unreproducible without rig hardware.
                 MessageBox.Show(
                     this,
-                    "Something went wrong while toggling. No changes were applied. Try again, or check Settings.",
+                    $"Something went wrong while toggling:\n\n{ex.GetType().Name}: {ex.Message}\n\nTry again, or check Settings.",
                     "Rig Toggle",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
