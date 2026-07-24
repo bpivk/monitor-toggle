@@ -102,43 +102,81 @@ public sealed class WindowsAudioController : IAudioController
 
     // D-01: applies deviceId to all three Windows audio roles, never just one
     // (03-RESEARCH.md Anti-Patterns explicitly forbids an eConsole-only switch).
-    // Each role cycle creates a fresh PolicyConfigClient, releases it in a finally
-    // (Pitfall C — never cache across cycles), then re-verifies via NAudio and throws
-    // on mismatch (D-03/D-04) rather than trusting the HRESULT alone (Pitfall 6).
     private void SetDefaultForAllRoles(string deviceId)
     {
         foreach (var (nativeRole, managedRole) in Roles)
         {
-            var client = (IPolicyConfig)new PolicyConfigClient();
-            try
-            {
-                int hr = client.SetDefaultEndpoint(deviceId, nativeRole);
-                if (hr != 0) // S_OK
-                {
-                    throw new InvalidOperationException(
-                        $"SetDefaultEndpoint failed for role {nativeRole} (HRESULT 0x{hr:X8}).");
-                }
-            }
-            finally
-            {
-                Marshal.ReleaseComObject(client); // release every cycle — Pitfall 5/C COM leak
-            }
-
-            // D-03/D-04: verify-and-throw, not trust-the-HRESULT (Pitfall 6)
-            using var enumerator = new MMDeviceEnumerator();
-            using var actual = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, managedRole);
-            if (!string.Equals(actual.ID, deviceId, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException(
-                    $"Audio default for role {managedRole} did not change to the requested " +
-                    $"device after SetDefaultEndpoint (expected '{deviceId}', got '{actual.ID}').");
-            }
+            ApplyAndVerify(nativeRole, managedRole, deviceId);
         }
     }
 
+    // D-02/AUDIO-02: restores each per-role snapshot captured by CaptureState, resolving
+    // by DeviceId first and falling back to a live friendly-name match when the saved ID
+    // is missing (Pitfall 4 — a device may have been unplugged/replaced since capture,
+    // but a name match is still a reasonable match). A role with neither a usable ID nor
+    // a resolvable name is skipped rather than failing the whole restore.
     public void Restore(AudioState previousState)
     {
-        // FAKE in Phase 2 — no-op. Real IPolicyConfig COM interop restore lands in Phase 3.
+        var snapshots = new (ERole Native, Role Managed, AudioRoleState Snapshot)[]
+        {
+            (ERole.eConsole, Role.Console, previousState.Console),
+            (ERole.eMultimedia, Role.Multimedia, previousState.Multimedia),
+            (ERole.eCommunications, Role.Communications, previousState.Communications),
+        };
+
+        foreach (var (nativeRole, managedRole, snapshot) in snapshots)
+        {
+            string? deviceId = snapshot.DeviceId;
+
+            if (string.IsNullOrEmpty(deviceId) && !string.IsNullOrEmpty(snapshot.DeviceName))
+            {
+                deviceId = GetPlaybackDevices()
+                    .FirstOrDefault(d => string.Equals(d.FriendlyName, snapshot.DeviceName, StringComparison.OrdinalIgnoreCase))
+                    ?.Id;
+            }
+
+            if (string.IsNullOrEmpty(deviceId))
+            {
+                // Neither a usable ID nor a resolvable friendly name — skip this role
+                // rather than aborting restore of the other two.
+                continue;
+            }
+
+            ApplyAndVerify(nativeRole, managedRole, deviceId);
+        }
+    }
+
+    // Shared by SetDefault and Restore (D-01/D-02/D-03/D-04): creates a fresh
+    // PolicyConfigClient, calls SetDefaultEndpoint for the given role, releases the COM
+    // object in a finally (Pitfall C/5 — never cache across cycles), then re-verifies the
+    // actual default via NAudio and throws InvalidOperationException on mismatch instead
+    // of trusting the HRESULT alone (Pitfall 6).
+    private static void ApplyAndVerify(ERole nativeRole, Role managedRole, string deviceId)
+    {
+        var client = (IPolicyConfig)new PolicyConfigClient();
+        try
+        {
+            int hr = client.SetDefaultEndpoint(deviceId, nativeRole);
+            if (hr != 0) // S_OK
+            {
+                throw new InvalidOperationException(
+                    $"SetDefaultEndpoint failed for role {nativeRole} (HRESULT 0x{hr:X8}).");
+            }
+        }
+        finally
+        {
+            Marshal.ReleaseComObject(client); // release every cycle — Pitfall 5/C COM leak
+        }
+
+        // D-03/D-04: verify-and-throw, not trust-the-HRESULT (Pitfall 6)
+        using var enumerator = new MMDeviceEnumerator();
+        using var actual = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, managedRole);
+        if (!string.Equals(actual.ID, deviceId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Audio default for role {managedRole} did not change to the requested " +
+                $"device after SetDefaultEndpoint (expected '{deviceId}', got '{actual.ID}').");
+        }
     }
 
     /// <summary>
