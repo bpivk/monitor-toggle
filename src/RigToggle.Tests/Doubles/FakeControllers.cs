@@ -42,11 +42,16 @@ public sealed class FakeAudioController : IAudioController
 {
     private readonly List<string> _callLog;
     private readonly string? _capturedDefaultDeviceId;
+    private readonly bool _throwOnRestore;
 
-    public FakeAudioController(List<string> callLog, string? capturedDefaultDeviceId = "fake-normal-device")
+    public FakeAudioController(
+        List<string> callLog,
+        string? capturedDefaultDeviceId = "fake-normal-device",
+        bool throwOnRestore = false)
     {
         _callLog = callLog;
         _capturedDefaultDeviceId = capturedDefaultDeviceId;
+        _throwOnRestore = throwOnRestore;
     }
 
     public IReadOnlyList<AudioDeviceInfo> GetPlaybackDevices()
@@ -70,6 +75,14 @@ public sealed class FakeAudioController : IAudioController
     public void Restore(AudioState previousState)
     {
         _callLog.Add($"audio.Restore:{previousState.Multimedia.DeviceId}");
+
+        if (_throwOnRestore)
+        {
+            // Gap-closure 03-04: simulates a role whose captured device is gone,
+            // surfacing as an uncaught InvalidOperationException from Restore — proves
+            // ToggleToNormalMode still minimizes + clears even when this throws.
+            throw new InvalidOperationException("Fake audio restore failure (simulated stale/missing device).");
+        }
     }
 }
 
