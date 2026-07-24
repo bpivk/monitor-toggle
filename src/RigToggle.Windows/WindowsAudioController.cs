@@ -20,7 +20,12 @@ public sealed class WindowsAudioController : IAudioController
 
         foreach (MMDevice device in enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active))
         {
-            result.Add(new AudioDeviceInfo(device.ID, device.FriendlyName));
+            // WR-03: each MMDevice wraps a native/COM IMMDevice reference that must be
+            // disposed individually — the enumerator's own `using` above does not cover it.
+            using (device)
+            {
+                result.Add(new AudioDeviceInfo(device.ID, device.FriendlyName));
+            }
         }
 
         return result;
@@ -34,7 +39,7 @@ public sealed class WindowsAudioController : IAudioController
         try
         {
             using var enumerator = new MMDeviceEnumerator();
-            MMDevice defaultDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            using MMDevice defaultDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
             return new AudioState(defaultDevice.ID);
         }
         catch (Exception)
@@ -72,7 +77,7 @@ public sealed class WindowsAudioController : IAudioController
         try
         {
             using var enumerator = new MMDeviceEnumerator();
-            MMDevice? device = enumerator.GetDevice(deviceId);
+            using MMDevice? device = enumerator.GetDevice(deviceId);
             return device is null ? null : new AudioDeviceInfo(device.ID, device.FriendlyName);
         }
         catch (Exception)

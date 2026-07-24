@@ -28,7 +28,21 @@ public sealed class WindowsAppController : IAppController
             return false;
         }
 
-        return Process.GetProcessesByName(processName).Length > 0;
+        var processes = Process.GetProcessesByName(processName);
+        try
+        {
+            return processes.Length > 0;
+        }
+        finally
+        {
+            // Process.GetProcessesByName hands back IDisposable Process objects wrapping
+            // native handles (WR-02) — dispose every one, not just the ones we happened
+            // to read .Length from.
+            foreach (var p in processes)
+            {
+                p.Dispose();
+            }
+        }
     }
 
     public void LaunchOrFocus(string companionAppPath)

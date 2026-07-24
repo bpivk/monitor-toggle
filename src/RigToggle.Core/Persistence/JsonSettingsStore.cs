@@ -31,8 +31,23 @@ public sealed class JsonSettingsStore : ISettingsStore
             return new AppSettings();
         }
 
-        var json = File.ReadAllText(_path);
-        return JsonSerializer.Deserialize<AppSettings>(json, Options) ?? new AppSettings();
+        try
+        {
+            var json = File.ReadAllText(_path);
+            return JsonSerializer.Deserialize<AppSettings>(json, Options) ?? new AppSettings();
+        }
+        catch (JsonException)
+        {
+            // Malformed/truncated/hand-edited settings.json (SETTINGS-04, T-02-CORRUPT) —
+            // degrade to a fresh "never configured" AppSettings rather than crash the app.
+            return new AppSettings();
+        }
+        catch (IOException)
+        {
+            // Read interrupted (e.g. antivirus lock, 0-byte file mid-write) — same
+            // degrade-to-fresh-settings behavior as the malformed-JSON case.
+            return new AppSettings();
+        }
     }
 
     public void Save(AppSettings settings)
