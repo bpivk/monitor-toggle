@@ -21,10 +21,12 @@ public sealed class FakeMonitorController : IMonitorController
         return new List<MonitorInfo> { new("\\\\?\\DISPLAY#FAKE", "Fake Monitor", true) };
     }
 
-    public MonitorState CaptureState(string monitorDevicePath)
+    public MonitorState CaptureState()
     {
-        _callLog.Add($"monitor.CaptureState:{monitorDevicePath}");
-        return new MonitorState(monitorDevicePath);
+        _callLog.Add("monitor.CaptureState");
+        return new MonitorState(
+            new List<MonitorPathSnapshot> { new("\\\\?\\DISPLAY#FAKE", "Fake Monitor", 0, 0, 1920, 1080, 0, 0, 0, 0, 60000UL, 0, true) },
+            "\\\\?\\DISPLAY#FAKE");
     }
 
     public void Disable(string monitorDevicePath)
@@ -34,7 +36,7 @@ public sealed class FakeMonitorController : IMonitorController
 
     public void Restore(MonitorState previousState)
     {
-        _callLog.Add($"monitor.Restore:{previousState.MonitorDevicePath}");
+        _callLog.Add($"monitor.Restore:{previousState.TargetDevicePath}");
     }
 }
 
