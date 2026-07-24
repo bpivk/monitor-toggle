@@ -222,17 +222,46 @@ namespace RigToggle.App
                && File.Exists(path)
                && string.Equals(Path.GetExtension(path), ".exe", StringComparison.OrdinalIgnoreCase);
 
-        // Browse (D-06) and Save/persist (SETTINGS-03) wiring is implemented in
-        // the Task 3 portion of this file — see the region below.
-
         private void BtnBrowse_Click(object? sender, EventArgs e)
         {
-            // Filled in by Task 3.
+            // D-06: file-browser dialog filtered to *.exe (Filter configured in the Designer).
+            if (dlgOpenExe.ShowDialog(this) == DialogResult.OK)
+            {
+                errApp.SetError(txtAppPath, string.Empty);
+                lblAppWarning.Visible = false;
+                txtAppPath.Text = dlgOpenExe.FileName;
+                ValidateSettingsForm();
+            }
         }
 
         private void BtnSaveSettings_Click(object? sender, EventArgs e)
         {
-            // Filled in by Task 3.
+            var monitorItem = cboMonitor.SelectedItem as PickerItem;
+            var audioNormalItem = cboAudioNormal.SelectedItem as PickerItem;
+            var audioRigItem = cboAudioRig.SelectedItem as PickerItem;
+
+            // Defensive guard only — btnSaveSettings.Enabled (D-12) should make this
+            // unreachable via the UI, but never persist a partial/invalid selection.
+            if (monitorItem is null || audioNormalItem is null || audioRigItem is null || !IsValidExePath(txtAppPath.Text))
+            {
+                return;
+            }
+
+            var settingsToSave = new AppSettings
+            {
+                MonitorDevicePath = monitorItem.Id,
+                MonitorFriendlyName = monitorItem.DisplayLabel,
+                NormalAudioDeviceId = audioNormalItem.Id,
+                NormalAudioDeviceName = audioNormalItem.DisplayLabel,
+                RigAudioDeviceId = audioRigItem.Id,
+                RigAudioDeviceName = audioRigItem.DisplayLabel,
+                CompanionAppPath = txtAppPath.Text,
+            };
+
+            // Persist before the declarative DialogResult.OK closes the dialog.
+            // Discard/close requires no handler — CancelButton wiring (constructor)
+            // produces DialogResult.Cancel with nothing persisted.
+            _settingsStore.Save(settingsToSave);
         }
     }
 }
