@@ -13,16 +13,17 @@ A single reliable action that disables the primary monitor (not just powers it o
 ### Validated
 
 - [x] GUI includes a settings view where the user selects: which monitor is the "primary to disable," which audio devices are the toggle pair, and which app (path) to launch/minimize — Validated in Phase 2: Foundations & GUI Shell (real enumeration wired into a modal Settings dialog with Save-gating, stale-device detection, and persistence confirmed across a true app restart on the rig)
+- [x] Toggling to rig mode switches the default audio output device to the rig speakers — Validated in Phase 3: App & Audio Control (real hand-embedded `IPolicyConfig` COM interop, all three audio roles, verify-and-throw on mismatch)
+- [x] Toggling back restores the exact previous default audio device across all relevant audio roles — Validated in Phase 3 (per-role capture + restore, stale-device-ID fallback via friendly-name match, per-role failure isolation added in gap-closure plan 03-04)
+- [x] Toggling to rig mode launches the Moza Companion app if it isn't already running; if it's already running, brings it to focus instead of launching a duplicate instance — Validated in Phase 3 (real Win32 P/Invoke: `Process.Start` + window-handle poll on fresh launch, `SetForegroundWindow` on already-running)
+- [x] Toggling back minimizes the Moza Companion app window (best-effort) — Validated in Phase 3 (`ShowWindow`/`SW_MINIMIZE`, always runs even if audio restore throws)
 
 ### Active
 
 - [ ] User can toggle from normal mode to rig mode in one action from a GUI window
 - [ ] Toggling to rig mode disables the primary monitor at the OS level (true disable, e.g. via Windows CCD/display API or MultiMonitorTool-equivalent — not just a DDC/CI power-off, since Windows must see only the rig monitor)
-- [ ] Toggling to rig mode switches the default audio output device to the rig speakers
-- [ ] Toggling to rig mode launches the Moza Companion app if it isn't already running; if it's already running, brings it to focus instead of launching a duplicate instance
+- [ ] Toggling back restores the exact monitor configuration that was active immediately before toggling to rig mode (not a fixed hardcoded preset) — monitor side still pending Phase 4; audio side validated in Phase 3
 - [ ] User can toggle back from rig mode to normal mode in one action
-- [ ] Toggling back restores the exact monitor and audio configuration that was active immediately before toggling to rig mode (not a fixed hardcoded preset)
-- [ ] Toggling back minimizes the Moza Companion app window (best-effort — true "close window but keep process alive" only if the app itself supports minimize-to-tray-on-close; otherwise just minimize)
 - [ ] Distributed as a standalone Windows .exe (no separate runtime install required to run it)
 
 ### Out of Scope
@@ -51,10 +52,10 @@ A single reliable action that disables the primary monitor (not just powers it o
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | True OS-level monitor disable, not power-off | Games must see only one display; power-off doesn't remove it from Windows' display list | — Pending |
-| Remember-previous-state restore, not a fixed "normal" preset | Toggle-back should always match whatever was actually active before, avoiding surprises | — Pending |
+| Remember-previous-state restore, not a fixed "normal" preset | Toggle-back should always match whatever was actually active before, avoiding surprises | Audio side validated Phase 3 — Pending for monitor (Phase 4) |
 | Standalone .exe packaging | No runtime-install friction — just run the file | — Pending |
 | Manual launch only, no autostart/tray/hotkey in v1 | Keep v1 scope tight; these are easy additions later if wanted | — Pending |
-| Best-effort minimize instead of guaranteed close-without-kill for Moza Companion | Can't be forced externally unless the target app supports it itself | — Pending |
+| Best-effort minimize instead of guaranteed close-without-kill for Moza Companion | Can't be forced externally unless the target app supports it itself | Validated Phase 3 |
 
 ## Evolution
 
@@ -74,4 +75,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-24 — Phase 2 complete*
+*Last updated: 2026-07-24 — Phase 3 complete*
