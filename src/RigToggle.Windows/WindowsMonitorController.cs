@@ -143,9 +143,66 @@ public sealed class WindowsMonitorController : IMonitorController
         }
     }
 
+    // Real live-identity-reconstruction CCD restore (04-RESEARCH.md Pattern 4) +
+    // verify-and-throw (D-03). Identity objects (PathDisplaySource/PathDisplayTarget)
+    // are always re-resolved live via GetAllPaths() matched on the stable stored
+    // DevicePath — never reconstructed from a persisted, session-scoped LUID. Mode/
+    // signal values (position/resolution/pixel format/rotation/scaling/frequency/scan-
+    // line ordering) come from the STORED snapshot, never from an inactive live path's
+    // own TargetsInfo (Pitfall 2 — Microsoft docs: inactive-path mode/signal info is
+    // "set to default values"). A missing live match throws rather than silently
+    // skipping (Pitfall 5). Never uses the WinForms screen-enumeration API as the
+    // oracle (D-04) and never attempts an automatic rollback on verification failure
+    // (D-05).
     public void Restore(MonitorState previousState)
     {
-        // FAKE — pending Task 2. Real PathInfo.GetAllPaths()-based live-identity
-        // restore (04-RESEARCH.md Pattern 4) lands in the next commit of this plan.
+        PathInfo[] liveAllPaths = PathInfo.GetAllPaths(virtualModeAware: false);
+
+        var rebuilt = new List<PathInfo>();
+        foreach (MonitorPathSnapshot snap in previousState.Paths)
+        {
+            PathInfo? liveMatch = liveAllPaths.FirstOrDefault(p =>
+                p.TargetsInfo.Any(t => t.DisplayTarget.DevicePath == snap.DevicePath));
+
+            if (liveMatch is null)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot restore '{snap.FriendlyName}' ({snap.DevicePath}) — no longer detected.");
+            }
+
+            PathTargetInfo liveTarget = liveMatch.TargetsInfo.First(t => t.DisplayTarget.DevicePath == snap.DevicePath);
+
+            var reconstructedTarget = new PathTargetInfo(
+                liveTarget.DisplayTarget,
+                snap.FrequencyInMillihertz,
+                (DisplayConfigScanLineOrdering)snap.ScanLineOrdering,
+                (DisplayConfigRotation)snap.Rotation,
+                (DisplayConfigScaling)snap.Scaling);
+
+            rebuilt.Add(new PathInfo(
+                liveMatch.DisplaySource,
+                new Point(snap.PositionX, snap.PositionY),
+                new Size(snap.ResolutionWidth, snap.ResolutionHeight),
+                (DisplayConfigPixelFormat)snap.PixelFormat,
+                new[] { reconstructedTarget }));
+        }
+
+        PathInfo.ApplyPathInfos(rebuilt.ToArray(), allowChanges: true);
+
+        // Pattern 4/D-03: verify-and-throw — confirm the configured target is present
+        // again and matches its stored position/primary designation.
+        PathInfo[] verifyPaths = PathInfo.GetActivePaths(virtualModeAware: false);
+        PathInfo? restoredTarget = verifyPaths.FirstOrDefault(p =>
+            p.TargetsInfo.Any(t => t.DisplayTarget.DevicePath == previousState.TargetDevicePath));
+        MonitorPathSnapshot expectedSnap = previousState.Paths.First(s => s.DevicePath == previousState.TargetDevicePath);
+
+        if (restoredTarget is null ||
+            restoredTarget.Position.X != expectedSnap.PositionX ||
+            restoredTarget.Position.Y != expectedSnap.PositionY ||
+            restoredTarget.IsGDIPrimary != expectedSnap.IsPrimary)
+        {
+            throw new InvalidOperationException(
+                "Monitor restore did not reproduce the exact prior configuration. No further automatic recovery is attempted (D-05).");
+        }
     }
 }
