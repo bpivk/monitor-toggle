@@ -112,9 +112,17 @@ public sealed class WindowsAudioController : IAudioController
 
     // D-02/AUDIO-02: restores each per-role snapshot captured by CaptureState, resolving
     // by DeviceId first and falling back to a live friendly-name match when the saved ID
-    // is missing (Pitfall 4 — a device may have been unplugged/replaced since capture,
-    // but a name match is still a reasonable match). A role with neither a usable ID nor
-    // a resolvable name is skipped rather than failing the whole restore.
+    // is missing OR stale (Pitfall 4 / gap-closure 03-04 — a device may have been
+    // unplugged/replaced since capture; a present-but-unresolvable ID is treated exactly
+    // like a never-captured one via TryResolveDevice, and both fall through to the same
+    // friendly-name match). A role with neither a usable ID nor a resolvable name is
+    // skipped rather than failing the whole restore. Each role's ApplyAndVerify is
+    // isolated in its own try/catch so one role's restore failure (e.g. the resolved
+    // device disappears between TryResolveDevice and ApplyAndVerify) never aborts
+    // restore of the other two roles (T-03-04-02) — this does not weaken
+    // SetDefault/ApplyAndVerify's own verify-and-throw contract (D-03/D-04), which still
+    // fires for the forward-mode path; here it is simply caught per-role rather than
+    // bubbled, since Restore's job is best-effort recovery, not forward application.
     public void Restore(AudioState previousState)
     {
         var snapshots = new (ERole Native, Role Managed, AudioRoleState Snapshot)[]
@@ -127,6 +135,15 @@ public sealed class WindowsAudioController : IAudioController
         foreach (var (nativeRole, managedRole, snapshot) in snapshots)
         {
             string? deviceId = snapshot.DeviceId;
+
+            if (!string.IsNullOrEmpty(deviceId) && TryResolveDevice(deviceId) is null)
+            {
+                // Stale ID (Pitfall 4 / gap-closure 03-04): the captured DeviceId no
+                // longer resolves to a live device. Null it out so control falls through
+                // to the same friendly-name fallback used for a never-captured ID below,
+                // instead of trusting a dead ID into ApplyAndVerify.
+                deviceId = null;
+            }
 
             if (string.IsNullOrEmpty(deviceId) && !string.IsNullOrEmpty(snapshot.DeviceName))
             {
@@ -142,7 +159,19 @@ public sealed class WindowsAudioController : IAudioController
                 continue;
             }
 
-            ApplyAndVerify(nativeRole, managedRole, deviceId);
+            try
+            {
+                ApplyAndVerify(nativeRole, managedRole, deviceId);
+            }
+            catch (InvalidOperationException)
+            {
+                // Per-role isolation (gap-closure 03-04 / T-03-04-02): a failure applying
+                // or verifying this role's default must not prevent the other two roles
+                // from being restored. Intentionally swallowed — this catch lives only in
+                // Restore's loop, never inside ApplyAndVerify itself or the forward
+                // SetDefault path, so D-03/D-04's verify-and-throw contract for
+                // SetDefault is unchanged.
+            }
         }
     }
 
