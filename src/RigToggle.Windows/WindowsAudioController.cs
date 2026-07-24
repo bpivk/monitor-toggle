@@ -10,6 +10,9 @@ namespace RigToggle.Windows;
 /// fills in the real IPolicyConfig COM interop mutation (02-RESEARCH.md Pattern 1).
 /// A fresh MMDeviceEnumerator is created and released per call — never cached across
 /// the session (02-RESEARCH.md Anti-Patterns, Pitfall/T-02-COMLEAK).
+/// CaptureState reads all three Windows audio roles (eConsole, eMultimedia,
+/// eCommunications) independently (D-02) so restore can be exact per role — a failed
+/// read for one role falls back to a null AudioRoleState without aborting the others.
 /// </summary>
 public sealed class WindowsAudioController : IAudioController
 {
@@ -31,21 +34,50 @@ public sealed class WindowsAudioController : IAudioController
         return result;
     }
 
-    // Real read today: captures the current default render endpoint so ToggleService
-    // can restore it later. Defensive try/catch covers the case where no default
-    // device can be determined at capture time.
+    // Real read today: captures the current default render endpoint for each of the
+    // three Windows audio roles so ToggleService can restore all of them later (D-02).
+    // Each role read is independently defensive — a failure on one role (e.g. no
+    // default assigned yet) falls back to AudioRoleState(null, null) rather than
+    // aborting capture of the other two roles.
     public AudioState CaptureState()
     {
+        AudioRoleState consoleState;
         try
         {
             using var enumerator = new MMDeviceEnumerator();
-            using MMDevice defaultDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-            return new AudioState(defaultDevice.ID);
+            using MMDevice device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Console);
+            consoleState = new AudioRoleState(device.ID, device.FriendlyName);
         }
         catch (Exception)
         {
-            return new AudioState(null);
+            consoleState = new AudioRoleState(null, null);
         }
+
+        AudioRoleState multimediaState;
+        try
+        {
+            using var enumerator = new MMDeviceEnumerator();
+            using MMDevice device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            multimediaState = new AudioRoleState(device.ID, device.FriendlyName);
+        }
+        catch (Exception)
+        {
+            multimediaState = new AudioRoleState(null, null);
+        }
+
+        AudioRoleState communicationsState;
+        try
+        {
+            using var enumerator = new MMDeviceEnumerator();
+            using MMDevice device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Communications);
+            communicationsState = new AudioRoleState(device.ID, device.FriendlyName);
+        }
+        catch (Exception)
+        {
+            communicationsState = new AudioRoleState(null, null);
+        }
+
+        return new AudioState(consoleState, multimediaState, communicationsState);
     }
 
     public void SetDefault(string deviceId)
