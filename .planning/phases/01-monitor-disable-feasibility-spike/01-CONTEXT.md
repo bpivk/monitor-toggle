@@ -16,7 +16,6 @@ Prove that the primary monitor can be truly disconnected at the OS level (remove
 ### Test Execution Environment
 - **D-01:** This session runs in a Linux environment and cannot execute or test Windows-native code directly. All spike code must be handed to the user as a runnable console tool + explicit instructions; the user builds/runs it on the actual rig PC and reports results back.
 - **D-02:** The user only has VS Code on the rig PC — no confirmed .NET SDK install. Spike instructions MUST include .NET SDK installation/setup steps, not just build/run commands.
-- **D-03:** Iterate as many round-trips as needed across build → run → report cycles until a clear go/no-go answer is reached. Do not artificially cap attempts at 1-2 tries.
 
 ### Target Hardware
 - **D-04:** Rig PC GPU is AMD (Radeon). Prioritize/verify the CCD topology-path-removal approach against AMD's driver behavior specifically — do not assume NVIDIA-only reference implementations transfer directly.
@@ -24,10 +23,13 @@ Prove that the primary monitor can be truly disconnected at the OS level (remove
 
 ### Success Validation
 - **D-06:** Phase 1's pass/fail criterion is display-enumeration only: the monitor must disappear from Windows' active display list (Display Settings / `EnumDisplayMonitors` / `QueryDisplayConfig`). A real game launch test is NOT required to pass this phase.
-- **D-07:** BeamNG.drive is the designated real-world validation game for later phases (once the full toggle flow exists in Phase 4/5) — noted for later use, not part of this spike's acceptance bar.
 
 ### Elevation Policy
 - **D-08:** The main app must stay non-elevated (`asInvoker`). If the chosen monitor-disable mechanism turns out to require admin rights, do not elevate the whole app — isolate that one operation in a small separate helper process instead. This protects cross-process window-focus control on the Moza Companion app (Phase 3), which breaks under UIPI if the calling process is elevated and the target isn't.
+
+### Claude's Discretion [informational]
+- **D-03** [informational]: Iterate as many round-trips as needed across build → run → report cycles until a clear go/no-go answer is reached. Do not artificially cap attempts at 1-2 tries. This governs the follow-up interaction after this plan executes (user runs the tool, reports back), not a task within this plan — no plan task implements it directly.
+- **D-07** [informational]: BeamNG.drive is the designated real-world validation game for later phases (once the full toggle flow exists in Phase 4/5) — noted for later use, not part of this spike's acceptance bar. Carry this forward to Phase 4/5 discussion; not implementable as a Phase 1 task.
 
 </decisions>
 

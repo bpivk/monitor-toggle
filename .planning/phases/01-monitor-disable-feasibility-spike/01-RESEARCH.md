@@ -362,7 +362,9 @@ Note: Microsoft's own guidance states `devcon.exe` (the historically-cited P/Inv
 
 **All A1-A3 above require the user's empirical test results to resolve — they cannot be resolved by further research and are the explicit reason D-03 allows unlimited build→run→report iterations.**
 
-## Open Questions
+## Open Questions (DEFERRED TO EMPIRICAL TEST)
+
+> These are NOT further researchable from the Linux planning sandbox — each is resolved (or not) only by the USER's empirical test on the rig PC. Treat them as risks/diagnostics to watch during that test, not as open research tasks.
 
 1. **Does `WindowsDisplayAPI`'s managed layer add any behavior (validation, exception-swallowing, flag defaults) that could mask a driver-level partial failure differently than a raw P/Invoke call would?**
    - What we know: the library's `ApplyPathInfos` is a thin wrapper that constructs flags and calls `SetDisplayConfig` directly (confirmed via source read) — no evidence of extra validation logic that would hide failures.
