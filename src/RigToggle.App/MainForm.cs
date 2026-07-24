@@ -1,6 +1,7 @@
 using System.Linq;
 using RigToggle.Core;
 using RigToggle.Core.Abstractions;
+using RigToggle.Core.Models;
 
 namespace RigToggle.App
 {
@@ -63,11 +64,13 @@ namespace RigToggle.App
 
         private void BtnToggle_Click(object? sender, EventArgs e)
         {
+            ToggleResult? result = null;
+
             try
             {
                 if (_toggleService.IsInRigMode())
                 {
-                    _toggleService.ToggleToNormalMode();
+                    result = _toggleService.ToggleToNormalMode();
                 }
                 else
                 {
@@ -109,19 +112,36 @@ namespace RigToggle.App
                         }
                     }
 
-                    _toggleService.ToggleToRigMode();
+                    result = _toggleService.ToggleToRigMode();
                 }
 
                 RefreshUi();
+
+                if (result is not null && !result.Success)
+                {
+                    // CORE-04: per-step checklist for a partial failure. State may have
+                    // partially changed (e.g. monitor disabled OK but audio failed), which
+                    // is why RefreshUi() above always runs before this dialog is shown.
+                    MessageBox.Show(
+                        this,
+                        $"The toggle did not fully complete:\n\n{FormatChecklist(result)}",
+                        "Rig Toggle",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                }
             }
             catch (Exception ex)
             {
-                // Basic guard only (D-13/T-02-FAKEFAIL) — full per-step CORE-04 partial-failure
-                // reporting is out of scope until Phase 5. Exception detail is included
-                // (not just a generic message) because this is a single-user diagnostic
-                // tool, not a hardened multi-user app — surfacing the real error is more
-                // useful than hiding it, especially for CCD-mutation failures that are
-                // otherwise unreproducible without rig hardware.
+                // Basic guard only (D-13/T-02-FAKEFAIL) — this catch is the fallback for the
+                // exception-based preflight/corrupted-snapshot guards (unconfigured settings,
+                // missing companion app path, corrupted monitor snapshot), which are NOT part
+                // of the ToggleResult contract (see Plan 01). Per-step CORE-04 partial-failure
+                // reporting for the three mutation steps (Monitor/Audio/App) happens via the
+                // ToggleResult checklist above. Exception detail is included (not just a
+                // generic message) because this is a single-user diagnostic tool, not a
+                // hardened multi-user app — surfacing the real error is more useful than
+                // hiding it, especially for CCD-mutation failures that are otherwise
+                // unreproducible without rig hardware.
                 MessageBox.Show(
                     this,
                     $"Something went wrong while toggling:\n\n{ex.GetType().Name}: {ex.Message}\n\nTry again, or check Settings.",
@@ -129,6 +149,23 @@ namespace RigToggle.App
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
             }
+        }
+
+        /// <summary>
+        /// Maps a ToggleResult's per-step outcomes to a human-readable checklist for the
+        /// partial-failure MessageBox (CORE-04). One line per step, in step order.
+        /// </summary>
+        private static string FormatChecklist(ToggleResult result)
+        {
+            return string.Join(
+                Environment.NewLine,
+                result.Steps.Select(step => step.Outcome switch
+                {
+                    ToggleStepOutcome.Succeeded => $"{step.StepName}: OK",
+                    ToggleStepOutcome.Failed => $"{step.StepName}: FAILED ({step.Reason})",
+                    ToggleStepOutcome.NotAttempted => $"{step.StepName}: not attempted",
+                    _ => $"{step.StepName}: unknown",
+                }));
         }
 
         private void BtnSettings_Click(object? sender, EventArgs e)
