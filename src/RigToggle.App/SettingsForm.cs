@@ -247,6 +247,11 @@ namespace RigToggle.App
                 return;
             }
 
+            // D-02: reset the durable confirmation-skip flag whenever the configured
+            // monitor changes, so a fresh named confirmation is forced for the new
+            // display; preserve the prior value when the monitor is unchanged.
+            bool monitorChanged = _settings.MonitorDevicePath != monitorItem.Id;
+
             var settingsToSave = new AppSettings
             {
                 MonitorDevicePath = monitorItem.Id,
@@ -256,6 +261,7 @@ namespace RigToggle.App
                 RigAudioDeviceId = audioRigItem.Id,
                 RigAudioDeviceName = audioRigItem.DisplayLabel,
                 CompanionAppPath = txtAppPath.Text,
+                SkipMonitorConfirmation = monitorChanged ? false : _settings.SkipMonitorConfirmation,
             };
 
             // Persist before the declarative DialogResult.OK closes the dialog.
