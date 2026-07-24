@@ -162,8 +162,18 @@ public sealed class WindowsMonitorController : IMonitorController
         var rebuilt = new List<PathInfo>();
         foreach (MonitorPathSnapshot snap in previousState.Paths)
         {
+            // PathDisplayTarget.DevicePath throws TargetNotAvailableException when
+            // IsAvailable is false (confirmed against WindowsDisplayAPI source —
+            // PathDisplayTarget.cs guards every EDID-derived property, including
+            // DevicePath, behind IsAvailable). GetAllPaths() returns many inactive
+            // target slots beyond just our two physical monitors (unused GPU output
+            // ports etc.), and those report IsAvailable=false — reading .DevicePath
+            // on them unconditionally while searching crashed Restore() on the rig
+            // (observed: TargetNotAvailableException), even though the target we
+            // were actually looking for was never at fault. Guard with IsAvailable
+            // first so the search only reads DevicePath on targets where it's safe.
             PathInfo? liveMatch = liveAllPaths.FirstOrDefault(p =>
-                p.TargetsInfo.Any(t => t.DisplayTarget.DevicePath == snap.DevicePath));
+                p.TargetsInfo.Any(t => t.DisplayTarget.IsAvailable && t.DisplayTarget.DevicePath == snap.DevicePath));
 
             if (liveMatch is null)
             {
@@ -171,7 +181,8 @@ public sealed class WindowsMonitorController : IMonitorController
                     $"Cannot restore '{snap.FriendlyName}' ({snap.DevicePath}) — no longer detected.");
             }
 
-            PathTargetInfo liveTarget = liveMatch.TargetsInfo.First(t => t.DisplayTarget.DevicePath == snap.DevicePath);
+            PathTargetInfo liveTarget = liveMatch.TargetsInfo.First(t =>
+                t.DisplayTarget.IsAvailable && t.DisplayTarget.DevicePath == snap.DevicePath);
 
             var reconstructedTarget = new PathTargetInfo(
                 liveTarget.DisplayTarget,
