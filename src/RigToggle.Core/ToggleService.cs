@@ -41,6 +41,16 @@ public sealed class ToggleService
     {
         var settings = _settingsStore.Load();
 
+        if (!IsFullyConfigured(settings))
+        {
+            // Guard against WR-01: without this check, an unconfigured (null-field)
+            // AppSettings would still make it through to _snapshotStore.Save() below,
+            // durably persisting a garbage snapshot and flipping IsInRigMode() to true
+            // (D-14) even though nothing was actually captured or changed.
+            throw new InvalidOperationException(
+                "Rig Toggle settings are not fully configured. Open Settings and choose a monitor, both audio devices, and the companion app path before switching to Rig Mode.");
+        }
+
         var monitorState = _monitorController.CaptureState(settings.MonitorDevicePath!);
         var audioState = _audioController.CaptureState();
 
@@ -51,6 +61,21 @@ public sealed class ToggleService
         _audioController.SetDefault(settings.RigAudioDeviceId!);
         _appController.LaunchOrFocus(settings.CompanionAppPath!);
     }
+
+    /// <summary>
+    /// True when every field ToggleToRigMode/ToggleToNormalMode depend on has been saved
+    /// at least once via Settings (mirrors the four fields SettingsForm.ValidateSettingsForm
+    /// already requires before enabling Save). Exposed publicly so MainForm can pre-check
+    /// before offering "Switch to Rig Mode" at all, rather than relying solely on the
+    /// exception thrown by ToggleToRigMode above.
+    /// </summary>
+    public bool IsSettingsConfigured() => IsFullyConfigured(_settingsStore.Load());
+
+    private static bool IsFullyConfigured(Models.AppSettings settings) =>
+        !string.IsNullOrEmpty(settings.MonitorDevicePath)
+        && !string.IsNullOrEmpty(settings.NormalAudioDeviceId)
+        && !string.IsNullOrEmpty(settings.RigAudioDeviceId)
+        && !string.IsNullOrEmpty(settings.CompanionAppPath);
 
     /// <summary>
     /// Loads the snapshot and restores the monitor and audio state it captured — the

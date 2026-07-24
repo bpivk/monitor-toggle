@@ -67,6 +67,20 @@ namespace RigToggle.App
                 }
                 else
                 {
+                    if (!_toggleService.IsSettingsConfigured())
+                    {
+                        // WR-01: don't let an incomplete Settings state reach ToggleToRigMode
+                        // at all — redirect to Settings instead of persisting a garbage
+                        // snapshot and flipping the mode indicator to "Rig".
+                        MessageBox.Show(
+                            this,
+                            "Please finish configuring Settings (monitor, both audio devices, and the companion app) before switching to Rig Mode.",
+                            "Rig Toggle",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+                        return;
+                    }
+
                     _toggleService.ToggleToRigMode();
                 }
 
