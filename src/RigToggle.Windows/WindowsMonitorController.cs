@@ -3,6 +3,7 @@ using RigToggle.Core.Abstractions;
 using RigToggle.Core.Models;
 using WindowsDisplayAPI;
 using WindowsDisplayAPI.DisplayConfig;
+using WindowsDisplayAPI.Native.DisplayConfig;
 
 namespace RigToggle.Windows;
 
