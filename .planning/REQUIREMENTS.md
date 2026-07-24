@@ -9,9 +9,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Display
 
-- [ ] **DISPLAY-01**: User can disable the configured primary monitor at the OS level (true CCD-style disconnect, not a DDC power-off) when toggling to rig mode
-- [ ] **DISPLAY-02**: User can re-enable the primary monitor, restored to its exact prior configuration (position, primary designation, orientation), when toggling back to normal mode
-- [ ] **DISPLAY-03**: Before disabling the primary monitor, the app shows a confirmation dialog naming the monitor about to be disabled
+- [x] **DISPLAY-01**: User can disable the configured primary monitor at the OS level (true CCD-style disconnect, not a DDC power-off) when toggling to rig mode
+- [x] **DISPLAY-02**: User can re-enable the primary monitor, restored to its exact prior configuration (position, primary designation, orientation), when toggling back to normal mode
+- [x] **DISPLAY-03**: Before disabling the primary monitor, the app shows a confirmation dialog naming the monitor about to be disabled
 
 ### Audio
 
@@ -85,9 +85,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DISPLAY-01 | Phase 4 | Pending |
-| DISPLAY-02 | Phase 4 | Pending |
-| DISPLAY-03 | Phase 4 | Pending |
+| DISPLAY-01 | Phase 4 | Complete |
+| DISPLAY-02 | Phase 4 | Complete |
+| DISPLAY-03 | Phase 4 | Complete |
 | AUDIO-01 | Phase 3 | Complete |
 | AUDIO-02 | Phase 3 | Complete |
 | APP-01 | Phase 3 | Complete |
