@@ -102,3 +102,7 @@ APP-01/APP-02/APP-03 are functionally complete pending the Windows-machine build
 ---
 *Phase: 03-app-audio-control*
 *Completed: 2026-07-24*
+
+## Self-Check: PASSED
+
+All 4 created/modified source files verified present on disk; all 3 task/summary commits (`2b9b55f`, `714d9a2`, `a688ede`) verified present in `git log`.
