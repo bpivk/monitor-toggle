@@ -12,7 +12,7 @@ A single reliable action that disables the primary monitor (not just powers it o
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] GUI includes a settings view where the user selects: which monitor is the "primary to disable," which audio devices are the toggle pair, and which app (path) to launch/minimize — Validated in Phase 2: Foundations & GUI Shell (real enumeration wired into a modal Settings dialog with Save-gating, stale-device detection, and persistence confirmed across a true app restart on the rig)
 
 ### Active
 
@@ -23,7 +23,6 @@ A single reliable action that disables the primary monitor (not just powers it o
 - [ ] User can toggle back from rig mode to normal mode in one action
 - [ ] Toggling back restores the exact monitor and audio configuration that was active immediately before toggling to rig mode (not a fixed hardcoded preset)
 - [ ] Toggling back minimizes the Moza Companion app window (best-effort — true "close window but keep process alive" only if the app itself supports minimize-to-tray-on-close; otherwise just minimize)
-- [ ] GUI includes a settings view where the user selects: which monitor is the "primary to disable," which audio devices are the toggle pair, and which app (path) to launch/minimize
 - [ ] Distributed as a standalone Windows .exe (no separate runtime install required to run it)
 
 ### Out of Scope
@@ -75,4 +74,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-24 after initialization*
+*Last updated: 2026-07-24 — Phase 2 complete*
