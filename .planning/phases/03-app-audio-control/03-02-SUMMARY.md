@@ -100,3 +100,12 @@ None - no external service configuration required.
 ---
 *Phase: 03-app-audio-control*
 *Completed: 2026-07-24*
+
+## Self-Check: PASSED
+
+- FOUND: src/RigToggle.Windows/Audio/IPolicyConfig.cs
+- FOUND: src/RigToggle.Windows/WindowsAudioController.cs
+- FOUND: .planning/phases/03-app-audio-control/03-02-SUMMARY.md
+- FOUND commit: c753751
+- FOUND commit: 5eb9e06
+- FOUND commit: b25ab62
