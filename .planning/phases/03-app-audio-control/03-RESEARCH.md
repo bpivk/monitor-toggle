@@ -395,7 +395,7 @@ See Architecture Patterns 1-5 above for the complete, verified code for:
 
 **If this table is empty:** N/A — see entries above; all are LOW risk and do not block planning.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `AudioState`'s serialization break be handled with a defensive `try/catch` in `JsonSnapshotStore.Load()`, or is a clean/manual `state.json` delete acceptable during development?**
    - What we know: The record's constructor shape is changing (D-02); `System.Text.Json` will throw on deserializing the old shape.
