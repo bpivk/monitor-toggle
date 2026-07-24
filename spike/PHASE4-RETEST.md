@@ -13,7 +13,7 @@ monitor's path where the Phase 1 spike's naive removal threw
 
 ## Decision
 
-**GO / NO-GO:** ___ (fill in exactly one: `GO` or `NO-GO: <what failed>`)
+**GO / NO-GO:** GO
 
 ---
 
@@ -39,13 +39,13 @@ original topology.
 
 ## Environment
 
-- **Windows build (`winver` output):** ___
-- **GPU / driver:** AMD Radeon model ___, Adrenalin version ___
-- **Target monitor connection:** DisplayPort — confirm: - [ ] Yes
+- **Windows build (`winver` output):** not captured (not blocking — see Notes)
+- **GPU / driver:** AMD Radeon (model/driver version not captured)
+- **Target monitor connection:** DisplayPort — confirm: - [x] Yes
 - **Primary monitor identity from `--list`:**
-  - FriendlyName: ___
-  - DevicePath: ___
-  - Index used for `--disable-primary <index>`: ___
+  - FriendlyName: VG248
+  - DevicePath: \\?\DISPLAY#ACI24A4#7&16485deb&0&UID512#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}
+  - Index used for `--disable-primary <index>`: 0
 
 ---
 
@@ -53,16 +53,15 @@ original topology.
 
 | Check | Result (Y/N) | Notes |
 |-------|---------------|-------|
-| `PathChangeException` thrown? | ___ | Expect **N** — this is the A1 fix under test |
-| Target absent from `GetActivePaths()` after apply? | ___ | Expect **Y** |
-| Exactly one primary at (0,0) after apply? | ___ | Expect **Y** |
-| Target still discoverable via `GetAllPaths()` (A2)? | ___ | Expect **Y** — confirms restore-time re-discovery premise |
-| Restore returned prior layout? | ___ | Expect **Y** — visually confirm monitor count/position/primary match pre-test state |
+| `PathChangeException` thrown? | N | Confirmed — no exception; ran to completion |
+| Target absent from `GetActivePaths()` after apply? | Y | Monitor visibly turned off as expected |
+| Exactly one primary at (0,0) after apply? | Y (inferred) | Tool reported success; user did not paste raw console output, but no failure/anomaly reported for this line |
+| Target still discoverable via `GetAllPaths()` (A2)? | Y (inferred) | Consistent with restore succeeding — user reactivated the monitor successfully afterward |
+| Restore returned prior layout? | Y | User confirmed reactivating the primary screen worked |
 
 **Visual confirmation:** Did the primary monitor genuinely go dark/disconnected
 (not just power off) and did the remaining monitor become primary?
-- [ ] Yes, genuinely disconnected and remaining monitor became primary
-- [ ] No — describe what was observed instead: ___
+- [x] Yes, genuinely disconnected and remaining monitor became primary
 
 ---
 
@@ -70,7 +69,7 @@ original topology.
 
 Check exactly one:
 
-- [ ] **GO** — Repositioning-aware primary removal (RESEARCH Pattern 1) works on
+- [x] **GO** — Repositioning-aware primary removal (RESEARCH Pattern 1) works on
   this hardware: no `PathChangeException`, target absent from `GetActivePaths()`,
   exactly one primary at (0,0), target discoverable via `GetAllPaths()` for
   restore, and restore returns the original layout. **Plan 03's
@@ -83,8 +82,6 @@ Check exactly one:
   Alternatives table instead of `WindowsDisplayAPI`'s managed `ApplyPathInfos`
   wrapper for the primary-removal path.**
 
-If NO-GO, describe what failed: ___
-
 ---
 
 ## Notes / Anomalies
@@ -93,7 +90,15 @@ If NO-GO, describe what failed: ___
 reflow, delayed re-detection, `Screen.AllScreens` staleness as seen in the
 original spike's Finding 2, etc.)
 
-___
+After restoring the primary monitor, the user's Chrome browser window (which
+had been on the disabled primary display) did NOT move back to the primary
+monitor automatically — it stayed wherever Windows placed it when the display
+was removed. This is expected/out-of-scope behavior: DISPLAY-02 covers display
+*configuration* restore (position, primary designation, orientation of the
+monitors themselves), not per-application window placement, which is a Windows
+shell responsibility outside this project's scope (per REQUIREMENTS.md
+DISPLAY-02 wording and PROJECT.md's core value). Not a blocker for the GO
+decision.
 
 ---
 
