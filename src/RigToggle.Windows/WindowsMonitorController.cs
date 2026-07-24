@@ -1,3 +1,4 @@
+using System.Drawing;
 using RigToggle.Core.Abstractions;
 using RigToggle.Core.Models;
 using WindowsDisplayAPI;
@@ -6,12 +7,19 @@ using WindowsDisplayAPI.DisplayConfig;
 namespace RigToggle.Windows;
 
 /// <summary>
-/// Real monitor enumeration and full-topology capture via WindowsDisplayAPI's CCD
-/// wrapper (proven non-elevated on this rig's AMD/DisplayPort hardware by the Phase 1
-/// spike, spike/MonitorDetachSpike/Program.cs RunList()). CaptureState() is real
-/// starting Plan 02 (04-RESEARCH.md Pattern 2); Disable/Restore remain documented
-/// no-op stubs until Plan 03 fills in the real CCD repositioning-aware
-/// topology-removal mutation and live-identity restore (04-RESEARCH.md Patterns 1/3/4).
+/// Real monitor enumeration, full-topology capture, and CCD-level primary-monitor
+/// disable/restore via WindowsDisplayAPI's CCD wrapper (proven non-elevated on this
+/// rig's AMD/DisplayPort hardware by the Phase 1 spike and re-confirmed by Plan 01's
+/// repositioning-aware rig re-test — see spike/PHASE4-RETEST.md GO decision).
+/// GetActiveMonitors/CaptureState are real starting Plan 02 (04-RESEARCH.md Pattern 2).
+/// Disable implements 04-RESEARCH.md Pattern 1 (repositioning-aware survivor
+/// reconstruction so exactly one survivor lands at (0,0)) + Pattern 3 (verify-and-throw
+/// against a fresh GetActivePaths() re-query, D-03). Restore implements Pattern 4
+/// (live-identity re-resolution via GetAllPaths() matched on stored DevicePath, mode/
+/// signal rebuilt from the STORED snapshot, never trusting an inactive path's own live
+/// data) + the same verify-and-throw idiom. Neither method uses the WinForms screen-
+/// enumeration API as an oracle (D-04) or attempts automatic rollback on verification
+/// failure (D-05) — the exception bubbles to MainForm's existing handler.
 /// </summary>
 public sealed class WindowsMonitorController : IMonitorController
 {
@@ -70,19 +78,74 @@ public sealed class WindowsMonitorController : IMonitorController
         return new MonitorState(snapshots, targetDevicePath);
     }
 
+    // Real repositioning-aware CCD primary-path removal (04-RESEARCH.md Pattern 1,
+    // empirically confirmed GO on this rig by Plan 01's spike/PHASE4-RETEST.md rig
+    // re-test) + verify-and-throw (Pattern 3, D-03). Never uses the WinForms screen-
+    // enumeration API as the verification oracle (D-04) and never attempts an
+    // automatic rollback on verification failure (D-05) — the exception bubbles to
+    // MainForm's existing handler.
     public void Disable(string monitorDevicePath)
     {
-        // FAKE in Plan 02 — no-op. Real CCD repositioning-aware topology-path-removal
-        // via PathInfo.ApplyPathInfos(reducedPaths, allowChanges: true) — excluding the
-        // target monitor's path and shifting surviving paths per 04-RESEARCH.md
-        // Pattern 1 — lands in Plan 03. Do NOT reuse the spike's RunDisable/VerifyOnce
-        // logic here (known primary-monitor repositioning gap, Plan 03 scope).
+        PathInfo[] currentPaths = PathInfo.GetActivePaths(virtualModeAware: false);
+
+        PathInfo? targetPath = currentPaths.FirstOrDefault(p =>
+            p.TargetsInfo.Any(t => t.DisplayTarget.DevicePath == monitorDevicePath));
+
+        if (targetPath is null)
+        {
+            throw new InvalidOperationException(
+                $"Configured monitor '{monitorDevicePath}' is not currently active.");
+        }
+
+        PathInfo[] survivors = currentPaths.Where(p => p != targetPath).ToArray();
+
+        PathInfo[] pathsToApply;
+        if (targetPath.IsGDIPrimary && survivors.Length > 0)
+        {
+            // Pitfall 1: shift ALL survivors by the same uniform delta (not just the
+            // promoted one) so relative layout is preserved — Position has no public
+            // setter, so a fresh PathInfo must be constructed per survivor.
+            Point promoted = survivors[0].Position;
+            var delta = new Point(-promoted.X, -promoted.Y);
+
+            pathsToApply = survivors
+                .Select(p => new PathInfo(
+                    p.DisplaySource,
+                    new Point(p.Position.X + delta.X, p.Position.Y + delta.Y),
+                    p.Resolution,
+                    p.PixelFormat,
+                    p.TargetsInfo))
+                .ToArray();
+        }
+        else
+        {
+            pathsToApply = survivors;
+        }
+
+        PathInfo.ApplyPathInfos(pathsToApply, allowChanges: true, saveToDatabase: false, forceModeEnumeration: false);
+
+        // Pattern 3/D-03: verify-and-throw against a fresh re-query — never trust
+        // ApplyPathInfos's non-throwing return alone as proof of success (D-04: not
+        // the WinForms screen-enumeration API).
+        PathInfo[] verifyPaths = PathInfo.GetActivePaths(virtualModeAware: false);
+
+        bool targetStillActive = verifyPaths
+            .SelectMany(p => p.TargetsInfo)
+            .Any(t => t.DisplayTarget.DevicePath == monitorDevicePath);
+
+        bool exactlyOnePrimary = verifyPaths.Count(p => p.IsGDIPrimary) == 1;
+
+        if (targetStillActive || !exactlyOnePrimary)
+        {
+            throw new InvalidOperationException(
+                $"Monitor disable did not take effect as expected (targetStillActive={targetStillActive}, " +
+                $"exactlyOnePrimary={exactlyOnePrimary}). No further automatic recovery is attempted (D-05).");
+        }
     }
 
     public void Restore(MonitorState previousState)
     {
-        // FAKE in Plan 02 — no-op. Real PathInfo.ApplyPathInfos(originalActivePaths,
-        // allowChanges: true) restore using previousState.Paths (04-RESEARCH.md
-        // Pattern 3/4, live-identity restore) lands in Plan 03.
+        // FAKE — pending Task 2. Real PathInfo.GetAllPaths()-based live-identity
+        // restore (04-RESEARCH.md Pattern 4) lands in the next commit of this plan.
     }
 }
