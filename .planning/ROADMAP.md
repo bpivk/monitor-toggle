@@ -44,7 +44,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. User can select which audio devices form the toggle pair (normal device, rig device) from a list of detected audio endpoints
   3. User can specify the file path of the companion app to launch/focus/minimize
   4. Settings persist across app restarts
-**Plans**: TBD
+**Plans**: 5 plans
+- [ ] 02-01-PLAN.md — Solution scaffold (4 projects, package legitimacy gate) + Core contracts (interfaces + models)
+- [ ] 02-02-PLAN.md — Core logic: atomic JSON persistence, ToggleService orchestration, unit tests
+- [ ] 02-03-PLAN.md — Windows adapters: real monitor/audio enumeration + app-running detection, no-op mutation stubs
+- [ ] 02-04-PLAN.md — Settings modal dialog: 3 real-enumerated pickers, stale detection, .exe browse, Save-gating + persist
+- [ ] 02-05-PLAN.md — Main window + composition root: mode-from-snapshot, toggle wiring, status line; end-of-phase human-verify
 **UI hint**: yes
 
 ### Phase 3: App & Audio Control
@@ -90,7 +95,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Monitor-Disable Feasibility Spike | 2/2 | Complete   | 2026-07-24 |
-| 2. Foundations & GUI Shell | 0/TBD | Not started | - |
+| 2. Foundations & GUI Shell | 0/5 | Planned | - |
 | 3. App & Audio Control | 0/TBD | Not started | - |
 | 4. Monitor Control (Production) | 0/TBD | Not started | - |
 | 5. Orchestration, Full Toggle & Packaging | 0/TBD | Not started | - |
