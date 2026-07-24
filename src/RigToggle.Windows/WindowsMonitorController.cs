@@ -226,6 +226,17 @@ public sealed class WindowsMonitorController : IMonitorController
                 (DisplayConfigRotation)snap.Rotation,
                 (DisplayConfigScaling)snap.Scaling);
 
+            // No public PathTargetInfo constructor accepts OutputTechnology — every
+            // manually-constructed instance silently defaults to
+            // DisplayConfigVideoOutputTechnology.Other, even though CaptureState()
+            // correctly captured the real value (e.g. DisplayPortExternal) into the
+            // snapshot. Telling CCD validation a DisplayPort target is "Other"
+            // technology is a strong suspect for the observed PathChangeException
+            // ("Invalid paths information."). liveTarget.OutputTechnology is reliable
+            // even for an inactive target — it describes the physical connector type,
+            // not session mode data (unlike Pitfall 2's frequency/rotation caveat).
+            CopyOutputTechnology(reconstructedTarget, liveTarget.OutputTechnology);
+
             rebuilt.Add(new PathInfo(
                 sourceToUse,
                 new Point(snap.PositionX, snap.PositionY),
@@ -244,7 +255,8 @@ public sealed class WindowsMonitorController : IMonitorController
             // ValidatePathInfos discards the underlying Win32 error code entirely —
             // this is the best available signal if source assignment is still wrong.
             string attempted = string.Join("; ", rebuilt.Select(p =>
-                $"{p.TargetsInfo.First().DisplayTarget.FriendlyName ?? "?"}@source={p.DisplaySource.SourceId} pos=({p.Position.X},{p.Position.Y})"));
+                $"{p.TargetsInfo.First().DisplayTarget.FriendlyName ?? "?"}@source={p.DisplaySource.SourceId} " +
+                $"pos=({p.Position.X},{p.Position.Y}) tech={p.TargetsInfo.First().OutputTechnology}"));
             throw new InvalidOperationException(
                 $"Monitor restore failed CCD validation: {ex.Message} Attempted topology: {attempted}", ex);
         }
@@ -264,5 +276,28 @@ public sealed class WindowsMonitorController : IMonitorController
             throw new InvalidOperationException(
                 "Monitor restore did not reproduce the exact prior configuration. No further automatic recovery is attempted (D-05).");
         }
+    }
+
+    // WindowsDisplayAPI's PathTargetInfo.OutputTechnology has no public constructor
+    // parameter — every manually-built instance defaults to
+    // DisplayConfigVideoOutputTechnology.Other regardless of the target's real
+    // connector type. This patches the compiler-generated backing field directly
+    // (the only way to correct it without depending on the library's internal
+    // constructor overload). Throws rather than silently leaving the wrong value if
+    // the library's compiled field name ever changes, so a future failure here is
+    // loud instead of silently reproducing this same bug.
+    private static void CopyOutputTechnology(PathTargetInfo target, DisplayConfigVideoOutputTechnology technology)
+    {
+        var field = typeof(PathTargetInfo).GetField(
+            "<OutputTechnology>k__BackingField",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        if (field is null)
+        {
+            throw new InvalidOperationException(
+                "Cannot patch PathTargetInfo.OutputTechnology — backing field not found (WindowsDisplayAPI internals changed).");
+        }
+
+        field.SetValue(target, technology);
     }
 }
