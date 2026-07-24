@@ -33,9 +33,11 @@ public sealed class ToggleService
     }
 
     /// <summary>
-    /// Loads settings, captures the current monitor + audio state, saves that snapshot
-    /// (BEFORE any mutation — CORE-03), then disables the configured monitor, switches
-    /// the default audio device, and launches/focuses the companion app.
+    /// Loads settings, verifies the companion app path still exists (D-05 preflight —
+    /// fails fast with nothing yet captured, persisted, or mutated), captures the
+    /// current monitor + audio state, saves that snapshot (BEFORE any mutation —
+    /// CORE-03), then disables the configured monitor, switches the default audio
+    /// device, and launches/focuses the companion app.
     /// </summary>
     public void ToggleToRigMode()
     {
@@ -49,6 +51,16 @@ public sealed class ToggleService
             // (D-14) even though nothing was actually captured or changed.
             throw new InvalidOperationException(
                 "Rig Toggle settings are not fully configured. Open Settings and choose a monitor, both audio devices, and the companion app path before switching to Rig Mode.");
+        }
+
+        if (!File.Exists(settings.CompanionAppPath))
+        {
+            // D-05: a missing/moved companion-app path must fail before any state is
+            // captured, persisted, or mutated — this is a fail-fast UX guard, not a
+            // security control (T-03-09 accepts the TOCTOU window between this check
+            // and the later Process.Start in WindowsAppController.LaunchOrFocus).
+            throw new InvalidOperationException(
+                $"The companion app could not be found at '{settings.CompanionAppPath}'. Open Settings and reselect the companion app path before switching to Rig Mode.");
         }
 
         var monitorState = _monitorController.CaptureState(settings.MonitorDevicePath!);
