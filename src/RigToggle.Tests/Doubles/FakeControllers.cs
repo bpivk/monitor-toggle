@@ -12,8 +12,13 @@ namespace RigToggle.Tests.Doubles;
 public sealed class FakeMonitorController : IMonitorController
 {
     private readonly List<string> _callLog;
+    private readonly bool _throwOnDisable;
 
-    public FakeMonitorController(List<string> callLog) => _callLog = callLog;
+    public FakeMonitorController(List<string> callLog, bool throwOnDisable = false)
+    {
+        _callLog = callLog;
+        _throwOnDisable = throwOnDisable;
+    }
 
     public IReadOnlyList<MonitorInfo> GetActiveMonitors()
     {
@@ -32,6 +37,13 @@ public sealed class FakeMonitorController : IMonitorController
     public void Disable(string monitorDevicePath)
     {
         _callLog.Add($"monitor.Disable:{monitorDevicePath}");
+
+        if (_throwOnDisable)
+        {
+            // D-04: simulates a CCD/topology failure, proving ToggleToRigMode records
+            // Monitor=Failed and marks Audio/App NotAttempted without calling them.
+            throw new InvalidOperationException("Fake monitor disable failure (simulated CCD/topology failure).");
+        }
     }
 
     public void Restore(MonitorState previousState)

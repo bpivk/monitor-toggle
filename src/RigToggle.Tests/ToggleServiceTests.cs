@@ -31,12 +31,13 @@ public class ToggleServiceTests
 
     private static (ToggleService Service, List<string> CallLog, InMemorySnapshotStore SnapshotStore) CreateService(
         AppSettings? settings = null,
-        bool audioThrowsOnRestore = false)
+        bool audioThrowsOnRestore = false,
+        bool monitorThrowsOnDisable = false)
     {
         var callLog = new List<string>();
         var settingsStore = new InMemorySettingsStore(settings ?? ConfiguredSettings);
         var snapshotStore = new InMemorySnapshotStore(callLog);
-        var monitorController = new FakeMonitorController(callLog);
+        var monitorController = new FakeMonitorController(callLog, throwOnDisable: monitorThrowsOnDisable);
         var audioController = new FakeAudioController(callLog, throwOnRestore: audioThrowsOnRestore);
         var appController = new FakeAppController(callLog);
 
@@ -65,9 +66,12 @@ public class ToggleServiceTests
     {
         var (service, _, _) = CreateService();
 
-        service.ToggleToRigMode();
+        var result = service.ToggleToRigMode();
 
         Assert.True(service.IsInRigMode());
+        Assert.True(result.Success);
+        Assert.Equal(3, result.Steps.Count);
+        Assert.All(result.Steps, step => Assert.Equal(ToggleStepOutcome.Succeeded, step.Outcome));
     }
 
     [Fact]
@@ -76,9 +80,10 @@ public class ToggleServiceTests
         var (service, callLog, _) = CreateService();
         service.ToggleToRigMode();
 
-        service.ToggleToNormalMode();
+        var result = service.ToggleToNormalMode();
 
         Assert.False(service.IsInRigMode());
+        Assert.True(result.Success);
         var snapshotInteractions = callLog.Where(entry => entry.StartsWith("snapshot.")).ToList();
         Assert.Equal("snapshot.Clear", snapshotInteractions.Last());
     }
@@ -124,6 +129,50 @@ public class ToggleServiceTests
         Assert.Contains(callLog, entry => entry.StartsWith("app.MinimizeIfRunning:"));
         Assert.Contains("snapshot.Clear", callLog);
         Assert.False(service.IsInRigMode());
+    }
+
+    [Fact]
+    public void ToggleToRigMode_ReturnsFailedMonitorStep_AndNotAttemptedRest_WhenDisableThrows()
+    {
+        // D-04 stop-on-first-failure: a failed Disable must short-circuit before Audio
+        // or App ever run, and be reported (not thrown) as a Failed Monitor step.
+        var (service, callLog, _) = CreateService(monitorThrowsOnDisable: true);
+
+        var result = service.ToggleToRigMode();
+
+        Assert.False(result.Success);
+        Assert.Equal(3, result.Steps.Count);
+
+        var monitorStep = result.Steps.Single(s => s.StepName == "Monitor");
+        Assert.Equal(ToggleStepOutcome.Failed, monitorStep.Outcome);
+        Assert.Contains("Fake monitor disable failure", monitorStep.Reason);
+
+        var audioStep = result.Steps.Single(s => s.StepName == "Audio");
+        var appStep = result.Steps.Single(s => s.StepName == "App");
+        Assert.Equal(ToggleStepOutcome.NotAttempted, audioStep.Outcome);
+        Assert.Equal(ToggleStepOutcome.NotAttempted, appStep.Outcome);
+
+        Assert.DoesNotContain(callLog, entry => entry.StartsWith("audio.SetDefault"));
+        Assert.DoesNotContain(callLog, entry => entry.StartsWith("app.LaunchOrFocus"));
+    }
+
+    [Fact]
+    public void ToggleToNormalMode_ReturnsFailedAudioStep_ButStillClears_WhenAudioRestoreThrows()
+    {
+        // Gap-closure 03-04 (T-03-04-02), now asserted via the ToggleResult contract:
+        // a throwing audio Restore must still be reported (not thrown) as a Failed
+        // Audio step, and MinimizeIfRunning + Clear must still run afterward.
+        var (service, callLog, _) = CreateService(audioThrowsOnRestore: true);
+        service.ToggleToRigMode();
+        callLog.Clear();
+
+        var result = service.ToggleToNormalMode();
+
+        var audioStep = result.Steps.Single(s => s.StepName == "Audio");
+        Assert.Equal(ToggleStepOutcome.Failed, audioStep.Outcome);
+        Assert.False(service.IsInRigMode());
+        Assert.Contains(callLog, entry => entry.StartsWith("app.MinimizeIfRunning"));
+        Assert.Contains("snapshot.Clear", callLog);
     }
 
     [Fact]
