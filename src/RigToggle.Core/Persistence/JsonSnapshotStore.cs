@@ -37,7 +37,24 @@ public sealed class JsonSnapshotStore : ISnapshotStore
     }
 
     public StateSnapshot? Load()
-        => Exists() ? JsonSerializer.Deserialize<StateSnapshot>(File.ReadAllText(_path)) : null;
+    {
+        if (!Exists())
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<StateSnapshot>(File.ReadAllText(_path));
+        }
+        catch (JsonException)
+        {
+            // A stale/old-shaped state.json (e.g. from before the AudioState reshape)
+            // is treated as "no snapshot" = normal mode, rather than crashing on startup
+            // (Open Question 1, T-03-01).
+            return null;
+        }
+    }
 
     public void Clear()
     {
