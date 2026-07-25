@@ -228,147 +228,89 @@ public sealed class WindowsMonitorController : IMonitorController
             }
         }
 
-        // Fallback (crash-recovery path only — no in-process cache survives a restart):
-        // reconstruct from the JSON-persisted primitive snapshot.
+        // Fallback (crash-recovery path only — no in-process cache survives a restart).
+        //
+        // Rig-discovered: manually reconstructing PathTargetInfo/PathInfo field-by-field from
+        // the stored primitive snapshot (source assignment, then signal info, then source
+        // assignment again) hit THREE separate CCD validation failures across three rig-tested
+        // iterations — every failure traced back to a property Windows does not reliably report
+        // for INACTIVE paths (Microsoft docs: inactive-path mode/signal info is "set to default
+        // values" — Pitfall 2). Rather than keep guessing which field is still wrong, this uses
+        // the exact same two-step strategy Disable() already uses successfully (twice,
+        // rig-confirmed): NEVER manually construct target/mode info from scratch — only ever
+        // reuse REAL, live-queried PathInfo/PathTargetInfo objects wholesale, touching nothing
+        // but Position.
+        //
+        // Step 1: an early "is the monitor still physically present" guard — before touching
+        // anything, since Extend below would otherwise fail with a confusing generic error if a
+        // configured display was unplugged.
         PathInfo[] liveAllPaths = PathInfo.GetAllPaths(virtualModeAware: false);
-
-        // Resolve every snapshot entry to its live match + live target first (two-pass),
-        // before deciding source assignment below — order-independent.
-        var resolved = new List<(MonitorPathSnapshot Snap, PathInfo LiveMatch, PathTargetInfo LiveTarget)>();
         foreach (MonitorPathSnapshot snap in previousState.Paths)
         {
-            // PathDisplayTarget.DevicePath throws TargetNotAvailableException when
-            // IsAvailable is false (confirmed against WindowsDisplayAPI source —
-            // PathDisplayTarget.cs guards every EDID-derived property, including
-            // DevicePath, behind IsAvailable). GetAllPaths() returns many inactive
-            // target slots beyond just our two physical monitors (unused GPU output
-            // ports etc.), and those report IsAvailable=false — reading .DevicePath
-            // on them unconditionally while searching crashed Restore() on the rig
-            // (observed: TargetNotAvailableException), even though the target we
-            // were actually looking for was never at fault. Guard with IsAvailable
-            // first so the search only reads DevicePath on targets where it's safe.
-            PathInfo? liveMatch = liveAllPaths.FirstOrDefault(p =>
+            bool stillPresent = liveAllPaths.Any(p =>
                 p.TargetsInfo.Any(t => t.DisplayTarget.IsAvailable && t.DisplayTarget.DevicePath == snap.DevicePath));
 
-            if (liveMatch is null)
+            if (!stillPresent)
             {
                 throw new InvalidOperationException(
                     $"Cannot restore '{snap.FriendlyName}' ({snap.DevicePath}) — no longer detected.");
             }
-
-            PathTargetInfo liveTarget = liveMatch.TargetsInfo.First(t =>
-                t.DisplayTarget.IsAvailable && t.DisplayTarget.DevicePath == snap.DevicePath);
-
-            resolved.Add((snap, liveMatch, liveTarget));
         }
 
-        // MonitorPathSnapshot deliberately stores no source-slot identity (Plan 02 —
-        // stays JSON-primitive, no WindowsDisplayAPI reference in Core), so the source
-        // to reattach an INACTIVE target to must be re-derived here. Trusting the
-        // inactive target's own live-reported DisplaySource (from GetAllPaths) is NOT
-        // safe — observed live on the rig as PathChangeException ("Invalid paths
-        // information.") from SetDisplayConfig's validation, most likely because that
-        // reported source collided with the source the still-active survivor monitor
-        // is already using (two paths cannot legally share one source). Reserve every
-        // CURRENTLY ACTIVE path's source system-wide first (not just ones present in
-        // this restore's snapshot — a monitor plugged in after the snapshot was
-        // captured is still live and its source still off-limits), then assign each
-        // INACTIVE target the first source not already reserved.
-        PathInfo[] activePathsForSourceLookup = PathInfo.GetActivePaths(virtualModeAware: false);
-        var usedSources = new HashSet<PathDisplaySource>(
-            activePathsForSourceLookup.Select(p => p.DisplaySource));
-        PathDisplaySource[] allSources = PathDisplaySource.GetDisplaySources();
+        // Step 2: PathInfo.ApplyTopology(Extend) — a single built-in CCD topology switch with NO
+        // manually-supplied path/mode structs at all, so none of the three failure modes above
+        // are even reachable. Brings the previously-disabled monitor back to SOME active state;
+        // exact position/arrangement don't matter yet — Step 3 corrects that.
+        PathInfo.ApplyTopology(DisplayConfigTopologyId.Extend, allowPersistence: false);
 
-        // Rig-discovered follow-up to the WR-02 fix above: liveMatch.DisplaySource (from
-        // GetAllPaths) is untrustworthy for an INACTIVE target (original WR-02 finding), but
-        // empirically it is ALSO untrustworthy for the currently-ACTIVE target — observed on
-        // the rig as both the active survivor AND the inactive target resolving to the same
-        // source=0, producing the exact "two paths cannot legally share one source" collision
-        // WR-02 was supposed to prevent. GetActivePaths() is the only query proven reliable for
-        // real, live source assignment, so build a device-path -> source lookup from IT (not
-        // GetAllPaths) and prefer it whenever a target is currently active.
-        var activeSourceByDevicePath = activePathsForSourceLookup
-            .SelectMany(p => p.TargetsInfo
-                .Where(t => t.DisplayTarget.IsAvailable)
-                .Select(t => (t.DisplayTarget.DevicePath, p.DisplaySource)))
-            .ToDictionary(x => x.DevicePath, x => x.DisplaySource);
+        // Step 3: re-query now that both targets are genuinely active, and reuse each REAL,
+        // live PathInfo's own TargetsInfo array UNCHANGED — the same "reuse real active
+        // TargetsInfo, only touch Position" idiom Disable() uses for its survivor reconstruction
+        // (Pitfall 1) — to move each display to its exact stored pre-disable position (and, for
+        // the target that was primary, back to (0,0), which is what makes it primary again —
+        // IsGDIPrimary is position-derived, per PathInfo.IsGDIPrimary). Resolution/pixel format
+        // are taken from the LIVE post-Extend query (not the stored snapshot) — Windows just
+        // confirmed those values are valid for this target moments ago, avoiding yet another
+        // category of "supplied mode info the driver doesn't currently consider valid" failure.
+        // Known limitation: rotation/scaling come from whatever Extend's own defaults are, not
+        // the stored snapshot, since TargetsInfo is reused unchanged — acceptable because Extend
+        // defaults to no rotation for the near-universal case of an unrotated monitor, and the
+        // verify-and-throw below (matching this method's existing scope) does not check rotation
+        // either.
+        PathInfo[] postExtendActivePaths = PathInfo.GetActivePaths(virtualModeAware: false);
 
-        var rebuilt = new List<PathInfo>();
-        foreach (var (snap, liveMatch, liveTarget) in resolved)
+        var corrected = new List<PathInfo>();
+        foreach (MonitorPathSnapshot snap in previousState.Paths)
         {
-            PathDisplaySource ownSourceForActivePath =
-                activeSourceByDevicePath.TryGetValue(snap.DevicePath, out PathDisplaySource trustedActiveSource)
-                    ? trustedActiveSource
-                    : liveMatch.DisplaySource; // fallback only; shouldn't be reached when IsPathActive is true
+            PathInfo? activeMatch = postExtendActivePaths.FirstOrDefault(p =>
+                p.TargetsInfo.Any(t => t.DisplayTarget.IsAvailable && t.DisplayTarget.DevicePath == snap.DevicePath));
 
-            PathDisplaySource sourceToUse = AssignSource(
-                liveTarget.IsPathActive,
-                ownSourceForActivePath,
-                usedSources,
-                allSources,
-                $"Cannot restore '{snap.FriendlyName}' ({snap.DevicePath})");
+            if (activeMatch is null)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot restore '{snap.FriendlyName}' ({snap.DevicePath}) — the Extend topology switch did " +
+                    "not bring it back to an active state. No further automatic recovery is attempted (D-05).");
+            }
 
-            // The (displayTarget, frequency, scanLineOrdering, rotation, scaling) constructor
-            // overload never sets IsSignalInformationAvailable=true (confirmed by reading
-            // WindowsDisplayAPI's PathTargetInfo.cs source directly — only the overloads that
-            // take an explicit PathTargetSignalInfo object set that flag). That means every
-            // previously-reconstructed target here supplied a fully-populated SOURCE mode
-            // (position/resolution/pixel format, from the PathInfo constructed below) while
-            // silently omitting TARGET mode info entirely — an inconsistent supplied-mode-info
-            // topology that is a strong suspect for the CCD validation failure observed on the
-            // rig during crash-recovery restore (PathChangeException "Invalid paths
-            // information.", confirmed reproducible, not a one-off). Constructing an explicit
-            // PathTargetSignalInfo instead ensures target mode info is genuinely supplied,
-            // matching what an internally-queried (live/active) PathTargetInfo would have.
-            // ActiveSize/TotalSize are approximated as equal to the target's resolution — this
-            // is the standard convention for digital (DisplayPort/HDMI) signals, which have no
-            // analog blanking interval, and is the best available since MonitorPathSnapshot
-            // (Plan 02) never captured full CVT/GTF timing detail.
-            var signalInfo = new PathTargetSignalInfo(
-                activeSize: new Size(snap.ResolutionWidth, snap.ResolutionHeight),
-                totalSize: new Size(snap.ResolutionWidth, snap.ResolutionHeight),
-                verticalSyncFrequencyInMillihertz: snap.FrequencyInMillihertz,
-                scanLineOrdering: (DisplayConfigScanLineOrdering)snap.ScanLineOrdering);
-
-            var reconstructedTarget = new PathTargetInfo(
-                liveTarget.DisplayTarget,
-                signalInfo,
-                (DisplayConfigRotation)snap.Rotation,
-                (DisplayConfigScaling)snap.Scaling);
-
-            // No public PathTargetInfo constructor accepts OutputTechnology — every
-            // manually-constructed instance silently defaults to
-            // DisplayConfigVideoOutputTechnology.Other, even though CaptureState()
-            // correctly captured the real value (e.g. DisplayPortExternal) into the
-            // snapshot. Telling CCD validation a DisplayPort target is "Other"
-            // technology is a strong suspect for the observed PathChangeException
-            // ("Invalid paths information."). liveTarget.OutputTechnology is reliable
-            // even for an inactive target — it describes the physical connector type,
-            // not session mode data (unlike Pitfall 2's frequency/rotation caveat).
-            CopyOutputTechnology(reconstructedTarget, liveTarget.OutputTechnology);
-
-            rebuilt.Add(new PathInfo(
-                sourceToUse,
+            corrected.Add(new PathInfo(
+                activeMatch.DisplaySource,
                 new Point(snap.PositionX, snap.PositionY),
-                new Size(snap.ResolutionWidth, snap.ResolutionHeight),
-                (DisplayConfigPixelFormat)snap.PixelFormat,
-                new[] { reconstructedTarget }));
+                activeMatch.Resolution,
+                activeMatch.PixelFormat,
+                activeMatch.TargetsInfo));
         }
 
         try
         {
-            PathInfo.ApplyPathInfos(rebuilt.ToArray(), allowChanges: true);
+            PathInfo.ApplyPathInfos(corrected.ToArray(), allowChanges: true);
         }
         catch (WindowsDisplayAPI.Exceptions.PathChangeException ex)
         {
             // Extra diagnostic detail beyond the library's generic message, since
-            // ValidatePathInfos discards the underlying Win32 error code entirely —
-            // this is the best available signal if source assignment is still wrong.
-            string attempted = string.Join("; ", rebuilt.Select(p =>
+            // ValidatePathInfos discards the underlying Win32 error code entirely.
+            string attempted = string.Join("; ", corrected.Select(p =>
                 $"{p.TargetsInfo.First().DisplayTarget.FriendlyName ?? "?"}@source={p.DisplaySource.SourceId} " +
-                $"pos=({p.Position.X},{p.Position.Y}) tech={p.TargetsInfo.First().OutputTechnology} " +
-                $"active={p.TargetsInfo.First().IsPathActive} sigInfo={p.TargetsInfo.First().IsSignalInformationAvailable} " +
-                $"modeInfo={p.IsModeInformationAvailable}"));
+                $"pos=({p.Position.X},{p.Position.Y}) tech={p.TargetsInfo.First().OutputTechnology}"));
             throw new InvalidOperationException(
                 $"Monitor restore failed CCD validation: {ex.Message} Attempted topology: {attempted}", ex);
         }
