@@ -1,23 +1,17 @@
 ---
 phase: 05-orchestration-full-toggle-packaging
 verified: 2026-07-25T19:30:00Z
-status: human_needed
+status: passed
 score: 6/6 must-haves verified
 overrides_applied: 0
-human_verification:
-  - test: "Induce a partial toggle failure (e.g. temporarily point the rig audio device at an unplugged/renamed endpoint) and click 'Switch to Rig Mode'"
-    expected: "The CORE-04 checklist MessageBox appears listing Monitor: OK, Audio: FAILED (reason), App: not attempted — not a generic exception dialog — and the mode indicator reflects the partial state (RefreshUi ran)"
-    why_human: "This is the one item from the 05-02 checkpoint the user explicitly deferred ('This was NOT verified... optional... does not block plan completion'). All static/code-review evidence supports it (FormatChecklist, result.Success branch, MessageBox wiring all present and correct), but the actual on-screen rendering of the checklist dialog has never been observed on real hardware."
-  - test: "(Low priority, defensive-only) On the rig, attempt Switch to Rig Mode with a monitor configuration that trips WindowsMonitorController.Disable's pre-mutation guards (target monitor not currently active, or target is the only active display) and confirm IsInRigMode() / 'Mode: Normal' is correctly reported afterward, not 'Mode: Rig'"
-    expected: "MainForm shows Mode: Normal (not Rig) after this specific failure, matching the CR-01 fix"
-    why_human: "CR-01 (code review) was fixed in commit 264781a with two new unit tests (ToggleToRigMode_ReturnsFailedMonitorStep_AndNotAttemptedRest_WhenDisableThrows, ToggleToRigMode_KeepsSnapshot_WhenDisableThrowsAfterPartiallyMutating) but this exact edge case never actually occurred during the extensive rig testing already performed (5+ round trips including forced-close retest) — the user's real Disable() calls always succeeded. The fix is defensive/correctness-only for a scenario that hasn't been reproduced on hardware. Not a regression in anything tested; included here only so it isn't forgotten before milestone close."
+human_verification_resolved: 2026-07-25T19:45:00Z
 ---
 
 # Phase 5: Orchestration, Full Toggle & Packaging Verification Report
 
 **Phase Goal:** The complete toggle — monitor, audio, and companion app together — works reliably in both directions from a single GUI action, survives a crash while in rig mode, reports partial failures honestly, and ships as a standalone .exe.
 **Verified:** 2026-07-25T19:30:00Z
-**Status:** human_needed
+**Status:** passed (both deferred human-verification items subsequently tested on the rig and passed — see 05-HUMAN-UAT.md)
 **Re-verification:** No — initial verification
 
 ## Goal Achievement
