@@ -274,16 +274,36 @@ public sealed class WindowsMonitorController : IMonitorController
         // this restore's snapshot — a monitor plugged in after the snapshot was
         // captured is still live and its source still off-limits), then assign each
         // INACTIVE target the first source not already reserved.
+        PathInfo[] activePathsForSourceLookup = PathInfo.GetActivePaths(virtualModeAware: false);
         var usedSources = new HashSet<PathDisplaySource>(
-            PathInfo.GetActivePaths(virtualModeAware: false).Select(p => p.DisplaySource));
+            activePathsForSourceLookup.Select(p => p.DisplaySource));
         PathDisplaySource[] allSources = PathDisplaySource.GetDisplaySources();
+
+        // Rig-discovered follow-up to the WR-02 fix above: liveMatch.DisplaySource (from
+        // GetAllPaths) is untrustworthy for an INACTIVE target (original WR-02 finding), but
+        // empirically it is ALSO untrustworthy for the currently-ACTIVE target — observed on
+        // the rig as both the active survivor AND the inactive target resolving to the same
+        // source=0, producing the exact "two paths cannot legally share one source" collision
+        // WR-02 was supposed to prevent. GetActivePaths() is the only query proven reliable for
+        // real, live source assignment, so build a device-path -> source lookup from IT (not
+        // GetAllPaths) and prefer it whenever a target is currently active.
+        var activeSourceByDevicePath = activePathsForSourceLookup
+            .SelectMany(p => p.TargetsInfo
+                .Where(t => t.DisplayTarget.IsAvailable)
+                .Select(t => (t.DisplayTarget.DevicePath, p.DisplaySource)))
+            .ToDictionary(x => x.DevicePath, x => x.DisplaySource);
 
         var rebuilt = new List<PathInfo>();
         foreach (var (snap, liveMatch, liveTarget) in resolved)
         {
+            PathDisplaySource ownSourceForActivePath =
+                activeSourceByDevicePath.TryGetValue(snap.DevicePath, out PathDisplaySource trustedActiveSource)
+                    ? trustedActiveSource
+                    : liveMatch.DisplaySource; // fallback only; shouldn't be reached when IsPathActive is true
+
             PathDisplaySource sourceToUse = AssignSource(
                 liveTarget.IsPathActive,
-                liveMatch.DisplaySource,
+                ownSourceForActivePath,
                 usedSources,
                 allSources,
                 $"Cannot restore '{snap.FriendlyName}' ({snap.DevicePath})");
