@@ -223,4 +223,23 @@ public class ToggleServiceTests
         Assert.Throws<InvalidOperationException>(() => service.ToggleToRigMode());
         Assert.DoesNotContain(callLog, entry => entry.StartsWith("snapshot.Save"));
     }
+
+    [Fact]
+    public void ToggleToNormalMode_IsNoOp_WhenNeverInRigMode()
+    {
+        // WR-01 (code review): ToggleToNormalMode is public with no enforced "must be
+        // in rig mode" precondition (MainForm happens to gate calls behind
+        // IsInRigMode(), but other/future callers are not required to). Calling it
+        // when no snapshot ever existed must be a true no-op — it must not minimize
+        // the companion app, must not touch the snapshot store's Clear(), and must
+        // return an empty (not misleadingly 1-entry) Steps list.
+        var (service, callLog, _) = CreateService();
+
+        var result = service.ToggleToNormalMode();
+
+        Assert.Empty(result.Steps);
+        Assert.DoesNotContain(callLog, entry => entry.StartsWith("app.MinimizeIfRunning"));
+        Assert.DoesNotContain(callLog, entry => entry == "snapshot.Clear");
+        Assert.False(service.IsInRigMode());
+    }
 }

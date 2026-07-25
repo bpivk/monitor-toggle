@@ -228,6 +228,15 @@ public sealed class ToggleService
                     "Your monitor and audio device were NOT restored automatically. Fix or " +
                     "delete the corrupted state file before retrying.");
             }
+
+            // WR-01 (code review): never was in rig mode (no snapshot ever existed) —
+            // there is nothing to restore. Falling through to the companion-app block
+            // below would minimize the app even though ToggleToRigMode never ran, and
+            // Clear() would operate on a snapshot that never existed. ToggleToNormalMode
+            // is public with no enforced "must be in rig mode" precondition (MainForm
+            // happens to gate calls behind IsInRigMode(), but other/future callers are
+            // not required to), so this must be a real no-op, not an implicit fallthrough.
+            return new ToggleResult(new List<ToggleStepResult>());
         }
         else
         {
