@@ -83,10 +83,36 @@ public sealed class ToggleService
         {
             // D-04 stop-on-first-failure: a failed Disable means Audio/App never run —
             // no point switching audio or launching the companion app on a monitor that
-            // never actually disabled. No rollback: the snapshot stays so a retry (or
-            // manual toggle-back) can still restore from it.
+            // never actually disabled.
             steps.Add(new ToggleStepResult("Audio", ToggleStepOutcome.NotAttempted, null));
             steps.Add(new ToggleStepResult("App", ToggleStepOutcome.NotAttempted, null));
+
+            // CR-01 (code review): WindowsMonitorController.Disable has pre-mutation
+            // validation guards (target not active / target is the only active display)
+            // that throw before any real CCD mutation is attempted — in that case
+            // nothing on the machine actually changed, so the snapshot saved above must
+            // not be left behind. Leaving it would flip IsInRigMode() to true (MainForm
+            // would show "Mode: Rig") at the exact moment this same result reports
+            // "Monitor: FAILED", even though the display was never touched. Re-capture
+            // and compare against the state captured before Disable() ran; clear the
+            // snapshot only if nothing changed. If re-capture throws, or the states
+            // differ (a real, possibly partial mutation did happen), the snapshot is
+            // kept — a retry or manual restore needs it, and silently discarding the
+            // only copy of that state would be worse than leaving it.
+            try
+            {
+                if (MonitorStateUnchanged(monitorState, _monitorController.CaptureState()))
+                {
+                    _snapshotStore.Clear();
+                }
+            }
+            catch
+            {
+                // Re-capture failed — can't confirm nothing changed, so err toward
+                // keeping the snapshot rather than risking silent loss of recoverable
+                // state.
+            }
+
             return new ToggleResult(steps);
         }
 
@@ -121,6 +147,17 @@ public sealed class ToggleService
             return false;
         }
     }
+
+    /// <summary>
+    /// Structural equality for MonitorState, used only by the CR-01 fix above. MonitorState
+    /// is a record, but its Paths member is typed IReadOnlyList&lt;T&gt; — record-generated
+    /// equality falls back to reference equality for that member (interfaces/List&lt;T&gt;
+    /// don't override Equals), so a plain `before == after` would always report "changed"
+    /// even when nothing did. SequenceEqual against MonitorPathSnapshot's own (correct,
+    /// record-generated) per-element equality avoids that trap.
+    /// </summary>
+    private static bool MonitorStateUnchanged(Models.MonitorState before, Models.MonitorState after) =>
+        before.TargetDevicePath == after.TargetDevicePath && before.Paths.SequenceEqual(after.Paths);
 
     /// <summary>
     /// True when every field ToggleToRigMode/ToggleToNormalMode depend on has been saved

@@ -32,12 +32,16 @@ public class ToggleServiceTests
     private static (ToggleService Service, List<string> CallLog, InMemorySnapshotStore SnapshotStore) CreateService(
         AppSettings? settings = null,
         bool audioThrowsOnRestore = false,
-        bool monitorThrowsOnDisable = false)
+        bool monitorThrowsOnDisable = false,
+        bool monitorMutatesBeforeThrowingOnDisable = false)
     {
         var callLog = new List<string>();
         var settingsStore = new InMemorySettingsStore(settings ?? ConfiguredSettings);
         var snapshotStore = new InMemorySnapshotStore(callLog);
-        var monitorController = new FakeMonitorController(callLog, throwOnDisable: monitorThrowsOnDisable);
+        var monitorController = new FakeMonitorController(
+            callLog,
+            throwOnDisable: monitorThrowsOnDisable,
+            mutatesBeforeThrowingOnDisable: monitorMutatesBeforeThrowingOnDisable);
         var audioController = new FakeAudioController(callLog, throwOnRestore: audioThrowsOnRestore);
         var appController = new FakeAppController(callLog);
 
@@ -154,6 +158,30 @@ public class ToggleServiceTests
 
         Assert.DoesNotContain(callLog, entry => entry.StartsWith("audio.SetDefault"));
         Assert.DoesNotContain(callLog, entry => entry.StartsWith("app.LaunchOrFocus"));
+
+        // CR-01 (code review): Disable's pre-mutation guard threw before touching live
+        // state — FakeMonitorController.CaptureState() reports the same state before and
+        // after, so the just-saved snapshot must be cleared rather than left behind.
+        // Leaving it would flip IsInRigMode() to true even though nothing was mutated.
+        Assert.False(service.IsInRigMode());
+    }
+
+    [Fact]
+    public void ToggleToRigMode_KeepsSnapshot_WhenDisableThrowsAfterPartiallyMutating()
+    {
+        // CR-01 (code review): unlike the pre-mutation-guard case above, a Disable
+        // failure that happens AFTER some real CCD mutation occurred (e.g. ApplyPathInfos
+        // succeeded but the verify-and-throw failed) must NOT clear the snapshot — the
+        // display may genuinely be in a different state now, and a retry/manual restore
+        // needs the pre-toggle snapshot to recover from it.
+        var (service, _, _) = CreateService(monitorMutatesBeforeThrowingOnDisable: true);
+
+        var result = service.ToggleToRigMode();
+
+        Assert.False(result.Success);
+        var monitorStep = result.Steps.Single(s => s.StepName == "Monitor");
+        Assert.Equal(ToggleStepOutcome.Failed, monitorStep.Outcome);
+        Assert.True(service.IsInRigMode(), "Snapshot must survive a Disable failure that may have partially mutated live state.");
     }
 
     [Fact]

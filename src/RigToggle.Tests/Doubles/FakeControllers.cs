@@ -13,11 +13,17 @@ public sealed class FakeMonitorController : IMonitorController
 {
     private readonly List<string> _callLog;
     private readonly bool _throwOnDisable;
+    private readonly bool _mutatesBeforeThrowingOnDisable;
+    private bool _disableWasCalled;
 
-    public FakeMonitorController(List<string> callLog, bool throwOnDisable = false)
+    public FakeMonitorController(
+        List<string> callLog,
+        bool throwOnDisable = false,
+        bool mutatesBeforeThrowingOnDisable = false)
     {
         _callLog = callLog;
         _throwOnDisable = throwOnDisable;
+        _mutatesBeforeThrowingOnDisable = mutatesBeforeThrowingOnDisable;
     }
 
     public IReadOnlyList<MonitorInfo> GetActiveMonitors()
@@ -29,16 +35,27 @@ public sealed class FakeMonitorController : IMonitorController
     public MonitorState CaptureState()
     {
         _callLog.Add("monitor.CaptureState");
+
+        // CR-01 test support: when _mutatesBeforeThrowingOnDisable is set, simulate a
+        // partial CCD mutation that happened before Disable's own verify-and-throw
+        // fired (as opposed to _throwOnDisable's pre-mutation guard case, which never
+        // touches live state at all) — the second CaptureState() call (post-Disable)
+        // must report a genuinely different position, proving ToggleService.
+        // MonitorStateUnchanged correctly detects "something changed" and keeps the
+        // snapshot rather than clearing it.
+        int positionX = _mutatesBeforeThrowingOnDisable && _disableWasCalled ? 999 : 0;
+
         return new MonitorState(
-            new List<MonitorPathSnapshot> { new("\\\\?\\DISPLAY#FAKE", "Fake Monitor", 0, 0, 1920, 1080, 0, 0, 0, 0, 60000UL, 0, true) },
+            new List<MonitorPathSnapshot> { new("\\\\?\\DISPLAY#FAKE", "Fake Monitor", positionX, 0, 1920, 1080, 0, 0, 0, 0, 60000UL, 0, true) },
             "\\\\?\\DISPLAY#FAKE");
     }
 
     public void Disable(string monitorDevicePath)
     {
         _callLog.Add($"monitor.Disable:{monitorDevicePath}");
+        _disableWasCalled = true;
 
-        if (_throwOnDisable)
+        if (_throwOnDisable || _mutatesBeforeThrowingOnDisable)
         {
             // D-04: simulates a CCD/topology failure, proving ToggleToRigMode records
             // Monitor=Failed and marks Audio/App NotAttempted without calling them.
