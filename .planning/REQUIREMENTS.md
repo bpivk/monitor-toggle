@@ -33,15 +33,15 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Core Toggle
 
-- [ ] **CORE-01**: User can trigger the toggle to rig mode with one action from the GUI
-- [ ] **CORE-02**: User can trigger the toggle back to normal mode with one action from the GUI
-- [ ] **CORE-03**: The app captures a full snapshot of the current monitor and audio configuration before mutating anything, so toggle-back restores exactly what was active before
-- [ ] **CORE-04**: If any step of a toggle fails partway, the app reports which steps succeeded/failed and stops rather than silently continuing or auto-reverting
-- [ ] **CORE-05**: Current mode (normal vs. rig) is correctly detected on app startup even after a crash or forced close while in rig mode
+- [x] **CORE-01**: User can trigger the toggle to rig mode with one action from the GUI
+- [x] **CORE-02**: User can trigger the toggle back to normal mode with one action from the GUI
+- [x] **CORE-03**: The app captures a full snapshot of the current monitor and audio configuration before mutating anything, so toggle-back restores exactly what was active before
+- [x] **CORE-04**: If any step of a toggle fails partway, the app reports which steps succeeded/failed and stops rather than silently continuing or auto-reverting
+- [x] **CORE-05**: Current mode (normal vs. rig) is correctly detected on app startup even after a crash or forced close while in rig mode
 
 ### Packaging
 
-- [ ] **PACKAGING-01**: The app is distributed as a standalone Windows .exe requiring no separate runtime install
+- [x] **PACKAGING-01**: The app is distributed as a standalone Windows .exe requiring no separate runtime install
 
 ## v2 Requirements
 
@@ -97,12 +97,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SETTINGS-02 | Phase 2 | Pending |
 | SETTINGS-03 | Phase 2 | Pending |
 | SETTINGS-04 | Phase 2 | Pending |
-| CORE-01 | Phase 5 | Pending |
-| CORE-02 | Phase 5 | Pending |
-| CORE-03 | Phase 5 | Pending |
-| CORE-04 | Phase 5 | Pending |
-| CORE-05 | Phase 5 | Pending |
-| PACKAGING-01 | Phase 5 | Pending |
+| CORE-01 | Phase 5 | Complete |
+| CORE-02 | Phase 5 | Complete |
+| CORE-03 | Phase 5 | Complete |
+| CORE-04 | Phase 5 | Complete |
+| CORE-05 | Phase 5 | Complete |
+| PACKAGING-01 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 18 total
