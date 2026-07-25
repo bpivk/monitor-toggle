@@ -11,25 +11,39 @@ namespace RigToggle.Tests;
 /// contract on the normal-mode path — all against hand-written recording doubles, no
 /// Windows dependency, no mocking framework.
 /// </summary>
-public class ToggleServiceTests
+public class ToggleServiceTests : IDisposable
 {
     // ToggleToRigMode now preflight-checks File.Exists(CompanionAppPath) (D-05) — the
     // happy-path fixture must point at a path that actually exists on the test host, so
     // create a real (empty) temp file rather than the fictional Program Files path.
-    private static readonly string ExistingCompanionAppPath = Path.GetTempFileName();
+    //
+    // IN-03 (code review): previously `static readonly`, which created one temp file
+    // per test-assembly run that was never deleted, leaking a file into the OS temp
+    // directory on every test run. Now an instance field (xunit constructs a fresh
+    // ToggleServiceTests instance per test method) paired with IDisposable.Dispose()
+    // below, so each test's temp file is cleaned up after that test runs. File.Delete
+    // is a no-op if the path is already gone, so Dispose() is always safe to call.
+    private readonly string ExistingCompanionAppPath = Path.GetTempFileName();
 
-    private static readonly AppSettings ConfiguredSettings = new()
+    private readonly AppSettings ConfiguredSettings;
+
+    public ToggleServiceTests()
     {
-        MonitorDevicePath = "\\\\?\\DISPLAY#PRIMARY",
-        MonitorFriendlyName = "Primary Monitor",
-        NormalAudioDeviceId = "normal-device-id",
-        NormalAudioDeviceName = "Headset",
-        RigAudioDeviceId = "rig-device-id",
-        RigAudioDeviceName = "Rig Speakers",
-        CompanionAppPath = ExistingCompanionAppPath,
-    };
+        ConfiguredSettings = new AppSettings
+        {
+            MonitorDevicePath = "\\\\?\\DISPLAY#PRIMARY",
+            MonitorFriendlyName = "Primary Monitor",
+            NormalAudioDeviceId = "normal-device-id",
+            NormalAudioDeviceName = "Headset",
+            RigAudioDeviceId = "rig-device-id",
+            RigAudioDeviceName = "Rig Speakers",
+            CompanionAppPath = ExistingCompanionAppPath,
+        };
+    }
 
-    private static (ToggleService Service, List<string> CallLog, InMemorySnapshotStore SnapshotStore) CreateService(
+    public void Dispose() => File.Delete(ExistingCompanionAppPath);
+
+    private (ToggleService Service, List<string> CallLog, InMemorySnapshotStore SnapshotStore) CreateService(
         AppSettings? settings = null,
         bool audioThrowsOnRestore = false,
         bool monitorThrowsOnDisable = false,
