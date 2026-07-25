@@ -120,3 +120,7 @@ None - no external service configuration required.
 ---
 *Phase: 05-orchestration-full-toggle-packaging*
 *Completed: 2026-07-25*
+
+## Self-Check: PASSED
+
+All claimed files verified present on disk (`src/RigToggle.App/MainForm.cs`, this SUMMARY.md); both commits (`9ef43c7` cherry-pick of Task 1, `f9a95d2` plan-metadata) verified present in `git log --oneline --all`.
