@@ -143,6 +143,11 @@ public sealed class ToggleService
         }
         catch (Exception ex)
         {
+            // IN-02 (code review): traced for the same reason as the restore-path
+            // catch blocks in ToggleToNormalMode below — no other logging exists in
+            // this codebase, and a Trace breadcrumb outlives the single
+            // ToggleStepResult/MessageBox prompt this failure is also surfaced through.
+            System.Diagnostics.Trace.WriteLine($"{stepName} step failed: {ex}");
             steps.Add(new ToggleStepResult(stepName, ToggleStepOutcome.Failed, ex.Message));
             return false;
         }
@@ -247,6 +252,13 @@ public sealed class ToggleService
             }
             catch (Exception ex)
             {
+                // IN-02 (code review): traced for the same reason as the audio-restore
+                // catch below and TryExecuteStep above — every step failure in this
+                // codebase is captured in the returned ToggleStepResult and surfaced to
+                // the user via a single MessageBox prompt, but only a Trace breadcrumb
+                // also survives past that prompt's lifetime. Previously only the audio
+                // path below did this, which was an inconsistent, unjustified asymmetry.
+                System.Diagnostics.Trace.WriteLine($"Monitor restore failed: {ex}");
                 monitorFailure = ex;
             }
 
@@ -257,9 +269,11 @@ public sealed class ToggleService
             }
             catch (Exception ex)
             {
-                // Intentionally swallowed (gap-closure 03-04): see class-level remarks.
-                // Traced (not silent) since this codebase has no other logging and a
-                // swallowed exception here would otherwise be forensically invisible.
+                // Gap-closure 03-04: audio restore is intentionally swallowed (continues
+                // rather than short-circuiting) — see class-level remarks. Traced for
+                // the same reason as every other step failure now (IN-02 code review):
+                // this codebase has no other logging, and a Trace breadcrumb outlives
+                // the single ToggleStepResult/MessageBox prompt.
                 System.Diagnostics.Trace.WriteLine($"Audio restore failed, continuing: {ex}");
                 audioFailure = ex;
             }
