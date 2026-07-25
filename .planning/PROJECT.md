@@ -17,14 +17,15 @@ A single reliable action that disables the primary monitor (not just powers it o
 - [x] Toggling back restores the exact previous default audio device across all relevant audio roles — Validated in Phase 3 (per-role capture + restore, stale-device-ID fallback via friendly-name match, per-role failure isolation added in gap-closure plan 03-04)
 - [x] Toggling to rig mode launches the Moza Companion app if it isn't already running; if it's already running, brings it to focus instead of launching a duplicate instance — Validated in Phase 3 (real Win32 P/Invoke: `Process.Start` + window-handle poll on fresh launch, `SetForegroundWindow` on already-running)
 - [x] Toggling back minimizes the Moza Companion app window (best-effort) — Validated in Phase 3 (`ShowWindow`/`SW_MINIMIZE`, always runs even if audio restore throws)
+- [x] Toggling to rig mode disables the primary monitor at the OS level (true disable) — Validated in Phase 4: Monitor Control (Production) (repositioning-aware CCD `ApplyPathInfos`, verify-and-throw against a fresh `GetActivePaths()` re-query)
+- [x] Toggling back restores the exact monitor configuration that was active immediately before toggling to rig mode — Validated in Phase 4 (full-topology snapshot, live-identity re-resolution restore) and hardened in Phase 5's crash-recovery fallback (`ApplyTopology(Extend)` + reposition-from-live-objects, rig-tested including a forced-close retest)
+- [x] User can toggle from normal mode to rig mode in one action from a GUI window — Validated in Phase 5: Orchestration, Full Toggle & Packaging (single-click, monitor+audio+app all switch together, rig-confirmed)
+- [x] User can toggle back from rig mode to normal mode in one action — Validated in Phase 5 (single-click, monitor+audio+app all restore together, rig-confirmed)
+- [x] Distributed as a standalone Windows .exe (no separate runtime install required to run it) — Validated in Phase 5 (self-contained/single-file/untrimmed win-x64 publish, rig-confirmed launch with no runtime-install prompt)
 
 ### Active
 
-- [ ] User can toggle from normal mode to rig mode in one action from a GUI window
-- [ ] Toggling to rig mode disables the primary monitor at the OS level (true disable, e.g. via Windows CCD/display API or MultiMonitorTool-equivalent — not just a DDC/CI power-off, since Windows must see only the rig monitor)
-- [ ] Toggling back restores the exact monitor configuration that was active immediately before toggling to rig mode (not a fixed hardcoded preset) — monitor side still pending Phase 4; audio side validated in Phase 3
-- [ ] User can toggle back from rig mode to normal mode in one action
-- [ ] Distributed as a standalone Windows .exe (no separate runtime install required to run it)
+None — all v1 requirements validated as of Phase 5 (2026-07-25). Phase 5 also added and validated CORE-04 (per-step partial-failure reporting) and CORE-05 (correct mode detection after a crash while in rig mode), both confirmed on the rig.
 
 ### Out of Scope
 
@@ -51,11 +52,12 @@ A single reliable action that disables the primary monitor (not just powers it o
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| True OS-level monitor disable, not power-off | Games must see only one display; power-off doesn't remove it from Windows' display list | — Pending |
-| Remember-previous-state restore, not a fixed "normal" preset | Toggle-back should always match whatever was actually active before, avoiding surprises | Audio side validated Phase 3 — Pending for monitor (Phase 4) |
-| Standalone .exe packaging | No runtime-install friction — just run the file | — Pending |
-| Manual launch only, no autostart/tray/hotkey in v1 | Keep v1 scope tight; these are easy additions later if wanted | — Pending |
+| True OS-level monitor disable, not power-off | Games must see only one display; power-off doesn't remove it from Windows' display list | Validated Phase 4 |
+| Remember-previous-state restore, not a fixed "normal" preset | Toggle-back should always match whatever was actually active before, avoiding surprises | Validated Phase 3 (audio), Phase 4 (monitor), hardened Phase 5 (crash-recovery restore) |
+| Standalone .exe packaging | No runtime-install friction — just run the file | Validated Phase 5 |
+| Manual launch only, no autostart/tray/hotkey in v1 | Keep v1 scope tight; these are easy additions later if wanted | Held for v1 — v2 backlog items (TRIG-01/TRAY-01/NOTIF-01/LOG-01) unchanged |
 | Best-effort minimize instead of guaranteed close-without-kill for Moza Companion | Can't be forced externally unless the target app supports it itself | Validated Phase 3 |
+| Stop-on-first-failure for toggle-to-rig, isolate-and-continue for toggle-to-normal | Forward steps have real dependencies (no point switching audio if the monitor never disabled); restore steps recover independent hardware state, so one failing shouldn't block the others | Validated Phase 5, rig-confirmed |
 
 ## Evolution
 
@@ -75,4 +77,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-24 — Phase 3 complete*
+*Last updated: 2026-07-25 — Phase 5 complete. All v1 requirements validated; v1.0 milestone roadmap (Phases 1-5) fully executed.*
