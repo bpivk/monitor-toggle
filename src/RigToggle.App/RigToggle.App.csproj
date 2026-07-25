@@ -4,6 +4,10 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- RuntimeIdentifier lives here (not only in the .pubxml) because `dotnet publish` CLI
+         does not honor RuntimeIdentifier set only inside a .pubxml file — see 05-RESEARCH.md
+         Pitfall 1. This project only ever targets win-x64 (D-09), so this is unconditioned. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- Intentionally no elevation manifest element of any kind: this keeps the tool asInvoker
