@@ -242,4 +242,30 @@ public class ToggleServiceTests
         Assert.DoesNotContain(callLog, entry => entry == "snapshot.Clear");
         Assert.False(service.IsInRigMode());
     }
+
+    [Fact]
+    public void Constructor_Throws_WhenAnyDependencyIsNull()
+    {
+        // WR-04 (code review): fail fast at construction time with an ArgumentNullException
+        // (matching the composition-root convention already established by MainForm's own
+        // constructor guards) rather than surfacing a far-less-actionable NullReferenceException
+        // from deep inside ToggleToRigMode/ToggleToNormalMode later.
+        var callLog = new List<string>();
+        var settingsStore = new InMemorySettingsStore(ConfiguredSettings);
+        var snapshotStore = new InMemorySnapshotStore(callLog);
+        var monitorController = new FakeMonitorController(callLog);
+        var audioController = new FakeAudioController(callLog);
+        var appController = new FakeAppController(callLog);
+
+        Assert.Throws<ArgumentNullException>(() =>
+            new ToggleService(null!, snapshotStore, monitorController, audioController, appController));
+        Assert.Throws<ArgumentNullException>(() =>
+            new ToggleService(settingsStore, null!, monitorController, audioController, appController));
+        Assert.Throws<ArgumentNullException>(() =>
+            new ToggleService(settingsStore, snapshotStore, null!, audioController, appController));
+        Assert.Throws<ArgumentNullException>(() =>
+            new ToggleService(settingsStore, snapshotStore, monitorController, null!, appController));
+        Assert.Throws<ArgumentNullException>(() =>
+            new ToggleService(settingsStore, snapshotStore, monitorController, audioController, null!));
+    }
 }

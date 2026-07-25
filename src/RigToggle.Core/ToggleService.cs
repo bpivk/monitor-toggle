@@ -31,11 +31,11 @@ public sealed class ToggleService
         IAudioController audioController,
         IAppController appController)
     {
-        _settingsStore = settingsStore;
-        _snapshotStore = snapshotStore;
-        _monitorController = monitorController;
-        _audioController = audioController;
-        _appController = appController;
+        _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
+        _snapshotStore = snapshotStore ?? throw new ArgumentNullException(nameof(snapshotStore));
+        _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
+        _audioController = audioController ?? throw new ArgumentNullException(nameof(audioController));
+        _appController = appController ?? throw new ArgumentNullException(nameof(appController));
     }
 
     /// <summary>
