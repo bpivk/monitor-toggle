@@ -288,10 +288,31 @@ public sealed class WindowsMonitorController : IMonitorController
                 allSources,
                 $"Cannot restore '{snap.FriendlyName}' ({snap.DevicePath})");
 
+            // The (displayTarget, frequency, scanLineOrdering, rotation, scaling) constructor
+            // overload never sets IsSignalInformationAvailable=true (confirmed by reading
+            // WindowsDisplayAPI's PathTargetInfo.cs source directly — only the overloads that
+            // take an explicit PathTargetSignalInfo object set that flag). That means every
+            // previously-reconstructed target here supplied a fully-populated SOURCE mode
+            // (position/resolution/pixel format, from the PathInfo constructed below) while
+            // silently omitting TARGET mode info entirely — an inconsistent supplied-mode-info
+            // topology that is a strong suspect for the CCD validation failure observed on the
+            // rig during crash-recovery restore (PathChangeException "Invalid paths
+            // information.", confirmed reproducible, not a one-off). Constructing an explicit
+            // PathTargetSignalInfo instead ensures target mode info is genuinely supplied,
+            // matching what an internally-queried (live/active) PathTargetInfo would have.
+            // ActiveSize/TotalSize are approximated as equal to the target's resolution — this
+            // is the standard convention for digital (DisplayPort/HDMI) signals, which have no
+            // analog blanking interval, and is the best available since MonitorPathSnapshot
+            // (Plan 02) never captured full CVT/GTF timing detail.
+            var signalInfo = new PathTargetSignalInfo(
+                activeSize: new Size(snap.ResolutionWidth, snap.ResolutionHeight),
+                totalSize: new Size(snap.ResolutionWidth, snap.ResolutionHeight),
+                verticalSyncFrequencyInMillihertz: snap.FrequencyInMillihertz,
+                scanLineOrdering: (DisplayConfigScanLineOrdering)snap.ScanLineOrdering);
+
             var reconstructedTarget = new PathTargetInfo(
                 liveTarget.DisplayTarget,
-                snap.FrequencyInMillihertz,
-                (DisplayConfigScanLineOrdering)snap.ScanLineOrdering,
+                signalInfo,
                 (DisplayConfigRotation)snap.Rotation,
                 (DisplayConfigScaling)snap.Scaling);
 
@@ -325,7 +346,9 @@ public sealed class WindowsMonitorController : IMonitorController
             // this is the best available signal if source assignment is still wrong.
             string attempted = string.Join("; ", rebuilt.Select(p =>
                 $"{p.TargetsInfo.First().DisplayTarget.FriendlyName ?? "?"}@source={p.DisplaySource.SourceId} " +
-                $"pos=({p.Position.X},{p.Position.Y}) tech={p.TargetsInfo.First().OutputTechnology}"));
+                $"pos=({p.Position.X},{p.Position.Y}) tech={p.TargetsInfo.First().OutputTechnology} " +
+                $"active={p.TargetsInfo.First().IsPathActive} sigInfo={p.TargetsInfo.First().IsSignalInformationAvailable} " +
+                $"modeInfo={p.IsModeInformationAvailable}"));
             throw new InvalidOperationException(
                 $"Monitor restore failed CCD validation: {ex.Message} Attempted topology: {attempted}", ex);
         }
