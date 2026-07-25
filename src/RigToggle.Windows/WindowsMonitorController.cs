@@ -352,19 +352,25 @@ public sealed class WindowsMonitorController : IMonitorController
         _originalPathsCache = null;
     }
 
-    // WindowsDisplayAPI's PathTargetInfo.OutputTechnology has no public constructor
-    // parameter — every manually-built instance defaults to
-    // DisplayConfigVideoOutputTechnology.Other regardless of the target's real
-    // connector type. This patches the compiler-generated backing field directly
-    // (the only way to correct it without depending on the library's internal
-    // constructor overload). Throws rather than silently leaving the wrong value if
-    // the library's compiled field name ever changes, so a future failure here is
-    // loud instead of silently reproducing this same bug.
+    // Phase 05 code review WR-02: NOT currently called by Disable() or Restore() in
+    // this file — Restore() was rewritten (see its own doc comment above) to never
+    // manually reconstruct PathTargetInfo/mode-info from scratch, so this
+    // backing-field patch is unused by any reachable production code path today.
+    // Kept intentionally as a documented known-good fallback from the earlier
+    // manual-reconstruction approach, in case a future WindowsDisplayAPI upgrade or
+    // hardware edge case forces a return to it — deleting it would lose already-
+    // solved, rig-hard-won knowledge, namely: WindowsDisplayAPI's
+    // PathTargetInfo.OutputTechnology has no public constructor parameter — every
+    // manually-built instance defaults to DisplayConfigVideoOutputTechnology.Other
+    // regardless of the target's real connector type. This patches the
+    // compiler-generated backing field directly (the only way to correct it without
+    // depending on the library's internal constructor overload). Throws rather than
+    // silently leaving the wrong value if the library's compiled field name ever
+    // changes, so a future failure here is loud instead of silently reproducing this
+    // same bug.
     // Internal (not private) + tested directly (RigToggle.Windows.Tests, see
-    // InternalsVisibleTo below) — this is the one piece of Restore()'s reconstruction
-    // logic that's fully unit-testable without live display hardware, and a routine
-    // WindowsDisplayAPI package upgrade could silently reintroduce this exact bug
-    // (04-03 SUMMARY.md WR-05) if nothing catches it before the rig does.
+    // InternalsVisibleTo below) so it stays correct and ready to reuse even while
+    // unreachable from production code (originally added per 04-03 SUMMARY.md WR-05).
     internal static void CopyOutputTechnology(PathTargetInfo target, DisplayConfigVideoOutputTechnology technology)
     {
         var field = typeof(PathTargetInfo).GetField(
@@ -380,11 +386,20 @@ public sealed class WindowsMonitorController : IMonitorController
         field.SetValue(target, technology);
     }
 
-    // Pure, testable extraction of Restore()'s fallback source-assignment rule (WR-02
-    // fix, pinned by RigToggle.Windows.Tests): an already-ACTIVE target keeps its own
-    // (correct, currently-in-use) source; an INACTIVE target gets the first source not
-    // already reserved in usedSources — mutating usedSources as sources are claimed, so
-    // sequential calls across multiple targets don't double-assign the same source.
+    // Phase 05 code review WR-02: like CopyOutputTechnology above, NOT currently
+    // called by Disable() or Restore() in this file — the current Restore() only
+    // ever reuses real, live-queried PathInfo/PathTargetInfo objects wholesale via
+    // the two-step ApplyTopology(Extend) + reposition approach, so no source is ever
+    // manually assigned today. Kept intentionally as a documented known-good
+    // fallback from the earlier manual-reconstruction approach (originally added per
+    // 04-03's own WR-02 fix): pure, testable extraction of that approach's
+    // source-assignment rule, pinned by RigToggle.Windows.Tests so it stays correct
+    // and ready to reuse if a future package upgrade or hardware edge case forces a
+    // return to manual reconstruction — an already-ACTIVE target keeps its own
+    // (correct, currently-in-use) source; an INACTIVE target gets the first source
+    // not already reserved in usedSources — mutating usedSources as sources are
+    // claimed, so sequential calls across multiple targets don't double-assign the
+    // same source.
     internal static PathDisplaySource AssignSource(
         bool isPathActive,
         PathDisplaySource ownSource,
