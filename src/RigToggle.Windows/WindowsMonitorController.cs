@@ -264,7 +264,22 @@ public sealed class WindowsMonitorController : IMonitorController
         // manually-supplied path/mode structs at all, so none of the three failure modes above
         // are even reachable. Brings the previously-disabled monitor back to SOME active state;
         // exact position/arrangement don't matter yet — Step 3 corrects that.
-        PathInfo.ApplyTopology(DisplayConfigTopologyId.Extend, allowPersistence: false);
+        try
+        {
+            PathInfo.ApplyTopology(DisplayConfigTopologyId.Extend, allowPersistence: false);
+        }
+        catch (Exception ex)
+        {
+            // WR-03 (code review): without this wrapper, a native CCD topology-switch
+            // failure here propagates as the library's raw, comparatively cryptic
+            // exception, unlike the sibling ApplyPathInfos call below (Step 3), which is
+            // already wrapped for diagnosability. This is the crash-recovery fallback
+            // path only reachable when the process restarted between Disable() and
+            // Restore() — exactly the scenario where the user has the least context to
+            // debug a bare library message.
+            throw new InvalidOperationException(
+                $"Monitor restore failed while switching to Extend topology: {ex.Message}", ex);
+        }
 
         // Step 3: re-query now that both targets are genuinely active, and reuse each REAL,
         // live PathInfo's own TargetsInfo array UNCHANGED — the same "reuse real active
