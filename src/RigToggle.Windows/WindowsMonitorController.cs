@@ -130,8 +130,11 @@ public sealed class WindowsMonitorController : IMonitorController
         }
 
         PathInfo[] pathsToApply;
-        if (targetPath.IsGDIPrimary && survivors.Length > 0)
+        if (targetPath.IsGDIPrimary)
         {
+            // IN-01 (code review): survivors.Length > 0 is always true here — the
+            // survivors.Length == 0 case already threw above, so this branch can never
+            // be reached with an empty survivors array. Dropped the redundant clause.
             // Pitfall 1: shift ALL survivors by the same uniform delta (not just the
             // promoted one) so relative layout is preserved — Position has no public
             // setter, so a fresh PathInfo must be constructed per survivor.
