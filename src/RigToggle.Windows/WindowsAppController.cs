@@ -232,21 +232,31 @@ public sealed class WindowsAppController : IAppController
                 IntPtr hWnd = FindBestMainWindow((uint)p.Id);
                 if (hWnd != IntPtr.Zero)
                 {
-                    // Diagnostic-only instrumentation for the toggle-back regression
-                    // investigation (quick task 260726-ixu, follow-up to 260726-idx): capture
-                    // the target window's real visible/iconic state immediately before and
-                    // after the unconditional ShowWindow(SW_MINIMIZE) call, and the call's own
-                    // return value. No control flow changed -- same target, same unconditional
-                    // minimize, same break.
+                    // Diagnostic instrumentation (quick task 260726-ixu) proved the
+                    // unconditional ShowWindow(SW_MINIMIZE) call below was the toggle-back
+                    // regression: when the window was already hidden/tray-only
+                    // (IsWindowVisible=False) before this call, the call forced it back to
+                    // a visible minimized taskbar icon (IsWindowVisible flips True) -- the
+                    // direct cause of "the Moza window is suddenly open" after toggling back
+                    // to normal mode. Fix (260726-j9y): only minimize when the window is
+                    // currently visible on-screen; an already-hidden window is already out
+                    // of the way and must be left untouched.
                     bool preVisible = NativeMethods.IsWindowVisible(hWnd);
                     bool preIconic = NativeMethods.IsIconic(hWnd);
                     Log($"MinimizeIfRunning: pre-minimize hWnd=0x{hWnd:X}, IsWindowVisible={preVisible}, IsIconic={preIconic}");
 
-                    bool showWindowReturned = NativeMethods.ShowWindow(hWnd, NativeMethods.SW_MINIMIZE); // best-effort
+                    if (preVisible)
+                    {
+                        bool showWindowReturned = NativeMethods.ShowWindow(hWnd, NativeMethods.SW_MINIMIZE); // best-effort
 
-                    bool postVisible = NativeMethods.IsWindowVisible(hWnd);
-                    bool postIconic = NativeMethods.IsIconic(hWnd);
-                    Log($"MinimizeIfRunning: post-minimize hWnd=0x{hWnd:X}, IsWindowVisible={postVisible}, IsIconic={postIconic}, ShowWindowReturned={showWindowReturned}");
+                        bool postVisible = NativeMethods.IsWindowVisible(hWnd);
+                        bool postIconic = NativeMethods.IsIconic(hWnd);
+                        Log($"MinimizeIfRunning: post-minimize hWnd=0x{hWnd:X}, IsWindowVisible={postVisible}, IsIconic={postIconic}, ShowWindowReturned={showWindowReturned}");
+                    }
+                    else
+                    {
+                        Log($"MinimizeIfRunning: skipped minimize hWnd=0x{hWnd:X} — window already hidden (IsWindowVisible=false)");
+                    }
 
                     break;
                 }
