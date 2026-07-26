@@ -26,10 +26,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Settings
 
-- [ ] **SETTINGS-01**: User can select which monitor is the "primary to disable" from a list of detected displays
-- [ ] **SETTINGS-02**: User can select which audio devices form the toggle pair (normal device, rig device) from a list of detected audio endpoints
-- [ ] **SETTINGS-03**: User can specify the file path of the companion app to launch/focus/minimize
-- [ ] **SETTINGS-04**: Settings persist across app restarts
+- [x] **SETTINGS-01**: User can select which monitor is the "primary to disable" from a list of detected displays
+- [x] **SETTINGS-02**: User can select which audio devices form the toggle pair (normal device, rig device) from a list of detected audio endpoints
+- [x] **SETTINGS-03**: User can specify the file path of the companion app to launch/focus/minimize
+- [x] **SETTINGS-04**: Settings persist across app restarts
 
 ### Core Toggle
 
@@ -93,10 +93,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | APP-01 | Phase 3 | Complete |
 | APP-02 | Phase 3 | Complete |
 | APP-03 | Phase 3 | Complete |
-| SETTINGS-01 | Phase 2 | Pending |
-| SETTINGS-02 | Phase 2 | Pending |
-| SETTINGS-03 | Phase 2 | Pending |
-| SETTINGS-04 | Phase 2 | Pending |
+| SETTINGS-01 | Phase 2 | Complete |
+| SETTINGS-02 | Phase 2 | Complete |
+| SETTINGS-03 | Phase 2 | Complete |
+| SETTINGS-04 | Phase 2 | Complete |
 | CORE-01 | Phase 5 | Complete |
 | CORE-02 | Phase 5 | Complete |
 | CORE-03 | Phase 5 | Complete |
@@ -111,4 +111,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-07-24*
-*Last updated: 2026-07-24 after roadmap creation*
+*Last updated: 2026-07-26 after v1.0 milestone completion (SETTINGS-01..04 checkbox/traceability corrected — feature was already shipped in Phase 2)*
