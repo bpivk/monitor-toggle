@@ -8,6 +8,19 @@ A Windows GUI utility that switches between "normal desktop mode" and "Moza rig 
 
 A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches (e.g. BeamNG.drive minimizing itself) reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
 
+## Current Milestone: v1.1 Automation & Multi-Monitor
+
+**Goal:** Remove the remaining daily-use friction (must open the GUI to toggle; only one monitor can be disabled) by adding background/automated triggering and generalizing monitor control to arbitrary multi-monitor rigs.
+
+**Target features:**
+- Tray residency (autostart on boot, minimize-to-tray on close) with a tray icon context menu (Switch to Rig/Normal Mode, Settings, Exit), configurable via Settings
+- Global hotkey trigger (Windows-wide keyboard shortcut)
+- CLI trigger (command-line args for macro pads / Stream Deck / external tools)
+- Toast/status notification confirming a toggle when triggered without the GUI open
+- Multi-monitor enable/disable configuration: independently-configurable "disable" and "enable" monitor sets applied when entering rig mode (mirrored on toggle-back) — generalizes v1.0's single "primary monitor to disable" to arbitrary multi-monitor desks and a rig monitor that's normally kept OS-disabled to save power
+
+**Deferred from this milestone:** LOG-01 (toggle history/log) — still a nice-to-have, lower priority than the above.
+
 ## Requirements
 
 ### Validated
@@ -25,13 +38,16 @@ A single reliable action that disables the primary monitor (not just powers it o
 
 ### Active
 
-None — all v1 requirements validated as of Phase 5 (2026-07-25). Phase 5 also added and validated CORE-04 (per-step partial-failure reporting) and CORE-05 (correct mode detection after a crash while in rig mode), both confirmed on the rig.
+- [ ] Tray residency, autostart, minimize-to-tray-on-close, and tray icon context menu (v1.1 — REQUIREMENTS.md defines exact REQ-IDs)
+- [ ] Global hotkey trigger (v1.1)
+- [ ] CLI trigger for external tools (v1.1)
+- [ ] Toast/status notification on toggle (v1.1)
+- [ ] Multi-monitor enable/disable configuration, generalizing the single "primary monitor to disable" setting (v1.1)
 
 ### Out of Scope
 
-- Global hotkey trigger — deferred, GUI-only trigger for v1
-- System tray residency / auto-start on Windows boot — deferred, manual launch only for v1
 - Guaranteed true "close main window, keep process running" — not reliably possible to force externally on an arbitrary app; best-effort minimize is the fallback, not a v1 guarantee
+- Toggle history/log (LOG-01) — deferred again past v1.1, still lower priority than the automation/multi-monitor features
 
 ## Context
 
@@ -57,7 +73,7 @@ None — all v1 requirements validated as of Phase 5 (2026-07-25). Phase 5 also 
 | True OS-level monitor disable, not power-off | Games must see only one display; power-off doesn't remove it from Windows' display list | Validated Phase 4 |
 | Remember-previous-state restore, not a fixed "normal" preset | Toggle-back should always match whatever was actually active before, avoiding surprises | Validated Phase 3 (audio), Phase 4 (monitor), hardened Phase 5 (crash-recovery restore) |
 | Standalone .exe packaging | No runtime-install friction — just run the file | Validated Phase 5 |
-| Manual launch only, no autostart/tray/hotkey in v1 | Keep v1 scope tight; these are easy additions later if wanted | Held for v1 — v2 backlog items (TRIG-01/TRAY-01/NOTIF-01/LOG-01) unchanged |
+| Manual launch only, no autostart/tray/hotkey in v1 | Keep v1 scope tight; validate the GUI-click flow before adding automation | Held for v1 — TRIG-01/TRAY-01/NOTIF-01 taken up in v1.1 now that the core flow is rig-validated and hardened; LOG-01 still deferred |
 | Best-effort minimize instead of guaranteed close-without-kill for Moza Companion | Can't be forced externally unless the target app supports it itself | Validated Phase 3 |
 | Stop-on-first-failure for toggle-to-rig, isolate-and-continue for toggle-to-normal | Forward steps have real dependencies (no point switching audio if the monitor never disabled); restore steps recover independent hardware state, so one failing shouldn't block the others | Validated Phase 5, rig-confirmed |
 | Relaunch-based (`ShellExecute`) app activation instead of window-handle focus manipulation | Rig-testing proved any raw external `SetForegroundWindow`/`ShowWindow` call on Moza's window desyncs something in its own window procedure, permanently disabling its close button; a well-behaved single-instance app already handles "already running, activate me" internally when relaunched, so RigToggle never needs to touch a window it doesn't own | Validated post-ship 2026-07-26, rig-confirmed both directions (`.planning/debug/resolved/moza-foreground-focus.md`) |
@@ -82,4 +98,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-26 — v1.0 milestone complete and archived. All 18 v1 requirements validated; post-ship hardening (H9 close-button fix, relaunch-based app activation, Settings generalization, opt-in debug logging) folded into this milestone.*
+*Last updated: 2026-07-26 — v1.1 milestone started (tray residency, global hotkey, CLI trigger, toast notification, multi-monitor enable/disable configuration).*

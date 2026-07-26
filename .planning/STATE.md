@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: MVP
-status: Awaiting next milestone
-stopped_at: Milestone v1.0 complete and archived
-last_updated: "2026-07-26T14:42:28.726Z"
-last_activity: 2026-07-26 — Milestone v1.0 completed and archived
+milestone: v1.1
+milestone_name: Automation & Multi-Monitor
+status: planning
+last_updated: "2026-07-26T19:20:11.808Z"
+last_activity: 2026-07-26
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 18
-  completed_plans: 18
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
-**Current focus:** Milestone complete
+**Current focus:** v1.1 — defining requirements (tray residency, hotkey/CLI trigger, toast notification, multi-monitor enable/disable)
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-26 — Milestone v1.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-07-26 — Milestone v1.1 started
 
 ## Performance Metrics
 
@@ -89,10 +88,10 @@ Items acknowledged and carried forward from previous milestone close:
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| v2 | TRIG-01 (global hotkey trigger) | Deferred to v2 | Initial requirements definition |
-| v2 | TRAY-01 (tray residency / autostart) | Deferred to v2 | Initial requirements definition |
-| v2 | NOTIF-01 (toast notification on toggle) | Deferred to v2 | Initial requirements definition |
-| v2 | LOG-01 (toggle history/log) | Deferred to v2 | Initial requirements definition |
+| v1.1 | TRIG-01 (global hotkey trigger) | Taken up in v1.1 | Initial requirements definition (v1.0) |
+| v1.1 | TRAY-01 (tray residency / autostart) | Taken up in v1.1 | Initial requirements definition (v1.0) |
+| v1.1 | NOTIF-01 (toast notification on toggle) | Taken up in v1.1 | Initial requirements definition (v1.0) |
+| v2 | LOG-01 (toggle history/log) | Still deferred | Initial requirements definition (v1.0); re-deferred at v1.1 scoping |
 
 Items acknowledged and deferred at v1.0 milestone close on 2026-07-26 (pre-close artifact audit — both are scanner false positives, not real gaps, confirmed by direct inspection):
 
@@ -109,4 +108,4 @@ Resume file: none — start the next milestone with /gsd-new-milestone
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Define v1.1 requirements, then create the roadmap
