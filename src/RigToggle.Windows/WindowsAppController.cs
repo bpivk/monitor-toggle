@@ -232,7 +232,22 @@ public sealed class WindowsAppController : IAppController
                 IntPtr hWnd = FindBestMainWindow((uint)p.Id);
                 if (hWnd != IntPtr.Zero)
                 {
-                    NativeMethods.ShowWindow(hWnd, NativeMethods.SW_MINIMIZE); // best-effort
+                    // Diagnostic-only instrumentation for the toggle-back regression
+                    // investigation (quick task 260726-ixu, follow-up to 260726-idx): capture
+                    // the target window's real visible/iconic state immediately before and
+                    // after the unconditional ShowWindow(SW_MINIMIZE) call, and the call's own
+                    // return value. No control flow changed -- same target, same unconditional
+                    // minimize, same break.
+                    bool preVisible = NativeMethods.IsWindowVisible(hWnd);
+                    bool preIconic = NativeMethods.IsIconic(hWnd);
+                    Log($"MinimizeIfRunning: pre-minimize hWnd=0x{hWnd:X}, IsWindowVisible={preVisible}, IsIconic={preIconic}");
+
+                    bool showWindowReturned = NativeMethods.ShowWindow(hWnd, NativeMethods.SW_MINIMIZE); // best-effort
+
+                    bool postVisible = NativeMethods.IsWindowVisible(hWnd);
+                    bool postIconic = NativeMethods.IsIconic(hWnd);
+                    Log($"MinimizeIfRunning: post-minimize hWnd=0x{hWnd:X}, IsWindowVisible={postVisible}, IsIconic={postIconic}, ShowWindowReturned={showWindowReturned}");
+
                     break;
                 }
             }

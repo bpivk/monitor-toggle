@@ -26,6 +26,18 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+    // Read-only diagnostic queries re-added for the toggle-back investigation into
+    // MinimizeIfRunning (quick task 260726-ixu). Not used for any control-flow decision --
+    // purely to log the target window's visible/iconic state before and after the
+    // ShowWindow(SW_MINIMIZE) call.
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsIconic(IntPtr hWnd);
+
     // .NET's own Process.MainWindowHandle only returns a non-zero handle for a
     // top-level, owner-less window where IsWindowVisible == true (documented .NET
     // internal heuristic). Companion apps that use the common WinForms "minimize/close
