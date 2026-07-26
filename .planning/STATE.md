@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
+milestone_name: MVP
 status: Awaiting next milestone
-stopped_at: Phase 5 context gathered
+stopped_at: Milestone v1.0 complete and archived
 last_updated: "2026-07-26T14:42:28.726Z"
 last_activity: 2026-07-26 — Milestone v1.0 completed and archived
 progress:
@@ -18,7 +18,7 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-24)
+See: .planning/PROJECT.md (updated 2026-07-26)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
 **Current focus:** Milestone complete
@@ -34,7 +34,7 @@ Last activity: 2026-07-26 — Milestone v1.0 completed and archived
 
 **Velocity:**
 
-- Total plans completed: 16
+- Total plans completed: 18
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -58,11 +58,7 @@ Last activity: 2026-07-26 — Milestone v1.0 completed and archived
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
-
-- Roadmap: Phase 1 (monitor-disable spike) is sequenced first out of normal dependency order — it's the project's one unvalidated core assumption and must be answered before other work is sunk in.
-- Roadmap: Coarse granularity merged research's suggested 8 phases into 5 — data/persistence merged with GUI shell (Phase 2), app control merged with audio control (Phase 3), orchestration wiring merged with packaging (Phase 5).
+Full decision log lives in PROJECT.md's Key Decisions table (all v1.0 decisions, including post-ship hardening, recorded there as of the v1.0 milestone close).
 
 ### Pending Todos
 
@@ -70,13 +66,11 @@ None.
 
 ### Known Limitations
 
-- **RESOLVED — Moza Companion close-button-inert symptom (H9), fully rig-verified 2026-07-26:** Moza Companion's window close (X) button, Alt+F4, and taskbar "Close window" previously became inert specifically on windows that RigToggle itself brought to the foreground. This had two independent directions, both now fixed and rig-confirmed: (a) toggle-TO-rig-mode direction fixed by `260726-idx`'s relaunch (ShellExecute) redesign, which never touches Moza's window at all; (b) toggle-TO-normal-mode (toggle-back) direction fixed by `260726-j9y`'s skip-when-hidden gate in `MinimizeIfRunning`, confirmed by rig `debug.log` evidence on 2026-07-26 (16:05–16:06) showing both the skip-minimize path (already-hidden window left untouched) and the normal visible-window minimize path behaving correctly in the same session. User confirmed: "Yes. This works now." Resolution chain: `260726-idx` (redesign launch/focus) → `260726-ixu` (added diagnostic logging that captured the toggle-back regression) → `260726-j9y` (fixed toggle-back via skip-when-hidden gate). Full investigation history: `.planning/debug/resolved/moza-foreground-focus.md`.
 - The relaunch-based launch redesign's `MinimizeIfRunning`/`IsRunning` (toggle-back) still derive the process name from the configured launch-target path via `Path.GetFileNameWithoutExtension`. If the user configures a `.lnk` (rather than the target `.exe` itself) as the launch target, that derived name will typically not match the real running process name, so toggle-back's minimize call may silently no-op. Documented, not patched (out of scope for the redesign — `MinimizeIfRunning` is explicitly unchanged).
 
 ### Blockers/Concerns
 
-- Phase 1: RESOLVED — spike/RESULTS-TEMPLATE.md now records a GO decision (non-elevated CCD topology-path-removal confirmed working on this rig's AMD Radeon/DisplayPort hardware for a non-primary display). Remaining caveat carried into Phase 4: disabling the PRIMARY monitor specifically threw `PathChangeException` twice (Windows requires a display at (0,0); `WindowsDisplayAPI.PathInfo.Position` has no public setter to reposition the remaining display first) — a scoped, known engineering task for Phase 4, not a feasibility blocker. Fallback (pnputil/elevation) was not needed and not tested.
-- Phase 4/5: Elevation requirements differ per subsystem (monitor/audio/window focus); requesting broad admin rights would break cross-process window focus on the companion app via UIPI — must default to asInvoker and confirm per-operation needs empirically. (Confirmed non-elevated for audio in Phase 3; monitor mechanism also non-elevated per Phase 1 spike.)
+None open. All v1.0 blockers resolved (Phase 1 monitor-disable feasibility, Phase 4/5 elevation requirements) — see PROJECT.md Key Decisions and `.planning/milestones/v1.0-ROADMAP.md` for the historical record.
 
 ### Quick Tasks Completed
 
@@ -109,9 +103,9 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-26 (pre-close
 
 ## Session Continuity
 
-Last session: 2026-07-24T21:48:46.566Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-orchestration-full-toggle-packaging/05-CONTEXT.md
+Last session: 2026-07-26T14:42:28.766Z
+Stopped at: v1.0 milestone completed and archived
+Resume file: none — start the next milestone with /gsd-new-milestone
 
 ## Operator Next Steps
 
