@@ -1,337 +1,112 @@
-# Pitfalls Research
+# Domain Pitfalls
 
-**Domain:** Windows desktop GUI utility — programmatic display enable/disable (CCD/device-node APIs), default audio device switching (undocumented COM interface), cross-process window management, standalone .exe packaging
-**Researched:** 2026-07-24
-**Confidence:** MEDIUM-HIGH (Win32/CCD/COM behavior confirmed via Microsoft Learn + driver docs + multiple independent implementations; packaging/AV behavior confirmed via multiple community reports; some specifics — e.g. exact SmartScreen thresholds, per-GPU-vendor CCD quirks — are LOW confidence and flagged individually)
+**Domain:** Adding tray residency, autostart, global hotkey, CLI-to-running-instance IPC, toast notifications, and generalized multi-monitor CCD enable/disable to an already-shipped, non-elevated, single-file WinForms utility (Rig Toggle v1.1)
+**Researched:** 2026-07-26
+**Scope note:** This is a *subsequent-milestone* pitfalls pass. It supersedes the v1.0-era `PITFALLS.md` content (that research — CCD "no disconnect flag", elevation/UIPI cascading, cross-process window focus — is preserved in project history and in `.planning/milestones/v1.0-phases/01-monitor-disable-feasibility-spike/01-RESEARCH.md`; its conclusions were already validated and shipped, so it is not repeated here). This pass assumes the v1.0 codebase read directly for this research (`src/RigToggle.App/Program.cs`, `src/RigToggle.Core/ToggleService.cs`, `src/RigToggle.App/MainForm.cs`, `src/RigToggle.Windows/WindowsAppController.cs`, `src/RigToggle.Windows/WindowsMonitorController.cs`) and two pieces of hard-won project history: `.planning/milestones/v1.0-phases/01-monitor-disable-feasibility-spike/01-RESEARCH.md` + `01-VERIFICATION.md` (the CCD feasibility spike and its own Pitfalls A-D) and `.planning/debug/resolved/moza-foreground-focus.md` (a 10-round, evidence-driven debug session whose general lesson — raw external Win32/driver state-mutation on a resource you don't fully control can desync in ways only real-hardware testing surfaces — is treated here as a transferable methodology, not a one-off Moza bug).
 
 ## Critical Pitfalls
 
-### Pitfall 1: "CCD API" doesn't have a public "disconnect this display" flag — the naive implementation only powers the monitor off or fails silently
-
-**What goes wrong:**
-Teams assume `SetDisplayConfig`/the CCD API exposes something equivalent to the Settings app's "Disconnect this display" button. It does not. There is no documented `SDC_*` flag or `DISPLAYCONFIG_PATH_INFO` field that maps directly to that UI action — Microsoft has confirmed on Q&A that no supported way to script per-monitor "disconnect" exists via the public API surface. Developers who reach for the obvious API (`ChangeDisplaySettingsEx` with a null/zeroed `DEVMODE`, or naive `SetDisplayConfig` calls) end up with a monitor that is blanked/powered-down (DPMS-style) but still enumerated by Windows as an active display — which is exactly the failure mode this project exists to avoid (games still see two displays and BeamNG-style self-minimize bugs persist).
-
-**Why it happens:**
-The public Win32 display API was designed for topology configuration (position, resolution, primary designation), not device presence toggling. The actual mechanisms that achieve a true "vanishes from Windows' display list" effect are either (a) supplying `SetDisplayConfig` a topology array that **omits the target's path entirely** using `SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG` (or `SDC_TOPOLOGY_SUPPLIED`) without `SDC_PATH_PERSIST_IF_REQUIRED`, which removes the path from the active configuration without touching the device node — the closest public-API equivalent to "Disconnect this display" — or (b) disabling the monitor's device node in Device Manager via `CM_Disable_DevNode` (cfgmgr32), which is a heavier operation (affects the driver/device instance, generally needs elevation, and by default re-enables after reboot unless `CM_DISABLE_PERSIST` is used on Windows 10+). Tools like NirSoft's MultiMonitorTool exist precisely because neither of these is discoverable from casual API browsing.
-
-**How to avoid:**
-- Prototype both approaches (topology-path-removal via `SetDisplayConfig`, and `CM_Disable_DevNode`) against the actual rig hardware/GPU driver before committing to an architecture — behavior can differ by GPU vendor (NVIDIA/AMD/Intel) and driver version (LOW confidence, unverified for this specific rig — must be hardware-tested).
-- Treat "topology-path-removal" as the preferred approach since it doesn't require touching the device driver state and is closer to what the OS-native "Disconnect" button does; reserve `CM_Disable_DevNode` as a fallback only if path-removal proves insufficient for the target games.
-- Do not use `ChangeDisplaySettingsEx`/legacy DEVMODE-zeroing as the primary mechanism — it is a legacy API from before CCD existed and its "detach" behavior is inconsistent on modern WDDM drivers.
-
-**Warning signs:**
-- After "disable," the monitor still appears in `EnumDisplayMonitors`, Task Manager's Performance tab, or Windows' own Display Settings list.
-- The target game still detects two displays or still exhibits the misbehavior (e.g., BeamNG self-minimize) that motivated this project.
-- Disable "succeeds" (no error) but visually the monitor just goes black/standby instead of Windows re-arranging remaining desktop icons/taskbar as it does on a real disconnect.
-
-**Phase to address:**
-Must be resolved as a spike/proof-of-concept *before* the monitor-disable feature is considered architecturally settled — this determines the core technical approach for the whole project and should be the first phase, not discovered mid-implementation.
-
----
-
-### Pitfall 2: Elevation (admin) requirements are inconsistent across the three subsystems, and requesting admin broadly breaks cross-process window control
-
-**What goes wrong:**
-Disabling a monitor via `CM_Disable_DevNode` (device-node disable) requires administrator privileges; disabling via `SetDisplayConfig` topology-path-removal generally works for the interactive console-session user without elevation; switching the default audio device via the undocumented `IPolicyConfig` COM interface does **not** require elevation. If a developer defaults to marking the whole app's manifest `requireAdministrator` "just to be safe" (common reflex once one operation needs it), every other Win32 call that touches *another process's* window — `SetForegroundWindow`, `ShowWindow`, `BringWindowToTop` on the Moza Companion window — silently stops working or behaves unreliably. This is because of User Interface Privilege Isolation (UIPI): a lower-integrity (non-elevated) process's window generally cannot receive focus-forcing calls from a higher-integrity (elevated) process, and normal foreground-lock rules also apply (a process can only steal foreground focus under specific conditions: it is the current foreground process, was started by it, received the last input event, etc.).
-
-**Why it happens:**
-Windows elevation is not a single on/off switch conceptually developers can reason about uniformly — different subsystems (Device Manager/PnP, CCD, Core Audio policy) have different, undocumented elevation requirements, and UAC's per-manifest, whole-process elevation model doesn't allow "elevate just this one Win32 call." Developers discover the admin requirement for one call, apply it globally via the app manifest, and only later discover unrelated window-management code has broken.
-
-**How to avoid:**
-- Determine the actual minimum-privilege requirement per operation empirically before writing the manifest (test topology-path-removal disable specifically — it likely does NOT need elevation, unlike `CM_Disable_DevNode`).
-- Prefer the non-elevation-requiring disable mechanism (Pitfall 1) specifically because it avoids this cascading problem.
-- If any operation genuinely requires elevation, isolate it in a separate short-lived elevated helper process (invoked via `ShellExecute` with `runas`, communicating results back over a pipe/exit code) rather than elevating the main GUI process — keep the main app (which does window focus/management) running at the same integrity level as Moza Companion (normal user).
-- Never set `requestedExecutionLevel="requireAdministrator"` reflexively; default to `asInvoker` and add elevation surgically only where proven necessary.
-
-**Warning signs:**
-- `SetForegroundWindow`/`ShowWindow` calls against the Moza Companion window return success/no exception but the window visually does not come to front (classic UIPI symptom, not a coding bug).
-- Feature works fine when both apps are run from the same elevated/non-elevated launch context during dev testing, but breaks for the real end-user launch scenario (double-clicking .exe from Explorer, no elevation).
-
-**Phase to address:**
-Must be validated during the display-control and app-launch/window-management phases — specifically, before considering the "bring Moza Companion to focus" requirement done, test it with Rig Toggle running unelevated (the expected real-world case) and confirm the display-disable mechanism chosen doesn't force elevation.
-
----
-
-### Pitfall 3: Race condition — disabling a monitor while windows/fullscreen apps are still displayed on it
-
-**What goes wrong:**
-When a monitor is removed from the active topology, Windows must relocate any windows that were on it to a remaining display. This relocation is not always graceful: maximized windows can lose their maximized state, windows can end up with mismatched DPI/scaling if the two monitors have different scale factors, and windows can be repositioned using raw coordinate math that leaves them partially or fully off-screen once the monitor is later re-enabled (because their last-known position assumed the now-removed monitor's coordinate space). If the primary desk monitor is the one being disabled while normal desktop windows are on it (the exact scenario in this project — "disable the primary monitor"), users can end up with orphaned windows, a jarring taskbar/Start-menu relocation (both are tied to whichever monitor becomes primary), and potential focus-loss if the disabled monitor held the currently-focused window.
-
-**Why it happens:**
-CCD topology changes are applied as an atomic OS-level operation, but window-manager-level consequences (relocation, restacking, DPI rescaling) happen as a best-effort side effect the app has no direct control over and cannot roll back.
-
-**How to avoid:**
-- Enumerate windows on the target monitor before disabling and either explicitly move them to the remaining monitor (preserving relative position/maximized state yourself) or, at minimum, warn/require the user to have moved things off it (acceptable for a personal single-user tool, but must be a documented behavior, not an accident).
-- Re-query monitor/window layout immediately after disable and log/verify no window ended up with negative or out-of-bounds coordinates.
-- Test explicitly with a maximized window and a fullscreen-exclusive game window on the target monitor at disable-time — these are the two cases most likely to break silently.
-
-**Warning signs:**
-- Windows that were on the primary monitor "disappear" (moved off-screen) after toggling to rig mode.
-- Taskbar or Start menu unexpectedly relocates to the rig monitor and doesn't return after toggle-back.
-- The game itself crashes or renders incorrectly if launched/running exactly during the disable operation (timing-dependent — only reproduces if disable happens while the game process already has a window handle open).
-
-**Phase to address:**
-Must be validated before the monitor-disable feature is considered done — include an explicit test case in that phase's acceptance criteria: "disable with a maximized window on the target monitor; verify no window is lost or left inaccessible."
-
----
-
-### Pitfall 4: Audio device identity is not stable — GUIDs/IDs used for the snapshot can silently point to nothing (or the wrong device) later
-
-**What goes wrong:**
-Windows Core Audio device IDs (the endpoint ID strings, e.g., `{0.0.0.00000000}.{guid}`) are tied to the underlying MMDevice enumeration in the registry (`HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio`). These IDs can change after a driver reinstall/update, a Windows Update that re-enumerates audio endpoints, or even (in some reported cases) a plain reboot when USB/HDMI audio devices re-enumerate in a different order. A snapshot-and-restore design that stores the raw endpoint ID string and blindly calls `SetDefaultEndpoint`/`IPolicyConfig::SetDefaultEndpoint` with it later can fail (device no longer exists) or, worse, silently do nothing if the ID happens to now belong to a different, unexpected device.
-
-**Why it happens:**
-Windows doesn't guarantee device-ID stability across driver/topology changes; it's an internal enumeration detail, not a documented stable contract, and Microsoft's own guidance/community tooling acknowledges this is a known pain point with no first-party stable-ID API.
-
-**How to avoid:**
-- Snapshot both the endpoint ID *and* a human-readable fallback (friendly name + device description) at toggle-time. At restore time, first try the exact ID; if `SetDefaultEndpoint`/the enumerator reports the device no longer exists, fall back to matching by friendly name, and if that also fails, surface a clear "couldn't restore audio device — it may have been removed/renamed" message rather than failing silently or applying a wrong device.
-- Re-enumerate available devices at restore time rather than assuming the snapshot's device list is still accurate.
-- Since this is a personal single-user rig with presumably static hardware, this is lower-severity in practice — but still must degrade gracefully (visible error) rather than silently switching to whatever device happens to be first in the new enumeration order.
-
-**Warning signs:**
-- Restore-to-normal-mode occasionally leaves audio on the rig speakers (or an unexpected device) with no error shown.
-- Behavior differs after any Windows Update or audio driver update — regression that "used to work."
-
-**Phase to address:**
-Must be handled in the state-snapshot/restore component — the snapshot schema and restore logic should be designed with ID instability as a first-class case from the start, not patched in after a failure is observed.
-
----
-
-### Pitfall 5: `IPolicyConfig` is a fully undocumented, unsupported private COM interface — it can change or vary by Windows build without warning, and has version-dependent vtable layouts
-
-**What goes wrong:**
-There is no public/supported Win32 or WinRT API to set the system default audio *playback* device programmatically — `MediaDevice`/WinRT audio APIs only let apps query the default, not set it (this is an intentional Microsoft restriction, not an oversight, to prevent malware from silently rerouting audio). The community workaround is `IPolicyConfig` (interface GUID `f8679f50-850a-41cf-9c72-430f290290c8`, class `CPolicyConfigClient` `870af99c-171d-4f9e-af0d-e63df40c2bc9`), reverse-engineered from the Sound control panel applet. This interface is explicitly unsupported by Microsoft, has a different vtable/method layout between "Vista" and "Windows 7+" variants, and Windows 10 1607+/11 introduced a third `ERole` target (console, multimedia, communications — the Settings app's "Output device" actually needs `SetDefaultEndpoint` called for multiple roles to fully match what the UI does) that naive single-role implementations miss, leaving one of the three roles pointed at the old device after a "switch."
-
-**Why it happens:**
-Because there is genuinely no supported alternative, every existing tool in this space (AudioDeviceCmdlets, SoundVolumeView, audioswitch, etc.) relies on the same reverse-engineered interface, copy-pasted across projects for years — its continued functioning on current Windows is observed/community-verified, not guaranteed by Microsoft, and could break in a future Windows build with zero warning or migration path.
-
-**How to avoid:**
-- Call `SetDefaultEndpoint` for all three roles (eConsole, eMultimedia, eCommunications) when switching the default output, matching what the Sound Control Panel actually does — a partial switch (one role only) is a common bug source where "some apps" still play through the old device after a "successful" switch.
-- Isolate the `IPolicyConfig` P/Invoke definitions behind a single internal abstraction so that if Microsoft breaks compatibility in a future Windows release, the fix is localized to one file, not scattered call sites.
-- Have a documented fallback plan (e.g., shell out to a maintained community tool like SoundVolumeView/AudioDeviceCmdlets as a process, or prompt the user to switch manually) in case the interface stops working after a Windows feature update — do not assume permanent compatibility.
-- Ensure correct COM lifecycle: initialize COM apartment (`CoInitializeEx`) appropriately for a long-lived GUI app that will call this repeatedly across many toggles in a session, and release COM objects (`Marshal.ReleaseComObject` or proper RCW disposal) each time rather than leaking — repeated toggle-cycles in one running session is exactly this app's core usage pattern, so COM object leaks or improper reinitialization will surface as "works the first few times, then fails" bugs.
-
-**Warning signs:**
-- Some applications (e.g., games with a startup audio-device cache, or apps that read only one of the three roles) don't follow the switched default even though Settings shows the new device as default.
-- After many toggle cycles in one running session, the audio switch starts silently failing or throwing COM exceptions (leak/reinit symptom).
-- A Windows feature update ships and default-switching stops working entirely with no code change on your side.
-
-**Phase to address:**
-Must be handled in the audio-control component — implementing all three roles and correct COM lifecycle management should be part of that phase's "definition of done," not treated as a later polish item.
-
----
-
-### Pitfall 6: Operations report success but don't actually take effect ("silent failure") — the API return code is not proof the display/audio actually changed
-
-**What goes wrong:**
-`SetDisplayConfig` has documented cases where it does not fail even when given an invalid/contradictory flag combination — it simply ignores the offending flag (e.g., violating the rule that `SDC_TOPOLOGY_SUPPLIED` can't combine with other `SDC_TOPOLOGY_XXX` flags causes the flag to be silently ignored rather than an error returned). More generally, both display and audio APIs in this space have known cases of returning a success `HRESULT`/non-error code while the visible system state doesn't actually change (e.g., driver rejects part of a topology request, or the "default" device change doesn't propagate to a role the code didn't set). Code that trusts the return value alone and immediately updates its own internal "we are now in rig mode" state can drift out of sync with actual Windows state.
-
-**Why it happens:**
-These are low-level, driver-mediated APIs where success often means "the request was accepted for processing," not "the requested end-state now exists" — validation happens at multiple layers (API, kernel, driver) and not all of them surface errors back up consistently.
-
-**How to avoid:**
-- After every mutating call (disable monitor, set default audio device), re-query actual state (`QueryDisplayConfig`/`EnumDisplayDevices` for displays; `IMMDeviceEnumerator::GetDefaultAudioEndpoint` for audio) and compare against the intended end-state before declaring the toggle successful in the UI.
-- Surface a clear, specific error to the user if verification fails ("monitor did not disable — still detected as active") rather than showing a generic success message or silently leaving the internal mode-flag out of sync with reality.
-- Never assume idempotent success — a "toggle to rig mode" that partially succeeds (e.g., audio switched but monitor disable was silently ignored) needs to be detectable and reported, not just assumed done.
-
-**Warning signs:**
-- User reports "I clicked toggle but nothing happened" with no error shown.
-- Internal state tracking says "rig mode" but the visible monitor/audio configuration doesn't match.
-
-**Phase to address:**
-Must be part of both the display-control and audio-control components' definition of done — each mutating operation needs a verify-after-write step, and this should be a stated acceptance criterion before either feature is marked complete.
-
----
-
-### Pitfall 7: State snapshot captures too little to guarantee exact restoration
-
-**What goes wrong:**
-A naive snapshot implementation captures only "which monitors were active" or "what was the default audio device name" — this loses information needed for *exact* restoration as required by this project (monitor position/arrangement, orientation, refresh rate, which monitor was primary; which of the three audio roles pointed to which device). Restoring from an incomplete snapshot can silently produce a topology that "looks similar" (same monitors active) but differs in primary-monitor designation, relative position (causing windows to jump/reflow), or scaling — a regression the user may not immediately notice but will hit the next time they try to use the desk monitor normally.
-
-**Why it happens:**
-`QueryDisplayConfig`'s output (`DISPLAYCONFIG_PATH_INFO[]` + `DISPLAYCONFIG_MODE_INFO[]`) is the actual complete, restorable representation of display state, but it's easy to under-scope a "snapshot" to just an enable/disable boolean per monitor because that's the surface-level thing the feature is about. Microsoft's own docs also warn that some fields/flags in a queried config aren't safely re-suppliable to `SetDisplayConfig` byte-for-byte without adjustment (certain "currently in use" validity flags must be cleared before reapplying), which is easy to miss and produces a restore call that fails or behaves unexpectedly.
-
-**How to avoid:**
-- Snapshot the full `QueryDisplayConfig` output (both path and mode arrays) for the "normal" state before ever mutating anything, not just a monitor-enabled boolean.
-- Snapshot all three audio roles' current default device, not just "the" default.
-- Test the round-trip explicitly: query → mutate to rig mode → restore from snapshot → re-query and diff against the original query result, confirming they match on primary designation, position, and resolution — not just "same set of monitors active."
-- Treat this round-trip test as a required acceptance check for the state-restore feature, run repeatedly (toggle back and forth several times in a row) to catch drift that only appears after multiple cycles.
-
-**Warning signs:**
-- After toggle-back, the primary monitor designation is wrong, or monitor arrangement (left/right) is swapped from what it was before.
-- Windows that were open before ever toggling end up in different positions after toggle-back even though "the same monitors" are active.
-
-**Phase to address:**
-Must be handled in the state-snapshot/restore component design from the start — this is the component most likely to "look done" (toggle back and forth once, looks fine) while having latent exact-restoration bugs that only surface with specific prior arrangements (non-default primary, non-default position) — explicitly test with a non-trivial monitor arrangement, not just the default side-by-side layout.
-
----
-
-### Pitfall 8: Toggle called when internal mode-tracking is out of sync with actual OS state (no persisted source of truth)
-
-**What goes wrong:**
-If the app tracks "current mode" (normal vs. rig) purely as an in-memory flag, any scenario where that flag doesn't reflect reality — app restarted mid-session, app crashed during a toggle, user manually changed display/audio settings outside the app — causes the next toggle to snapshot the *wrong* state as "normal" (e.g., snapshotting rig-mode audio/display as if it were the baseline to restore to later), effectively corrupting the restore target permanently until manually fixed.
-
-**Why it happens:**
-It's simplest to implement toggle logic as "if flag says normal, snapshot and switch to rig; if flag says rig, restore from snapshot and clear flag" — this is correct only if the flag is always trustworthy, which it isn't across app restarts or crashes unless persisted and validated.
-
-**How to avoid:**
-- On startup, don't trust a persisted "we were in rig mode" flag blindly — actively detect current state by comparing live display/audio configuration against known rig-mode settings (from the settings view) to determine actual current mode.
-- Persist the pre-toggle snapshot to disk (not just memory) immediately when toggling to rig mode, so an app crash/restart mid-rig-session doesn't lose the ability to restore.
-- Consider treating "toggle to rig mode while already detected as in rig mode" as a safe no-op (or a "re-apply rig settings" action) rather than re-snapshotting.
-
-**Warning signs:**
-- After an app crash or forced-close while in rig mode, relaunching and toggling back doesn't restore the original desktop configuration.
-- Toggling twice in a row without an intervening restore produces unexpected results.
-
-**Phase to address:**
-Must be addressed in the state-snapshot/restore component — persisted-state design should be decided alongside the in-memory toggle logic, not added afterward.
-
----
-
-### Pitfall 9: Launching/focusing a third-party app's window races against that app's own startup time
-
-**What goes wrong:**
-Detecting "is Moza Companion already running" via process name/handle is straightforward, but immediately after launching it (when not already running), code that tries to find its main window handle and call `SetForegroundWindow` right away will often fail or silently no-op, because the target process hasn't finished creating its main window yet (process start and main-window creation are not simultaneous — there can be a real, sometimes multi-second, delay, especially for apps with splash screens or startup work).
-
-**Why it happens:**
-`Process.Start()` returns as soon as the process object exists, well before the app's UI thread has pumped its first message loop and created a window; a single immediate `FindWindow`/`GetProcesses()[0].MainWindowHandle` check right after `Start()` frequently returns null/zero.
-
-**How to avoid:**
-- Poll for the target window handle with a timeout (e.g., check every 200-300ms for up to 10-15 seconds) after launching, rather than a single immediate check.
-- Handle the "launched but window never appeared within timeout" case explicitly (don't hang indefinitely or throw an unhandled exception) — surface a clear message rather than silently doing nothing.
-- For the "already running, bring to focus" path specifically, be aware of the `SetForegroundWindow` restrictions described in Pitfall 2 (UIPI/foreground-lock rules) — even correct window-handle detection can still fail to visually focus the window if the caller doesn't qualify per Windows' foreground-switching rules.
-
-**Warning signs:**
-- "Launch Moza Companion" works in slow/debug testing (developer naturally pauses between steps) but fails intermittently or always in the packaged release build's real-world timing.
-- Companion app window sometimes doesn't come to focus after a fresh launch specifically (vs. the "already running" bring-to-front path, which is more likely to work since the window already exists).
-
-**Phase to address:**
-Must be validated in the app-launch/window-management phase — the acceptance test should specifically include "launch when not already running, from a cold start (splash screen scenario if the app has one), and verify focus succeeds," not just the already-running case.
-
----
-
-### Pitfall 10: Unsigned, self-contained single-file .exe gets flagged by SmartScreen/antivirus specifically because of what it does, not just how it's packaged
-
-**What goes wrong:**
-Two independent risk factors compound here: (1) .NET self-contained single-file publishing bundles the runtime and self-extracts/loads components at startup — a packing pattern that resembles malware droppers and is a documented trigger for Defender/AV heuristics and reduced SmartScreen reputation (new, rarely-downloaded, unsigned executables are treated as inherently riskier by SmartScreen's reputation model); and (2) the actual behavior of this app — P/Invoke calls into device-management (`cfgmgr32`/CCD), undocumented COM interfaces for audio routing, and cross-process window enumeration/manipulation of another running application — overlaps heavily with behaviors flagged in RAT/spyware/remote-control malware signatures. Combined, first-run (and possibly every-run, since SmartScreen reputation is per-binary-hash and rebuilding changes the hash) SmartScreen/Defender warnings are likely, and this can appear as an outright block rather than a dismissible "Run anyway" warning depending on Defender's SmartScreen mode.
-
-**Why it happens:**
-Both the distribution format (unsigned, self-contained, single-file, low download count — since this is a personal tool used by exactly one person) and the functional behavior independently raise flags; there is no realistic way to fully avoid this without either code-signing (which requires purchasing a certificate — a real cost/step for a personal tool) or reducing the app's file-system/behavioral footprint (neither of which eliminates the core P/Invoke behaviors that are the actual point of the app).
-
-**How to avoid:**
-- Set expectations correctly from the start: for a personal single-user tool, accept that a one-time "Windows protected your PC" SmartScreen click-through (More info -> Run anyway) or a Defender exclusion for the specific .exe path is the realistic outcome, not a bug to "fix" via code changes.
-- If avoiding the warning entirely matters, budget for a code-signing certificate (OV certificates from providers like Comodo/Sectigo are available in the tens of euros/year range) — signing alone helps but reputation still needs to build over time/downloads with SmartScreen specifically (a fresh signature doesn't instantly grant trusted-publisher status).
-- Consider not using aggressive trimming (`PublishTrimmed`) if it doesn't meaningfully help distribution size for a personal tool, since trimming has independently been reported to trigger Defender false positives in some .NET SDK versions.
-- Document this as expected first-run friction in whatever setup notes accompany the tool, rather than treating a SmartScreen prompt during testing as evidence something is broken.
-
-**Warning signs:**
-- Windows Defender quarantines the built .exe on the build machine itself before you even test it, or after a rebuild changes its hash.
-- SmartScreen shows "Windows protected your PC" on first launch on a clean machine/VM.
-
-**Phase to address:**
-Should be explicitly called out in the packaging/distribution phase's scope and acceptance criteria — decide up front whether code signing is in scope for v1 (likely not, given single-user/personal-tool context) and document the expected click-through step so it isn't mistaken for a bug during final validation.
-
----
-
-## Technical Debt Patterns
-
-| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|--------------------|-----------------|------------------|
-| Hardcoding one audio role (`eConsole` only) in `SetDefaultEndpoint` instead of all three roles | Faster to implement, "works" in casual testing | Some apps/games keep using old device on the role that wasn't switched | Never — implement all three roles from the start; it's the same amount of code |
-| In-memory-only mode/state tracking (no persisted snapshot to disk) | Simpler initial implementation | Crash/restart mid-rig-session permanently loses restore target | Acceptable only for a throwaway prototype/spike, never for the shipped v1 |
-| Skipping post-mutation state verification ("trust the return code") | Less code, faster feature completion | Silent failures ship as "it works" until a user hits the specific driver/flag edge case | Never for monitor-disable or audio-switch; acceptable temporarily for early spikes only |
-| Requesting `requireAdministrator` manifest-wide to unblock one operation | Immediately unblocks whichever call needed elevation | Breaks `SetForegroundWindow`/window management against the (non-elevated) Moza Companion via UIPI | Never — isolate elevation to a helper process instead |
-| Matching audio devices by friendly name only (no ID-based snapshot) | Simple to implement, human-readable | Fails when devices are renamed, or ambiguous if 2 devices share a name | Only as a documented fallback layer, never as the sole matching strategy |
-
-## Integration Gotchas
-
-| Integration | Common Mistake | Correct Approach |
-|-------------|-----------------|--------------------|
-| CCD / Win32 display API (`SetDisplayConfig`/`QueryDisplayConfig`) | Assuming a documented "disconnect" flag exists; using legacy `ChangeDisplaySettingsEx` as the primary disable mechanism | Use topology-path-removal via `SetDisplayConfig` with a supplied path set that omits the target monitor; validate against real hardware first |
-| `IPolicyConfig` COM interface | Using only one interface variant/vtable layout without version-checking; calling `SetDefaultEndpoint` for only one `ERole` | Support both Vista/7+ vtable variants defensively if targeting a range of Windows versions; always set all three roles |
-| Win32 window APIs against Moza Companion | Assuming `SetForegroundWindow` always works if you have the right window handle | Account for UIPI/foreground-lock rules; keep integrity levels matched between Rig Toggle and Moza Companion |
-| `Process.Start()` + window discovery | Single immediate check for `MainWindowHandle` after starting the process | Poll with timeout; handle the "window never appeared" case explicitly |
-
-## Performance Traps
-
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|-----------------|
-| Leaking COM objects (`IPolicyConfig`, `IMMDeviceEnumerator`) across repeated toggles in one long-running session | Audio switching starts failing intermittently after many toggle cycles in the same app session | Explicitly release/dispose COM RCWs after each use; consider re-creating rather than caching across calls if lifetime is unclear | Not a "scale" issue in the traditional sense — breaks after N toggle cycles within a single running session (N varies, but is a realistic failure mode for a tool meant to be toggled repeatedly per gaming session) |
-| Polling loop for window-handle discovery with too-short timeout or too-tight interval | False "launch failed" errors on a slower-starting Moza Companion (e.g., after a Windows/driver update slows its startup) | Use a generous timeout (10-15s) with reasonable polling interval (200-300ms), and make the timeout configurable if possible | Breaks whenever the target app's startup time varies (cold cache, pending Windows updates, etc.) |
-
-## Security Mistakes
-
-| Mistake | Risk | Prevention |
-|---------|------|------------|
-| Running the whole app elevated "to be safe" | Breaks window-focus operations against non-elevated processes (UIPI); increases blast radius of any bug since elevated code can affect the whole system | Default to `asInvoker`; isolate any genuinely-required elevated operation to a minimal helper process |
-| Storing the Moza Companion executable path from user input without validating it before `Process.Start()` | Launching arbitrary attacker-supplied paths if settings are ever tampered with or corrupted (low risk for a personal single-user tool, but still worth a basic sanity check) | Validate the configured path exists and is a `.exe` before launching; this is a personal tool so risk is low, but cheap to guard against corrupted config |
-| Treating the undocumented `IPolicyConfig` GUID/vtable definitions as "safe because everyone copies them" | A future Windows update could subtly change behavior without any error, silently misrouting audio | Version-gate or defensively verify actual effect via post-call state verification (Pitfall 6), not just trust in community-sourced interop code |
-
-## UX Pitfalls
-
-| Pitfall | User Impact | Better Approach |
-|---------|--------------|-------------------|
-| No feedback distinguishing "toggle succeeded," "toggle partially succeeded," and "toggle failed" | User can't tell if rig mode is actually fully active, leading to launching a game onto the wrong monitor without realizing the toggle silently failed | Explicit per-step status in the UI (monitor: OK/failed, audio: OK/failed, app launch: OK/failed) rather than one binary success/fail indicator |
-| Toggle button usable while a previous toggle operation is still in-flight | Rapid double-clicks can race two toggle operations against each other, corrupting the snapshot or leaving state genuinely inconsistent | Disable/debounce the toggle control while an operation is in progress; show a busy/in-progress state |
-| No visible indication of current mode (normal vs rig) on app open | User can't tell current state without checking physical monitors/speakers, especially after app restart | Detect and display actual current mode on launch (tied to Pitfall 8's state-detection logic), not just an assumed default |
-
-## "Looks Done But Isn't" Checklist
-
-- [ ] **Monitor disable:** Often just powers off (DPMS-style) instead of removing from Windows' active display list — verify with `EnumDisplayMonitors`/Display Settings that the monitor is truly gone, and confirm the actual target game (BeamNG or similar) no longer misbehaves, not just that the screen goes black.
-- [ ] **Audio device switch:** Often only sets one of the three roles (console/multimedia/communications) — verify via Sound Control Panel that all relevant apps (not just system sounds) route through the new device.
-- [ ] **State restore:** Often restores "the same monitors active" but not the same primary designation/arrangement/position — verify with a non-default monitor arrangement (not just side-by-side defaults) and confirm an exact round-trip via `QueryDisplayConfig` diff.
-- [ ] **App launch/focus:** Often only tested against the "already running" case — verify the cold-launch path (app not running, including from a state where its splash screen delays main-window creation) with a real timeout/poll, not a single immediate check.
-- [ ] **Single-instance / already-running detection:** Often only tested with matching integrity levels during dev — verify it still works when Rig Toggle and Moza Companion run at different privilege levels (this should not happen per Pitfall 2, but verify explicitly).
-- [ ] **Packaging:** Often "done" once it runs on the dev machine — verify on a clean VM/machine without dev tools or Defender exclusions already configured, to see the actual first-run SmartScreen/AV experience a real (even single) user would hit.
-- [ ] **Toggle-twice / crash-recovery:** Often untested — verify behavior when toggling to rig mode twice in a row, and when the app is force-closed while in rig mode and relaunched.
-
-## Recovery Strategies
-
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|----------------|-----------------|
-| Snapshot corrupted (wrong state saved as "normal") | MEDIUM | Manually restore correct monitor/audio configuration via Windows Settings, then perform one clean toggle cycle to re-baseline the snapshot; consider adding a manual "reset baseline snapshot" action in Settings for exactly this recovery case |
-| `IPolicyConfig` breaks after a Windows update | HIGH (no code fix may exist immediately) | Fall back to manual switching via Windows Settings/Sound Control Panel as a stopgap; monitor community sources (NirSoft, audioswitch repo) for updated interop definitions; isolate the interop code so a fix is a single-file patch |
-| Monitor disable silently no-ops due to a driver-specific CCD quirk | MEDIUM | Fall back to `CM_Disable_DevNode` (device-node disable) as an alternate mechanism for that specific hardware, accepting the elevation tradeoff (Pitfall 2) as a documented exception for that machine |
-| Window left off-screen after a disable/restore cycle mismatch | LOW | Use Windows' built-in "Win+Shift+Arrow" or right-click taskbar "Move" to manually recover the window; consider adding a "reset window positions" utility action if this recurs |
-
-## Pitfall-to-Phase Mapping
-
-| Pitfall | Prevention Phase | Verification |
-|---------|--------------------|----------------|
-| No public CCD "disconnect" API (Pitfall 1) | Spike/technical-approach phase (before feature build) | Confirm chosen mechanism (topology-path-removal vs. device-node disable) actually removes the monitor from `EnumDisplayMonitors`/Display Settings on real hardware, and that the target game no longer misbehaves |
-| Elevation/UIPI conflicts (Pitfall 2) | Display-control phase + app-launch/window-management phase | Test window-focus of Moza Companion with Rig Toggle running unelevated, using whichever disable mechanism was chosen in Pitfall 1 |
-| Race condition disabling monitor with windows on it (Pitfall 3) | Monitor-disable feature phase | Explicit test: maximized window and fullscreen game window on target monitor at disable-time; verify no window lost |
-| Audio device ID instability (Pitfall 4) | State-snapshot/restore component | Test restore after simulating a "device ID changed" scenario (e.g., re-plug/driver update) and confirm graceful fallback/error, not silent misfire |
-| Undocumented `IPolicyConfig` fragility (Pitfall 5) | Audio-control component | Verify all three roles are set; verify COM objects are released; run 10+ toggle cycles in one session to catch leak-related failures |
-| Silent operation failures (Pitfall 6) | Display-control and audio-control components | Add and test post-mutation state verification for both display and audio changes |
-| Incomplete state snapshot (Pitfall 7) | State-snapshot/restore component | Round-trip test: query, mutate, restore, re-query, diff against original — with a non-default monitor arrangement |
-| Mode-tracking desync after crash/restart (Pitfall 8) | State-snapshot/restore component | Test: force-close app while in rig mode, relaunch, verify correct mode detection and successful restore |
-| Launch/focus race with target app startup (Pitfall 9) | App-launch/window-management phase | Test cold-launch path with polling/timeout, not just already-running path |
-| Unsigned .exe AV/SmartScreen flagging (Pitfall 10) | Packaging/distribution phase | Test the built .exe on a clean VM without prior Defender exclusions; document expected first-run warning behavior |
+### Pitfall 1: Toast notifications are silently swallowed for an unpackaged, non-shortcut-registered self-contained exe
+**What goes wrong:** Calling the modern `ToastNotificationManager`/`Windows.UI.Notifications` API (or the CommunityToolkit wrapper around it) from a non-MSIX, non-Store, self-contained single-file .exe throws no exception, returns no error — the toast simply never appears. Microsoft's own docs are explicit: **"Without a valid shortcut installed in the Start screen or in All Programs, you cannot raise a toast notification from a desktop app."** The AppUserModelID (AUMID) that toast delivery keys off of must come from a Start Menu `.lnk` shortcut whose `PKEY_AppUserModel_ID` property store value matches the AUMID string passed to `CreateToastNotifier(aumid)` — Rig Toggle ships with no installer, so nothing creates that shortcut today.
+**Why it happens:** The toast subsystem was designed around MSIX/Store app identity; unpackaged Win32 apps need to fake that identity via a manually-created shortcut + registered AUMID, a step every unpackaged-app toast guide treats as mandatory, not optional.
+**Consequences:** The whole "toast/status notification on toggle" feature silently does nothing on a fresh install — worse, it can appear to work while developing/debugging in Visual Studio (some dev-loop shortcuts get created incidentally) and then fail specifically in the **published, self-contained single-file exe** the user actually runs, matching a documented real-world report ("ToastNotificationManager ... only works within VS, not in published EXE").
+**Prevention:** Either (a) programmatically create/verify the Start Menu `.lnk` + AUMID registration on first run (before ever calling `Show()`), using the same `IShellLink`/`IPropertyStore` pattern Microsoft's own sample uses, and always test against the **published** exe, never an IDE debug session; or (b) sidestep the whole AUMID requirement by using classic `NotifyIcon.ShowBalloonTip(...)` instead of Action-Center toasts — it needs zero shortcut/AUMID registration and is a strictly lower-risk choice for a single-user personal tool. Recommend (b) as the default unless the milestone specifically wants the modern toast visual.
+**Detection/validation:** Rig-test the notification specifically from the **published, self-contained single-file exe** run from its real install location (not `dotnet run`, not F5 in VS) — this is the exact gap the documented failure reports describe. If choosing the AUMID/shortcut route, test it on a genuinely clean state (delete any existing shortcut first) so a leftover dev-time shortcut doesn't mask the real first-run behavior.
+
+### Pitfall 2: Re-enabling a monitor that has been CCD-disabled (or physically powered off) for an extended period is a different, unvalidated scenario from anything v1.0 tested
+**What goes wrong:** v1.0's `WindowsMonitorController.Restore()` has exactly two paths: an in-process cache replay (works only if the same process instance that called `Disable()` is still alive) and a crash-recovery fallback that reconstructs from a `MonitorState` snapshot **captured by this app moments before its own `Disable()` call**. Both paths assume a full position/resolution/pixel-format snapshot exists. The new v1.1 feature — a rig monitor that's *normally* kept OS-disabled to save power and gets enabled on toggle-to-rig — has **no such baseline**: there was never a RigToggle-captured "before" state for it, because it wasn't RigToggle that disabled it (or it was disabled so long ago no snapshot survives). This is architecturally a new "Enable(monitorDevicePath)" operation, not a variant of `Restore()`.
+**Why it happens:** The existing code's entire design (both the in-memory fast path and the `GetAllPaths()`-based crash-recovery fallback) is keyed on "this app just disabled it, now bring it back exactly." A monitor disabled for days/weeks by a different mechanism (Windows power management, the user manually, or a much earlier RigToggle session with no snapshot left) breaks that assumption in at least three concrete ways: (1) `GetAllPaths()` (the enumeration this app already relies on for inactive paths) may not even list a monitor Windows has aged out after long disconnection/idle — the OS's memory of an inactive path's identity is not proven durable at that time scale, only tested at the seconds-scale in Phase 1's spike; (2) the monitor's `DevicePath`/target identity can drift across driver updates, cable/port changes, or KVM switching that may have happened in the intervening time, silently invalidating a user-configured device-path setting; (3) even if the path is still found, there is no stored position/resolution to restore to — the code has to fall back to *some* default/preferred mode instead of "the exact prior state," a fundamentally different contract than what `Restore()` currently guarantees.
+**Consequences:** If unvalidated, "enable rig monitor" could silently no-op (target not found in `GetAllPaths()`), throw a confusing CCD validation error, or apply a degenerate mode (Microsoft's own docs already warn inactive-path mode/signal info reports "default values" — this is Pitfall 2 in the Phase 1 research carried forward, now hitting a longer time horizon).
+**Prevention:** Design this as an explicit new `Enable(monitorDevicePath)` operation (not a `Restore()` variant) that (a) re-queries `GetAllPaths()` fresh at enable-time, (b) fails loudly and distinguishably if the target isn't found rather than silently no-opping, and (c) applies either a user-configured target resolution/position or the driver's own preferred/default mode — explicitly documented as *not* a "restore exact prior state" guarantee, since none exists for this case.
+**Detection/validation — REQUIRED RIG CHECKPOINT (mirrors Phase 1's spike gate):** Before committing to a production implementation, run a dedicated rig round-trip: disable the target monitor (via RigToggle or Windows Display Settings), then leave it in that state across (i) at least one sleep/wake cycle and (ii) at least one full reboot — not just the seconds-scale delay Phase 1's Pitfall C already covers — then attempt the new Enable path and confirm: does `GetAllPaths()` still list it at all; does its `DevicePath` match what was configured; does the app successfully bring it to an active, sane-resolution state without a stored baseline. This is exactly the kind of "no amount of research substitutes for testing on the actual rig" situation that gated all of Phase 1 — treat it the same way (a go/no-go checkpoint before the feature ships), not as something safe to assume from the fact that same-session Disable/Restore already works.
+
+### Pitfall 3: Generalizing from "one primary monitor disabled + full-topology restore" to independently-configurable arbitrary disable-sets and enable-sets multiplies CCD topology-construction risk
+**What goes wrong:** v1.0's `Disable()` handles exactly one case well: remove one (usually primary) path, and if it was primary, uniformly reposition every survivor by a delta so exactly one lands at (0,0) (already a hard-won, repositioning-aware fix — see the file's own Pitfall-1 comment). v1.1 wants independently-configurable **sets** — some monitors to disable, others to enable, applied together in one toggle. A single `ApplyPathInfos` call now has to simultaneously remove N paths, add M previously-inactive paths, guarantee exactly one surviving/added path ends up GDI-primary at (0,0), and avoid any two paths overlapping in position — a materially harder topology-construction problem than the single-primary-removal case Phase 1/Phase 4 actually validated.
+**Why it happens:** It's tempting to treat "enable a monitor" and "disable a monitor" as symmetric, independent operations that can just be composed by calling existing single-target logic twice. CCD's `SetDisplayConfig` validates the **entire proposed topology atomically** — arbitrary composition of two separately-reasoned-about operations is exactly the class of thing `SDC_ALLOW_CHANGES`/primary-reassignment already surprised this project once (Phase 1 Pitfall B).
+**Consequences:** Silent validation failure (`ApplyPathInfos` throwing `PathChangeException` with a generic message, already seen in this codebase's `WR-03`/restore-path comments) or, worse, a topology that "succeeds" per the API but produces two monitors stacked at the same position, no GDI primary, or the wrong monitor treated as primary.
+**Prevention:** Design the combined disable+enable apply as one deliberate, tested code path (not two independent single-target calls run back to back) that explicitly computes final positions for every survivor + newly-enabled monitor before calling `ApplyPathInfos` once, reusing the existing verify-and-throw discipline (fresh `GetActivePaths()` re-query, `exactlyOnePrimary` check) already proven in `Disable()`.
+**Detection/validation — REQUIRED RIG CHECKPOINT:** Treat this the same way Phase 1 treated the original disable mechanism: a dedicated go/no-go round-trip on the actual rig with the **real configured disable+enable sets** (not a single monitor, not a synthetic test), checking (i) exactly one GDI primary results, (ii) no position overlap, (iii) the newly-enabled monitor lands at a sane, non-degenerate resolution. Do not infer this is safe merely because the existing single-primary-disable unit tests pass — this is a genuinely new topology shape those tests never exercised.
+
+### Pitfall 4: No reentrancy guard exists in ToggleService — multiple new trigger sources make concurrent/overlapping toggles newly possible
+**What goes wrong:** `ToggleService.ToggleToRigMode()`/`ToggleToNormalMode()` have zero locking or busy-state guard (confirmed by direct read of `src/RigToggle.Core/ToggleService.cs`) — this was safe in v1.0 only because the sole caller was a single synchronous UI-thread button click (`MainForm.BtnToggle_Click`), which cannot itself be re-entered while running. Adding a global hotkey handler, a named-pipe IPC command handler (potentially on a different thread), and a tray context-menu item creates three more independent entry points that can call into `ToggleService` concurrently with each other or with the GUI button, or in rapid double-fire succession (e.g. a double-tap of the hotkey, or a Stream Deck macro firing while a hotkey-triggered toggle is still mid-flight).
+**Why it happens:** The original design reasonably assumed one interactive user clicking one button. Nothing in the architecture enforces "only one toggle in flight at a time" as an invariant — it was true only because there used to be exactly one way to start a toggle.
+**Consequences:** Interleaved calls can corrupt the snapshot-then-mutate contract this whole app is built on: e.g. a second `ToggleToRigMode()` call's `CaptureState()` could run **after** a first, still-in-flight call's `Disable()` already changed the topology — persisting a snapshot of the *already-disabled* state as if it were the pre-toggle baseline, permanently corrupting the data toggle-back needs to restore correctly. Since current mode is derived purely from snapshot-file presence (D-14), an interleaved re-entrant call can also silently overwrite a correct snapshot mid-restore.
+**Prevention:** Add an explicit in-process guard (lock/semaphore or a simple "busy" flag) checked by **every** trigger path — hotkey handler, IPC command handler, tray menu item, and the existing GUI button — before calling into `ToggleService`. Rapid/overlapping requests should either no-op with a clear notification ("toggle already in progress") or queue, never silently interleave. This must be an explicit design decision made when hotkey/CLI/tray are added, not something assumed safe because it "worked before."
+**Detection/validation:** Warning sign on the rig — toggle-back restores the monitor to the *wrong* layout, or an audio restore appears to no-op, specifically after using two different trigger methods (e.g. hotkey then immediately the tray menu, or a macro-pad script firing twice quickly) rather than a single trigger. Test explicitly: fire two different trigger sources within the same few seconds and confirm the result is either serialized correctly or cleanly rejected, not silently corrupted.
+
+### Pitfall 5: Applying the project's own "don't touch what you don't fully control" lesson from the Moza debug session to CCD monitor manipulation
+**What goes wrong:** The resolved `moza-foreground-focus.md` debug session's core, hard-won lesson was that raw external Win32 state-mutation calls (`SetForegroundWindow`/`ShowWindow`) against a resource RigToggle does not fully own (a third-party process's window) desynced something in that resource's own internal handling, in a way that was only discoverable through 10 rounds of real-hardware, evidence-driven debugging — never predictable from reasoning or docs alone. The same class of risk applies to CCD monitor enable/disable: the GPU driver "owns" the actual hardware/display state, and `ApplyPathInfos`/`ApplyTopology` calls are external mutations against a subsystem whose internal bookkeeping is just as opaque as a foreign app's window procedure. Phase 1's own research already flagged one instance of this (Pitfall C: hotplug re-detection silently reversing a disable after a delay) — the risk does not disappear for the *reverse* direction (enabling a long-idle monitor) or for the newly-combined disable+enable topology changes in v1.1.
+**Why it happens:** It's easy to treat "the CCD API call returned without throwing" as proof the hardware state is now correct and stable, the same trap the project already fell into once with `SetForegroundWindow`'s silent-failure semantics.
+**Consequences:** A monitor that appears to enable/disable correctly in an immediate check could still: silently revert a few seconds/minutes later (driver re-asserts a "remembered" topology — already-documented Pitfall C mechanism, now relevant in both directions), come back at the wrong resolution/rotation because of stale cached EDID data, or interact badly with the newly-added "enable a long-off monitor" feature in a way indistinguishable, from the outside, from a code bug — exactly the ambiguity that made the Moza debug session take 10 rounds to resolve.
+**Prevention:** Never trust a single immediate post-apply verification as proof of a stable end state for this feature category. Reuse (and extend) the project's own already-proven pattern: verify via a second, independent oracle (already done via `GetActivePaths()` re-query — consider also cross-checking `Screen.AllScreens`, per Phase 1's Pattern 2) **and** re-verify again after a real delay, not just immediately — Phase 1 used 10-30 seconds for the disable direction; this milestone's higher-risk scenario (a monitor idle for a long period, or a newly-combined multi-monitor topology) warrants a longer soak/re-check window, plus a genuine sleep/wake or reboot round-trip (see Pitfall 2's checkpoint) before declaring it production-ready.
+**Detection/validation:** Treat any new CCD enable/disable code path added in this milestone as needing its own explicit rig-validation checkpoint (mirroring Phase 1's spike-then-go/no-go structure) rather than being folded silently into "the existing Disable/Restore already work" confidence — that confidence was earned for a narrower, single-session, single-primary scenario, and does not automatically transfer.
+
+## Moderate Pitfalls
+
+### Pitfall 6: Minimize-to-tray implemented by letting the form's native window get destroyed, rather than canceling `FormClosing` + `Hide()`
+**What goes wrong:** v1.0's `Program.cs` has zero `FormClosing`/`Close` handling today (confirmed by direct read) — `Application.Run(mainForm)` is the only lifecycle wiring that exists. If the new tray-residency code doesn't explicitly intercept the "X" button (`e.Cancel = true` + `Hide()`) and instead lets a normal `Close()` proceed, the form's native `HWND` is destroyed. Windows auto-unregisters any `RegisterHotKey` binding tied to that HWND when it's destroyed, and the tray icon's own message-only callback window (or the form itself, if it's what receives `Shell_NotifyIcon` callbacks) can stop functioning too.
+**Why it happens:** "Minimize to tray" and "close normally" look identical from the user's perspective (window disappears) but are completely different at the Win32 level — a very common first-implementation mistake for exactly this feature.
+**Consequences:** After the very first "X" click, the global hotkey silently stops firing for the rest of that process's lifetime, even though the tray icon may still visually appear present — a confusing, hard-to-attribute symptom if not anticipated.
+**Prevention:** Override `FormClosing`, check the close reason, cancel it and `Hide()` for a user-initiated close (only the tray "Exit" menu item should allow a real close). Note this is meaningfully **safer** than the Moza situation in Pitfall 5/the debug session — this is RigToggle's *own* window, fully owned and controlled, so subclassing its own close behavior is a standard, well-understood pattern, not the "manipulating a resource you don't own" risk class.
+**Detection/validation:** One manual test suffices (not a multi-round rig investigation): minimize to tray via the X button, then immediately try the hotkey — it must still fire.
+
+### Pitfall 7: RegisterHotKey conflicts silently with other rig software already using the same key combination
+**What goes wrong:** `RegisterHotKey` returns `FALSE` (with `GetLastError() == ERROR_HOTKEY_ALREADY_REGISTERED`) if another process already owns that exact key combination — a completely silent failure if the return value isn't checked. This rig specifically already runs other automation-heavy software (Moza Companion, and plausibly other sim-racing peripheral tools) that are known to register their own global hotkeys.
+**Why it happens:** Easy to overlook checking `RegisterHotKey`'s boolean return value, since the P/Invoke call "succeeds" from a compile/runtime-exception perspective either way.
+**Consequences:** The hotkey feature "does nothing" specifically on the real, fully-loaded rig PC (with Moza Companion and other tools running) while working fine in isolated development/testing — the same "only visible on the real rig" pattern this project has already hit multiple times (H7-H10 in the Moza debug session).
+**Prevention:** Always check `RegisterHotKey`'s return value; on failure, surface a clear error in the Settings UI (not silence) and let the user choose a different combination.
+**Detection/validation:** Rig-test the chosen hotkey with Moza Companion (and any other rig automation software) actually running, not just RigToggle alone on a clean dev machine.
+
+### Pitfall 8: CLI trigger behavior when no resident instance is running is easy to leave undefined
+**What goes wrong:** v1.0 has no single-instance detection at all today — multiple GUI instances can currently be launched side by side with no complaint (confirmed: no Mutex/pipe code anywhere in `Program.cs`). Adding single-instance detection for v1.1 changes this existing (if accidental) tolerance. A CLI invocation (`RigToggle.exe --rig`) that finds no resident instance (autostart disabled, or the tray icon was manually exited) needs an explicit, decided behavior — auto-launch a full instance and then perform the toggle, or fail clearly — rather than an accidental fallthrough that, say, launches a full duplicate GUI process just to service one CLI call.
+**Prevention:** Make this an explicit design decision in the phase that implements CLI+IPC, and document/test both branches (resident running / not running) × (autostart on / off).
+**Detection/validation:** Test all four combinations explicitly on the rig, not just the happy path where a resident instance is already running.
+
+### Pitfall 9: Named-pipe IPC timeout mismatched against the toggle's real multi-second duration
+**What goes wrong:** A CLI client with a short connect/response timeout (a commonly-referenced pattern uses ~3 seconds) can time out and report failure to the calling macro pad/Stream Deck even though the resident instance's toggle (monitor CCD change + audio switch + app relaunch via `ShellExecute`, which is not instant) is still legitimately in progress and completes successfully moments later.
+**Prevention:** Either size the client's wait timeout generously above the realistic worst-case toggle duration, or design the protocol so the server acknowledges receipt of the command immediately (fire-and-forget) rather than blocking the CLI client until the entire toggle sequence finishes — more important the more this is driven by external tools (Stream Deck, macro pads) that may have their own execution timeouts.
+**Detection/validation:** Time an actual end-to-end toggle on the rig (all three steps) and confirm the chosen IPC timeout comfortably exceeds it.
+
+### Pitfall 10: Autostart Registry Run-key entry goes stale if the user moves/re-publishes the exe
+**What goes wrong:** Rig Toggle ships as a single self-contained exe the user places and moves themselves (no installer, no fixed Program Files path) — a Registry Run key pointing at a fixed path is far more likely to go stale here than for an MSI-installed app. A stale Run-key entry fails completely silently — the process just never launches at boot, with no error surfaced anywhere.
+**Prevention:** Re-write the Run-key value using the current `Environment.ProcessPath`/`AppContext.BaseDirectory` on every app startup (not just once at first-enable), so re-publishing to a new folder self-heals autostart the next time the app is manually launched once.
+**Detection/validation:** Move/rename the published exe after enabling autostart, reboot, and confirm autostart either self-heals on the next manual launch or the Settings UI clearly surfaces autostart as broken — not silent, unexplained absence.
+
+### Pitfall 11: Toast/notification content can drift from the GUI's own partial-failure reporting
+**What goes wrong:** v1.0's `MainForm` already has a per-step (`Monitor`/`Audio`/`App`) partial-failure checklist (`FormatChecklist`, CORE-04). A separately-implemented toast/notification path that just says "Toggled to Rig Mode" without reflecting the same per-step outcome could disagree with what the GUI shows if the user later opens it — e.g. toast says success while a partial failure actually occurred.
+**Prevention:** Reuse the existing `ToggleResult`/step-outcome data (and ideally the same formatting logic) to build the toast/notification text, rather than maintaining a second, independently-written success/failure message.
+**Detection/validation:** Trigger a toggle that deliberately fails one step (e.g. temporarily misconfigure the audio device) via a non-GUI trigger and confirm the toast reflects the same partial-failure detail the GUI checklist would show.
+
+## Minor Pitfalls
+
+### Pitfall 12: NotifyIcon ghost/orphaned tray icon on ungraceful exit
+**What goes wrong:** If `NotifyIcon` isn't explicitly set invisible and disposed before the process truly exits, Windows can leave a "ghost" icon in the tray until the user mouses over it — confusing since it looks like the app is still running.
+**Prevention:** Wire the tray "Exit" command to explicitly `Visible = false` + `Dispose()` before `Application.Exit()`. Accept (don't over-engineer) that a hard process kill (Task Manager) can still leave a transient ghost icon — this is a well-known, generally-accepted OS-level limitation, not something fully fixable from app code.
+
+### Pitfall 13: Tray context menu item handler leaks/duplicates across mode changes
+**What goes wrong:** Rebuilding the tray context menu's "Switch to Rig/Normal Mode" item (or its whole `ContextMenuStrip`) from scratch on every mode change, instead of just updating its `Text`, risks re-attaching a `Click` handler without removing the old one — causing the toggle action to fire multiple times per click after several mode changes.
+**Prevention:** Keep the same menu item/handler instance for the app's lifetime; only mutate its `Text` property when mode changes.
+
+### Pitfall 14: Modal Settings dialog does not block hotkey/other trigger delivery the way it blocks the GUI button
+**What goes wrong:** WinForms modal dialogs (`ShowDialog`) still pump messages for other top-level windows on the same UI thread, including `WM_HOTKEY` delivered to the main form's handle — so a hotkey press while Settings is open modally could still fire a toggle mid-edit, something impossible today (single trigger source = the GUI button, itself blocked while Settings is modal).
+**Prevention:** Explicitly decide (and test) whether hotkey/CLI/tray-menu triggers should be suppressed or queued while the Settings dialog is open, rather than leaving it as an untested edge case introduced incidentally by adding new trigger sources.
+
+## Phase-Specific Warnings
+
+| Phase Topic | Likely Pitfall | Mitigation |
+|--------------|-----------------|------------|
+| Tray residency + minimize-to-tray + autostart | Pitfalls 6, 10, 12, 13 | Cancel `FormClosing`/`Hide()` (own window, low risk); self-healing Run-key path; explicit NotifyIcon disposal; stable menu-item/handler instances |
+| Global hotkey | Pitfall 7 (Moza/rig-software conflict), Pitfall 6 (lost registration after tray-close if implemented wrong) | Check `RegisterHotKey` return value and surface conflicts; rig-test with Moza Companion running; verify hotkey survives a minimize-to-tray cycle |
+| CLI trigger + single-instance IPC | Pitfalls 4, 8, 9 | Explicit busy-guard shared across all trigger sources; explicit no-resident-instance behavior; generous/ack-based IPC timeout — **standard, well-understood .NET pattern (Mutex + named pipe), unlikely to need deep rig-hardware research beyond the reentrancy/timeout design decisions above** |
+| Toast/status notification | Pitfall 1 (AUMID/shortcut requirement), Pitfall 11 (content drift from GUI checklist) | Prefer `NotifyIcon.ShowBalloonTip` over full toast unless AUMID/shortcut registration is deliberately built and tested against the **published** exe; reuse existing `ToggleResult` formatting |
+| Multi-monitor generalized enable/disable sets | Pitfalls 2, 3, 5 — **flag as needing its own feasibility/go-no-go rig checkpoint, mirroring Phase 1** | Design `Enable()` as a new operation (not a `Restore()` variant); validate combined disable+enable topology on the actual rig with real configured sets; long-idle/sleep/reboot round-trip test before shipping; delayed re-verification, not just immediate |
 
 ## Sources
 
-- [Windows 11 – Is there a supported way to script/automate "Disconnect this display"? — Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/5662114/windows-11-is-there-a-supported-way-to-script-auto)
-- [SetDisplayConfig function (winuser.h) — Microsoft Learn / sdk-api](https://github.com/MicrosoftDocs/sdk-api/blob/docs/sdk-api-src/content/winuser/nf-winuser-setdisplayconfig.md)
-- [SetDisplayConfig summary and scenarios — Windows Drivers docs](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/setdisplayconfig-summary-and-scenarios)
-- [Connecting and configuring displays (CCD) — Windows Drivers docs](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/connecting-and-configuring-displays)
-- [CM_Disable_DevNode function — Microsoft Learn (cfgmgr32)](https://learn.microsoft.com/en-us/windows/win32/api/cfgmgr32/nf-cfgmgr32-cm_disable_devnode)
-- [ChangeDisplaySettingsExW function — Microsoft Learn](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-changedisplaysettingsexw)
-- [MultiMonitorTool — NirSoft](https://www.nirsoft.net/utils/multi_monitor_tool.html)
-- [IPolicyConfig.h — tartakynov/audioswitch (GitHub)](https://github.com/tartakynov/audioswitch/blob/master/IPolicyConfig.h)
-- [PolicyConfig.h — sgiurgiu/DefaultAudioChanger (GitHub)](https://github.com/sgiurgiu/DefaultAudioChanger/blob/master/DefaultAudioChanger/PolicyConfig.h)
-- [AudioDeviceCmdlets — cdhunt/WindowsAudioDevice-Powershell-Cmdlet (GitHub)](https://github.com/cdhunt/WindowsAudioDevice-Powershell-Cmdlet)
-- [SetForegroundWindow function — Microsoft Learn](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow)
-- [LockSetForegroundWindow function — Microsoft Learn](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-locksetforegroundwindow)
-- [How to get rid of/reset enumeration of audio devices — Sysnative Forums](https://www.sysnative.com/forums/threads/how-to-get-rid-of-reset-enumeration-of-audio-devices.45275/)
-- [Global Audio Devices settings reset after Windows update — obs-studio issue #12050 (GitHub)](https://github.com/obsproject/obs-studio/issues/12050)
-- [Seeking Feedback: Open-Source Solution for Stable Audio Device Identification on Windows — Microsoft Q&A](https://learn.microsoft.com/en-gb/answers/questions/2123506/seeking-feedback-open-source-solution-for-stable-a)
-- [Dealing with Anti-Virus False Positives — Rick Strahl's Weblog](https://weblog.west-wind.com/posts/2016/oct/05/dealing-with-antivirus-false-positives)
-- [/p:PublishTrimmed=true activates Windows Defender false positive — dotnet/runtime issue #33745 (GitHub)](https://github.com/dotnet/runtime/issues/33745)
-- [Create a single file for application deployment — .NET, Microsoft Learn](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview)
-- [How to report a false-positive in Microsoft SmartScreen — Ctrl blog](https://www.ctrl.blog/entry/how-to-false-smartscreen-positive.html)
-- [Single-Instance .NET Apps: Mutexes, Named Pipes, UX](https://www.dotnet-guide.com/how-to-restrict-a-program-to-single-instance-in-net.html)
-
----
-*Pitfalls research for: Windows system-level control desktop utility (display CCD/device APIs, default audio device switching, cross-process window management, standalone .exe packaging)*
-*Researched: 2026-07-24*
+- Direct code read: `src/RigToggle.App/Program.cs`, `src/RigToggle.Core/ToggleService.cs`, `src/RigToggle.App/MainForm.cs`, `src/RigToggle.Windows/WindowsAppController.cs`, `src/RigToggle.Windows/WindowsMonitorController.cs` — confirmed no existing single-instance detection, no `FormClosing` override, no reentrancy guard in `ToggleService`, and the exact shape of the existing CCD disable/restore code this milestone must generalize. HIGH confidence (primary source, this repo).
+- `.planning/milestones/v1.0-phases/01-monitor-disable-feasibility-spike/01-RESEARCH.md` and `01-VERIFICATION.md` — Pitfalls A-D (AMD-vs-NVIDIA unverified, primary-repositioning `SDC_ALLOW_CHANGES` requirement, hotplug re-detection reverting a disable, elevation-contamination risk) and the project's own established go/no-go rig-spike methodology. HIGH confidence (primary source, this project's own prior empirical work).
+- `.planning/debug/resolved/moza-foreground-focus.md` — the 10-round debug session establishing the "raw external state-mutation on a resource you don't fully control can desync unpredictably, discoverable only via real-hardware testing" lesson generalized here to CCD monitor manipulation. HIGH confidence (primary source, this project's own resolved incident).
+- https://learn.microsoft.com/en-us/windows/win32/shell/enable-desktop-toast-with-appusermodelid — official Microsoft guidance confirming the Start Menu shortcut + AUMID requirement for desktop-app toast notifications. HIGH confidence (official docs, fetched directly).
+- https://github.com/Ivy-Interactive/Rustino/issues/11 and https://csharpforums.net/threads/toastnotificationmanager-packaging-project-to-create-the-app-id-only-works-within-vs-not-in-published-exe.7210/ — community-reported confirmation of the "works in dev/IDE, silently fails in published exe" toast trap for unpackaged apps. MEDIUM confidence (community reports, corroborate the official docs' stated requirement).
+- https://www.autoitconsulting.com/site/development/single-instance-winform-app-csharp-mutex-named-pipes/ — Mutex + named-pipe single-instance/IPC pattern for WinForms, including timeout and pipe-security considerations referenced in Pitfalls 8/9. MEDIUM confidence (community reference implementation, pattern is well-established/widely mirrored).
+- General WebSearch corroboration on `RegisterHotKey` message-only-window/thread-ownership behavior and `WM_HOTKEY` delivery semantics (Microsoft Learn `RegisterHotKey` reference, cross-referenced community articles). MEDIUM-HIGH confidence (Win32 API behavior is stable and well-documented; specific rig-conflict risk in Pitfall 7 is project-specific reasoning, not independently sourced, and is exactly why it's flagged for rig validation rather than stated as certain).
