@@ -31,7 +31,6 @@ namespace RigToggle.App
             this.lblMode = new System.Windows.Forms.Label();
             this.btnToggle = new System.Windows.Forms.Button();
             this.btnSettings = new System.Windows.Forms.Button();
-            this.lblCompanionStatus = new System.Windows.Forms.Label();
 
             this.SuspendLayout();
 
@@ -64,16 +63,6 @@ namespace RigToggle.App
             this.btnSettings.Click += new System.EventHandler(this.BtnSettings_Click);
 
             //
-            // lblCompanionStatus
-            //
-            this.lblCompanionStatus.Text = "Moza Companion: Not running";
-            this.lblCompanionStatus.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            this.lblCompanionStatus.Location = new System.Drawing.Point(16, 156);
-            this.lblCompanionStatus.Size = new System.Drawing.Size(288, 20);
-            this.lblCompanionStatus.AutoSize = false;
-            this.lblCompanionStatus.Name = "lblCompanionStatus";
-
-            //
             // MainForm
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -89,7 +78,6 @@ namespace RigToggle.App
             this.Controls.Add(this.lblMode);
             this.Controls.Add(this.btnToggle);
             this.Controls.Add(this.btnSettings);
-            this.Controls.Add(this.lblCompanionStatus);
 
             this.ResumeLayout(false);
         }
@@ -99,6 +87,5 @@ namespace RigToggle.App
         private System.Windows.Forms.Label lblMode;
         private System.Windows.Forms.Button btnToggle;
         private System.Windows.Forms.Button btnSettings;
-        private System.Windows.Forms.Label lblCompanionStatus;
     }
 }

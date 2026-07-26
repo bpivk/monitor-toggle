@@ -88,7 +88,7 @@ namespace RigToggle.App
 
             SettingsForm SettingsFormFactory() => new SettingsForm(monitorController, audioController, settingsStore);
 
-            var mainForm = new MainForm(toggleService, appController, settingsStore, monitorController, SettingsFormFactory);
+            var mainForm = new MainForm(toggleService, settingsStore, monitorController, SettingsFormFactory);
 
             Application.Run(mainForm);
         }

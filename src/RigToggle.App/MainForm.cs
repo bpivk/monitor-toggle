@@ -6,30 +6,27 @@ using RigToggle.Core.Models;
 namespace RigToggle.App
 {
     /// <summary>
-    /// Main window (D-13): mode indicator, Toggle button, Settings launch, and the
-    /// companion-app status line (D-15). Never instantiates a concrete Windows
-    /// adapter or Json store directly — everything is injected by the composition
-    /// root (Program.cs, Anti-Pattern 2 in 02-RESEARCH.md). Mode is derived from
-    /// ToggleService.IsInRigMode(), which itself derives from snapshot-file
-    /// presence (D-14) — correct on startup even after a crash while in Rig mode.
+    /// Main window (D-13): mode indicator, Toggle button, Settings launch. Never
+    /// instantiates a concrete Windows adapter or Json store directly — everything
+    /// is injected by the composition root (Program.cs, Anti-Pattern 2 in
+    /// 02-RESEARCH.md). Mode is derived from ToggleService.IsInRigMode(), which
+    /// itself derives from snapshot-file presence (D-14) — correct on startup even
+    /// after a crash while in Rig mode.
     /// </summary>
     public partial class MainForm : Form
     {
         private readonly ToggleService _toggleService;
-        private readonly IAppController _appController;
         private readonly ISettingsStore _settingsStore;
         private readonly IMonitorController _monitorController;
         private readonly Func<SettingsForm> _settingsFormFactory;
 
         public MainForm(
             ToggleService toggleService,
-            IAppController appController,
             ISettingsStore settingsStore,
             IMonitorController monitorController,
             Func<SettingsForm> settingsFormFactory)
         {
             _toggleService = toggleService ?? throw new ArgumentNullException(nameof(toggleService));
-            _appController = appController ?? throw new ArgumentNullException(nameof(appController));
             _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
             _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
             _settingsFormFactory = settingsFormFactory ?? throw new ArgumentNullException(nameof(settingsFormFactory));
@@ -44,22 +41,14 @@ namespace RigToggle.App
         }
 
         /// <summary>
-        /// Re-derives the mode indicator (from snapshot-file presence, D-14) and the
-        /// companion-app status line (from real Process.GetProcessesByName detection,
-        /// D-07/D-15). Called on startup and after every toggle/Settings-dialog close.
+        /// Re-derives the mode indicator (from snapshot-file presence, D-14). Called
+        /// on startup and after every toggle/Settings-dialog close.
         /// </summary>
         private void RefreshUi()
         {
             bool isInRigMode = _toggleService.IsInRigMode();
             lblMode.Text = isInRigMode ? "Mode: Rig" : "Mode: Normal";
             btnToggle.Text = isInRigMode ? "Switch to Normal Mode" : "Switch to Rig Mode";
-
-            var settings = _settingsStore.Load();
-            bool companionRunning = !string.IsNullOrEmpty(settings.CompanionAppPath)
-                && _appController.IsRunning(settings.CompanionAppPath);
-            lblCompanionStatus.Text = companionRunning
-                ? "Moza Companion: Running"
-                : "Moza Companion: Not running";
         }
 
         private void BtnToggle_Click(object? sender, EventArgs e)
