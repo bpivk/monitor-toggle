@@ -16,4 +16,5 @@ public sealed class AppSettings
     public string? RigAudioDeviceName { get; set; }
     public string? CompanionAppPath { get; set; }
     public bool SkipMonitorConfirmation { get; set; }
+    public bool EnableDebugLogging { get; set; }
 }

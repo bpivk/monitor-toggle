@@ -47,6 +47,8 @@ namespace RigToggle.App
             this.btnBrowse = new System.Windows.Forms.Button();
             this.lblAppWarning = new System.Windows.Forms.Label();
 
+            this.chkEnableDebugLogging = new System.Windows.Forms.CheckBox();
+
             this.btnSaveSettings = new System.Windows.Forms.Button();
             this.btnDiscardChanges = new System.Windows.Forms.Button();
 
@@ -201,10 +203,19 @@ namespace RigToggle.App
             this.lblAppWarning.Name = "lblAppWarning";
 
             //
+            // chkEnableDebugLogging
+            //
+            this.chkEnableDebugLogging.Text = "Enable debug logging (writes to %LOCALAPPDATA%\\RigToggle\\debug.log)";
+            this.chkEnableDebugLogging.Location = new System.Drawing.Point(12, 326);
+            this.chkEnableDebugLogging.Size = new System.Drawing.Size(396, 24);
+            this.chkEnableDebugLogging.AutoSize = false;
+            this.chkEnableDebugLogging.Name = "chkEnableDebugLogging";
+
+            //
             // btnSaveSettings
             //
             this.btnSaveSettings.Text = "Save Settings";
-            this.btnSaveSettings.Location = new System.Drawing.Point(180, 332);
+            this.btnSaveSettings.Location = new System.Drawing.Point(180, 360);
             this.btnSaveSettings.Size = new System.Drawing.Size(110, 32);
             this.btnSaveSettings.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnSaveSettings.Name = "btnSaveSettings";
@@ -214,7 +225,7 @@ namespace RigToggle.App
             // btnDiscardChanges
             //
             this.btnDiscardChanges.Text = "Discard Changes";
-            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 332);
+            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 360);
             this.btnDiscardChanges.Size = new System.Drawing.Size(110, 32);
             this.btnDiscardChanges.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.btnDiscardChanges.Name = "btnDiscardChanges";
@@ -239,7 +250,7 @@ namespace RigToggle.App
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(420, 380);
+            this.ClientSize = new System.Drawing.Size(420, 408);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -251,6 +262,7 @@ namespace RigToggle.App
             this.Controls.Add(this.grpMonitor);
             this.Controls.Add(this.grpAudioDevices);
             this.Controls.Add(this.grpAppPath);
+            this.Controls.Add(this.chkEnableDebugLogging);
             this.Controls.Add(this.btnSaveSettings);
             this.Controls.Add(this.btnDiscardChanges);
 
@@ -282,6 +294,8 @@ namespace RigToggle.App
         private System.Windows.Forms.TextBox txtAppPath;
         private System.Windows.Forms.Button btnBrowse;
         private System.Windows.Forms.Label lblAppWarning;
+
+        private System.Windows.Forms.CheckBox chkEnableDebugLogging;
 
         private System.Windows.Forms.Button btnSaveSettings;
         private System.Windows.Forms.Button btnDiscardChanges;

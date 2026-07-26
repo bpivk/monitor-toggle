@@ -50,6 +50,7 @@ namespace RigToggle.App
             PopulateMonitorPicker();
             PopulateAudioPickers();
             PopulateAppPathField();
+            chkEnableDebugLogging.Checked = _settings.EnableDebugLogging;
             ValidateSettingsForm();
         }
 
@@ -328,6 +329,7 @@ namespace RigToggle.App
                 RigAudioDeviceName = audioRigItem.DisplayLabel,
                 CompanionAppPath = txtAppPath.Text,
                 SkipMonitorConfirmation = monitorChanged ? false : _settings.SkipMonitorConfirmation,
+                EnableDebugLogging = chkEnableDebugLogging.Checked,
             };
 
             // Persist before the declarative DialogResult.OK closes the dialog.
