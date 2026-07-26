@@ -162,19 +162,25 @@ namespace RigToggle.App
             this.grpAppPath.Location = new System.Drawing.Point(12, 244);
             this.grpAppPath.Size = new System.Drawing.Size(396, 76);
             this.grpAppPath.TabStop = false;
-            this.grpAppPath.Text = "Application Path";
+            this.grpAppPath.Text = "Target App";
+            this.grpAppPath.AllowDrop = true;
             this.grpAppPath.Controls.Add(this.txtAppPath);
             this.grpAppPath.Controls.Add(this.btnBrowse);
             this.grpAppPath.Controls.Add(this.lblAppWarning);
+            this.grpAppPath.DragEnter += new System.Windows.Forms.DragEventHandler(this.AppPath_DragEnter);
+            this.grpAppPath.DragDrop += new System.Windows.Forms.DragEventHandler(this.AppPath_DragDrop);
 
             //
             // txtAppPath
             //
             this.txtAppPath.ReadOnly = true;
-            this.txtAppPath.Text = "No file selected";
+            this.txtAppPath.Text = "No app shortcut or .exe selected";
             this.txtAppPath.Location = new System.Drawing.Point(12, 22);
             this.txtAppPath.Size = new System.Drawing.Size(288, 23);
             this.txtAppPath.Name = "txtAppPath";
+            this.txtAppPath.AllowDrop = true;
+            this.txtAppPath.DragEnter += new System.Windows.Forms.DragEventHandler(this.AppPath_DragEnter);
+            this.txtAppPath.DragDrop += new System.Windows.Forms.DragEventHandler(this.AppPath_DragDrop);
 
             //
             // btnBrowse
@@ -216,9 +222,9 @@ namespace RigToggle.App
             //
             // dlgOpenExe
             //
-            this.dlgOpenExe.Filter = "Executable files (*.exe)|*.exe";
+            this.dlgOpenExe.Filter = "App shortcuts and executables (*.lnk;*.exe)|*.lnk;*.exe";
             this.dlgOpenExe.CheckFileExists = true;
-            this.dlgOpenExe.Title = "Select Companion Application";
+            this.dlgOpenExe.Title = "Select Target App";
 
             //
             // errMonitor / errAudioNormal / errAudioRig / errApp

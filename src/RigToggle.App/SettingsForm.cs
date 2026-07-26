@@ -5,7 +5,7 @@ namespace RigToggle.App
 {
     /// <summary>
     /// Settings modal dialog (D-03): three labeled sections (Monitor, Audio Devices,
-    /// Application Path — D-09) bound to real enumerated hardware (D-05) through the
+    /// Target App — D-09) bound to real enumerated hardware (D-05) through the
     /// Core interfaces only — never instantiates concrete Windows adapters directly
     /// (02-RESEARCH.md Anti-Pattern: "Putting P/Invoke/COM calls in ... code-behind").
     /// </summary>
@@ -184,17 +184,17 @@ namespace RigToggle.App
             if (savedPath is null)
             {
                 // First-ever run: no warning (Pitfall 3).
-                txtAppPath.Text = "No file selected";
+                txtAppPath.Text = "No app shortcut or .exe selected";
             }
             else
             {
                 txtAppPath.Text = savedPath;
-                if (!IsValidExePath(savedPath))
+                if (!IsValidLaunchTarget(savedPath))
                 {
                     // D-10: previously configured, but no longer resolves — inline warning.
                     // The field itself can't be "unselected" like a ComboBox; leaving the
                     // stale path visible alongside the warning lets the user see what to fix.
-                    ShowStaleWarning(errApp, txtAppPath, lblAppWarning, "application");
+                    ShowStaleWarning(errApp, txtAppPath, lblAppWarning, "target app");
                 }
             }
         }
@@ -212,19 +212,23 @@ namespace RigToggle.App
             bool monitorOk = cboMonitor.SelectedItem is PickerItem;
             bool audioNormalOk = cboAudioNormal.SelectedItem is PickerItem;
             bool audioRigOk = cboAudioRig.SelectedItem is PickerItem;
-            bool appPathOk = IsValidExePath(txtAppPath.Text);
+            bool appPathOk = IsValidLaunchTarget(txtAppPath.Text);
 
             btnSaveSettings.Enabled = monitorOk && audioNormalOk && audioRigOk && appPathOk;
         }
 
-        private static bool IsValidExePath(string path)
+        // Accepts any existing .lnk or .exe as the launch target — a .lnk shortcut is
+        // stored and later launched verbatim (no resolution here); ShellExecute handles
+        // both at launch time (WindowsAppController.LaunchOrFocus).
+        private static bool IsValidLaunchTarget(string path)
             => !string.IsNullOrEmpty(path)
                && File.Exists(path)
-               && string.Equals(Path.GetExtension(path), ".exe", StringComparison.OrdinalIgnoreCase);
+               && (string.Equals(Path.GetExtension(path), ".exe", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(Path.GetExtension(path), ".lnk", StringComparison.OrdinalIgnoreCase));
 
         private void BtnBrowse_Click(object? sender, EventArgs e)
         {
-            // D-06: file-browser dialog filtered to *.exe (Filter configured in the Designer).
+            // D-06: file-browser dialog filtered to *.lnk/*.exe (Filter configured in the Designer).
             if (dlgOpenExe.ShowDialog(this) == DialogResult.OK)
             {
                 errApp.SetError(txtAppPath, string.Empty);
@@ -232,6 +236,59 @@ namespace RigToggle.App
                 txtAppPath.Text = dlgOpenExe.FileName;
                 ValidateSettingsForm();
             }
+        }
+
+        // Drag-and-drop alternative to Browse (redesign: generalized "target app"
+        // configuration, .planning/quick/260726-idx-redesign-companion-app-launch-focus-mech).
+        // Accept only a single dropped file with a .exe/.lnk extension; anything else
+        // (multiple files, wrong extension, non-file drag source) is rejected via
+        // DragDropEffects.None (T-idx-02).
+        private void AppPath_DragEnter(object? sender, DragEventArgs e)
+        {
+            e.Effect = TryGetSingleDroppedLaunchTarget(e, out _)
+                ? DragDropEffects.Copy
+                : DragDropEffects.None;
+        }
+
+        private void AppPath_DragDrop(object? sender, DragEventArgs e)
+        {
+            if (!TryGetSingleDroppedLaunchTarget(e, out string? path))
+            {
+                return;
+            }
+
+            // Store whatever is dropped verbatim as the launch-target path — no .lnk
+            // resolution (ShellExecute handles both .lnk and .exe at launch time).
+            errApp.SetError(txtAppPath, string.Empty);
+            lblAppWarning.Visible = false;
+            txtAppPath.Text = path;
+            ValidateSettingsForm();
+        }
+
+        private static bool TryGetSingleDroppedLaunchTarget(DragEventArgs e, out string? path)
+        {
+            path = null;
+
+            if (!e.Data!.GetDataPresent(DataFormats.FileDrop))
+            {
+                return false;
+            }
+
+            if (e.Data.GetData(DataFormats.FileDrop) is not string[] { Length: 1 } files)
+            {
+                return false;
+            }
+
+            string candidate = files[0];
+            string extension = Path.GetExtension(candidate);
+            if (!string.Equals(extension, ".exe", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(extension, ".lnk", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            path = candidate;
+            return true;
         }
 
         private void BtnSaveSettings_Click(object? sender, EventArgs e)
@@ -242,7 +299,7 @@ namespace RigToggle.App
 
             // Defensive guard only — btnSaveSettings.Enabled (D-12) should make this
             // unreachable via the UI, but never persist a partial/invalid selection.
-            if (monitorItem is null || audioNormalItem is null || audioRigItem is null || !IsValidExePath(txtAppPath.Text))
+            if (monitorItem is null || audioNormalItem is null || audioRigItem is null || !IsValidLaunchTarget(txtAppPath.Text))
             {
                 return;
             }
