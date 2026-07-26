@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: milestone_complete
 stopped_at: Milestone complete (Phase 5 was final phase)
-last_updated: 2026-07-26T16:06:00Z
-last_activity: 2026-07-26 -- Quick task 260726-jti: gated debug.log behind an off-by-default Settings checkbox and removed MainForm's dead companion-status line + IAppController dependency
+last_updated: 2026-07-26T16:30:00Z
+last_activity: 2026-07-26 -- Quick task 260726-k3u: fixed clipped text on the 260726-jti debug-logging checkbox (height 24px -> 40px)
 progress:
   total_phases: 5
   completed_phases: 4
@@ -89,6 +89,7 @@ None.
 | 260726-j9y | Skip ShowWindow(SW_MINIMIZE) in MinimizeIfRunning when the window is already hidden — fixes toggle-back regression confirmed by 260726-ixu's diagnostic evidence; rig-verified/confirmed 2026-07-26 | 2026-07-26 | e6e1989..7731923 | [260726-j9y-fix-minimizeifrunning-to-skip-showwindow](./quick/260726-j9y-fix-minimizeifrunning-to-skip-showwindow/) |
 | 260726-jm3 | Docs-only closeout: mark H9 fully rig-verified resolved across STATE.md, knowledge-base.md, and 260726-j9y-SUMMARY (resolution chain: 260726-idx → 260726-ixu → 260726-j9y) | 2026-07-26 | 46b9c01 | [260726-jm3-mark-h9-fully-rig-verified-resolved-acro](./quick/260726-jm3-mark-h9-fully-rig-verified-resolved-acro/) |
 | 260726-jti | Gate debug.log behind a new Settings checkbox (EnableDebugLogging, off by default); remove MainForm's dead "Moza Companion: Running/Not running" status line and its now-unused IAppController dependency | 2026-07-26 | d0e4636..309112b | [260726-jti-gate-debug-log-behind-a-settings-toggle-](./quick/260726-jti-gate-debug-log-behind-a-settings-toggle-/) |
+| 260726-k3u | UI fix: grow the "Enable debug logging" checkbox height (24px -> 40px) so its wrapped two-line text isn't clipped after "(writes to" — rig-reported regression from 260726-jti; buttons and ClientSize shifted down 16px to match | 2026-07-26 | 984814d | [260726-k3u-fix-settingsform-checkbox-height-so-the-](./quick/260726-k3u-fix-settingsform-checkbox-height-so-the-/) |
 
 ## Deferred Items
 
