@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: milestone_complete
 stopped_at: Milestone complete (Phase 5 was final phase)
-last_updated: 2026-07-25T19:10:05.379Z
-last_activity: 2026-07-24 -- Phase 5 execution started
+last_updated: 2026-07-26T13:25:00Z
+last_activity: 2026-07-26 -- Completed quick task 260726-idx: Redesign companion app launch/focus mechanism
 progress:
   total_phases: 5
   completed_phases: 4
@@ -79,6 +79,12 @@ _(none currently open — the Moza foreground-focus follow-up below was resolved
 
 - Phase 1: RESOLVED — spike/RESULTS-TEMPLATE.md now records a GO decision (non-elevated CCD topology-path-removal confirmed working on this rig's AMD Radeon/DisplayPort hardware for a non-primary display). Remaining caveat carried into Phase 4: disabling the PRIMARY monitor specifically threw `PathChangeException` twice (Windows requires a display at (0,0); `WindowsDisplayAPI.PathInfo.Position` has no public setter to reposition the remaining display first) — a scoped, known engineering task for Phase 4, not a feasibility blocker. Fallback (pnputil/elevation) was not needed and not tested.
 - Phase 4/5: Elevation requirements differ per subsystem (monitor/audio/window focus); requesting broad admin rights would break cross-process window focus on the companion app via UIPI — must default to asInvoker and confirm per-operation needs empirically. (Confirmed non-elevated for audio in Phase 3; monitor mechanism also non-elevated per Phase 1 spike.)
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260726-idx | Redesign companion app launch/focus mechanism: unconditional ShellExecute relaunch replaces window-focus dance; Settings adds .lnk/.exe drag-and-drop | 2026-07-26 | 09c758a..792f976 | [260726-idx-redesign-companion-app-launch-focus-mech](./quick/260726-idx-redesign-companion-app-launch-focus-mech/) |
 
 ## Deferred Items
 
