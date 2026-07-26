@@ -68,7 +68,11 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Moza Companion window sometimes doesn't come to the foreground after toggling to Rig Mode, even though the process is confirmed running (process launches/is detected correctly — `LaunchOrFocus`'s "already running" branch just doesn't reliably bring the window forward). Plausibly Win32's `SetForegroundWindow` restriction (fails silently when the calling process isn't itself in the foreground). Discovered during Phase 4 Plan 03 rig testing (2026-07-24) but is Phase 3 scope (APP-01/APP-02, already shipped) — not a Phase 4 blocker. Worth a small follow-up investigation in a future phase.
+_(none currently open — the Moza foreground-focus follow-up below was resolved via debug session `moza-foreground-focus`)_
+
+### Known Limitations
+
+- Moza Companion's window close (X) button, Alt+F4, and taskbar "Close window" all become inert (zero visual reaction) specifically on windows that RigToggle itself brought to the foreground — never on windows Moza opens on its own. Minimize is unaffected. Investigated across 10 rounds in debug session `moza-foreground-focus` (2026-07-24 to 2026-07-26); every passively-observable Win32 mechanism a separate process can query (WS_DISABLED, system-menu MF_GRAYED, FormClosing-visible-revert) was tested and eliminated. The remaining likely cause — Moza intercepting close input at the message level (WM_NCHITTEST/WM_NCLBUTTONDOWN/WM_SYSCOMMAND) inside its own window procedure — is upstream of anything RigToggle's own process can observe or fix without hooking Moza's message loop, which is outside this project's Win32-utility scope (CLAUDE.md/STACK.md). Accepted as a Moza-side, not-fixable-from-RigToggle known limitation; not an open bug. Full investigation history: `.planning/debug/resolved/moza-foreground-focus.md`.
 
 ### Blockers/Concerns
 
