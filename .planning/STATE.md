@@ -89,7 +89,7 @@ Recent decisions affecting current work:
 |---|-------------|------|--------|-----------|
 | 260726-idx | Redesign companion app launch/focus mechanism: unconditional ShellExecute relaunch replaces window-focus dance; Settings adds .lnk/.exe drag-and-drop | 2026-07-26 | 09c758a..792f976 | [260726-idx-redesign-companion-app-launch-focus-mech](./quick/260726-idx-redesign-companion-app-launch-focus-mech/) |
 | 260726-ixu | Diagnostic-only: log IsWindowVisible/IsIconic/ShowWindow-return before+after MinimizeIfRunning's minimize call, to gather rig-test evidence for the toggle-back regression reported after 260726-idx | 2026-07-26 | f0bf28a | [260726-ixu-add-targeted-diagnostic-logging-to-windo](./quick/260726-ixu-add-targeted-diagnostic-logging-to-windo/) |
-| 260726-j9y | Skip ShowWindow(SW_MINIMIZE) in MinimizeIfRunning when the window is already hidden — fixes toggle-back regression confirmed by 260726-ixu's diagnostic evidence; rig-test still pending | 2026-07-26 | e6e1989 (pending closing commit) | [260726-j9y-fix-minimizeifrunning-to-skip-showwindow](./quick/260726-j9y-fix-minimizeifrunning-to-skip-showwindow/) |
+| 260726-j9y | Skip ShowWindow(SW_MINIMIZE) in MinimizeIfRunning when the window is already hidden — fixes toggle-back regression confirmed by 260726-ixu's diagnostic evidence; rig-test still pending | 2026-07-26 | e6e1989..7731923 | [260726-j9y-fix-minimizeifrunning-to-skip-showwindow](./quick/260726-j9y-fix-minimizeifrunning-to-skip-showwindow/) |
 
 ## Deferred Items
 
