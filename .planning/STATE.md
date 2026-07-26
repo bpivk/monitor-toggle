@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: milestone_complete
 stopped_at: Milestone complete (Phase 5 was final phase)
-last_updated: 2026-07-26T13:25:00Z
-last_activity: 2026-07-26 -- Completed quick task 260726-idx: Redesign companion app launch/focus mechanism
+last_updated: 2026-07-26T13:38:00Z
+last_activity: 2026-07-26 -- Completed quick task 260726-ixu: Added targeted diagnostic logging to MinimizeIfRunning (toggle-back regression investigation, rig-test needed)
 progress:
   total_phases: 5
   completed_phases: 4
@@ -68,7 +68,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-_(none currently open — the Moza foreground-focus follow-up below was resolved via debug session `moza-foreground-focus`)_
+- Rig-test needed: quick task `260726-ixu` added diagnostic logging (pre/post `IsWindowVisible`/`IsIconic`/`ShowWindow` return) around `MinimizeIfRunning`'s minimize call, targeting a toggle-back regression reported after `260726-idx` (Moza window reappears and becomes un-closeable after toggling back to normal mode). No fix has been applied yet — the user must build, rig-test the toggle-back path, and read back `%LOCALAPPDATA%\RigToggle\debug.log`'s `MinimizeIfRunning: pre-minimize/post-minimize` lines so a follow-up task can diagnose and fix the actual cause.
 
 ### Known Limitations
 
@@ -85,6 +85,7 @@ _(none currently open — the Moza foreground-focus follow-up below was resolved
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260726-idx | Redesign companion app launch/focus mechanism: unconditional ShellExecute relaunch replaces window-focus dance; Settings adds .lnk/.exe drag-and-drop | 2026-07-26 | 09c758a..792f976 | [260726-idx-redesign-companion-app-launch-focus-mech](./quick/260726-idx-redesign-companion-app-launch-focus-mech/) |
+| 260726-ixu | Diagnostic-only: log IsWindowVisible/IsIconic/ShowWindow-return before+after MinimizeIfRunning's minimize call, to gather rig-test evidence for the toggle-back regression reported after 260726-idx | 2026-07-26 | f0bf28a | [260726-ixu-add-targeted-diagnostic-logging-to-windo](./quick/260726-ixu-add-targeted-diagnostic-logging-to-windo/) |
 
 ## Deferred Items
 
