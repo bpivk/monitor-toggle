@@ -85,18 +85,11 @@ None — plan executed exactly as written. Both tasks' automated grep-based veri
 
 None — no external service configuration required.
 
-**Rig-test needed to confirm the fix (this is the critical next step):**
-1. Build the app on the rig (e.g. `dotnet publish -r win-x64 --self-contained true -p:PublishSingleFile=true`, or run from Visual Studio / `dotnet run`).
-2. Toggle to rig mode (launches/focuses Moza Companion as before).
-3. Close Moza Companion to the system tray using its own X (close) button — this is the scenario that previously retriggered the close-inert bug.
-4. Toggle back to normal mode.
-5. Confirm the Moza window STAYS hidden (does not reappear as a visible minimized taskbar icon) and no close-inert symptom occurs afterward.
-6. Read `%LOCALAPPDATA%\RigToggle\debug.log` and confirm a `MinimizeIfRunning: skipped minimize hWnd=... — window already hidden (IsWindowVisible=false)` line appears for that run (rather than a `post-minimize` line showing `IsWindowVisible` flipping to `True`).
-7. Report back the exact log lines if anything looks off, or confirm success so `260726-j9y` can be marked rig-verified in STATE.md.
+**Rig-test completed and confirmed on 2026-07-26:** the user rig-tested this fix and confirmed "Yes. This works now." The `debug.log` evidence (2026-07-26, 16:05–16:06) shows both the toggle-back skip-minimize path (`MinimizeIfRunning: skipped minimize hWnd=0x2811EC — window already hidden (IsWindowVisible=false)`) and the normal visible-window minimize path (`post-minimize ... IsWindowVisible=True, IsIconic=True, ShowWindowReturned=True`) behaving correctly in the same session. No further action needed.
 
 ## Next Phase Readiness
-- Both directions of the H9 close-inert symptom now have applied fixes; only rig verification of this round's fix (toggle-back direction) remains before the symptom can be considered fully resolved end-to-end.
-- No further code changes are planned unless rig-test evidence shows the fix did not resolve the symptom, in which case a follow-up quick task should analyze fresh `debug.log` output rather than re-chasing already-eliminated read-only diagnostics.
+- Both directions of the H9 close-inert symptom now have applied fixes, and both have been rig-verified and confirmed by the user on 2026-07-26 ("Yes. This works now.") — the symptom is fully resolved end-to-end.
+- No further code changes are planned. See quick task `260726-jm3` for the docs-only closeout that marks H9 fully resolved across STATE.md and knowledge-base.md.
 
 ---
 *Phase: quick-260726-j9y*

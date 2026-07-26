@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: milestone_complete
 stopped_at: Milestone complete (Phase 5 was final phase)
-last_updated: 2026-07-26T14:15:00Z
-last_activity: 2026-07-26 -- Completed quick task 260726-j9y: Fixed toggle-back regression by gating MinimizeIfRunning's ShowWindow(SW_MINIMIZE) on preVisible (skip when already hidden); rig-test needed
+last_updated: 2026-07-26T16:06:00Z
+last_activity: 2026-07-26 -- H9 (Moza Companion close-inert symptom) fully rig-verified resolved, both directions confirmed via rig debug.log (260726-idx, 260726-ixu, 260726-j9y resolution chain)
 progress:
   total_phases: 5
   completed_phases: 4
@@ -68,14 +68,11 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Rig-test needed: quick task `260726-j9y` fixed the toggle-back regression diagnosed via `260726-ixu`'s logging — `MinimizeIfRunning` now skips its `ShowWindow(SW_MINIMIZE)` call when the target window is already hidden/tray-only (`preVisible == false`), instead of unconditionally forcing it back to a visible minimized state. This fix has NOT itself been rig-tested. The user must build, then: toggle to rig mode → close Moza to tray via its X button → toggle back to normal mode → confirm the window STAYS hidden (does not reappear) and no close-inert symptom occurs, and read back `%LOCALAPPDATA%\RigToggle\debug.log` to confirm a "skipped minimize ... already hidden" line appears for that run.
+None.
 
 ### Known Limitations
 
-- Moza Companion's window close (X) button, Alt+F4, and taskbar "Close window" all become inert (zero visual reaction) specifically on windows that RigToggle itself brought to the foreground — never on windows Moza opens on its own. Minimize is unaffected. Investigated across 10 rounds in debug session `moza-foreground-focus` (2026-07-24 to 2026-07-26); every passively-observable Win32 mechanism a separate process can query (WS_DISABLED, system-menu MF_GRAYED, FormClosing-visible-revert) was tested and eliminated. The remaining likely cause — Moza intercepting close input at the message level (WM_NCHITTEST/WM_NCLBUTTONDOWN/WM_SYSCOMMAND) inside its own window procedure — is upstream of anything RigToggle's own process can observe or fix without hooking Moza's message loop, which is outside this project's Win32-utility scope (CLAUDE.md/STACK.md). This symptom has two independent directions, tracked and fixed separately:
-  - **(a) Toggle-TO-rig-mode direction — fixed:** quick task `.planning/quick/260726-idx-redesign-companion-app-launch-focus-mech` redesigned the launch-to-rig-mode path to relaunch-based (ShellExecute) activation that never touches Moza's window at all, so the trigger for this limitation (RigToggle foregrounding a window it doesn't own) no longer exists on that path.
-  - **(b) Toggle-TO-normal-mode (toggle-back) direction — separate bug, now fixed:** diagnostic logging added by quick task `.planning/quick/260726-ixu-add-targeted-diagnostic-logging-to-windo` captured rig evidence that `MinimizeIfRunning` was doing an unconditional raw Win32 `ShowWindow(SW_MINIMIZE)` that, when the window was already hidden/tray-only, forced it back to a visible minimized state (pre `IsWindowVisible=False` → post `True`) — retriggering the close-inert symptom on toggle-back. Quick task `.planning/quick/260726-j9y-fix-minimizeifrunning-to-skip-showwindow` fixed this by skipping the `ShowWindow` call whenever the window is already hidden.
-  - **(c) Current overall status:** a fix has been applied for BOTH directions, but direction (b)'s fix has NOT yet been rig-tested. The user still needs to verify: toggle to rig mode → close Moza to tray via its X button → toggle back to normal mode → confirm the window STAYS hidden (does not reappear) and no close-inert symptom occurs. This sandbox has no Windows runtime, so none of this can be run/tested here — the user rig-tests. Full investigation history: `.planning/debug/resolved/moza-foreground-focus.md`.
+- **RESOLVED — Moza Companion close-button-inert symptom (H9), fully rig-verified 2026-07-26:** Moza Companion's window close (X) button, Alt+F4, and taskbar "Close window" previously became inert specifically on windows that RigToggle itself brought to the foreground. This had two independent directions, both now fixed and rig-confirmed: (a) toggle-TO-rig-mode direction fixed by `260726-idx`'s relaunch (ShellExecute) redesign, which never touches Moza's window at all; (b) toggle-TO-normal-mode (toggle-back) direction fixed by `260726-j9y`'s skip-when-hidden gate in `MinimizeIfRunning`, confirmed by rig `debug.log` evidence on 2026-07-26 (16:05–16:06) showing both the skip-minimize path (already-hidden window left untouched) and the normal visible-window minimize path behaving correctly in the same session. User confirmed: "Yes. This works now." Resolution chain: `260726-idx` (redesign launch/focus) → `260726-ixu` (added diagnostic logging that captured the toggle-back regression) → `260726-j9y` (fixed toggle-back via skip-when-hidden gate). Full investigation history: `.planning/debug/resolved/moza-foreground-focus.md`.
 - The relaunch-based launch redesign's `MinimizeIfRunning`/`IsRunning` (toggle-back) still derive the process name from the configured launch-target path via `Path.GetFileNameWithoutExtension`. If the user configures a `.lnk` (rather than the target `.exe` itself) as the launch target, that derived name will typically not match the real running process name, so toggle-back's minimize call may silently no-op. Documented, not patched (out of scope for the redesign — `MinimizeIfRunning` is explicitly unchanged).
 
 ### Blockers/Concerns
@@ -89,7 +86,7 @@ Recent decisions affecting current work:
 |---|-------------|------|--------|-----------|
 | 260726-idx | Redesign companion app launch/focus mechanism: unconditional ShellExecute relaunch replaces window-focus dance; Settings adds .lnk/.exe drag-and-drop | 2026-07-26 | 09c758a..792f976 | [260726-idx-redesign-companion-app-launch-focus-mech](./quick/260726-idx-redesign-companion-app-launch-focus-mech/) |
 | 260726-ixu | Diagnostic-only: log IsWindowVisible/IsIconic/ShowWindow-return before+after MinimizeIfRunning's minimize call, to gather rig-test evidence for the toggle-back regression reported after 260726-idx | 2026-07-26 | f0bf28a | [260726-ixu-add-targeted-diagnostic-logging-to-windo](./quick/260726-ixu-add-targeted-diagnostic-logging-to-windo/) |
-| 260726-j9y | Skip ShowWindow(SW_MINIMIZE) in MinimizeIfRunning when the window is already hidden — fixes toggle-back regression confirmed by 260726-ixu's diagnostic evidence; rig-test still pending | 2026-07-26 | e6e1989..7731923 | [260726-j9y-fix-minimizeifrunning-to-skip-showwindow](./quick/260726-j9y-fix-minimizeifrunning-to-skip-showwindow/) |
+| 260726-j9y | Skip ShowWindow(SW_MINIMIZE) in MinimizeIfRunning when the window is already hidden — fixes toggle-back regression confirmed by 260726-ixu's diagnostic evidence; rig-verified/confirmed 2026-07-26 | 2026-07-26 | e6e1989..7731923 | [260726-j9y-fix-minimizeifrunning-to-skip-showwindow](./quick/260726-j9y-fix-minimizeifrunning-to-skip-showwindow/) |
 
 ## Deferred Items
 
