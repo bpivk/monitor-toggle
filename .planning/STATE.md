@@ -5,7 +5,7 @@ milestone_name: milestone
 status: milestone_complete
 stopped_at: Milestone complete (Phase 5 was final phase)
 last_updated: 2026-07-26T16:06:00Z
-last_activity: 2026-07-26 -- H9 (Moza Companion close-inert symptom) fully rig-verified resolved, both directions confirmed via rig debug.log (260726-idx, 260726-ixu, 260726-j9y resolution chain)
+last_activity: 2026-07-26 -- Quick task 260726-jti: gated debug.log behind an off-by-default Settings checkbox and removed MainForm's dead companion-status line + IAppController dependency
 progress:
   total_phases: 5
   completed_phases: 4
@@ -88,6 +88,7 @@ None.
 | 260726-ixu | Diagnostic-only: log IsWindowVisible/IsIconic/ShowWindow-return before+after MinimizeIfRunning's minimize call, to gather rig-test evidence for the toggle-back regression reported after 260726-idx | 2026-07-26 | f0bf28a | [260726-ixu-add-targeted-diagnostic-logging-to-windo](./quick/260726-ixu-add-targeted-diagnostic-logging-to-windo/) |
 | 260726-j9y | Skip ShowWindow(SW_MINIMIZE) in MinimizeIfRunning when the window is already hidden — fixes toggle-back regression confirmed by 260726-ixu's diagnostic evidence; rig-verified/confirmed 2026-07-26 | 2026-07-26 | e6e1989..7731923 | [260726-j9y-fix-minimizeifrunning-to-skip-showwindow](./quick/260726-j9y-fix-minimizeifrunning-to-skip-showwindow/) |
 | 260726-jm3 | Docs-only closeout: mark H9 fully rig-verified resolved across STATE.md, knowledge-base.md, and 260726-j9y-SUMMARY (resolution chain: 260726-idx → 260726-ixu → 260726-j9y) | 2026-07-26 | 46b9c01 | [260726-jm3-mark-h9-fully-rig-verified-resolved-acro](./quick/260726-jm3-mark-h9-fully-rig-verified-resolved-acro/) |
+| 260726-jti | Gate debug.log behind a new Settings checkbox (EnableDebugLogging, off by default); remove MainForm's dead "Moza Companion: Running/Not running" status line and its now-unused IAppController dependency | 2026-07-26 | d0e4636..309112b | [260726-jti-gate-debug-log-behind-a-settings-toggle-](./quick/260726-jti-gate-debug-log-behind-a-settings-toggle-/) |
 
 ## Deferred Items
 
