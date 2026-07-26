@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: milestone_complete
-stopped_at: Milestone complete (Phase 5 was final phase)
-last_updated: 2026-07-26T16:30:00Z
-last_activity: 2026-07-26 -- Quick task 260726-k3u: fixed clipped text on the 260726-jti debug-logging checkbox (height 24px -> 40px)
+status: Awaiting next milestone
+stopped_at: Phase 5 context gathered
+last_updated: "2026-07-26T14:42:28.726Z"
+last_activity: 2026-07-26 — Milestone v1.0 completed and archived
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 18
   completed_plans: 18
-  percent: 80
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,10 @@ See: .planning/PROJECT.md (updated 2026-07-24)
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-07-25
-
-Progress: [██████████] 100%
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-26 — Milestone v1.0 completed and archived
 
 ## Performance Metrics
 
@@ -114,3 +112,7 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-26 (pre-close
 Last session: 2026-07-24T21:48:46.566Z
 Stopped at: Phase 5 context gathered
 Resume file: .planning/phases/05-orchestration-full-toggle-packaging/05-CONTEXT.md
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
