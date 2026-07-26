@@ -1,6 +1,7 @@
 ---
 phase: quick-260726-ixu
 plan: 01
+status: complete
 subsystem: app-control
 tags: [win32, p-invoke, diagnostic-logging, minimize, toggle-back]
 

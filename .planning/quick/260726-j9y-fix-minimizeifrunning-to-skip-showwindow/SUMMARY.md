@@ -1,6 +1,7 @@
 ---
 phase: quick-260726-j9y
 plan: 01
+status: complete
 subsystem: app-control
 tags: [win32, p-invoke, minimize, toggle-back, regression-fix]
 

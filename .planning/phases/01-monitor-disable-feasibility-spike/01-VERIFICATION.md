@@ -1,7 +1,7 @@
 ---
 phase: 01-monitor-disable-feasibility-spike
 verified: 2026-07-24T12:00:00Z
-status: human_needed
+status: resolved
 score: 14/14 deliverable must-haves verified (tool + docs); 0/4 ROADMAP Success Criteria empirically closed
 overrides_applied: 0
 human_verification:
@@ -132,5 +132,12 @@ The one substantive gap is not in the deliverables but in the phase's actual com
 
 ---
 
+## Resolution Addendum (2026-07-24)
+
+The human round-trip requested above was completed the same day: the spike tool was built and run on the actual rig PC, and `spike/RESULTS-TEMPLATE.md` was filled in with real dual-source before/after counts, PASS/FAIL lines, and a checked decision box — **GO** (non-elevated `SetDisplayConfig` topology-path-removal confirmed working for a non-primary display; the primary-display case needs one additional, well-understood repositioning fix, tracked as a Phase 4 implementation requirement, not a feasibility blocker). The admin fallback (`FALLBACK.md`) was not needed and not exercised. This closes ROADMAP Phase 1 Success Criterion #3 and the two human-verification items above; see `.planning/STATE.md` Blockers/Concerns for the carried-forward Phase 4 caveat.
+
+---
+
 *Verified: 2026-07-24T12:00:00Z*
 *Verifier: Claude (gsd-verifier)*
+*Resolution recorded: 2026-07-24 (spike/RESULTS-TEMPLATE.md)*

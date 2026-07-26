@@ -102,6 +102,13 @@ Items acknowledged and carried forward from previous milestone close:
 | v2 | NOTIF-01 (toast notification on toggle) | Deferred to v2 | Initial requirements definition |
 | v2 | LOG-01 (toggle history/log) | Deferred to v2 | Initial requirements definition |
 
+Items acknowledged and deferred at v1.0 milestone close on 2026-07-26 (pre-close artifact audit — both are scanner false positives, not real gaps, confirmed by direct inspection):
+
+| Category | Item | Status |
+|----------|------|--------|
+| debug | knowledge-base | `.planning/debug/knowledge-base.md` is a persistent reference doc (not a debug session) sitting directly in `.planning/debug/`; the audit scanner treats every `.md` file in that directory as a session and flags it "unknown" for lacking a `status:` field. Not an open investigation — acknowledged and left as-is. |
+| uat_gap | Phase 05 (05-HUMAN-UAT.md) | File's own frontmatter already reads `status: resolved` with 0 pending scenarios; the scanner surfaces any existing UAT file regardless of resolution. Already resolved — acknowledged, no action needed. |
+
 ## Session Continuity
 
 Last session: 2026-07-24T21:48:46.566Z
