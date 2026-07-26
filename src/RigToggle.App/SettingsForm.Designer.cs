@@ -207,7 +207,7 @@ namespace RigToggle.App
             //
             this.chkEnableDebugLogging.Text = "Enable debug logging (writes to %LOCALAPPDATA%\\RigToggle\\debug.log)";
             this.chkEnableDebugLogging.Location = new System.Drawing.Point(12, 326);
-            this.chkEnableDebugLogging.Size = new System.Drawing.Size(396, 24);
+            this.chkEnableDebugLogging.Size = new System.Drawing.Size(396, 40);
             this.chkEnableDebugLogging.AutoSize = false;
             this.chkEnableDebugLogging.Name = "chkEnableDebugLogging";
 
@@ -215,7 +215,7 @@ namespace RigToggle.App
             // btnSaveSettings
             //
             this.btnSaveSettings.Text = "Save Settings";
-            this.btnSaveSettings.Location = new System.Drawing.Point(180, 360);
+            this.btnSaveSettings.Location = new System.Drawing.Point(180, 376);
             this.btnSaveSettings.Size = new System.Drawing.Size(110, 32);
             this.btnSaveSettings.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnSaveSettings.Name = "btnSaveSettings";
@@ -225,7 +225,7 @@ namespace RigToggle.App
             // btnDiscardChanges
             //
             this.btnDiscardChanges.Text = "Discard Changes";
-            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 360);
+            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 376);
             this.btnDiscardChanges.Size = new System.Drawing.Size(110, 32);
             this.btnDiscardChanges.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.btnDiscardChanges.Name = "btnDiscardChanges";
@@ -250,7 +250,7 @@ namespace RigToggle.App
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(420, 408);
+            this.ClientSize = new System.Drawing.Size(420, 424);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
