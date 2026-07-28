@@ -31,7 +31,10 @@ namespace RigToggle.App
             this.components = new System.ComponentModel.Container();
 
             this.grpMonitor = new System.Windows.Forms.GroupBox();
-            this.cboMonitor = new System.Windows.Forms.ComboBox();
+            this.dgvMonitors = new System.Windows.Forms.DataGridView();
+            this.colMonitorName = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colDisable = new System.Windows.Forms.DataGridViewCheckBoxColumn();
+            this.colEnable = new System.Windows.Forms.DataGridViewCheckBoxColumn();
             this.lblMonitorWarning = new System.Windows.Forms.Label();
 
             this.grpAudioDevices = new System.Windows.Forms.GroupBox();
@@ -62,6 +65,7 @@ namespace RigToggle.App
             ((System.ComponentModel.ISupportInitialize)(this.errAudioNormal)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.errAudioRig)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.errApp)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dgvMonitors)).BeginInit();
             this.grpMonitor.SuspendLayout();
             this.grpAudioDevices.SuspendLayout();
             this.grpAppPath.SuspendLayout();
@@ -71,24 +75,58 @@ namespace RigToggle.App
             // grpMonitor
             //
             this.grpMonitor.Location = new System.Drawing.Point(12, 12);
-            this.grpMonitor.Size = new System.Drawing.Size(396, 76);
+            this.grpMonitor.Size = new System.Drawing.Size(396, 176);
             this.grpMonitor.TabStop = false;
             this.grpMonitor.Text = "Monitor";
-            this.grpMonitor.Controls.Add(this.cboMonitor);
+            this.grpMonitor.Controls.Add(this.dgvMonitors);
             this.grpMonitor.Controls.Add(this.lblMonitorWarning);
 
             //
-            // cboMonitor
+            // dgvMonitors
             //
-            this.cboMonitor.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cboMonitor.Location = new System.Drawing.Point(12, 22);
-            this.cboMonitor.Size = new System.Drawing.Size(372, 23);
-            this.cboMonitor.Name = "cboMonitor";
+            this.dgvMonitors.AllowUserToAddRows = false;
+            this.dgvMonitors.AllowUserToDeleteRows = false;
+            this.dgvMonitors.AllowUserToResizeRows = false;
+            this.dgvMonitors.AllowUserToResizeColumns = false;
+            this.dgvMonitors.RowHeadersVisible = false;
+            this.dgvMonitors.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.CellSelect;
+            this.dgvMonitors.MultiSelect = false;
+            this.dgvMonitors.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            this.dgvMonitors.EditMode = System.Windows.Forms.DataGridViewEditMode.EditOnEnter;
+            this.dgvMonitors.Location = new System.Drawing.Point(12, 22);
+            this.dgvMonitors.Size = new System.Drawing.Size(372, 120);
+            this.dgvMonitors.Name = "dgvMonitors";
+            this.dgvMonitors.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+            this.colMonitorName,
+            this.colDisable,
+            this.colEnable});
+
+            //
+            // colMonitorName
+            //
+            this.colMonitorName.HeaderText = "Monitor";
+            this.colMonitorName.Name = "colMonitorName";
+            this.colMonitorName.ReadOnly = true;
+            this.colMonitorName.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+
+            //
+            // colDisable
+            //
+            this.colDisable.HeaderText = "Disable";
+            this.colDisable.Name = "colDisable";
+            this.colDisable.Width = 60;
+
+            //
+            // colEnable
+            //
+            this.colEnable.HeaderText = "Enable";
+            this.colEnable.Name = "colEnable";
+            this.colEnable.Width = 60;
 
             //
             // lblMonitorWarning
             //
-            this.lblMonitorWarning.Location = new System.Drawing.Point(12, 48);
+            this.lblMonitorWarning.Location = new System.Drawing.Point(12, 148);
             this.lblMonitorWarning.Size = new System.Drawing.Size(372, 20);
             this.lblMonitorWarning.AutoSize = false;
             this.lblMonitorWarning.Visible = false;
@@ -97,7 +135,7 @@ namespace RigToggle.App
             //
             // grpAudioDevices
             //
-            this.grpAudioDevices.Location = new System.Drawing.Point(12, 100);
+            this.grpAudioDevices.Location = new System.Drawing.Point(12, 200);
             this.grpAudioDevices.Size = new System.Drawing.Size(396, 132);
             this.grpAudioDevices.TabStop = false;
             this.grpAudioDevices.Text = "Audio Devices";
@@ -161,7 +199,7 @@ namespace RigToggle.App
             //
             // grpAppPath
             //
-            this.grpAppPath.Location = new System.Drawing.Point(12, 244);
+            this.grpAppPath.Location = new System.Drawing.Point(12, 344);
             this.grpAppPath.Size = new System.Drawing.Size(396, 76);
             this.grpAppPath.TabStop = false;
             this.grpAppPath.Text = "Target App";
@@ -206,7 +244,7 @@ namespace RigToggle.App
             // chkEnableDebugLogging
             //
             this.chkEnableDebugLogging.Text = "Enable debug logging (writes to %LOCALAPPDATA%\\RigToggle\\debug.log)";
-            this.chkEnableDebugLogging.Location = new System.Drawing.Point(12, 326);
+            this.chkEnableDebugLogging.Location = new System.Drawing.Point(12, 426);
             this.chkEnableDebugLogging.Size = new System.Drawing.Size(396, 40);
             this.chkEnableDebugLogging.AutoSize = false;
             this.chkEnableDebugLogging.Name = "chkEnableDebugLogging";
@@ -215,7 +253,7 @@ namespace RigToggle.App
             // btnSaveSettings
             //
             this.btnSaveSettings.Text = "Save Settings";
-            this.btnSaveSettings.Location = new System.Drawing.Point(180, 376);
+            this.btnSaveSettings.Location = new System.Drawing.Point(180, 476);
             this.btnSaveSettings.Size = new System.Drawing.Size(110, 32);
             this.btnSaveSettings.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnSaveSettings.Name = "btnSaveSettings";
@@ -225,7 +263,7 @@ namespace RigToggle.App
             // btnDiscardChanges
             //
             this.btnDiscardChanges.Text = "Discard Changes";
-            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 376);
+            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 476);
             this.btnDiscardChanges.Size = new System.Drawing.Size(110, 32);
             this.btnDiscardChanges.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.btnDiscardChanges.Name = "btnDiscardChanges";
@@ -250,7 +288,7 @@ namespace RigToggle.App
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(420, 424);
+            this.ClientSize = new System.Drawing.Size(420, 524);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -270,6 +308,7 @@ namespace RigToggle.App
             ((System.ComponentModel.ISupportInitialize)(this.errAudioNormal)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.errAudioRig)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.errApp)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dgvMonitors)).EndInit();
             this.grpMonitor.ResumeLayout(false);
             this.grpAudioDevices.ResumeLayout(false);
             this.grpAppPath.ResumeLayout(false);
@@ -279,7 +318,10 @@ namespace RigToggle.App
         #endregion
 
         private System.Windows.Forms.GroupBox grpMonitor;
-        private System.Windows.Forms.ComboBox cboMonitor;
+        private System.Windows.Forms.DataGridView dgvMonitors;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colMonitorName;
+        private System.Windows.Forms.DataGridViewCheckBoxColumn colDisable;
+        private System.Windows.Forms.DataGridViewCheckBoxColumn colEnable;
         private System.Windows.Forms.Label lblMonitorWarning;
 
         private System.Windows.Forms.GroupBox grpAudioDevices;
