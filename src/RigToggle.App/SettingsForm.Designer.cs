@@ -36,6 +36,7 @@ namespace RigToggle.App
             this.colDisable = new System.Windows.Forms.DataGridViewCheckBoxColumn();
             this.colEnable = new System.Windows.Forms.DataGridViewCheckBoxColumn();
             this.lblMonitorWarning = new System.Windows.Forms.Label();
+            this.lblMonitorExplain = new System.Windows.Forms.Label();
 
             this.grpAudioDevices = new System.Windows.Forms.GroupBox();
             this.lblAudioNormalCaption = new System.Windows.Forms.Label();
@@ -78,6 +79,7 @@ namespace RigToggle.App
             this.grpMonitor.Size = new System.Drawing.Size(396, 176);
             this.grpMonitor.TabStop = false;
             this.grpMonitor.Text = "Monitor";
+            this.grpMonitor.Controls.Add(this.lblMonitorExplain);
             this.grpMonitor.Controls.Add(this.dgvMonitors);
             this.grpMonitor.Controls.Add(this.lblMonitorWarning);
 
@@ -112,16 +114,27 @@ namespace RigToggle.App
             //
             // colDisable
             //
-            this.colDisable.HeaderText = "Disable";
+            this.colDisable.HeaderText = "Off (Rig)";
             this.colDisable.Name = "colDisable";
-            this.colDisable.Width = 60;
+            this.colDisable.Width = 66;
+            this.colDisable.ToolTipText = "Turns this monitor off when switching to Rig Mode. Restored automatically when switching back to Normal Mode.";
 
             //
             // colEnable
             //
-            this.colEnable.HeaderText = "Enable";
+            this.colEnable.HeaderText = "On (Rig)";
             this.colEnable.Name = "colEnable";
-            this.colEnable.Width = 60;
+            this.colEnable.Width = 66;
+            this.colEnable.ToolTipText = "Turns this monitor on when switching to Rig Mode (for a monitor normally kept off, e.g. to save power). Turned off again automatically when switching back to Normal Mode.";
+
+            //
+            // lblMonitorExplain
+            //
+            this.lblMonitorExplain.Location = new System.Drawing.Point(12, 22);
+            this.lblMonitorExplain.Size = new System.Drawing.Size(372, 50);
+            this.lblMonitorExplain.AutoSize = false;
+            this.lblMonitorExplain.Text = "Only controls what changes when switching TO Rig Mode. Normal Mode is always restored exactly as it was before — nothing to set up separately.";
+            this.lblMonitorExplain.Name = "lblMonitorExplain";
 
             //
             // lblMonitorWarning
@@ -323,6 +336,7 @@ namespace RigToggle.App
         private System.Windows.Forms.DataGridViewCheckBoxColumn colDisable;
         private System.Windows.Forms.DataGridViewCheckBoxColumn colEnable;
         private System.Windows.Forms.Label lblMonitorWarning;
+        private System.Windows.Forms.Label lblMonitorExplain;
 
         private System.Windows.Forms.GroupBox grpAudioDevices;
         private System.Windows.Forms.Label lblAudioNormalCaption;
