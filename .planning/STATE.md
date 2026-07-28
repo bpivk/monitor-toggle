@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Automation & Multi-Monitor
 status: executing
-stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-07-28T11:14:48.983Z"
+stopped_at: Phase 6 Wave 4 — awaiting rig-validation checkpoint (Plan 06-06)
+last_updated: "2026-07-28T11:38:53.851Z"
 last_activity: 2026-07-28 -- Phase 6 execution started
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 6
-  completed_plans: 0
+  completed_plans: 5
   percent: 0
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-07-26)
 ## Current Position
 
 Phase: 6 (Multi-Monitor Data Model & Controller Generalization) — EXECUTING
-Plan: 1 of 6
+Plan: 5 of 6 (06-06 rig checkpoint pending re-run after gap-closure fix)
 Status: Executing Phase 6
-Last activity: 2026-07-28 -- Phase 6 execution started
+Last activity: 2026-07-28 - Completed quick task 260728-qj1: Fix WindowsMonitorController.GetAllMonitors() dedup bug
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -79,8 +79,14 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 6's two CCD scenarios (long-idle/reboot monitor re-enable; combined disable+enable topology in one atomic `SetDisplayConfig` call) are unvalidated by documentation alone and require hands-on rig hardware testing before Phase 6 can be considered complete — same discipline as v1.0 Phase 1's spike-first gate.
+- Phase 6's two CCD scenarios (long-idle/reboot monitor re-enable; combined disable+enable topology in one atomic `SetDisplayConfig` call) are unvalidated by documentation alone and require hands-on rig hardware testing before Phase 6 can be considered complete — same discipline as v1.0 Phase 1's spike-first gate. First rig-validation attempt (06-06 checkpoint) returned NO-GO: `GetAllMonitors()` showed duplicate rows and dual "Primary" monitors on the real 2-monitor rig. Fixed via quick task 260728-qj1 (dedup by `DevicePath`, trust Primary/Active state only from the already-correct `GetActiveMonitors()`). Checkpoint must be re-run in full from scratch on the rig before Phase 6 can close.
 - Phase 9's `RegisterHotKey` must be rig-tested with Moza Companion actually running, since silent conflicts with other rig software are the realistic failure mode this requirement (TRIG-01) exists to catch.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260728-qj1 | Fix WindowsMonitorController.GetAllMonitors() duplicate-row/dual-primary bug found during Phase 6's 06-06 rig checkpoint | 2026-07-28 | fe0aee7 | [260728-qj1-fix-windowsmonitorcontroller-getallmonit](./quick/260728-qj1-fix-windowsmonitorcontroller-getallmonit/) |
 
 ## Deferred Items
 
@@ -99,9 +105,9 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-26 (pre-close
 
 ## Session Continuity
 
-Last session: 2026-07-28T10:46:58.728Z
-Stopped at: Phase 6 UI-SPEC approved
-Resume file: .planning/phases/06-multi-monitor-data-model-controller-generalization/06-UI-SPEC.md
+Last session: 2026-07-28T11:38:53.835Z
+Stopped at: Phase 6 Wave 4 — awaiting rig-validation checkpoint (Plan 06-06)
+Resume file: .planning/phases/06-multi-monitor-data-model-controller-generalization/06-06-PLAN.md
 
 ## Operator Next Steps
 
