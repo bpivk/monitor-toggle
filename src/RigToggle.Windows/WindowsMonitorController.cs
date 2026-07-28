@@ -13,26 +13,31 @@ namespace RigToggle.Windows;
 /// rig's AMD/DisplayPort hardware by the Phase 1 spike and re-confirmed by Plan 01's
 /// repositioning-aware rig re-test — see spike/PHASE4-RETEST.md GO decision).
 /// GetActiveMonitors/CaptureState are real starting Plan 02 (04-RESEARCH.md Pattern 2).
-/// Disable implements 04-RESEARCH.md Pattern 1 (repositioning-aware survivor
-/// reconstruction so exactly one survivor lands at (0,0)) + Pattern 3 (verify-and-throw
-/// against a fresh GetActivePaths() re-query, D-03). Restore implements Pattern 4
-/// (live-identity re-resolution via GetAllPaths() matched on stored DevicePath, mode/
-/// signal rebuilt from the STORED snapshot, never trusting an inactive path's own live
-/// data) + the same verify-and-throw idiom. Neither method uses the WinForms screen-
-/// enumeration API as an oracle (D-04) or attempts automatic rollback on verification
-/// failure (D-05) — the exception bubbles to MainForm's existing handler.
+/// GetAllMonitors/ActivateMonitors/DeactivateMonitors generalize the triad to N
+/// monitors starting Phase 6 (06-RESEARCH.md Patterns 1/2/3) — DeactivateMonitors is
+/// the direct 1->N generalization of the former single-target Disable(string),
+/// implementing 04-RESEARCH.md Pattern 1 (repositioning-aware survivor reconstruction
+/// so exactly one survivor lands at (0,0)) + Pattern 3 (verify-and-throw against a
+/// fresh GetActivePaths() re-query, D-03, now including a bounding-box overlap
+/// check). Restore implements Pattern 4 (live-identity re-resolution via
+/// GetAllPaths() matched on stored DevicePath, mode/signal rebuilt from the STORED
+/// snapshot, never trusting an inactive path's own live data) + the same
+/// verify-and-throw idiom, also N-generalized with the overlap check. None of these
+/// methods use the WinForms screen-enumeration API as an oracle (D-04) or attempt
+/// automatic rollback on verification failure (D-05) — the exception bubbles to
+/// MainForm's existing handler.
 /// </summary>
 public sealed class WindowsMonitorController : IMonitorController
 {
     // In-process fast path (Program.cs constructs exactly one WindowsMonitorController
     // for the app's entire lifetime — verified in the composition root). Caches the
-    // exact pre-mutation live PathInfo[] array captured at Disable()-time, so Restore()
-    // can replay it directly via the SAME mechanism already proven twice (Phase 1
-    // spike's GO, Plan 01's rig re-test GO: PathInfo.ApplyPathInfos(originalActivePaths,
+    // exact pre-mutation live PathInfo[] array captured at DeactivateMonitors()-time,
+    // so Restore() can replay it directly via the SAME mechanism already proven twice
+    // (Phase 1 spike's GO, Plan 01's rig re-test GO: PathInfo.ApplyPathInfos(originalActivePaths,
     // allowChanges: true)) instead of reconstructing from primitive snapshot values.
     // Reconstruction-from-snapshot remains as the fallback ONLY for the rarer case
-    // where the process restarted between Disable() and Restore() (CORE-05 crash
-    // recovery), where no in-memory cache can possibly survive.
+    // where the process restarted between DeactivateMonitors() and Restore() (CORE-05
+    // crash recovery), where no in-memory cache can possibly survive.
     private PathInfo[]? _originalPathsCache;
 
     public IReadOnlyList<MonitorInfo> GetActiveMonitors()
@@ -191,14 +196,23 @@ public sealed class WindowsMonitorController : IMonitorController
         }
     }
 
-    // Real repositioning-aware CCD primary-path removal (04-RESEARCH.md Pattern 1,
-    // empirically confirmed GO on this rig by Plan 01's spike/PHASE4-RETEST.md rig
-    // re-test) + verify-and-throw (Pattern 3, D-03). Never uses the WinForms screen-
-    // enumeration API as the verification oracle (D-04) and never attempts an
-    // automatic rollback on verification failure (D-05) — the exception bubbles to
-    // MainForm's existing handler.
-    public void Disable(string monitorDevicePath)
+    // Real repositioning-aware CCD N-target removal (04-RESEARCH.md Pattern 1,
+    // generalized 1->N per 06-RESEARCH.md Pattern 1 — empirically confirmed GO on
+    // this rig by Plan 01's spike/PHASE4-RETEST.md rig re-test for the single-target
+    // case) + verify-and-throw (Pattern 3, D-03, now including a bounding-box overlap
+    // check, T-06-05). Never uses the WinForms screen-enumeration API as the
+    // verification oracle (D-04) and never attempts an automatic rollback on
+    // verification failure (D-05) — the exception bubbles to MainForm's existing
+    // handler.
+    //
+    // D-02: this same method is reused for BOTH the rig-mode-entry disable-set
+    // removal AND the toggle-back enable-set teardown (one primitive, two call
+    // sites) — the toggle-back call is an unconditional re-disable, not
+    // snapshot-based; that asymmetry is intentional (see ToggleService).
+    public void DeactivateMonitors(IReadOnlySet<string> monitorDevicePaths)
     {
+        if (monitorDevicePaths.Count == 0) return; // no-op, e.g. enable-only config on toggle-back
+
         PathInfo[] currentPaths = PathInfo.GetActivePaths(virtualModeAware: false);
 
         // Cache BEFORE any mutation, regardless of what happens below, so a retry-
@@ -206,16 +220,23 @@ public sealed class WindowsMonitorController : IMonitorController
         // fast path — see field doc comment).
         _originalPathsCache = currentPaths;
 
-        PathInfo? targetPath = currentPaths.FirstOrDefault(p =>
-            p.TargetsInfo.Any(t => t.DisplayTarget.DevicePath == monitorDevicePath));
+        PathInfo[] targets = currentPaths
+            .Where(p => p.TargetsInfo.Any(t => monitorDevicePaths.Contains(t.DisplayTarget.DevicePath)))
+            .ToArray();
 
-        if (targetPath is null)
+        // Generalized "not currently active" guard (was a single not-found check
+        // pre-06): compute every requested device path NOT present among any
+        // currently-active target.
+        var missing = monitorDevicePaths.Except(
+            currentPaths.SelectMany(p => p.TargetsInfo).Select(t => t.DisplayTarget.DevicePath)).ToArray();
+
+        if (missing.Length > 0)
         {
             throw new InvalidOperationException(
-                $"Configured monitor '{monitorDevicePath}' is not currently active.");
+                $"Configured monitor(s) not currently active: {string.Join(", ", missing)}");
         }
 
-        PathInfo[] survivors = currentPaths.Where(p => p != targetPath).ToArray();
+        PathInfo[] survivors = currentPaths.Where(p => !targets.Contains(p)).ToArray();
 
         if (survivors.Length == 0)
         {
@@ -223,22 +244,26 @@ public sealed class WindowsMonitorController : IMonitorController
             // generic PathChangeException("Invalid paths information.") with no
             // indication of the actual cause (validation fails before any native
             // mutation — this does NOT blank the screen, but the error is useless).
-            // Reachable in production: rig monitor unplugged/off, or a laptop with only
-            // its built-in display, when Switch to Rig Mode is pressed.
+            // Reachable in production: every currently-active display is configured
+            // in the disable-set, or a laptop with only its built-in display, when
+            // Switch to Rig Mode is pressed.
             throw new InvalidOperationException(
-                $"Cannot disable '{monitorDevicePath}' — it is currently the only active " +
-                "display. Connect and enable another display before switching to Rig Mode.");
+                "Cannot disable all configured monitors — at least one active display must " +
+                "remain. Connect and enable another display before switching to Rig Mode.");
         }
 
+        // Unchanged uniform-shift idiom, generalized to a multi-target primary check:
+        // shift ALL survivors by the same uniform delta iff ANY removed target was
+        // GDI-primary, promoting the first survivor to (0,0) — Position has no public
+        // setter, so a fresh PathInfo must be constructed per survivor. No gap-
+        // closing/reflow logic beyond this uniform shift is added (D-01 explicitly
+        // scoped that out — Windows' own default placement is good enough for the
+        // surviving layout otherwise).
+        bool anyTargetWasPrimary = targets.Any(t => t.IsGDIPrimary);
+
         PathInfo[] pathsToApply;
-        if (targetPath.IsGDIPrimary)
+        if (anyTargetWasPrimary)
         {
-            // IN-01 (code review): survivors.Length > 0 is always true here — the
-            // survivors.Length == 0 case already threw above, so this branch can never
-            // be reached with an empty survivors array. Dropped the redundant clause.
-            // Pitfall 1: shift ALL survivors by the same uniform delta (not just the
-            // promoted one) so relative layout is preserved — Position has no public
-            // setter, so a fresh PathInfo must be constructed per survivor.
             Point promoted = survivors[0].Position;
             var delta = new Point(-promoted.X, -promoted.Y);
 
@@ -260,20 +285,28 @@ public sealed class WindowsMonitorController : IMonitorController
 
         // Pattern 3/D-03: verify-and-throw against a fresh re-query — never trust
         // ApplyPathInfos's non-throwing return alone as proof of success (D-04: not
-        // the WinForms screen-enumeration API).
+        // the WinForms screen-enumeration API). Generalized to N: none of the
+        // requested device paths may still be active, exactly one GDI primary must
+        // remain, AND (new, 06-RESEARCH.md/T-06-05) no survivor bounding-box overlap.
         PathInfo[] verifyPaths = PathInfo.GetActivePaths(virtualModeAware: false);
 
-        bool targetStillActive = verifyPaths
+        bool anyTargetStillActive = verifyPaths
             .SelectMany(p => p.TargetsInfo)
-            .Any(t => t.DisplayTarget.DevicePath == monitorDevicePath);
+            .Any(t => monitorDevicePaths.Contains(t.DisplayTarget.DevicePath));
 
         bool exactlyOnePrimary = verifyPaths.Count(p => p.IsGDIPrimary) == 1;
 
-        if (targetStillActive || !exactlyOnePrimary)
+        bool overlap = AnyRectanglesOverlap(verifyPaths
+            .Where(p => p.IsModeInformationAvailable)
+            .Select(p => new Rectangle(p.Position, p.Resolution))
+            .ToList());
+
+        if (anyTargetStillActive || !exactlyOnePrimary || overlap)
         {
             throw new InvalidOperationException(
-                $"Monitor disable did not take effect as expected (targetStillActive={targetStillActive}, " +
-                $"exactlyOnePrimary={exactlyOnePrimary}). No further automatic recovery is attempted (D-05).");
+                $"Monitor disable did not take effect as expected (anyTargetStillActive={anyTargetStillActive}, " +
+                $"exactlyOnePrimary={exactlyOnePrimary}, overlap={overlap}). " +
+                "No further automatic recovery is attempted (D-05).");
         }
     }
 
@@ -292,7 +325,7 @@ public sealed class WindowsMonitorController : IMonitorController
     {
         // In-process fast path: if this exact WindowsMonitorController instance is
         // still holding the pre-disable live PathInfo[] array (i.e. no process
-        // restart happened between Disable() and Restore()), replay it directly via
+        // restart happened between DeactivateMonitors() and Restore()), replay it directly via
         // the SAME mechanism already proven twice on this rig (Phase 1 spike GO,
         // Plan 01 rig re-test GO) instead of reconstructing from primitive snapshot
         // values — sidesteps every reconstruction pitfall (source assignment,
@@ -319,10 +352,19 @@ public sealed class WindowsMonitorController : IMonitorController
                 MonitorPathSnapshot fastExpectedSnap =
                     previousState.Paths.First(s => s.DevicePath == previousState.TargetDevicePath);
 
+                // N-generalized (06-RESEARCH.md/T-06-05): also reject a restore that
+                // reproduces the target's own position/primary designation correctly
+                // but leaves the survivor set overlapping.
+                bool fastOverlap = AnyRectanglesOverlap(fastVerifyPaths
+                    .Where(p => p.IsModeInformationAvailable)
+                    .Select(p => new Rectangle(p.Position, p.Resolution))
+                    .ToList());
+
                 if (fastRestoredTarget is null ||
                     fastRestoredTarget.Position.X != fastExpectedSnap.PositionX ||
                     fastRestoredTarget.Position.Y != fastExpectedSnap.PositionY ||
-                    fastRestoredTarget.IsGDIPrimary != fastExpectedSnap.IsPrimary)
+                    fastRestoredTarget.IsGDIPrimary != fastExpectedSnap.IsPrimary ||
+                    fastOverlap)
                 {
                     throw new InvalidOperationException(
                         "Monitor restore did not reproduce the exact prior configuration. No further automatic recovery is attempted (D-05).");
@@ -340,7 +382,7 @@ public sealed class WindowsMonitorController : IMonitorController
         // iterations — every failure traced back to a property Windows does not reliably report
         // for INACTIVE paths (Microsoft docs: inactive-path mode/signal info is "set to default
         // values" — Pitfall 2). Rather than keep guessing which field is still wrong, this uses
-        // the exact same two-step strategy Disable() already uses successfully (twice,
+        // the exact same two-step strategy DeactivateMonitors() already uses successfully (twice,
         // rig-confirmed): NEVER manually construct target/mode info from scratch — only ever
         // reuse REAL, live-queried PathInfo/PathTargetInfo objects wholesale, touching nothing
         // but Position.
@@ -375,7 +417,7 @@ public sealed class WindowsMonitorController : IMonitorController
             // failure here propagates as the library's raw, comparatively cryptic
             // exception, unlike the sibling ApplyPathInfos call below (Step 3), which is
             // already wrapped for diagnosability. This is the crash-recovery fallback
-            // path only reachable when the process restarted between Disable() and
+            // path only reachable when the process restarted between DeactivateMonitors() and
             // Restore() — exactly the scenario where the user has the least context to
             // debug a bare library message.
             throw new InvalidOperationException(
@@ -384,7 +426,7 @@ public sealed class WindowsMonitorController : IMonitorController
 
         // Step 3: re-query now that both targets are genuinely active, and reuse each REAL,
         // live PathInfo's own TargetsInfo array UNCHANGED — the same "reuse real active
-        // TargetsInfo, only touch Position" idiom Disable() uses for its survivor reconstruction
+        // TargetsInfo, only touch Position" idiom DeactivateMonitors() uses for its survivor reconstruction
         // (Pitfall 1) — to move each display to its exact stored pre-disable position (and, for
         // the target that was primary, back to (0,0), which is what makes it primary again —
         // IsGDIPrimary is position-derived, per PathInfo.IsGDIPrimary). Resolution/pixel format
@@ -435,16 +477,23 @@ public sealed class WindowsMonitorController : IMonitorController
         }
 
         // Pattern 4/D-03: verify-and-throw — confirm the configured target is present
-        // again and matches its stored position/primary designation.
+        // again and matches its stored position/primary designation, AND (new,
+        // 06-RESEARCH.md/T-06-05) that the restored survivor set doesn't overlap.
         PathInfo[] verifyPaths = PathInfo.GetActivePaths(virtualModeAware: false);
         PathInfo? restoredTarget = verifyPaths.FirstOrDefault(p =>
             p.TargetsInfo.Any(t => t.DisplayTarget.DevicePath == previousState.TargetDevicePath));
         MonitorPathSnapshot expectedSnap = previousState.Paths.First(s => s.DevicePath == previousState.TargetDevicePath);
 
+        bool overlap = AnyRectanglesOverlap(verifyPaths
+            .Where(p => p.IsModeInformationAvailable)
+            .Select(p => new Rectangle(p.Position, p.Resolution))
+            .ToList());
+
         if (restoredTarget is null ||
             restoredTarget.Position.X != expectedSnap.PositionX ||
             restoredTarget.Position.Y != expectedSnap.PositionY ||
-            restoredTarget.IsGDIPrimary != expectedSnap.IsPrimary)
+            restoredTarget.IsGDIPrimary != expectedSnap.IsPrimary ||
+            overlap)
         {
             throw new InvalidOperationException(
                 "Monitor restore did not reproduce the exact prior configuration. No further automatic recovery is attempted (D-05).");
@@ -453,7 +502,30 @@ public sealed class WindowsMonitorController : IMonitorController
         _originalPathsCache = null;
     }
 
-    // Phase 05 code review WR-02: NOT currently called by Disable() or Restore() in
+    // Pure axis-aligned bounding-box overlap check (06-RESEARCH.md "Bounding-box
+    // overlap check" code example) — shared by both DeactivateMonitors' and
+    // Restore's verify-and-throw sections to catch a mutation that silently leaves
+    // an overlapping topology (T-06-05). System.Drawing.Rectangle is already in
+    // scope via WindowsDisplayAPI's own Point/Size usage in PathInfo — no new
+    // dependency. Internal (not private) + tested directly (RigToggle.Windows.Tests,
+    // see InternalsVisibleTo below).
+    internal static bool AnyRectanglesOverlap(IReadOnlyList<Rectangle> rects)
+    {
+        for (int i = 0; i < rects.Count; i++)
+        {
+            for (int j = i + 1; j < rects.Count; j++)
+            {
+                if (rects[i].IntersectsWith(rects[j]))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // Phase 05 code review WR-02: NOT currently called by DeactivateMonitors() or Restore() in
     // this file — Restore() was rewritten (see its own doc comment above) to never
     // manually reconstruct PathTargetInfo/mode-info from scratch, so this
     // backing-field patch is unused by any reachable production code path today.
@@ -488,7 +560,7 @@ public sealed class WindowsMonitorController : IMonitorController
     }
 
     // Phase 05 code review WR-02: like CopyOutputTechnology above, NOT currently
-    // called by Disable() or Restore() in this file — the current Restore() only
+    // called by DeactivateMonitors() or Restore() in this file — the current Restore() only
     // ever reuses real, live-queried PathInfo/PathTargetInfo objects wholesale via
     // the two-step ApplyTopology(Extend) + reposition approach, so no source is ever
     // manually assigned today. Kept intentionally as a documented known-good
