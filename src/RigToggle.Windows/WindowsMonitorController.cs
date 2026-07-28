@@ -63,31 +63,61 @@ public sealed class WindowsMonitorController : IMonitorController
     // Real enumeration of active AND currently OS-disabled-but-available displays
     // (06-RESEARCH.md Pattern 3) — the enumeration gap GetActiveMonitors() cannot
     // fill, since DISPLAY-05 requires picking exactly an inactive monitor (e.g. a rig
-    // monitor normally kept OS-disabled to save power) from a list. Two guards are
-    // MANDATORY here that GetActiveMonitors() doesn't need, because inactive paths
-    // report differently than active ones: (1) IsGDIPrimary reads Position, which
-    // throws MissingModeException on an inactive path — guarded behind
-    // IsModeInformationAvailable. (2) PathDisplayTarget.FriendlyName/DevicePath throw
-    // TargetNotAvailableException when !IsAvailable — targets are filtered to
-    // IsAvailable before those getters are touched (06-RESEARCH.md Pitfall 1's
-    // "pitfall inside the pitfall").
+    // monitor normally kept OS-disabled to save power) from a list. Dedups by the
+    // stable DevicePath (GetAllPaths() returns one entry per historical/stale CCD
+    // path, so a physical monitor can otherwise appear multiple times — rig-confirmed
+    // bug, 06-06-SUMMARY.md NO-GO) and sources Active/Primary state EXCLUSIVELY from
+    // GetActiveMonitors() (already correct, GetActivePaths()-based) rather than
+    // reading IsGDIPrimary/IsPathActive off potentially-stale inactive PathInfo
+    // entries — the same "inactive-path fields are unreliable" landmine already
+    // worked around elsewhere in this file (Restore()/DeactivateMonitors()). Targets
+    // are filtered to IsAvailable before FriendlyName/DevicePath are touched
+    // (06-RESEARCH.md Pitfall 1's "pitfall inside the pitfall" — those getters throw
+    // TargetNotAvailableException otherwise). Actual dedup/merge logic lives in the
+    // pure, unit-tested MergeAllMonitors() seam below.
     public IReadOnlyList<MonitorInfo> GetAllMonitors()
     {
+        IReadOnlyList<MonitorInfo> activeMonitors = GetActiveMonitors();
+
         PathInfo[] allPaths = PathInfo.GetAllPaths(virtualModeAware: false);
+        var availableTargets = allPaths
+            .SelectMany(p => p.TargetsInfo)
+            .Where(t => t.DisplayTarget.IsAvailable)
+            .Select(t => (t.DisplayTarget.DevicePath, t.DisplayTarget.FriendlyName ?? "(unknown display)"))
+            .ToList();
+
+        return MergeAllMonitors(activeMonitors, availableTargets);
+    }
+
+    // Pure dedup/merge seam (unit-tested, RigToggle.Windows.Tests — no live CCD
+    // hardware needed) extracted from GetAllMonitors() so the gap-closure fix for the
+    // rig-confirmed duplicate-rows/multi-primary bug (06-06-SUMMARY.md) is directly
+    // testable. Active monitors are emitted first (deduped by DevicePath, promoted to
+    // IsActive=true via `with`, IsPrimary preserved from GetActiveMonitors()); any
+    // availableTarget whose DevicePath was not already emitted is appended as
+    // IsPrimary=false/IsActive=false (a disabled monitor cannot be primary). A single
+    // `seen` HashSet spanning both loops guarantees a DevicePath present in both
+    // inputs — or duplicated within either input — yields exactly one row.
+    internal static IReadOnlyList<MonitorInfo> MergeAllMonitors(
+        IReadOnlyList<MonitorInfo> activeMonitors,
+        IReadOnlyList<(string DevicePath, string FriendlyName)> availableTargets)
+    {
+        var seen = new HashSet<string>();
         var result = new List<MonitorInfo>();
 
-        foreach (PathInfo path in allPaths)
+        foreach (MonitorInfo m in activeMonitors)
         {
-            bool isPrimary = path.IsModeInformationAvailable && path.IsGDIPrimary;
-
-            foreach (PathTargetInfo targetInfo in path.TargetsInfo.Where(t => t.DisplayTarget.IsAvailable))
+            if (seen.Add(m.DevicePath))
             {
-                PathDisplayTarget target = targetInfo.DisplayTarget;
-                result.Add(new MonitorInfo(
-                    DevicePath: target.DevicePath,
-                    FriendlyName: target.FriendlyName ?? "(unknown display)",
-                    IsPrimary: isPrimary,
-                    IsActive: targetInfo.IsPathActive));
+                result.Add(m with { IsActive = true });
+            }
+        }
+
+        foreach ((string devicePath, string friendlyName) in availableTargets)
+        {
+            if (seen.Add(devicePath))
+            {
+                result.Add(new MonitorInfo(devicePath, friendlyName, IsPrimary: false, IsActive: false));
             }
         }
 
