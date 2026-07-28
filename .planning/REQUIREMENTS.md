@@ -64,27 +64,28 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TRAY-01 | TBD | Pending |
-| TRAY-02 | TBD | Pending |
-| TRAY-03 | TBD | Pending |
-| TRAY-04 | TBD | Pending |
-| TRAY-05 | TBD | Pending |
-| TRIG-01 | TBD | Pending |
-| TRIG-02 | TBD | Pending |
-| TRIG-03 | TBD | Pending |
-| NOTIF-01 | TBD | Pending |
-| DISPLAY-04 | TBD | Pending |
-| DISPLAY-05 | TBD | Pending |
-| DISPLAY-06 | TBD | Pending |
-| DISPLAY-07 | TBD | Pending |
-| DISPLAY-08 | TBD | Pending |
-| CORE-06 | TBD | Pending |
+| TRAY-01 | Phase 8 | Pending |
+| TRAY-02 | Phase 8 | Pending |
+| TRAY-03 | Phase 8 | Pending |
+| TRAY-04 | Phase 8 | Pending |
+| TRAY-05 | Phase 8 | Pending |
+| TRIG-01 | Phase 9 | Pending |
+| TRIG-02 | Phase 10 | Pending |
+| TRIG-03 | Phase 10 | Pending |
+| NOTIF-01 | Phase 8 | Pending |
+| DISPLAY-04 | Phase 6 | Pending |
+| DISPLAY-05 | Phase 6 | Pending |
+| DISPLAY-06 | Phase 6 | Pending |
+| DISPLAY-07 | Phase 6 | Pending |
+| DISPLAY-08 | Phase 6 | Pending |
+| CORE-06 | Phase 7 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 15 total
-- Mapped to phases: 0 (0%) — pending roadmap creation
-- Unmapped: 15
+- Mapped to phases: 15 (100%)
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-07-26*
-*Last updated: 2026-07-26 after v1.1 requirements definition*
+*Last updated: 2026-07-26 after v1.1 roadmap creation (Phases 6-10)*
+</content>

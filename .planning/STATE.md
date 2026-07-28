@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Automation & Multi-Monitor
 status: planning
-last_updated: "2026-07-26T19:20:11.808Z"
+last_updated: "2026-07-26T21:30:00.000Z"
 last_activity: 2026-07-26
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
-**Current focus:** v1.1 — defining requirements (tray residency, hotkey/CLI trigger, toast notification, multi-monitor enable/disable)
+**Current focus:** v1.1 — roadmap created (Phases 6-10), ready to plan Phase 6
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-07-26 — Milestone v1.1 started
+Phase: 6 of 10 (Multi-Monitor Data Model & Controller Generalization)
+Plan: — (not yet planned)
+Status: Ready to plan
+Last activity: 2026-07-26 — ROADMAP.md created for v1.1 (Phases 6-10), REQUIREMENTS.md traceability updated to 100% coverage
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -59,28 +61,24 @@ Last activity: 2026-07-26 — Milestone v1.1 started
 
 Full decision log lives in PROJECT.md's Key Decisions table (all v1.0 decisions, including post-ship hardening, recorded there as of the v1.0 milestone close).
 
+v1.1 roadmap decisions (from research, to be executed during planning, not yet implemented):
+- Phase 6 (multi-monitor) sequenced first because it changes `AppSettings`/`IMonitorController` shapes every later trigger path's confirmation dialog calls into; requires its own rig-validation checkpoint (long-idle/reboot enable, combined disable+enable topology) as a completion gate, not follow-up hardening.
+- Phase 7 (shared orchestration helper) must decide the reentrancy guard design (lock/busy-flag/queue) as its own scope — the single most consequential cross-cutting design decision from research.
+- Toast notifications will use `NotifyIcon.ShowBalloonTip`, not a packaged-app toast API (AUMID/shortcut registration is a confirmed trap for unpackaged self-contained exes).
+- Autostart will use a plain `HKCU\...\Run` registry key, not Task Scheduler (matches the app's existing non-elevated execution model).
+
 ### Pending Todos
 
 None.
 
 ### Known Limitations
 
-- The relaunch-based launch redesign's `MinimizeIfRunning`/`IsRunning` (toggle-back) still derive the process name from the configured launch-target path via `Path.GetFileNameWithoutExtension`. If the user configures a `.lnk` (rather than the target `.exe` itself) as the launch target, that derived name will typically not match the real running process name, so toggle-back's minimize call may silently no-op. Documented, not patched (out of scope for the redesign — `MinimizeIfRunning` is explicitly unchanged).
+- The relaunch-based launch redesign's `MinimizeIfRunning`/`IsRunning` (toggle-back) still derive the process name from the configured launch-target path via `Path.GetFileNameWithoutExtension`. If the user configures a `.lnk` (rather than the target `.exe` itself) as the launch target, that derived name will typically not match the real running process name, so toggle-back's minimize call may silently no-op. Documented, not patched (out of scope, carried over from v1.0).
 
 ### Blockers/Concerns
 
-None open. All v1.0 blockers resolved (Phase 1 monitor-disable feasibility, Phase 4/5 elevation requirements) — see PROJECT.md Key Decisions and `.planning/milestones/v1.0-ROADMAP.md` for the historical record.
-
-### Quick Tasks Completed
-
-| # | Description | Date | Commit | Directory |
-|---|-------------|------|--------|-----------|
-| 260726-idx | Redesign companion app launch/focus mechanism: unconditional ShellExecute relaunch replaces window-focus dance; Settings adds .lnk/.exe drag-and-drop | 2026-07-26 | 09c758a..792f976 | [260726-idx-redesign-companion-app-launch-focus-mech](./quick/260726-idx-redesign-companion-app-launch-focus-mech/) |
-| 260726-ixu | Diagnostic-only: log IsWindowVisible/IsIconic/ShowWindow-return before+after MinimizeIfRunning's minimize call, to gather rig-test evidence for the toggle-back regression reported after 260726-idx | 2026-07-26 | f0bf28a | [260726-ixu-add-targeted-diagnostic-logging-to-windo](./quick/260726-ixu-add-targeted-diagnostic-logging-to-windo/) |
-| 260726-j9y | Skip ShowWindow(SW_MINIMIZE) in MinimizeIfRunning when the window is already hidden — fixes toggle-back regression confirmed by 260726-ixu's diagnostic evidence; rig-verified/confirmed 2026-07-26 | 2026-07-26 | e6e1989..7731923 | [260726-j9y-fix-minimizeifrunning-to-skip-showwindow](./quick/260726-j9y-fix-minimizeifrunning-to-skip-showwindow/) |
-| 260726-jm3 | Docs-only closeout: mark H9 fully rig-verified resolved across STATE.md, knowledge-base.md, and 260726-j9y-SUMMARY (resolution chain: 260726-idx → 260726-ixu → 260726-j9y) | 2026-07-26 | 46b9c01 | [260726-jm3-mark-h9-fully-rig-verified-resolved-acro](./quick/260726-jm3-mark-h9-fully-rig-verified-resolved-acro/) |
-| 260726-jti | Gate debug.log behind a new Settings checkbox (EnableDebugLogging, off by default); remove MainForm's dead "Moza Companion: Running/Not running" status line and its now-unused IAppController dependency | 2026-07-26 | d0e4636..309112b | [260726-jti-gate-debug-log-behind-a-settings-toggle-](./quick/260726-jti-gate-debug-log-behind-a-settings-toggle-/) |
-| 260726-k3u | UI fix: grow the "Enable debug logging" checkbox height (24px -> 40px) so its wrapped two-line text isn't clipped after "(writes to" — rig-reported regression from 260726-jti; buttons and ClientSize shifted down 16px to match | 2026-07-26 | 984814d | [260726-k3u-fix-settingsform-checkbox-height-so-the-](./quick/260726-k3u-fix-settingsform-checkbox-height-so-the-/) |
+- Phase 6's two CCD scenarios (long-idle/reboot monitor re-enable; combined disable+enable topology in one atomic `SetDisplayConfig` call) are unvalidated by documentation alone and require hands-on rig hardware testing before Phase 6 can be considered complete — same discipline as v1.0 Phase 1's spike-first gate.
+- Phase 9's `RegisterHotKey` must be rig-tested with Moza Companion actually running, since silent conflicts with other rig software are the realistic failure mode this requirement (TRIG-01) exists to catch.
 
 ## Deferred Items
 
@@ -88,9 +86,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| v1.1 | TRIG-01 (global hotkey trigger) | Taken up in v1.1 | Initial requirements definition (v1.0) |
-| v1.1 | TRAY-01 (tray residency / autostart) | Taken up in v1.1 | Initial requirements definition (v1.0) |
-| v1.1 | NOTIF-01 (toast notification on toggle) | Taken up in v1.1 | Initial requirements definition (v1.0) |
 | v2 | LOG-01 (toggle history/log) | Still deferred | Initial requirements definition (v1.0); re-deferred at v1.1 scoping |
 
 Items acknowledged and deferred at v1.0 milestone close on 2026-07-26 (pre-close artifact audit — both are scanner false positives, not real gaps, confirmed by direct inspection):
@@ -102,10 +97,12 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-26 (pre-close
 
 ## Session Continuity
 
-Last session: 2026-07-26T14:42:28.766Z
-Stopped at: v1.0 milestone completed and archived
-Resume file: none — start the next milestone with /gsd-new-milestone
+Last session: 2026-07-26T21:30:00.000Z
+Stopped at: v1.1 ROADMAP.md created and approved-pending (Phases 6-10, 15/15 requirements mapped)
+Resume file: none
 
 ## Operator Next Steps
 
-- Define v1.1 requirements, then create the roadmap
+- Review ROADMAP.md draft for v1.1 (Phases 6-10) and approve or request revisions
+- Once approved: `/gsd:plan-phase 6`
+</content>
