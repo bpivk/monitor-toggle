@@ -3,8 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Automation & Multi-Monitor
 status: planning
-last_updated: "2026-07-26T21:30:00.000Z"
-last_activity: 2026-07-26
+stopped_at: Phase 6 context gathered
+last_updated: "2026-07-28T10:23:10.305Z"
+last_activity: 2026-07-26 — ROADMAP.md created for v1.1 (Phases 6-10), REQUIREMENTS.md traceability updated to 100% coverage
 progress:
   total_phases: 5
   completed_phases: 0
@@ -62,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 Full decision log lives in PROJECT.md's Key Decisions table (all v1.0 decisions, including post-ship hardening, recorded there as of the v1.0 milestone close).
 
 v1.1 roadmap decisions (from research, to be executed during planning, not yet implemented):
+
 - Phase 6 (multi-monitor) sequenced first because it changes `AppSettings`/`IMonitorController` shapes every later trigger path's confirmation dialog calls into; requires its own rig-validation checkpoint (long-idle/reboot enable, combined disable+enable topology) as a completion gate, not follow-up hardening.
 - Phase 7 (shared orchestration helper) must decide the reentrancy guard design (lock/busy-flag/queue) as its own scope — the single most consequential cross-cutting design decision from research.
 - Toast notifications will use `NotifyIcon.ShowBalloonTip`, not a packaged-app toast API (AUMID/shortcut registration is a confirmed trap for unpackaged self-contained exes).
@@ -97,12 +99,13 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-26 (pre-close
 
 ## Session Continuity
 
-Last session: 2026-07-26T21:30:00.000Z
-Stopped at: v1.1 ROADMAP.md created and approved-pending (Phases 6-10, 15/15 requirements mapped)
-Resume file: none
+Last session: 2026-07-28T10:23:10.285Z
+Stopped at: Phase 6 context gathered
+Resume file: .planning/phases/06-multi-monitor-data-model-controller-generalization/06-CONTEXT.md
 
 ## Operator Next Steps
 
 - Review ROADMAP.md draft for v1.1 (Phases 6-10) and approve or request revisions
 - Once approved: `/gsd:plan-phase 6`
+
 </content>
