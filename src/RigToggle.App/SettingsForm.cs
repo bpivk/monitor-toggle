@@ -335,16 +335,78 @@ namespace RigToggle.App
             warningLabel.Visible = true;
         }
 
+        // DISPLAY-06/D-05: "will at least one monitor be active once the rig-mode
+        // topology is fully applied" — NOT just "is every currently-active monitor in the
+        // disable-set" (an enable-set monitor counts as staying active too).
+        private static bool WouldLeaveAtLeastOneMonitorActive(
+            IReadOnlyList<MonitorInfo> allMonitors,
+            HashSet<string> monitorsToDisable,
+            HashSet<string> monitorsToEnable)
+        {
+            bool anySurvivingActiveMonitor = allMonitors
+                .Any(m => m.IsActive && !monitorsToDisable.Contains(m.DevicePath));
+
+            return anySurvivingActiveMonitor || monitorsToEnable.Count > 0;
+        }
+
+        // Grid Spec § Validation contract — priority order for which single
+        // lblMonitorWarning/errMonitor message is shown (only one is visible at a time):
+        //   1. DISPLAY-06 gate (highest priority, blocking)
+        //   2. D-07 non-empty gate (blocking)
+        //   3. Stale-saved-monitor warning (lowest priority, non-blocking)
+        //   4. Clear the warning entirely
         private void ValidateSettingsForm()
         {
-            // Minimal non-empty gate for now — Task 3 replaces this with the full
-            // DISPLAY-06/D-07 priority-ordered gate chain (WouldLeaveAtLeastOneMonitorActive
-            // + exact locked copy + stale-warning priority).
-            var (disableSelected, enableSelected) = GetGridSelection();
-            bool monitorOk = dgvMonitors.Enabled && (disableSelected.Count > 0 || enableSelected.Count > 0);
             bool audioNormalOk = cboAudioNormal.SelectedItem is PickerItem;
             bool audioRigOk = cboAudioRig.SelectedItem is PickerItem;
             bool appPathOk = IsValidLaunchTarget(txtAppPath.Text);
+            bool monitorOk;
+
+            if (!dgvMonitors.Enabled)
+            {
+                // Grid Spec § Empty state — "No displays detected." is already set by
+                // PopulateMonitorGrid; nothing here should overwrite that message. The
+                // "at least one monitor action configured" gate naturally evaluates to
+                // false anyway (zero rows means zero selections), which is sufficient to
+                // keep Save disabled.
+                monitorOk = false;
+            }
+            else
+            {
+                var (disableSelected, enableSelected) = GetGridSelection();
+
+                if (!WouldLeaveAtLeastOneMonitorActive(_allMonitors, disableSelected, enableSelected))
+                {
+                    lblMonitorWarning.Text = "This configuration would leave no monitor active. At least one monitor must stay enabled after switching to Rig Mode.";
+                    lblMonitorWarning.Visible = true;
+                    errMonitor.SetError(dgvMonitors, lblMonitorWarning.Text);
+                    monitorOk = false;
+                }
+                else if (disableSelected.Count == 0 && enableSelected.Count == 0)
+                {
+                    lblMonitorWarning.Text = "Select at least one monitor to disable or enable.";
+                    lblMonitorWarning.Visible = true;
+                    errMonitor.SetError(dgvMonitors, lblMonitorWarning.Text);
+                    monitorOk = false;
+                }
+                else
+                {
+                    errMonitor.SetError(dgvMonitors, string.Empty);
+
+                    var staleDevicePaths = GetStaleSavedDevicePaths();
+                    if (staleDevicePaths.Count > 0)
+                    {
+                        // Non-blocking (Grid Spec) — informational only, does not affect monitorOk.
+                        ShowStaleMonitorWarning(staleDevicePaths.ToList());
+                    }
+                    else
+                    {
+                        lblMonitorWarning.Visible = false;
+                    }
+
+                    monitorOk = true;
+                }
+            }
 
             btnSaveSettings.Enabled = monitorOk && audioNormalOk && audioRigOk && appPathOk;
         }
@@ -425,20 +487,46 @@ namespace RigToggle.App
 
         private void BtnSaveSettings_Click(object? sender, EventArgs e)
         {
-            // Minimal grid-only persistence for now — Task 3 replaces this with the full
-            // merged-set save (preserving stale/disconnected entries) and the
-            // HashSet.SetEquals-based SkipMonitorConfirmation reset.
             var audioNormalItem = cboAudioNormal.SelectedItem as PickerItem;
             var audioRigItem = cboAudioRig.SelectedItem as PickerItem;
             var (disableSelected, enableSelected) = GetGridSelection();
 
-            // Defensive guard only — btnSaveSettings.Enabled should make this unreachable
-            // via the UI, but never persist a partial/invalid selection.
+            // Defensive guard only — btnSaveSettings.Enabled (ValidateSettingsForm) should
+            // make this unreachable via the UI, but never persist a partial/invalid/
+            // would-leave-no-monitor-active selection.
             if (audioNormalItem is null || audioRigItem is null || !IsValidLaunchTarget(txtAppPath.Text)
-                || (disableSelected.Count == 0 && enableSelected.Count == 0))
+                || (disableSelected.Count == 0 && enableSelected.Count == 0)
+                || !WouldLeaveAtLeastOneMonitorActive(_allMonitors, disableSelected, enableSelected))
             {
                 return;
             }
+
+            // Grid Spec § Stale saved-monitor handling: persisted sets = (previously-saved
+            // entries GetAllMonitors() no longer enumerates at all) UNION (currently-
+            // checked rows' device paths). Stale/disconnected entries pass through
+            // untouched — a temporarily-unplugged rig monitor must not lose its
+            // configuration just because Settings was opened and saved for something
+            // unrelated (06-UI-SPEC.md, generalizes D-10).
+            var enumeratedPaths = new HashSet<string>(_allMonitors.Select(m => m.DevicePath));
+            IEnumerable<string> staleDisable = (_settings.MonitorsToDisable ?? new List<string>())
+                .Where(p => !enumeratedPaths.Contains(p));
+            IEnumerable<string> staleEnable = (_settings.MonitorsToEnable ?? new List<string>())
+                .Where(p => !enumeratedPaths.Contains(p));
+
+            var mergedDisable = new HashSet<string>(staleDisable);
+            mergedDisable.UnionWith(disableSelected);
+
+            var mergedEnable = new HashSet<string>(staleEnable);
+            mergedEnable.UnionWith(enableSelected);
+
+            // Pitfall 4 / ToggleService.MonitorStateUnchanged precedent: List<string> has
+            // no value equality and reordering-sensitive != comparison would mis-detect a
+            // genuine change — use order-independent HashSet<string>.SetEquals against
+            // both plural sets to decide whether to reset the durable confirmation-skip
+            // flag (generalizes the old single-string MonitorDevicePath comparison).
+            bool monitorsChanged =
+                !new HashSet<string>(_settings.MonitorsToDisable ?? new List<string>()).SetEquals(mergedDisable)
+                || !new HashSet<string>(_settings.MonitorsToEnable ?? new List<string>()).SetEquals(mergedEnable);
 
             var settingsToSave = new AppSettings
             {
@@ -446,14 +534,14 @@ namespace RigToggle.App
                 // never repopulated from the grid.
                 MonitorDevicePath = _settings.MonitorDevicePath,
                 MonitorFriendlyName = _settings.MonitorFriendlyName,
-                MonitorsToDisable = disableSelected.ToList(),
-                MonitorsToEnable = enableSelected.ToList(),
+                MonitorsToDisable = mergedDisable.ToList(),
+                MonitorsToEnable = mergedEnable.ToList(),
                 NormalAudioDeviceId = audioNormalItem.Id,
                 NormalAudioDeviceName = audioNormalItem.DisplayLabel,
                 RigAudioDeviceId = audioRigItem.Id,
                 RigAudioDeviceName = audioRigItem.DisplayLabel,
                 CompanionAppPath = txtAppPath.Text,
-                SkipMonitorConfirmation = _settings.SkipMonitorConfirmation,
+                SkipMonitorConfirmation = monitorsChanged ? false : _settings.SkipMonitorConfirmation,
                 EnableDebugLogging = chkEnableDebugLogging.Checked,
             };
 
