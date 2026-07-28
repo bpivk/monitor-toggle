@@ -431,22 +431,25 @@ private static bool AnyOverlap(IReadOnlyList<PathInfo> activePaths)
 
 **If this table is empty:** N/A — see above.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `IMonitorController.Restore(MonitorState)` also perform its own defensive overlap/all-active-check, or is that only needed on the forward (`ActivateMonitors`/`DeactivateMonitors`) path?**
    - What we know: `Restore()` already has its own verify-and-throw (position/primary match against the snapshot), which structurally can't produce an overlap if the snapshot itself never had one (since restore reproduces exact prior positions).
    - What's unclear: whether `DeactivateMonitors(enableSet)` running *after* `Restore()` (D-02's teardown) could theoretically introduce a fresh overlap if repositioning is needed (e.g. an enable-set monitor became GDI-primary during rig mode and needs to be un-primaried on the way out).
    - Recommendation: reuse the same generalized `DeactivateMonitors` verify-and-throw (which already includes the overlap check) for this call site — no separate logic needed, just confirm the planner wires `DeactivateMonitors` into both call sites, not a divergent teardown-only variant.
+   - **RESOLVED:** Implemented in `06-03-PLAN.md` Task 2 — `DeactivateMonitors`'s verify-and-throw (including the overlap check) is reused at both call sites, per gsd-plan-checker's verification pass.
 
 2. **Should the Settings grid show a per-row "currently OS-disabled" indicator or hint text, even though CONTEXT.md doesn't mandate a specific UI treatment?**
    - What we know: `MonitorInfo.IsActive` (new field, Pattern 3) makes this information available.
    - What's unclear: CONTEXT.md's Claude's-Discretion section leaves exact grid presentation to the planner/executor.
    - Recommendation: surface `IsActive` in the row (e.g. `"LG UltraGear (currently OS-disabled)"` in the friendly-name column) — cheap, directly answers "why would I check Enable for this row," and reuses the existing `D-10`-style informational-label convention already established in `SettingsForm`.
+   - **RESOLVED:** Locked in `06-UI-SPEC.md` (approved by gsd-ui-checker) and implemented in `06-04-PLAN.md` — the recommended row-suffix treatment was adopted.
 
 3. **How should a stale saved device path (in either set, no longer enumerated by `GetAllMonitors()`) be surfaced, given the grid can only show rows for currently-enumerated monitors?**
    - What we know: the existing single-`ComboBox` pattern (D-10, Phase 2) shows "previously selected monitor not found" via an inline warning label when the saved ID doesn't match any enumerated item. A grid has no analogous "unselected but remembered" row state — a monitor either has a row (and can be checked) or doesn't exist in the grid at all.
    - What's unclear: whether to (a) silently drop the stale device path from the set on next Save (simplest, but silently discards a user's prior configuration for a monitor that's merely disconnected, e.g. rig PC powered off), or (b) show a shared warning label listing all currently-unmatched saved device paths (consistent with the existing no-truncation, full-name-listing convention from D-06).
    - Recommendation: (b) — generalize the existing `ShowStaleWarning` helper to accept a list and reuse D-06's "always list every name, no truncation" convention for consistency; do not silently drop saved-but-disconnected monitors from the persisted set (a temporarily-unplugged rig monitor should not lose its configuration).
+   - **RESOLVED:** Locked in `06-UI-SPEC.md` (approved, non-blocking on Save per its documented rationale) and implemented in `06-04-PLAN.md` — option (b) was adopted.
 
 ## Environment Availability
 
