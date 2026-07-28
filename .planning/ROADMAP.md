@@ -48,12 +48,19 @@ Full phase details: `.planning/milestones/v1.0-ROADMAP.md`
   3. Settings refuses to save a configuration that would disable every monitor, with a clear explanation (DISPLAY-06)
   4. The pre-disable confirmation modal names every monitor being disabled and every monitor being enabled, not just one (DISPLAY-07)
   5. A user upgrading from a genuine v1.0-era settings.json sees their previously-configured single monitor already selected as the disable-set on first launch, with no re-configuration required (DISPLAY-08)
-**Plans**: TBD
+**Plans**: 6 plans (waves: 1 → 2 → 3 → 4)
+Plans:
+- [ ] 06-01-PLAN.md — Core data model (plural monitor sets, MonitorInfo.IsActive) + silent v1.0→v1.1 migration (DISPLAY-08)
+- [ ] 06-02-PLAN.md — Generalized IMonitorController triad + ToggleService orchestration (ordering, D-07, D-02) + Core tests
+- [ ] 06-03-PLAN.md — Windows CCD adapter: GetAllMonitors/ActivateMonitors/DeactivateMonitors + N-generalized Restore/overlap verify
+- [ ] 06-04-PLAN.md — SettingsForm multi-select grid (D-03/D-04) + DISPLAY-06/D-07 validation + merged-set save
+- [ ] 06-05-PLAN.md — Multi-monitor confirmation dialog (D-06) + MainForm name resolution via GetAllMonitors (DISPLAY-07)
+- [ ] 06-06-PLAN.md — Mandatory rig-validation checkpoint (go/no-go gate: reboot re-enable + combined topology)
 **UI hint**: yes
 **Notes** (completion gate, not optional groundwork):
-- This phase is not "done" when code compiles and unit tests pass. It requires a dedicated rig-validation checkpoint before being considered complete, mirroring v1.0 Phase 1's spike-first discipline: (a) disable a monitor, then sleep/wake or reboot the rig PC, then attempt to re-enable it, confirming it is still enumerable and comes back at a sane resolution; (b) apply a combined disable+enable topology using the real configured sets in one operation, confirming exactly one GDI primary results with no position overlap. Both are go/no-go gates on this phase, not follow-up hardening.
-- The one-time settings migration (legacy singular `AppSettings.MonitorDevicePath` -> new plural `MonitorsToDisable`/`MonitorsToEnable` fields) is an explicit task in this phase's scope, with an acceptance test that loads a genuine v1.0-era `settings.json` file and confirms the migrated result — not an afterthought bolted onto the model change.
-- Open design question to resolve during planning: should `IsFullyConfigured` still require a non-empty disable-set now that the tool generalizes beyond "always disable exactly one monitor"?
+- This phase is not "done" when code compiles and unit tests pass. It requires a dedicated rig-validation checkpoint before being considered complete, mirroring v1.0 Phase 1's spike-first discipline: (a) disable a monitor, then sleep/wake or reboot the rig PC, then attempt to re-enable it, confirming it is still enumerable and comes back at a sane resolution; (b) apply a combined disable+enable topology using the real configured sets in one operation, confirming exactly one GDI primary results with no position overlap. Both are go/no-go gates on this phase, not follow-up hardening. (Planned as 06-06-PLAN.md.)
+- The one-time settings migration (legacy singular `AppSettings.MonitorDevicePath` -> new plural `MonitorsToDisable`/`MonitorsToEnable` fields) is an explicit task in this phase's scope, with an acceptance test that loads a genuine v1.0-era `settings.json` file and confirms the migrated result — not an afterthought bolted onto the model change. (Planned as 06-01-PLAN.md Task 2.)
+- Open design question resolved during discussion (D-07): `IsFullyConfigured` no longer requires a non-empty disable-set — it requires disable-set OR enable-set non-empty (implemented in 06-02-PLAN.md).
 
 ### Phase 7: Shared Toggle-Orchestration Helper Extraction
 **Goal**: Every toggle trigger (button, tray menu, hotkey, CLI) runs through one shared, reentrancy-safe pipeline, so a toggle already in progress can never be corrupted by a second concurrent request.
@@ -119,9 +126,8 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 3. App & Audio Control | v1.0 | 4/4 | Complete | 2026-07-24 |
 | 4. Monitor Control (Production) | v1.0 | 4/4 | Complete | 2026-07-24 |
 | 5. Orchestration, Full Toggle & Packaging | v1.0 | 3/3 | Complete | 2026-07-25 |
-| 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 0/TBD | Not started | - |
+| 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 0/6 | Not started | - |
 | 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 0/TBD | Not started | - |
 | 8. Tray Residency, Autostart & Toast Notification | v1.1 | 0/TBD | Not started | - |
 | 9. Global Hotkey Trigger | v1.1 | 0/TBD | Not started | - |
 | 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Not started | - |
-</content>
