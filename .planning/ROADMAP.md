@@ -56,7 +56,7 @@ Full phase details: `.planning/milestones/v1.0-ROADMAP.md`
 Plans:
 **Wave 1**
 
-- [ ] 06-01-PLAN.md — Core data model (plural monitor sets, MonitorInfo.IsActive) + silent v1.0→v1.1 migration (DISPLAY-08)
+- [x] 06-01-PLAN.md — Core data model (plural monitor sets, MonitorInfo.IsActive) + silent v1.0→v1.1 migration (DISPLAY-08)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -158,7 +158,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 3. App & Audio Control | v1.0 | 4/4 | Complete | 2026-07-24 |
 | 4. Monitor Control (Production) | v1.0 | 4/4 | Complete | 2026-07-24 |
 | 5. Orchestration, Full Toggle & Packaging | v1.0 | 3/3 | Complete | 2026-07-25 |
-| 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 0/6 | Not started | - |
+| 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 1/6 | In Progress|  |
 | 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 0/TBD | Not started | - |
 | 8. Tray Residency, Autostart & Toast Notification | v1.1 | 0/TBD | Not started | - |
 | 9. Global Hotkey Trigger | v1.1 | 0/TBD | Not started | - |
