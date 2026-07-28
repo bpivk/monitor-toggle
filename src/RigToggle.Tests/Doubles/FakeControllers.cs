@@ -29,7 +29,13 @@ public sealed class FakeMonitorController : IMonitorController
     public IReadOnlyList<MonitorInfo> GetActiveMonitors()
     {
         _callLog.Add("monitor.GetActiveMonitors");
-        return new List<MonitorInfo> { new("\\\\?\\DISPLAY#FAKE", "Fake Monitor", true) };
+        return new List<MonitorInfo> { new("\\\\?\\DISPLAY#FAKE", "Fake Monitor", true, IsActive: true) };
+    }
+
+    public IReadOnlyList<MonitorInfo> GetAllMonitors()
+    {
+        _callLog.Add("monitor.GetAllMonitors");
+        return new List<MonitorInfo> { new("\\\\?\\DISPLAY#FAKE", "Fake Monitor", true, IsActive: true) };
     }
 
     public MonitorState CaptureState()
@@ -37,12 +43,12 @@ public sealed class FakeMonitorController : IMonitorController
         _callLog.Add("monitor.CaptureState");
 
         // CR-01 test support: when _mutatesBeforeThrowingOnDisable is set, simulate a
-        // partial CCD mutation that happened before Disable's own verify-and-throw
-        // fired (as opposed to _throwOnDisable's pre-mutation guard case, which never
-        // touches live state at all) — the second CaptureState() call (post-Disable)
-        // must report a genuinely different position, proving ToggleService.
-        // MonitorStateUnchanged correctly detects "something changed" and keeps the
-        // snapshot rather than clearing it.
+        // partial CCD mutation that happened before DeactivateMonitors' own
+        // verify-and-throw fired (as opposed to _throwOnDisable's pre-mutation guard
+        // case, which never touches live state at all) — the second CaptureState()
+        // call (post-DeactivateMonitors) must report a genuinely different position,
+        // proving ToggleService.MonitorStateUnchanged correctly detects "something
+        // changed" and keeps the snapshot rather than clearing it.
         int positionX = _mutatesBeforeThrowingOnDisable && _disableWasCalled ? 999 : 0;
 
         return new MonitorState(
@@ -50,9 +56,14 @@ public sealed class FakeMonitorController : IMonitorController
             "\\\\?\\DISPLAY#FAKE");
     }
 
-    public void Disable(string monitorDevicePath)
+    public void ActivateMonitors(IReadOnlySet<string> monitorDevicePaths)
     {
-        _callLog.Add($"monitor.Disable:{monitorDevicePath}");
+        _callLog.Add($"monitor.ActivateMonitors:{string.Join(",", monitorDevicePaths)}");
+    }
+
+    public void DeactivateMonitors(IReadOnlySet<string> monitorDevicePaths)
+    {
+        _callLog.Add($"monitor.DeactivateMonitors:{string.Join(",", monitorDevicePaths)}");
         _disableWasCalled = true;
 
         if (_throwOnDisable || _mutatesBeforeThrowingOnDisable)

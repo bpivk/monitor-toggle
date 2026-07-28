@@ -33,6 +33,7 @@ public class ToggleServiceTests : IDisposable
         {
             MonitorDevicePath = "\\\\?\\DISPLAY#PRIMARY",
             MonitorFriendlyName = "Primary Monitor",
+            MonitorsToDisable = new List<string> { "\\\\?\\DISPLAY#PRIMARY" },
             NormalAudioDeviceId = "normal-device-id",
             NormalAudioDeviceName = "Headset",
             RigAudioDeviceId = "rig-device-id",
@@ -71,7 +72,7 @@ public class ToggleServiceTests : IDisposable
         service.ToggleToRigMode();
 
         var saveIndex = callLog.IndexOf("snapshot.Save");
-        var mutationLabels = new[] { "monitor.Disable", "audio.SetDefault", "app.LaunchOrFocus" };
+        var mutationLabels = new[] { "monitor.ActivateMonitors", "monitor.DeactivateMonitors", "audio.SetDefault", "app.LaunchOrFocus" };
         var firstMutationIndex = callLog.FindIndex(entry => mutationLabels.Any(entry.StartsWith));
 
         Assert.True(saveIndex >= 0, "Expected snapshot.Save to be recorded.");
@@ -113,7 +114,7 @@ public class ToggleServiceTests : IDisposable
 
         service.ToggleToRigMode();
 
-        Assert.Contains($"monitor.Disable:{ConfiguredSettings.MonitorDevicePath}", callLog);
+        Assert.Contains($"monitor.DeactivateMonitors:{string.Join(",", ConfiguredSettings.MonitorsToDisable!)}", callLog);
         Assert.Contains($"audio.SetDefault:{ConfiguredSettings.RigAudioDeviceId}", callLog);
         Assert.Contains($"app.LaunchOrFocus:{ConfiguredSettings.CompanionAppPath}", callLog);
     }
@@ -226,6 +227,7 @@ public class ToggleServiceTests : IDisposable
         {
             MonitorDevicePath = ConfiguredSettings.MonitorDevicePath,
             MonitorFriendlyName = ConfiguredSettings.MonitorFriendlyName,
+            MonitorsToDisable = ConfiguredSettings.MonitorsToDisable,
             NormalAudioDeviceId = ConfiguredSettings.NormalAudioDeviceId,
             NormalAudioDeviceName = ConfiguredSettings.NormalAudioDeviceName,
             RigAudioDeviceId = ConfiguredSettings.RigAudioDeviceId,
@@ -255,6 +257,97 @@ public class ToggleServiceTests : IDisposable
         Assert.DoesNotContain(callLog, entry => entry.StartsWith("app.MinimizeIfRunning"));
         Assert.DoesNotContain(callLog, entry => entry == "snapshot.Clear");
         Assert.False(service.IsInRigMode());
+    }
+
+    [Fact]
+    public void IsSettingsConfigured_EnableOnly_ReturnsTrue()
+    {
+        // D-07: an enable-only configuration (empty/absent MonitorsToDisable, non-empty
+        // MonitorsToEnable, both audio devices + app path set) must be considered fully
+        // configured — there is no longer a single required MonitorDevicePath.
+        var settings = new AppSettings
+        {
+            MonitorsToDisable = null,
+            MonitorsToEnable = new List<string> { "\\\\?\\DISPLAY#RIG" },
+            NormalAudioDeviceId = ConfiguredSettings.NormalAudioDeviceId,
+            RigAudioDeviceId = ConfiguredSettings.RigAudioDeviceId,
+            CompanionAppPath = ExistingCompanionAppPath,
+        };
+        var (service, _, _) = CreateService(settings);
+
+        Assert.True(service.IsSettingsConfigured());
+    }
+
+    [Fact]
+    public void IsSettingsConfigured_BothSetsEmpty_ReturnsFalse()
+    {
+        // D-07: even with both audio devices and the app path set, a configuration with
+        // no monitors in either set (both null) must NOT be considered fully configured.
+        var settings = new AppSettings
+        {
+            MonitorsToDisable = null,
+            MonitorsToEnable = null,
+            NormalAudioDeviceId = ConfiguredSettings.NormalAudioDeviceId,
+            RigAudioDeviceId = ConfiguredSettings.RigAudioDeviceId,
+            CompanionAppPath = ExistingCompanionAppPath,
+        };
+        var (service, _, _) = CreateService(settings);
+
+        Assert.False(service.IsSettingsConfigured());
+    }
+
+    [Fact]
+    public void ToggleToRigMode_ActivatesEnableSet_BeforeDeactivatingDisableSet()
+    {
+        // 06-RESEARCH.md Pitfall 2: ActivateMonitors (enable-set) must run before
+        // DeactivateMonitors (disable-set) within the single Monitor step, since
+        // ApplyTopology(Extend) would otherwise silently undo the disable.
+        var settings = new AppSettings
+        {
+            MonitorsToDisable = ConfiguredSettings.MonitorsToDisable,
+            MonitorsToEnable = new List<string> { "\\\\?\\DISPLAY#RIG" },
+            NormalAudioDeviceId = ConfiguredSettings.NormalAudioDeviceId,
+            RigAudioDeviceId = ConfiguredSettings.RigAudioDeviceId,
+            CompanionAppPath = ExistingCompanionAppPath,
+        };
+        var (service, callLog, _) = CreateService(settings);
+
+        service.ToggleToRigMode();
+
+        var activateIndex = callLog.IndexOf(callLog.First(entry => entry.StartsWith("monitor.ActivateMonitors")));
+        var deactivateIndex = callLog.IndexOf(callLog.First(entry => entry.StartsWith("monitor.DeactivateMonitors")));
+
+        Assert.True(activateIndex >= 0, "Expected monitor.ActivateMonitors to be recorded.");
+        Assert.True(deactivateIndex >= 0, "Expected monitor.DeactivateMonitors to be recorded.");
+        Assert.True(activateIndex < deactivateIndex, "ActivateMonitors must run before DeactivateMonitors.");
+    }
+
+    [Fact]
+    public void ToggleToNormalMode_RestoresBeforeReDisablingEnableSet()
+    {
+        // D-02: the enable-set is unconditionally re-disabled (DeactivateMonitors) AFTER
+        // the disable-set snapshot restore (Restore), not before — same Pitfall 2
+        // ordering constraint as the rig-mode Monitor step.
+        var settings = new AppSettings
+        {
+            MonitorsToDisable = ConfiguredSettings.MonitorsToDisable,
+            MonitorsToEnable = new List<string> { "\\\\?\\DISPLAY#RIG" },
+            NormalAudioDeviceId = ConfiguredSettings.NormalAudioDeviceId,
+            RigAudioDeviceId = ConfiguredSettings.RigAudioDeviceId,
+            CompanionAppPath = ExistingCompanionAppPath,
+        };
+        var (service, callLog, _) = CreateService(settings);
+        service.ToggleToRigMode();
+        callLog.Clear();
+
+        service.ToggleToNormalMode();
+
+        var restoreIndex = callLog.IndexOf(callLog.First(entry => entry.StartsWith("monitor.Restore")));
+        var deactivateIndex = callLog.IndexOf(callLog.First(entry => entry.StartsWith("monitor.DeactivateMonitors")));
+
+        Assert.True(restoreIndex >= 0, "Expected monitor.Restore to be recorded.");
+        Assert.True(deactivateIndex >= 0, "Expected monitor.DeactivateMonitors to be recorded.");
+        Assert.True(restoreIndex < deactivateIndex, "Restore must run before the enable-set DeactivateMonitors teardown.");
     }
 
     [Fact]
