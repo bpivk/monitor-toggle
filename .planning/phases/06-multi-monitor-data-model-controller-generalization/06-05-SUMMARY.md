@@ -94,3 +94,14 @@ None - no external service configuration required.
 - This plan's changes only compile as part of the full `RigToggle.App` project, which (per the plan's ENVIRONMENT note) requires both Plan 04 and this plan (06-05) to have landed. Live build verification and dialog-wording checks (disable-only / enable-only / both) are deferred to the Plan 06 rig checkpoint, consistent with the plan's stated verification strategy.
 - Source-level verification confirms: two-list constructor signature present, old single-string constructor removed, `FormatNames` present with no truncation logic, Designer coordinates/title match 06-UI-SPEC.md exactly, `MainForm` resolves both sets via `GetAllMonitors()` (2 occurrences: doc-comment + call), `GetActiveMonitors()` no longer referenced anywhere in `MainForm.cs`, and the D-07 guard copy string is present verbatim.
 - No blockers for the next wave.
+
+## Self-Check: PASSED
+
+All created/modified files and all task/summary commits verified present on disk and in `git log`:
+- `src/RigToggle.App/MonitorConfirmDialog.cs` - FOUND
+- `src/RigToggle.App/MonitorConfirmDialog.Designer.cs` - FOUND
+- `src/RigToggle.App/MainForm.cs` - FOUND
+- `.planning/phases/06-multi-monitor-data-model-controller-generalization/06-05-SUMMARY.md` - FOUND
+- Commit `49e4a66` (Task 1) - FOUND
+- Commit `574f826` (Task 2) - FOUND
+- Commit `669c10b` (SUMMARY) - FOUND
