@@ -64,9 +64,9 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 06-03-PLAN.md — Windows CCD adapter: GetAllMonitors/ActivateMonitors/DeactivateMonitors + N-generalized Restore/overlap verify
-- [ ] 06-04-PLAN.md — SettingsForm multi-select grid (D-03/D-04) + DISPLAY-06/D-07 validation + merged-set save
-- [ ] 06-05-PLAN.md — Multi-monitor confirmation dialog (D-06) + MainForm name resolution via GetAllMonitors (DISPLAY-07)
+- [x] 06-03-PLAN.md — Windows CCD adapter: GetAllMonitors/ActivateMonitors/DeactivateMonitors + N-generalized Restore/overlap verify
+- [x] 06-04-PLAN.md — SettingsForm multi-select grid (D-03/D-04) + DISPLAY-06/D-07 validation + merged-set save
+- [x] 06-05-PLAN.md — Multi-monitor confirmation dialog (D-06) + MainForm name resolution via GetAllMonitors (DISPLAY-07)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -158,7 +158,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 3. App & Audio Control | v1.0 | 4/4 | Complete | 2026-07-24 |
 | 4. Monitor Control (Production) | v1.0 | 4/4 | Complete | 2026-07-24 |
 | 5. Orchestration, Full Toggle & Packaging | v1.0 | 3/3 | Complete | 2026-07-25 |
-| 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 2/6 | In Progress|  |
+| 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 5/6 | In Progress|  |
 | 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 0/TBD | Not started | - |
 | 8. Tray Residency, Autostart & Toast Notification | v1.1 | 0/TBD | Not started | - |
 | 9. Global Hotkey Trigger | v1.1 | 0/TBD | Not started | - |
