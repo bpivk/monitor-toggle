@@ -72,6 +72,58 @@ public class JsonStoreTests : IDisposable
     }
 
     [Fact]
+    public void SettingsStore_Load_MigratesLegacyMonitorDevicePath_IntoDisableSet()
+    {
+        // Genuine v1.0-shape JSON: only legacy singular fields, NO plural fields at all
+        // (proves this is a real pre-Phase-6 file, not a hand-crafted null-plural stand-in).
+        Directory.CreateDirectory(_tempDir);
+        var path = Path.Combine(_tempDir, "settings.json");
+        File.WriteAllText(path, """
+            {
+              "MonitorDevicePath": "\\\\?\\DISPLAY#PRIMARY",
+              "MonitorFriendlyName": "Primary Monitor",
+              "NormalAudioDeviceId": "normal-id",
+              "NormalAudioDeviceName": "Headset",
+              "RigAudioDeviceId": "rig-id",
+              "RigAudioDeviceName": "Rig Speakers",
+              "CompanionAppPath": "C:\\Apps\\MozaCompanion.exe"
+            }
+            """);
+        var store = new JsonSettingsStore(path);
+
+        var loaded = store.Load();
+
+        Assert.NotNull(loaded.MonitorsToDisable);
+        Assert.Single(loaded.MonitorsToDisable!);
+        Assert.Equal(@"\\?\DISPLAY#PRIMARY", loaded.MonitorsToDisable![0]);
+        Assert.True(loaded.MonitorsToEnable is null || loaded.MonitorsToEnable.Count == 0);
+    }
+
+    [Fact]
+    public void SettingsStore_Load_DoesNotRemigrate_WhenDisableSetAlreadyPopulated()
+    {
+        // v1.1-shape file: legacy MonitorDevicePath still present (never scrubbed) AND
+        // a non-empty MonitorsToDisable already persisted — migration must not overwrite it.
+        Directory.CreateDirectory(_tempDir);
+        var path = Path.Combine(_tempDir, "settings.json");
+        File.WriteAllText(path, """
+            {
+              "MonitorDevicePath": "\\\\?\\DISPLAY#PRIMARY",
+              "MonitorFriendlyName": "Primary Monitor",
+              "MonitorsToDisable": ["\\\\?\\DISPLAY#RIG"],
+              "MonitorsToEnable": []
+            }
+            """);
+        var store = new JsonSettingsStore(path);
+
+        var loaded = store.Load();
+
+        Assert.NotNull(loaded.MonitorsToDisable);
+        Assert.Single(loaded.MonitorsToDisable!);
+        Assert.Equal(@"\\?\DISPLAY#RIG", loaded.MonitorsToDisable![0]);
+    }
+
+    [Fact]
     public void SettingsStore_Save_OverExistingFile_LeavesNoTempFileAndUpdatesContent()
     {
         var path = Path.Combine(_tempDir, "settings.json");

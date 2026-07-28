@@ -34,7 +34,21 @@ public sealed class JsonSettingsStore : ISettingsStore
         try
         {
             var json = File.ReadAllText(_path);
-            return JsonSerializer.Deserialize<AppSettings>(json, Options) ?? new AppSettings();
+            var loaded = JsonSerializer.Deserialize<AppSettings>(json, Options) ?? new AppSettings();
+
+            // D-08: silent v1.0->v1.1 migration. A genuine legacy file has no plural
+            // fields at all (they deserialize to null); an already-migrated v1.1 file
+            // has a non-empty MonitorsToDisable, which must NOT be overwritten. Lives
+            // inside this try block on purpose — a corrupted legacy file must still
+            // hit the JsonException/IOException degrade-to-fresh-AppSettings() path
+            // below, not a second/divergent failure mode.
+            if (!string.IsNullOrEmpty(loaded.MonitorDevicePath)
+                && (loaded.MonitorsToDisable is null || loaded.MonitorsToDisable.Count == 0))
+            {
+                loaded.MonitorsToDisable = new List<string> { loaded.MonitorDevicePath };
+            }
+
+            return loaded;
         }
         catch (JsonException)
         {
