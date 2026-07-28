@@ -15,6 +15,12 @@ namespace RigToggle.Core;
 /// gap-closure 03-04) because each restore step recovers independent, unrelated hardware
 /// state and a failure in one should not block attempting the others. This asymmetry is
 /// intentional and must not be "fixed" into false symmetry.
+///
+/// A second, unrelated asymmetry (D-02, added Phase 6): the disable-set is
+/// snapshot-restored via IMonitorController.Restore, but the enable-set is ALWAYS
+/// unconditionally re-disabled via DeactivateMonitors — never snapshot-restored. See the
+/// inline comment on that call inside ToggleToNormalMode for the full rationale. This is
+/// also intentional and must not be "fixed" into snapshot-based symmetry.
 /// </summary>
 public sealed class ToggleService
 {
@@ -58,7 +64,7 @@ public sealed class ToggleService
             // durably persisting a garbage snapshot and flipping IsInRigMode() to true
             // (D-14) even though nothing was actually captured or changed.
             throw new InvalidOperationException(
-                "Rig Toggle settings are not fully configured. Open Settings and choose a monitor, both audio devices, and the companion app path before switching to Rig Mode.");
+                "Rig Toggle settings are not fully configured. Open Settings and choose at least one monitor to disable or enable, both audio devices, and the companion app path before switching to Rig Mode.");
         }
 
         if (!File.Exists(settings.CompanionAppPath))
@@ -79,7 +85,22 @@ public sealed class ToggleService
 
         var steps = new List<ToggleStepResult>();
 
-        if (!TryExecuteStep("Monitor", () => _monitorController.Disable(settings.MonitorDevicePath!), steps))
+        var disableSet = (settings.MonitorsToDisable ?? new List<string>()).ToHashSet();
+        var enableSet = (settings.MonitorsToEnable ?? new List<string>()).ToHashSet();
+
+        // 06-RESEARCH.md Pitfall 2: ActivateMonitors MUST run BEFORE DeactivateMonitors.
+        // ApplyTopology(Extend) (used internally by ActivateMonitors) restores the CCD
+        // persistence database's last-known extend layout, which still contains the
+        // disable-set monitors as active because DeactivateMonitors uses
+        // saveToDatabase:false — running Activate after Deactivate would silently undo
+        // the disable. Kept as a single "Monitor" step closure below (not two separate
+        // steps) so the ToggleResult checklist still reports one Monitor step, not two
+        // (Phase 5 per-step, not per-sub-action, granularity).
+        if (!TryExecuteStep("Monitor", () =>
+            {
+                _monitorController.ActivateMonitors(enableSet);
+                _monitorController.DeactivateMonitors(disableSet);
+            }, steps))
         {
             // D-04 stop-on-first-failure: a failed Disable means Audio/App never run —
             // no point switching audio or launching the companion app on a monitor that
@@ -173,8 +194,12 @@ public sealed class ToggleService
     /// </summary>
     public bool IsSettingsConfigured() => IsFullyConfigured(_settingsStore.Load());
 
+    // D-07: an enable-only or disable-only configuration is fully configured — a
+    // single required MonitorDevicePath no longer exists (v1.1 generalizes to
+    // arbitrary disable/enable sets), so this checks that at least one of the two
+    // sets is non-empty rather than requiring a specific monitor.
     private static bool IsFullyConfigured(Models.AppSettings settings) =>
-        !string.IsNullOrEmpty(settings.MonitorDevicePath)
+        (settings.MonitorsToDisable?.Count > 0 || settings.MonitorsToEnable?.Count > 0)
         && !string.IsNullOrEmpty(settings.NormalAudioDeviceId)
         && !string.IsNullOrEmpty(settings.RigAudioDeviceId)
         && !string.IsNullOrEmpty(settings.CompanionAppPath);
@@ -249,6 +274,19 @@ public sealed class ToggleService
             try
             {
                 _monitorController.Restore(snapshot.Monitor);
+
+                // D-02 (deliberate asymmetry, NOT a bug — do not "fix" into snapshot-based
+                // symmetry): enable-set monitors are ALWAYS re-disabled on toggle-back,
+                // never snapshot-restored. An enable-set monitor is disabled by definition
+                // before ToggleToRigMode runs — entering rig mode activated it via
+                // ActivateMonitors, so toggle-back's only job is to undo that single
+                // activation by deactivating it again, unconditionally. This call MUST run
+                // AFTER Restore (same 06-RESEARCH.md Pitfall 2 ordering as the rig-mode
+                // Monitor step: Restore's own crash-recovery fallback uses Extend
+                // internally, and ApplyTopology(Extend) would otherwise reactivate the
+                // enable-set monitors via the CCD persistence database). An empty enable
+                // set makes this a no-op.
+                _monitorController.DeactivateMonitors((settings.MonitorsToEnable ?? new List<string>()).ToHashSet());
             }
             catch (Exception ex)
             {
