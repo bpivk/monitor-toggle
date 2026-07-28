@@ -55,6 +55,40 @@ public sealed class WindowsMonitorController : IMonitorController
         return result;
     }
 
+    // Real enumeration of active AND currently OS-disabled-but-available displays
+    // (06-RESEARCH.md Pattern 3) — the enumeration gap GetActiveMonitors() cannot
+    // fill, since DISPLAY-05 requires picking exactly an inactive monitor (e.g. a rig
+    // monitor normally kept OS-disabled to save power) from a list. Two guards are
+    // MANDATORY here that GetActiveMonitors() doesn't need, because inactive paths
+    // report differently than active ones: (1) IsGDIPrimary reads Position, which
+    // throws MissingModeException on an inactive path — guarded behind
+    // IsModeInformationAvailable. (2) PathDisplayTarget.FriendlyName/DevicePath throw
+    // TargetNotAvailableException when !IsAvailable — targets are filtered to
+    // IsAvailable before those getters are touched (06-RESEARCH.md Pitfall 1's
+    // "pitfall inside the pitfall").
+    public IReadOnlyList<MonitorInfo> GetAllMonitors()
+    {
+        PathInfo[] allPaths = PathInfo.GetAllPaths(virtualModeAware: false);
+        var result = new List<MonitorInfo>();
+
+        foreach (PathInfo path in allPaths)
+        {
+            bool isPrimary = path.IsModeInformationAvailable && path.IsGDIPrimary;
+
+            foreach (PathTargetInfo targetInfo in path.TargetsInfo.Where(t => t.DisplayTarget.IsAvailable))
+            {
+                PathDisplayTarget target = targetInfo.DisplayTarget;
+                result.Add(new MonitorInfo(
+                    DevicePath: target.DevicePath,
+                    FriendlyName: target.FriendlyName ?? "(unknown display)",
+                    IsPrimary: isPrimary,
+                    IsActive: targetInfo.IsPathActive));
+            }
+        }
+
+        return result;
+    }
+
     // Real full-topology capture (04-RESEARCH.md Pattern 2): one MonitorPathSnapshot
     // per active PathTargetInfo across ALL active paths — not just the configured
     // target — because Plan 03's repositioning-aware disable shifts every surviving
@@ -88,6 +122,73 @@ public sealed class WindowsMonitorController : IMonitorController
             ?? string.Empty;
 
         return new MonitorState(snapshots, targetDevicePath);
+    }
+
+    // Real Extend-based activation of previously OS-disabled monitors (06-RESEARCH.md
+    // Pattern 2) — the load-bearing generalization answer: NEVER manually reconstruct
+    // PathTargetInfo/mode info for a previously-inactive target (already tried and
+    // abandoned in this exact codebase's Restore() history, three separate rig-tested
+    // validation failures — see Restore()'s own doc comment below). Instead reuse the
+    // exact same zero-argument PathInfo.ApplyTopology(Extend) call Restore()'s
+    // crash-recovery fallback already proves works: Extend takes no path/mode
+    // arguments at all and lets the OS pick mode/position from the CCD persistence
+    // database's last-known extend layout for currently-available targets.
+    //
+    // Pitfall 2 ordering contract (06-RESEARCH.md): this method MUST run BEFORE
+    // DeactivateMonitors on rig-mode entry. Extend restores the persistence
+    // database's last-known layout, which still includes any disable-set monitor(s)
+    // as active if DeactivateMonitors' saveToDatabase:false call already ran first —
+    // silently undoing the disable. On toggle-back, the mirror-image rule applies to
+    // DeactivateMonitors(enableSet): it must run AFTER Restore(), not before, for the
+    // same reason (Restore()'s crash-recovery fallback also uses Extend internally).
+    // ToggleService is the enforcement point for this ordering; documented here too so
+    // a reader of this adapter alone still understands the contract.
+    public void ActivateMonitors(IReadOnlySet<string> monitorDevicePaths)
+    {
+        if (monitorDevicePaths.Count == 0) return;
+
+        PathInfo[] currentActive = PathInfo.GetActivePaths(virtualModeAware: false);
+        var currentlyActiveDevicePaths = currentActive
+            .SelectMany(p => p.TargetsInfo)
+            .Select(t => t.DisplayTarget.DevicePath)
+            .ToHashSet();
+
+        // Skip-optimization (Pitfall 3): Extend recomputes the WHOLE topology from the
+        // DB record, not just the newly-added target(s) — it can incidentally
+        // reposition an unrelated, already-correct third monitor. If every requested
+        // device path is already active, there is nothing to do — never call Extend
+        // just to be thorough.
+        if (monitorDevicePaths.All(currentlyActiveDevicePaths.Contains)) return;
+
+        // Early availability guard (mirrors Restore() Step 1) — a clear,
+        // domain-specific error instead of a confusing generic CCD failure if a
+        // configured enable-set monitor is physically unplugged/undetected.
+        PathInfo[] allPaths = PathInfo.GetAllPaths(virtualModeAware: false);
+        var missing = monitorDevicePaths.Where(dp => !allPaths.Any(p =>
+            p.TargetsInfo.Any(t => t.DisplayTarget.IsAvailable && t.DisplayTarget.DevicePath == dp))).ToArray();
+
+        if (missing.Length > 0)
+        {
+            throw new InvalidOperationException(
+                $"Cannot enable monitor(s) — not detected: {string.Join(", ", missing)}");
+        }
+
+        PathInfo.ApplyTopology(DisplayConfigTopologyId.Extend, allowPersistence: false);
+
+        // Verify-and-throw (D-03/D-04 discipline, unchanged): re-query, confirm every
+        // requested device path is now active. Never trust a non-throwing return
+        // alone, never use Screen.AllScreens as the oracle. No further automatic
+        // recovery is attempted on mismatch (D-05).
+        PathInfo[] postExtend = PathInfo.GetActivePaths(virtualModeAware: false);
+        var stillInactive = monitorDevicePaths.Except(
+            postExtend.SelectMany(p => p.TargetsInfo).Select(t => t.DisplayTarget.DevicePath)).ToArray();
+
+        if (stillInactive.Length > 0)
+        {
+            throw new InvalidOperationException(
+                $"Monitor enable did not take effect: {string.Join(", ", stillInactive)}. " +
+                "No further automatic recovery is attempted (D-05).");
+        }
     }
 
     // Real repositioning-aware CCD primary-path removal (04-RESEARCH.md Pattern 1,
