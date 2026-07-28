@@ -70,25 +70,45 @@ namespace RigToggle.App
                         // snapshot and flipping the mode indicator to "Rig".
                         MessageBox.Show(
                             this,
-                            "Please finish configuring Settings (monitor, both audio devices, and the companion app) before switching to Rig Mode.",
+                            "Please finish configuring Settings (at least one monitor to disable or enable, both audio devices, and the companion app) before switching to Rig Mode.",
                             "Rig Toggle",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
                         return;
                     }
 
-                    // DISPLAY-03 / D-01 / D-02: informed-consent confirmation naming the
-                    // monitor about to be disabled, durably suppressible via "don't ask
-                    // again" and reset whenever Settings changes the configured monitor
-                    // (04-RESEARCH.md Pattern 5).
+                    // DISPLAY-07 / D-06: informed-consent confirmation naming every
+                    // monitor being disabled AND every monitor being enabled, durably
+                    // suppressible via "don't ask again" and reset whenever Settings
+                    // changes either configured set (04-RESEARCH.md Pattern 5, generalized
+                    // Phase 6). Names are resolved via GetAllMonitors() (not
+                    // GetActiveMonitors()) because an enable-set monitor is inactive at
+                    // confirm-time and would otherwise fail to resolve.
                     var settings = _settingsStore.Load();
                     if (!settings.SkipMonitorConfirmation)
                     {
-                        var monitor = _monitorController.GetActiveMonitors()
-                            .FirstOrDefault(m => m.DevicePath == settings.MonitorDevicePath);
-                        string name = monitor?.FriendlyName ?? "the configured monitor";
+                        var disablePaths = settings.MonitorsToDisable ?? new List<string>();
+                        var enablePaths = settings.MonitorsToEnable ?? new List<string>();
 
-                        using var confirmDialog = new MonitorConfirmDialog(name);
+                        IReadOnlyList<MonitorInfo> allMonitors;
+                        try
+                        {
+                            allMonitors = _monitorController.GetAllMonitors();
+                        }
+                        catch
+                        {
+                            // Defensive fallback: an enumeration hiccup must never block the
+                            // confirmation — fall back to raw device paths as names.
+                            allMonitors = Array.Empty<MonitorInfo>();
+                        }
+
+                        string ResolveName(string devicePath) =>
+                            allMonitors.FirstOrDefault(m => m.DevicePath == devicePath)?.FriendlyName ?? devicePath;
+
+                        var disableNames = disablePaths.Select(ResolveName).ToList();
+                        var enableNames = enablePaths.Select(ResolveName).ToList();
+
+                        using var confirmDialog = new MonitorConfirmDialog(disableNames, enableNames);
                         if (confirmDialog.ShowDialog(this) != DialogResult.OK)
                         {
                             return; // user cancelled — nothing mutated

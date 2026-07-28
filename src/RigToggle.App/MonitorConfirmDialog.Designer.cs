@@ -39,7 +39,7 @@ namespace RigToggle.App
             // lblMessage
             //
             this.lblMessage.Location = new System.Drawing.Point(12, 12);
-            this.lblMessage.Size = new System.Drawing.Size(360, 48);
+            this.lblMessage.Size = new System.Drawing.Size(360, 72);
             this.lblMessage.AutoSize = false;
             this.lblMessage.Name = "lblMessage";
 
@@ -47,7 +47,7 @@ namespace RigToggle.App
             // chkDontAskAgain
             //
             this.chkDontAskAgain.Text = "Don't ask again";
-            this.chkDontAskAgain.Location = new System.Drawing.Point(12, 64);
+            this.chkDontAskAgain.Location = new System.Drawing.Point(12, 88);
             this.chkDontAskAgain.Size = new System.Drawing.Size(200, 24);
             this.chkDontAskAgain.Name = "chkDontAskAgain";
 
@@ -55,7 +55,7 @@ namespace RigToggle.App
             // btnContinue
             //
             this.btnContinue.Text = "Continue";
-            this.btnContinue.Location = new System.Drawing.Point(184, 100);
+            this.btnContinue.Location = new System.Drawing.Point(184, 124);
             this.btnContinue.Size = new System.Drawing.Size(90, 32);
             this.btnContinue.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnContinue.Name = "btnContinue";
@@ -64,7 +64,7 @@ namespace RigToggle.App
             // btnCancel
             //
             this.btnCancel.Text = "Cancel";
-            this.btnCancel.Location = new System.Drawing.Point(282, 100);
+            this.btnCancel.Location = new System.Drawing.Point(282, 124);
             this.btnCancel.Size = new System.Drawing.Size(90, 32);
             this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.btnCancel.Name = "btnCancel";
@@ -74,13 +74,13 @@ namespace RigToggle.App
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(384, 144);
+            this.ClientSize = new System.Drawing.Size(384, 168);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Disable Monitor?";
+            this.Text = "Confirm Monitor Changes?";
             this.Name = "MonitorConfirmDialog";
 
             this.Controls.Add(this.lblMessage);
