@@ -1,7 +1,9 @@
 using System.Drawing;
+using System.Linq;
 using WindowsDisplayAPI.DisplayConfig;
 using WindowsDisplayAPI.Native.DisplayConfig;
 using WindowsDisplayAPI.Native.Structures;
+using RigToggle.Core.Models;
 using RigToggle.Windows;
 using Xunit;
 
@@ -146,5 +148,107 @@ public class WindowsMonitorControllerTests
     public void AnyRectanglesOverlap_Empty_ReturnsFalse()
     {
         Assert.False(WindowsMonitorController.AnyRectanglesOverlap(Array.Empty<Rectangle>()));
+    }
+
+    // Covers the gap-closure fix for GetAllMonitors()'s rig-confirmed
+    // duplicate-rows/multi-primary bug (06-06-SUMMARY.md NO-GO): pure, unit-testable
+    // dedup/merge logic extracted into MergeAllMonitors(), same "pure logic only, no
+    // live CCD hardware" discipline as the rest of this file. MonitorInfo has a public
+    // constructor (record) so inputs are constructed directly — no PathInfo/
+    // PathDisplayTarget fakes needed.
+    [Fact]
+    public void MergeAllMonitors_DuplicatedActiveDevicePath_CollapsesToOneRow()
+    {
+        var active = new[]
+        {
+            new MonitorInfo("DEV1", "Monitor A", IsPrimary: true),
+            new MonitorInfo("DEV1", "Monitor A", IsPrimary: true),
+        };
+        var availableTargets = Array.Empty<(string DevicePath, string FriendlyName)>();
+
+        var result = WindowsMonitorController.MergeAllMonitors(active, availableTargets);
+
+        Assert.Single(result);
+        Assert.Equal("DEV1", result[0].DevicePath);
+    }
+
+    [Fact]
+    public void MergeAllMonitors_DevicePathInBothInputs_YieldsOneActiveRow_NotDuplicateDisabledRow()
+    {
+        var active = new[] { new MonitorInfo("DEV1", "Monitor A", IsPrimary: true) };
+        var availableTargets = new[] { ("DEV1", "Monitor A") };
+
+        var result = WindowsMonitorController.MergeAllMonitors(active, availableTargets);
+
+        Assert.Single(result);
+        Assert.True(result[0].IsActive);
+        Assert.True(result[0].IsPrimary);
+    }
+
+    [Fact]
+    public void MergeAllMonitors_AvailableButNotActive_BecomesDisabledNonPrimaryRow()
+    {
+        var active = Array.Empty<MonitorInfo>();
+        var availableTargets = new[] { ("DEV2", "Monitor B") };
+
+        var result = WindowsMonitorController.MergeAllMonitors(active, availableTargets);
+
+        MonitorInfo row = Assert.Single(result);
+        Assert.Equal("DEV2", row.DevicePath);
+        Assert.False(row.IsPrimary);
+        Assert.False(row.IsActive);
+    }
+
+    [Fact]
+    public void MergeAllMonitors_ActiveRows_PromotedToIsActiveTrue_WithPrimaryCarriedFromInput()
+    {
+        var active = new[]
+        {
+            new MonitorInfo("DEV1", "Monitor A", IsPrimary: true),
+            new MonitorInfo("DEV2", "Monitor B", IsPrimary: false),
+        };
+        var availableTargets = Array.Empty<(string DevicePath, string FriendlyName)>();
+
+        var result = WindowsMonitorController.MergeAllMonitors(active, availableTargets);
+
+        Assert.Equal(2, result.Count);
+        MonitorInfo primary = result.Single(r => r.DevicePath == "DEV1");
+        MonitorInfo secondary = result.Single(r => r.DevicePath == "DEV2");
+        Assert.True(primary.IsActive);
+        Assert.True(primary.IsPrimary);
+        Assert.True(secondary.IsActive);
+        Assert.False(secondary.IsPrimary);
+    }
+
+    [Fact]
+    public void MergeAllMonitors_RigRegressionScenario_ExactlyOneRowPerDevicePath_ExactlyOnePrimary()
+    {
+        // Mirrors the 06-06 rig NO-GO: 2 physical monitors, one active-primary and one
+        // active-non-primary, plus stale duplicate PathInfo entries for both in
+        // availableTargets, plus one genuinely-disabled third monitor.
+        var active = new[]
+        {
+            new MonitorInfo("DEV1", "VG248", IsPrimary: true),
+            new MonitorInfo("DEV2", "Dell U2415", IsPrimary: false),
+        };
+        var availableTargets = new[]
+        {
+            ("DEV1", "VG248"),
+            ("DEV1", "VG248"),
+            ("DEV2", "Dell U2415"),
+            ("DEV2", "Dell U2415"),
+            ("DEV2", "Dell U2415"),
+            ("DEV3", "Disabled Monitor"),
+        };
+
+        var result = WindowsMonitorController.MergeAllMonitors(active, availableTargets);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(3, result.Select(r => r.DevicePath).Distinct().Count());
+        Assert.True(result.Count(r => r.IsPrimary) == 1);
+
+        MonitorInfo disabled = result.Single(r => r.DevicePath == "DEV3");
+        Assert.False(disabled.IsPrimary);
+        Assert.False(disabled.IsActive);
     }
 }
