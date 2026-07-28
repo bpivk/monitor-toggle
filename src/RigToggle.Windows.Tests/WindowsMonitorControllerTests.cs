@@ -1,3 +1,4 @@
+using System.Drawing;
 using WindowsDisplayAPI.DisplayConfig;
 using WindowsDisplayAPI.Native.DisplayConfig;
 using WindowsDisplayAPI.Native.Structures;
@@ -110,5 +111,40 @@ public class WindowsMonitorControllerTests
                 isPathActive: false, ownSource: source0, usedSources, allSources, "no free source"));
 
         Assert.Contains("no free source", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Covers the pure axis-aligned bounding-box overlap helper added in Phase 6 Plan
+    // 03 (06-RESEARCH.md "Bounding-box overlap check" code example), shared by both
+    // DeactivateMonitors' and Restore's verify-and-throw sections. Same "pure logic
+    // only, no live CCD hardware" constraint as the rest of this file — the helper
+    // itself has no dependency on WindowsDisplayAPI beyond System.Drawing.Rectangle.
+    [Fact]
+    public void AnyRectanglesOverlap_NonOverlappingSideBySide_ReturnsFalse()
+    {
+        var rects = new[]
+        {
+            new Rectangle(0, 0, 1920, 1080),
+            new Rectangle(1920, 0, 2560, 1440),
+        };
+
+        Assert.False(WindowsMonitorController.AnyRectanglesOverlap(rects));
+    }
+
+    [Fact]
+    public void AnyRectanglesOverlap_Overlapping_ReturnsTrue()
+    {
+        var rects = new[]
+        {
+            new Rectangle(0, 0, 1920, 1080),
+            new Rectangle(1000, 0, 1920, 1080),
+        };
+
+        Assert.True(WindowsMonitorController.AnyRectanglesOverlap(rects));
+    }
+
+    [Fact]
+    public void AnyRectanglesOverlap_Empty_ReturnsFalse()
+    {
+        Assert.False(WindowsMonitorController.AnyRectanglesOverlap(Array.Empty<Rectangle>()));
     }
 }
