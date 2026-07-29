@@ -86,9 +86,14 @@ namespace RigToggle.App
                 audioController,
                 appController);
 
+            // 07-01: every toggle trigger (this GUI button today; tray/hotkey/CLI in
+            // Phases 8-10) must call through ToggleOrchestrator, never ToggleService
+            // directly — it wraps ToggleService with the CORE-06 reentrancy guard.
+            var toggleOrchestrator = new ToggleOrchestrator(toggleService);
+
             SettingsForm SettingsFormFactory() => new SettingsForm(monitorController, audioController, settingsStore);
 
-            var mainForm = new MainForm(toggleService, settingsStore, monitorController, SettingsFormFactory);
+            var mainForm = new MainForm(toggleOrchestrator, settingsStore, monitorController, SettingsFormFactory);
 
             Application.Run(mainForm);
         }
