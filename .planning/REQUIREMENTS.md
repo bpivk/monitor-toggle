@@ -27,11 +27,11 @@ Requirements for the v1.1 milestone (Automation & Multi-Monitor). Each maps to r
 
 ### Display
 
-- [ ] **DISPLAY-04**: User can configure a set of monitors to disable when entering rig mode (not limited to one)
-- [ ] **DISPLAY-05**: User can configure a set of monitors to enable when entering rig mode (e.g. a rig monitor normally kept OS-disabled to save power)
-- [ ] **DISPLAY-06**: Settings prevents saving a configuration that would disable every monitor
-- [ ] **DISPLAY-07**: The pre-disable confirmation dialog names every monitor being disabled and enabled, not just one
-- [ ] **DISPLAY-08**: A user upgrading from v1.0 keeps their previously-configured single monitor working automatically (no re-configuration required)
+- [x] **DISPLAY-04**: User can configure a set of monitors to disable when entering rig mode (not limited to one)
+- [x] **DISPLAY-05**: User can configure a set of monitors to enable when entering rig mode (e.g. a rig monitor normally kept OS-disabled to save power)
+- [x] **DISPLAY-06**: Settings prevents saving a configuration that would disable every monitor
+- [x] **DISPLAY-07**: The pre-disable confirmation dialog names every monitor being disabled and enabled, not just one
+- [x] **DISPLAY-08**: A user upgrading from v1.0 keeps their previously-configured single monitor working automatically (no re-configuration required)
 
 ### Reliability
 
@@ -73,11 +73,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TRIG-02 | Phase 10 | Pending |
 | TRIG-03 | Phase 10 | Pending |
 | NOTIF-01 | Phase 8 | Pending |
-| DISPLAY-04 | Phase 6 | Pending |
-| DISPLAY-05 | Phase 6 | Pending |
-| DISPLAY-06 | Phase 6 | Pending |
-| DISPLAY-07 | Phase 6 | Pending |
-| DISPLAY-08 | Phase 6 | Pending |
+| DISPLAY-04 | Phase 6 | Complete |
+| DISPLAY-05 | Phase 6 | Complete |
+| DISPLAY-06 | Phase 6 | Complete |
+| DISPLAY-07 | Phase 6 | Complete |
+| DISPLAY-08 | Phase 6 | Complete |
 | CORE-06 | Phase 7 | Pending |
 
 **Coverage:**

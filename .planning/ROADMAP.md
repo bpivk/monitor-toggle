@@ -31,7 +31,7 @@ Full phase details: `.planning/milestones/v1.0-ROADMAP.md`
 
 **Milestone Goal:** Remove the remaining daily-use friction (must open the GUI to toggle; only one monitor can be disabled) by adding background/automated triggering and generalizing monitor control to arbitrary multi-monitor rigs.
 
-- [ ] **Phase 6: Multi-Monitor Data Model & Controller Generalization** - Independently-configurable disable/enable monitor sets, with a rig-validated CCD checkpoint and a v1.0-settings migration
+- [x] **Phase 6: Multi-Monitor Data Model & Controller Generalization** - Independently-configurable disable/enable monitor sets, with a rig-validated CCD checkpoint and a v1.0-settings migration (completed 2026-07-29)
 - [ ] **Phase 7: Shared Toggle-Orchestration Helper Extraction** - One reentrancy-safe pipeline every trigger (button/tray/hotkey/CLI) runs through
 - [ ] **Phase 8: Tray Residency, Autostart & Toast Notification** - Minimize-to-tray, autostart, tray context menu, and toast confirmation for headless triggers
 - [ ] **Phase 9: Global Hotkey Trigger** - Configurable Windows-wide keyboard shortcut with surfaced registration failures
@@ -70,7 +70,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 06-06-PLAN.md — Mandatory rig-validation checkpoint (go/no-go gate: reboot re-enable + combined topology)
+- [x] 06-06-PLAN.md — Mandatory rig-validation checkpoint (go/no-go gate: reboot re-enable + combined topology)
 
 **UI hint**: yes
 **Notes** (completion gate, not optional groundwork):
@@ -158,7 +158,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 3. App & Audio Control | v1.0 | 4/4 | Complete | 2026-07-24 |
 | 4. Monitor Control (Production) | v1.0 | 4/4 | Complete | 2026-07-24 |
 | 5. Orchestration, Full Toggle & Packaging | v1.0 | 3/3 | Complete | 2026-07-25 |
-| 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 5/6 | In Progress|  |
+| 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 6/6 | Complete    | 2026-07-29 |
 | 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 0/TBD | Not started | - |
 | 8. Tray Residency, Autostart & Toast Notification | v1.1 | 0/TBD | Not started | - |
 | 9. Global Hotkey Trigger | v1.1 | 0/TBD | Not started | - |
