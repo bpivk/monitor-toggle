@@ -6,77 +6,80 @@ tags: [winforms, ccd, windowsdisplayapi, monitor-enumeration]
 
 requires:
   - phase: 06-03
-    provides: WindowsMonitorController.GetAllMonitors()/ActivateMonitors()/DeactivateMonitors()
+    provides: WindowsMonitorController.GetAllMonitors()/ActivateMonitors()/DeactivateMonitors()/Restore()
 provides:
-  - Rig-hardware evidence that GetAllMonitors() has a real enumeration bug
-affects: [06-03, gap-closure]
+  - Rig-validated multi-monitor disable/enable toggle, including the combined disable+enable topology and reboot/sleep re-enable scenarios
+affects: [06-03, milestone-v1.1]
 
 tech-stack:
   added: []
-  patterns: []
+  patterns:
+    - "GetAllMonitors() dedups by stable DevicePath and sources Active/Primary state only from GetActiveMonitors(), never from potentially-stale inactive PathInfo fields"
+    - "Restore() only takes the raw in-process cache-replay fast path on an exact SetEquals match; any DISPLAY-05 enable-set monitor (or genuinely stale cache) routes through RestoreViaReconstruction(), which never submits a Source-ID hint captured across a mutation boundary"
 
 key-files:
   created: []
-  modified: []
+  modified:
+    - src/RigToggle.Windows/WindowsMonitorController.cs
 
 key-decisions:
-  - "Checkpoint recorded as NO-GO — phase not marked complete pending a gap-closure fix to GetAllMonitors()"
+  - "Checkpoint required two gap-closure rounds (quick task 260728-qj1 for GetAllMonitors dedup; debug session monitor-not-active-on-restore for Restore()'s Source-staleness bug, itself requiring two investigation rounds) before reaching GO — both are real rig-only bugs the Linux planning sandbox's source-only verification could not have caught, confirming the mandatory rig-validation gate did its job."
 
-patterns-established: []
+patterns-established:
+  - "Never replay a cached PathInfo/PathDisplaySource captured before an intervening CCD mutation that could have triggered driver source-ID renumbering — always re-query live immediately before reuse (RestoreViaReconstruction)."
 
-requirements-completed: []  # No requirements close out on a NO-GO — DISPLAY-04/05 remain open pending the fix.
+requirements-completed: [DISPLAY-04, DISPLAY-05]
 
-duration: (interrupted — precondition failed before gate scenarios (a)/(b) could be attempted)
-completed: 2026-07-28
+duration: multi-session (2026-07-28 initial NO-GO -> 2026-07-29 GO, across 2 gap-closure quick tasks + 1 two-round debug session)
+completed: 2026-07-29
 ---
 
 # Phase 6: Multi-Monitor Data Model & Controller Generalization — Plan 06 (Rig Checkpoint) Summary
 
-**Rig testing surfaced a real `GetAllMonitors()` enumeration bug before gate scenarios (a)/(b) could even be attempted — checkpoint is a NO-GO.**
+**Full rig-validation checkpoint now GO — multi-monitor disable/enable, combined-topology toggle, and reboot/sleep re-enable all confirmed working on the real 2-monitor rig, after two rounds of rig-discovered gap-closure fixes.**
 
 ## Performance
 
-- **Duration:** N/A — stopped at the "grid lists every monitor" precondition (step 2 of `<how-to-verify>`), before reaching scenarios (a)/(b)
-- **Tasks:** 1/1 attempted, FAILED (precondition, not the gate scenarios themselves)
-
-## Accomplishments
-
-- Confirmed the app builds and runs on the real Windows rig (`dotnet publish`/`dotnet build` succeeded; the self-contained exe launches).
-- Rig hardware exposed a real bug in `WindowsMonitorController.GetAllMonitors()` that source-only/grep-based verification (the only verification available in the Linux planning sandbox) could not have caught.
+- **Duration:** Spans 2026-07-28 (initial attempt, NO-GO) through 2026-07-29 (final GO), interleaved with 2 gap-closure quick tasks and a 2-round debug session
+- **Tasks:** 1/1 — final result GO across all four checklist items (build, migration check, gate scenario (a), gate scenario (b))
 
 ## Go/No-Go Result
 
-**NO-GO.**
+**GO.** All four checklist items pass:
 
-### Precondition check ("Settings grid lists every monitor") — FAILED
+1. **Build/test** — `dotnet publish`/`dotnet build` succeed on the rig; self-contained exe launches.
+2. **DISPLAY-08 migration spot-check** — a genuine v1.0-era `settings.json` (singular `MonitorDevicePath` only) loads with that monitor already checked in the Disable column, no prompt/banner.
+3. **Gate scenario (a) — long-idle/reboot re-enable** — disable VG248 (Rig Mode), sleep/wake or reboot, confirmed it comes back enumerable at its correct/native resolution. Confirmed by user 2026-07-29: "Everything is just fine."
+4. **Gate scenario (b) — combined disable+enable topology** — disable-set = VG248, enable-set = Dell U2415 (a monitor normally kept OS-disabled). Toggle to Rig Mode: VG248 detaches, Dell activates, exactly one GDI primary, no overlap. Toggle back to Normal Mode: VG248 restored exactly, Dell returned to OS-disabled. Confirmed by user 2026-07-29 after the second gap-closure fix landed: "This works without errors now."
 
-Physical rig has exactly 2 monitors (a VG248 and a Dell U2415). The Settings grid instead showed:
-- `VG248` — Primary
-- `Dell U2415` — Primary
-- `Dell U2415` again — no primary tag
-- `VG248` × 4 — "(currently OS-disabled)"
-- `Dell U2415` × 3 — "(currently OS-disabled)"
+## Gap-Closure History (both rig-discovered, neither catchable from the Linux planning sandbox)
 
-10 rows for 2 physical monitors, including two simultaneously-"Primary" rows (structurally impossible in real Windows — there is only ever one GDI primary).
+### Round 1 — `GetAllMonitors()` duplicate-row / dual-primary bug (initial NO-GO, 2026-07-28)
 
-### Root cause (confirmed by source read, not yet rig-retested)
+First rig attempt failed at the precondition step ("Settings grid lists every monitor"), before either gate scenario could even be attempted. Physical rig has 2 monitors; the grid showed 10 rows, including two simultaneously-"Primary" rows (structurally impossible in real Windows).
 
-`WindowsMonitorController.GetAllMonitors()` (added in Plan 06-03) iterates every `PathInfo` returned by `PathInfo.GetAllPaths()` and every `PathTargetInfo` within it, without deduplicating by the stable `DevicePath` identifier. `GetAllPaths()` returns one entry per historical CCD path — Windows accumulates multiple stale/inactive paths referencing the same physical monitor over time (port changes, driver updates, etc.) — so each physical monitor appears once per stale path instead of once total.
+**Root cause:** `GetAllMonitors()` iterated every `PathInfo` from `PathInfo.GetAllPaths()` without deduplicating by the stable `DevicePath` — Windows accumulates multiple stale/inactive CCD paths per physical monitor over time, so each monitor appeared once per stale path. `IsPrimary` was also read directly off these same potentially-stale inactive paths.
 
-Compounding this, `IsPrimary` is computed per-`PathInfo` (`path.IsModeInformationAvailable && path.IsGDIPrimary`) directly off these same potentially-stale/inactive paths. This is the same "inactive-path fields are set to default/unreliable values" landmine already documented elsewhere in this codebase (`Restore()`'s own comments, citing Microsoft's docs) — it was correctly worked around in `Restore()` and `DeactivateMonitors()`, but `GetAllMonitors()` (new, Plan 06-03) didn't apply the same discipline.
+**Fix:** Quick task `260728-qj1` — `GetAllMonitors()` rewritten to dedupe by `DevicePath` via a pure `MergeAllMonitors()` seam, sourcing Active/Primary state exclusively from the already-correct `GetActiveMonitors()`. Verified fixed on rig re-test (grid showed exactly 2 rows, correct single primary).
 
-06-RESEARCH.md's own Environment Availability section flagged this exact class of risk as unvalidatable without live hardware (Assumptions A1/A2, confidence MEDIUM) — this is precisely why the rig-validation checkpoint exists, and it did its job.
+Separately, a follow-up quick task (`260728-rmp`) relabeled the Settings grid's Disable/Enable columns to "Off (Rig)"/"On (Rig)" with tooltips and an explanatory caption, after user feedback that the original labels didn't make clear the grid only configures the transition into Rig Mode (Normal Mode is always restored exactly as it was, never separately configured) — a UX clarification, not a correctness bug.
 
-### Gate scenarios (a) and (b) — NOT ATTEMPTED
+### Round 2 — `Restore()` Source-staleness bug on toggle-back with an enable-set monitor (2026-07-29)
 
-Testing stopped at the precondition; the sleep/wake/reboot re-enable scenario and the combined disable+enable topology scenario were never reached.
+Gate scenario (b)'s toggle-back direction failed: `Monitor: FAILED (Configured monitor(s) not currently active: {Dell U2415 device path})`, thrown by `DeactivateMonitors()`'s D-02 enable-set teardown call, immediately after `Restore()` had returned successfully with no exception.
+
+**Root cause (found across 2 debug-session rounds — see `.planning/debug/resolved/monitor-not-active-on-restore.md` for full investigation detail):**
+- Round 1 of the debug session found that `Restore()`'s in-process fast-path cache-acceptance guard (`SetEquals`) always failed whenever an enable-set was configured (the cache legitimately contains the enable-set monitor, but the pre-Rig-Mode snapshot never does) — fixed by widening to `IsSupersetOf`. Rig re-test showed the exact same failure recurred, proving this fix insufficient.
+- Round 2 found the real defect: taking the fast path was itself unsafe. The cached entry for the enable-set monitor was captured *before* `DeactivateMonitors()`'s own topology-reducing mutation, which can trigger CCD/driver source-ID renumbering for the surviving target. Replaying that stale cached Source assignment via `ApplyPathInfos` doesn't throw (confirmed via reading WindowsDisplayAPI's own source — it only checks the raw Win32 status, never per-target outcome) but can silently leave the enable-set monitor inactive.
+
+**Fix:** `Restore()`'s fast-path gate reverted to strict `SetEquals` (raw cache replay now used only for the simple no-enable-set case it was originally rig-proven for); every other case (including any DISPLAY-05 enable-set monitor) now routes through `RestoreViaReconstruction()` — the same Extend-plus-live-requery mechanism the crash-recovery path already used, extended to explicitly verify any enable-set monitor is still active after the corrected topology is applied. Never trusts a Source-ID hint captured across a mutation boundary. Rig-confirmed fixed 2026-07-29.
 
 ## Next Phase Readiness
 
-**Blocking:** `GetAllMonitors()` must be fixed to (1) deduplicate by `DevicePath` — exactly one `MonitorInfo` row per physical monitor — and (2) source `IsPrimary`/`IsActive` only from `GetActiveMonitors()` (already correct, `GetActivePaths()`-based) for monitors that are currently active, and hard-code `IsPrimary: false` for monitors not currently active (a disabled monitor cannot be primary by definition).
+Phase 6 is now complete — DISPLAY-04, DISPLAY-05, DISPLAY-06, DISPLAY-07, DISPLAY-08 all rig-validated. `IMonitorController`'s N-monitor triad (`GetAllMonitors`/`ActivateMonitors`/`DeactivateMonitors`/`Restore`) is proven correct on real hardware for both single-set and combined disable+enable configurations, including the crash-recovery-style reconstruction path. Phase 7 (shared toggle-orchestration helper) can build on this generalized, rig-hardened controller with confidence.
 
-Phase 6 remains **not complete**. Fix tracked as a gap-closure task against Plan 06-03; this checkpoint (06-06) must be re-run in full (including the two gate scenarios) once the fix lands.
+**Known residual behavior (not a defect):** RigToggle's disable/enable mutations are deliberately non-persistent (`saveToDatabase: false`/`allowPersistence: false`) — a sleep/wake or reboot resets monitors to Windows' own last-known topology independent of RigToggle's own mode state, in either direction (a disabled monitor can come back on its own, and an enable-set monitor can come back on even while nominally in Normal Mode). This is an accepted consequence of the deliberate choice never to persist changes to Windows' own display database outside explicit user-triggered toggles, not something Phase 6 was ever scoped to control.
 
 ---
 *Phase: 06-multi-monitor-data-model-controller-generalization*
-*Completed: 2026-07-28 (NO-GO)*
+*Completed: 2026-07-29 (GO)*
