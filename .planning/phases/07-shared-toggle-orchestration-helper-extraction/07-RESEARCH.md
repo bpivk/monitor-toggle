@@ -336,17 +336,19 @@ Recommend adding a new, narrowly-scoped test double (not bloating `FakeMonitorCo
 | A1 | No genuine cross-thread concurrency exists in the app today — all current and Phase 8/9 trigger sources (button, tray menu, `WM_HOTKEY`) dispatch through the single WinForms UI-thread message loop, so they cannot literally execute `BtnToggle_Click`-equivalent handlers in parallel with each other today. This is based on general WinForms/Win32 message-loop semantics (training knowledge), not verified against this specific app's future Phase 8/9 code (which doesn't exist yet). | Summary, Open Questions | Low — even if wrong, the `Interlocked`-based guard recommended here is correct regardless of whether real parallelism exists, so no design change would be needed; this assumption only affects how strongly the research argues the guard is "future-proofing" vs. "needed today." |
 | A2 | Phase 10's CLI/IPC listener (out of scope for this phase, mentioned only as forward context) will run on a thread distinct from the UI thread, and any UI-visible side effect from that path will need explicit `Control.Invoke`/`BeginInvoke` marshaling. This is inferred from the "CLI trigger... must signal the resident instance via IPC" note in REQUIREMENTS.md's Out-of-Scope table, not from any Phase 10 design that exists yet. | Open Questions | Low for this phase specifically (Phase 10 is 3 phases away and will do its own research/context gathering) — flagged only so Phase 7's orchestrator design doesn't need revisiting later purely for thread-safety reasons. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does the reentrancy guard need to be verified thread-safe for a genuinely cross-thread caller in THIS phase, or is UI-thread-only sufficient for now?**
+1. **RESOLVED — Does the reentrancy guard need to be verified thread-safe for a genuinely cross-thread caller in THIS phase, or is UI-thread-only sufficient for now?**
    - What we know: Today's only trigger (`MainForm.BtnToggle_Click`) and Phases 8-9's planned triggers (tray menu, hotkey) all appear to be UI-thread-dispatched per standard WinForms/Win32 semantics.
    - What's unclear: Whether Phase 10's CLI/IPC listener (the one plausible source of genuine cross-thread calls) will call this same orchestrator instance directly from a background thread, or will marshal onto the UI thread before calling it — that design doesn't exist yet.
    - Recommendation: Build the guard with `Interlocked.CompareExchange` regardless (it costs nothing extra and is correct either way) so this question never needs to be revisited later — the orchestrator is thread-safe by construction whether or not Phase 10 ends up needing that property.
+   - Resolution: Adopted in full — `07-01-PLAN.md`'s Task 1 builds the guard with `Interlocked.CompareExchange`.
 
-2. **Should the reentrancy test double live in the shared `Doubles/` folder or be scoped to the orchestrator's own test file?**
+2. **RESOLVED — Should the reentrancy test double live in the shared `Doubles/` folder or be scoped to the orchestrator's own test file?**
    - What we know: The existing convention (`FakeControllers.cs`) centralizes fakes in `Doubles/` and reuses them across `ToggleServiceTests.cs`.
    - What's unclear: Whether a blocking/event-driven double (needed only for this one reentrancy test) belongs in the shared file (bloating its already-multi-parameter constructors) or as a small dedicated class.
    - Recommendation: Left to planner/executor per CONTEXT.md's Claude's Discretion — this research recommends a small dedicated double to avoid coupling the widely-reused `FakeMonitorController` to a concern only one test needs, but either placement is workable.
+   - Resolution: Adopted the recommendation — `07-01-PLAN.md` creates a small dedicated `BlockingMonitorController.cs` rather than extending `FakeMonitorController`.
 
 ## Environment Availability
 
