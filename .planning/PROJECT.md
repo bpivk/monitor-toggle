@@ -35,6 +35,7 @@ A single reliable action that disables the primary monitor (not just powers it o
 - [x] User can toggle from normal mode to rig mode in one action from a GUI window — Validated in Phase 5: Orchestration, Full Toggle & Packaging (single-click, monitor+audio+app all switch together, rig-confirmed)
 - [x] User can toggle back from rig mode to normal mode in one action — Validated in Phase 5 (single-click, monitor+audio+app all restore together, rig-confirmed)
 - [x] Distributed as a standalone Windows .exe (no separate runtime install required to run it) — Validated in Phase 5 (self-contained/single-file/untrimmed win-x64 publish, rig-confirmed launch with no runtime-install prompt)
+- [x] Multi-monitor enable/disable configuration, generalizing the single "primary monitor to disable" setting (DISPLAY-04/05/06/07/08) — Validated in Phase 6: Multi-Monitor Data Model & Controller Generalization (N-monitor disable/enable sets via generalized `IMonitorController` triad and real CCD `ActivateMonitors`/`DeactivateMonitors`, save-time guard against disabling every monitor, confirmation dialog naming every monitor in both sets, silent v1.0→v1.1 settings migration). Rig-validated on real 2-monitor hardware after two gap-closure rounds (`GetAllMonitors()` duplicate-row/dual-primary dedup fix; `Restore()` Source-staleness fix routing enable-set monitors through live reconstruction). Post-validation code review then found and fixed two further correctness bugs: a migration guard that re-corrupted a deliberately-emptied disable set, and a non-exception-safe companion-app minimize step that could strand the UI in "Mode: Rig."
 
 ### Active
 
@@ -42,7 +43,6 @@ A single reliable action that disables the primary monitor (not just powers it o
 - [ ] Global hotkey trigger (v1.1)
 - [ ] CLI trigger for external tools (v1.1)
 - [ ] Toast/status notification on toggle (v1.1)
-- [ ] Multi-monitor enable/disable configuration, generalizing the single "primary monitor to disable" setting (v1.1)
 
 ### Out of Scope
 
@@ -79,6 +79,10 @@ A single reliable action that disables the primary monitor (not just powers it o
 | Relaunch-based (`ShellExecute`) app activation instead of window-handle focus manipulation | Rig-testing proved any raw external `SetForegroundWindow`/`ShowWindow` call on Moza's window desyncs something in its own window procedure, permanently disabling its close button; a well-behaved single-instance app already handles "already running, activate me" internally when relaunched, so RigToggle never needs to touch a window it doesn't own | Validated post-ship 2026-07-26, rig-confirmed both directions (`.planning/debug/resolved/moza-foreground-focus.md`) |
 | Settings accepts any app (drag-and-drop `.lnk`/`.exe`), not a Moza-specific hardcoded path | Free side effect of the relaunch redesign no longer depending on Moza-specific window-finding logic; costs nothing extra and generalizes the tool | Validated post-ship 2026-07-26 |
 | Diagnostic `debug.log` gated behind an off-by-default Settings checkbox rather than always-on or fully removed | Keeps the capability available for a future issue without a rebuild, but stops unconditional disk writes now that the investigation needing it is closed | Validated post-ship 2026-07-26 |
+| `GetAllMonitors()` dedups by stable `DevicePath`, sourcing Active/Primary state only from `GetActiveMonitors()` | Rig-confirmed bug: `GetAllPaths()` returns one entry per historical CCD path, causing duplicate rows and dual-primary in the Settings grid | Validated Phase 6, rig-confirmed |
+| `Restore()`'s cache-replay fast path requires an exact `SetEquals` between cache and previous state; any enable-set monitor or stale cache routes through live reconstruction instead | Rig-confirmed: the cache can legitimately contain an enable-set monitor whose Source-ID was renumbered by an intervening CCD mutation between capture and replay, silently leaving it inactive if blindly replayed | Validated Phase 6, rig-confirmed (`.planning/debug/resolved/monitor-not-active-on-restore.md`) |
+| Settings-migration guard keys off `MonitorsToDisable is null` only, never on an empty-but-non-null list | Code review (06-REVIEW.md CR-01) found the prior null-or-empty check re-injected the legacy v1.0 monitor into the disable set on every load, even after a user deliberately emptied it (e.g. moving to enable-only) — `MonitorDevicePath` is never scrubbed post-migration, so that condition could never become permanently false | Validated Phase 6 |
+| `ToggleToNormalMode`'s companion-app minimize step wrapped in try/catch like every other restore step | Code review (06-REVIEW.md CR-02) found this was the only unguarded step, contradicting the class's own isolate-and-continue invariant — a throw here would skip `snapshot.Clear()` and permanently strand the UI showing "Mode: Rig" | Validated Phase 6 |
 
 ## Evolution
 
@@ -98,4 +102,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-26 — v1.1 milestone started (tray residency, global hotkey, CLI trigger, toast notification, multi-monitor enable/disable configuration).*
+*Last updated: 2026-07-29 — Phase 6 (Multi-Monitor Data Model & Controller Generalization) complete: rig-validated, code-reviewed, and gap-closed.*
