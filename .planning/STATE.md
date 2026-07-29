@@ -4,14 +4,14 @@ milestone: v1.1
 milestone_name: Automation & Multi-Monitor
 status: ready_to_plan
 stopped_at: Phase 6 complete (6/6) — ready to discuss Phase 7
-last_updated: 2026-07-29T20:44:24.717Z
+last_updated: 2026-07-29T21:54:01.700Z
 last_activity: 2026-07-28 -- Phase 6 execution started
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 6
   completed_plans: 6
-  percent: 0
+  percent: 20
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Plan: Not started
 Status: Ready to plan
 Last activity: 2026-07-29
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 20%
 
 ## Performance Metrics
 
@@ -80,7 +80,7 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 6's two CCD scenarios (long-idle/reboot monitor re-enable; combined disable+enable topology in one atomic `SetDisplayConfig` call) are unvalidated by documentation alone and require hands-on rig hardware testing before Phase 6 can be considered complete — same discipline as v1.0 Phase 1's spike-first gate. First rig-validation attempt (06-06 checkpoint) returned NO-GO: `GetAllMonitors()` showed duplicate rows and dual "Primary" monitors on the real 2-monitor rig. Fixed via quick task 260728-qj1 (dedup by `DevicePath`, trust Primary/Active state only from the already-correct `GetActiveMonitors()`). Checkpoint must be re-run in full from scratch on the rig before Phase 6 can close.
+- [Phase 6, resolved] The two CCD scenarios (long-idle/reboot monitor re-enable; combined disable+enable topology) are rig-validated: final **GO** recorded in `06-06-SUMMARY.md` after two gap-closure rounds (`GetAllMonitors()` dedup fix, `Restore()` Source-staleness fix). Post-validation code review (`06-REVIEW.md`) then found and fixed two further Critical bugs (settings-migration re-corruption of a deliberately-emptied disable set; a non-exception-safe companion-app minimize step) — both fixed with regression tests in commit `9d891a8`. Phase 6 formally verified `passed` 5/5 in `06-VERIFICATION.md`.
 - Phase 9's `RegisterHotKey` must be rig-tested with Moza Companion actually running, since silent conflicts with other rig software are the realistic failure mode this requirement (TRIG-01) exists to catch.
 
 ### Quick Tasks Completed
@@ -107,13 +107,12 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-26 (pre-close
 
 ## Session Continuity
 
-Last session: 2026-07-28T11:38:53.835Z
-Stopped at: Phase 6 Wave 4 — awaiting rig-validation checkpoint (Plan 06-06)
-Resume file: .planning/phases/06-multi-monitor-data-model-controller-generalization/06-06-PLAN.md
+Last session: 2026-07-29T21:54:01.700Z
+Stopped at: Phase 6 complete, ready to discuss Phase 7
+Resume file: None
 
 ## Operator Next Steps
 
-- Review ROADMAP.md draft for v1.1 (Phases 6-10) and approve or request revisions
-- Once approved: `/gsd:plan-phase 6`
+- `/gsd:discuss-phase 7` — gather context for Phase 7 (Shared Toggle-Orchestration Helper Extraction) before planning
 
 </content>
