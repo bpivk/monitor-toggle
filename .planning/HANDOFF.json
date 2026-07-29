@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-07-29T19:12:27.466Z",
+  "phase": "6",
+  "phase_name": "Multi-Monitor Data Model & Controller Generalization",
+  "phase_dir": ".planning/phases/06-multi-monitor-data-model-controller-generalization",
+  "plan": 6,
+  "task": 1,
+  "total_tasks": 6,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "06-01 Data model + silent v1.0 migration", "status": "done", "commit": "0dee857"},
+    {"id": 2, "name": "06-02 IMonitorController N-monitor triad + ToggleService rewiring", "status": "done", "commit": "96ec820"},
+    {"id": 3, "name": "06-03 Windows CCD adapter generalization", "status": "done", "commit": "d2533f4"},
+    {"id": 4, "name": "06-04 Settings monitor grid", "status": "done", "commit": "be0e92b"},
+    {"id": 5, "name": "06-05 Multi-monitor confirmation dialog + MainForm", "status": "done", "commit": "574f826"},
+    {"id": 6, "name": "06-06 Mandatory rig-validation checkpoint", "status": "done", "commit": "938b08e"}
+  ],
+  "remaining_tasks": [
+    {"id": 7, "name": "execute-phase.md code_review_gate — spawn gsd-code-reviewer via /gsd:code-review 6", "status": "not_started"},
+    {"id": 8, "name": "execute-phase.md regression_gate — run prior-phase tests (likely no-op, no test runner detected in this sandbox)", "status": "not_started"},
+    {"id": 9, "name": "execute-phase.md codebase_drift_gate — non-blocking structural drift check", "status": "not_started"},
+    {"id": 10, "name": "execute-phase.md verify_phase_goal — spawn gsd-verifier, produce 06-VERIFICATION.md", "status": "not_started"},
+    {"id": 11, "name": "execute-phase.md update_roadmap — phase.complete, mark Phase 6 checkbox/date in ROADMAP.md", "status": "not_started"},
+    {"id": 12, "name": "execute-phase.md auto_copy_learnings / close_phase_todos / update_project_md", "status": "not_started"},
+    {"id": 13, "name": "execute-phase.md offer_next / auto-advance to Phase 7 (--chain was active for the whole discuss->plan->execute pipeline)", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "workflow.security_enforcement=true but no 06-SECURITY.md exists yet for Phase 6", "type": "human_action", "workaround": "Non-blocking per execute-phase.md's own gate — surfaces as a reminder in next-steps routing (recommend /gsd:secure-phase 6), does not block phase completion"}
+  ],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "GetAllMonitors() dedups by stable DevicePath; sources Active/Primary state only from GetActiveMonitors(), never from potentially-stale inactive PathInfo fields", "rationale": "Rig-confirmed bug: GetAllPaths() returns one entry per historical CCD path, causing duplicate rows and dual-primary in the Settings grid", "phase": "6"},
+    {"decision": "Restore() only takes the raw in-process cache-replay fast path on an exact SetEquals match between the cache and previousState.Paths; any DISPLAY-05 enable-set monitor (or genuinely stale cache) routes through RestoreViaReconstruction()", "rationale": "Rig-confirmed: the cache can legitimately contain an enable-set monitor whose Source-ID may have been renumbered by an intervening CCD mutation between cache-capture and replay; blindly replaying it doesn't throw but can silently leave the monitor inactive", "phase": "6"},
+    {"decision": "Settings grid columns relabeled 'Off (Rig)'/'On (Rig)' (was 'Disable'/'Enable') with tooltips and a permanent explanatory caption", "rationale": "User feedback: original labels didn't convey that the grid only configures the transition into Rig Mode; Normal Mode is always restored exactly as it was, never separately configured", "phase": "6"}
+  ],
+  "uncommitted_files": [".planning/config.json (workflow._auto_chain_active tracking flag — safe to leave, will be updated by next GSD command)"],
+  "next_action": "Run /gsd:code-review 6 to execute the code_review_gate step, then continue execute-phase.md's remaining post-wave steps (regression_gate, verify_phase_goal, update_roadmap, offer_next) to formally close Phase 6.",
+  "context_notes": "Phase 6 is functionally COMPLETE and rig-validated — all 6 plans done, both rig-discovered bugs (GetAllMonitors dedup, Restore() Source-staleness) found and fixed via 2 quick tasks + a 2-round debug session, all fixes committed and confirmed working on the real 2-monitor rig by the user. What remains is pure GSD process closure (code review pass, phase-goal verification, ROADMAP/STATE finalization) — no known outstanding functional issues. Paused here specifically because context usage hit ~65% right as the code-review skill was launched, before its gsd-code-reviewer agent was spawned. --chain/--auto was active for the whole discuss-phase->plan-phase->execute-phase pipeline (workflow._auto_chain_active=true in config.json), so once phase closure completes, the natural continuation is auto-advancing into Phase 7 (Shared Toggle-Orchestration Helper Extraction) unless the user wants to stop and review first."
+}
