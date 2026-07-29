@@ -26,6 +26,32 @@ namespace RigToggle.Windows;
 /// methods use the WinForms screen-enumeration API as an oracle (D-04) or attempt
 /// automatic rollback on verification failure (D-05) — the exception bubbles to
 /// MainForm's existing handler.
+///
+/// Bug fix (gap-closure post-06-06, rig round 1): Restore() must account for
+/// devices that are active but NOT part of previousState.Paths — namely a DISPLAY-05
+/// enable-set monitor, which ActivateMonitors() activates before DeactivateMonitors()
+/// captures its pre-mutation cache, but which was still OS-disabled (and therefore
+/// absent) when CaptureState() ran even earlier.
+///
+/// Bug fix (gap-closure post-06-06, rig round 2): round 1 widened the in-process fast
+/// path's cache-acceptance check from SetEquals to IsSupersetOf so this scenario
+/// would still take the fast path (a direct replay of the raw pre-mutation
+/// PathInfo[] cache) — but rig re-testing showed that replay can silently leave the
+/// enable-set monitor inactive without ApplyPathInfos throwing. Root cause:
+/// DeactivateMonitors()'s OWN topology-reducing mutation runs AFTER the cache is
+/// captured but BEFORE Restore() ever reapplies it; CCD/driver source-ID renumbering
+/// triggered by that reduction (the sole survivor's native source commonly gets
+/// compacted to a lower index once the disabled target's source is freed) can make
+/// the cache's stored PathDisplaySource assignment for the enable-set monitor stale
+/// by the time it's replayed — SetDisplayConfig with SDC_ALLOW_CHANGES accepts the
+/// stale array without error but does not necessarily keep the mis-sourced target
+/// active. Fixed by reverting the fast path's gate back to strict SetEquals (so it
+/// is used only for the simple, no-enable-set-device case it was originally
+/// rig-proven for) and routing every other case — including the DISPLAY-05
+/// enable-set scenario — through RestoreViaReconstruction(), the same
+/// Extend-plus-live-requery mechanism the crash-recovery fallback already used,
+/// which never trusts a Source assignment captured across a mutation boundary. See
+/// Restore()'s own inline comments for the full mechanism.
 /// </summary>
 public sealed class WindowsMonitorController : IMonitorController
 {
@@ -355,13 +381,26 @@ public sealed class WindowsMonitorController : IMonitorController
     {
         // In-process fast path: if this exact WindowsMonitorController instance is
         // still holding the pre-disable live PathInfo[] array (i.e. no process
-        // restart happened between DeactivateMonitors() and Restore()), replay it directly via
-        // the SAME mechanism already proven twice on this rig (Phase 1 spike GO,
-        // Plan 01 rig re-test GO) instead of reconstructing from primitive snapshot
-        // values — sidesteps every reconstruction pitfall (source assignment,
-        // OutputTechnology, mode-info shape) entirely, because nothing is rebuilt.
-        // Sanity-checked against previousState.Paths' device-path set before trusting
-        // it, so a mismatched/stale cache never gets silently applied.
+        // restart happened between DeactivateMonitors() and Restore()), replay it
+        // directly via the SAME mechanism already proven twice on this rig (Phase 1
+        // spike GO, Plan 01 rig re-test GO) instead of reconstructing from primitive
+        // snapshot values — sidesteps every reconstruction pitfall (source
+        // assignment, OutputTechnology, mode-info shape) entirely, because nothing is
+        // rebuilt.
+        //
+        // Gate is strict SetEquals (rig round 2 — see class doc comment), not
+        // superset: this raw replay is safe ONLY when the cache's device-path set is
+        // an EXACT match for previousState.Paths, i.e. no DISPLAY-05 enable-set
+        // monitor was active alongside the disable-set at cache-capture time. When an
+        // enable-set monitor IS present, the cache's PathInfo entry for it was
+        // captured BEFORE DeactivateMonitors()'s own topology-reducing mutation — a
+        // mutation that can trigger CCD/driver source-ID renumbering for the
+        // surviving target — so that entry's PathDisplaySource can be stale by the
+        // time it would be replayed here. Rig-confirmed: replaying such a stale
+        // superset cache does not throw, but can silently leave the enable-set
+        // monitor inactive. Route that case (and the true crash-recovery case, where
+        // no cache exists at all) through RestoreViaReconstruction() instead, which
+        // never trusts a Source assignment captured across a mutation boundary.
         if (_originalPathsCache is not null)
         {
             var cachedDevicePaths = _originalPathsCache
@@ -402,21 +441,40 @@ public sealed class WindowsMonitorController : IMonitorController
 
                 return;
             }
+
+            // Cache doesn't exactly match previousState.Paths — either genuinely
+            // stale, or (the common DISPLAY-05 case) it legitimately contains an
+            // enable-set monitor in addition to the disable-set. Either way, discard
+            // it rather than trust it any further; RestoreViaReconstruction() below
+            // never depends on it.
+            _originalPathsCache = null;
         }
 
-        // Fallback (crash-recovery path only — no in-process cache survives a restart).
-        //
-        // Rig-discovered: manually reconstructing PathTargetInfo/PathInfo field-by-field from
-        // the stored primitive snapshot (source assignment, then signal info, then source
-        // assignment again) hit THREE separate CCD validation failures across three rig-tested
-        // iterations — every failure traced back to a property Windows does not reliably report
-        // for INACTIVE paths (Microsoft docs: inactive-path mode/signal info is "set to default
-        // values" — Pitfall 2). Rather than keep guessing which field is still wrong, this uses
-        // the exact same two-step strategy DeactivateMonitors() already uses successfully (twice,
-        // rig-confirmed): NEVER manually construct target/mode info from scratch — only ever
-        // reuse REAL, live-queried PathInfo/PathTargetInfo objects wholesale, touching nothing
-        // but Position.
-        //
+        RestoreViaReconstruction(previousState);
+    }
+
+    // Reconstruction path — reachable from two callers: (1) Restore() above, whenever
+    // the in-process fast path is unavailable or its cache doesn't exactly match
+    // previousState.Paths (DISPLAY-05 enable-set monitor present, or a genuinely
+    // stale cache); (2) the true crash-recovery case (CORE-05, process restart
+    // between DeactivateMonitors() and Restore(), where _originalPathsCache is null
+    // by construction — no in-memory cache can survive a restart).
+    //
+    // Rig-discovered: manually reconstructing PathTargetInfo/PathInfo field-by-field from
+    // the stored primitive snapshot (source assignment, then signal info, then source
+    // assignment again) hit THREE separate CCD validation failures across three rig-tested
+    // iterations — every failure traced back to a property Windows does not reliably report
+    // for INACTIVE paths (Microsoft docs: inactive-path mode/signal info is "set to default
+    // values" — Pitfall 2). Rather than keep guessing which field is still wrong, this uses
+    // the exact same two-step strategy DeactivateMonitors() already uses successfully (twice,
+    // rig-confirmed): NEVER manually construct target/mode info from scratch — only ever
+    // reuse REAL, live-queried PathInfo/PathTargetInfo objects wholesale, touching nothing
+    // but Position. Critically (rig round 2 fix), this also means no explicit Source-ID
+    // hint is ever supplied for a device whose native source assignment might have shifted
+    // since an earlier query — Extend takes none, and the reposition step below always
+    // reuses a PathInfo queried fresh, immediately beforehand, in this same call.
+    private void RestoreViaReconstruction(MonitorState previousState)
+    {
         // Step 1: an early "is the monitor still physically present" guard — before touching
         // anything, since Extend below would otherwise fail with a confusing generic error if a
         // configured display was unplugged.
@@ -446,10 +504,7 @@ public sealed class WindowsMonitorController : IMonitorController
             // WR-03 (code review): without this wrapper, a native CCD topology-switch
             // failure here propagates as the library's raw, comparatively cryptic
             // exception, unlike the sibling ApplyPathInfos call below (Step 3), which is
-            // already wrapped for diagnosability. This is the crash-recovery fallback
-            // path only reachable when the process restarted between DeactivateMonitors() and
-            // Restore() — exactly the scenario where the user has the least context to
-            // debug a bare library message.
+            // already wrapped for diagnosability.
             throw new InvalidOperationException(
                 $"Monitor restore failed while switching to Extend topology: {ex.Message}", ex);
         }
@@ -468,27 +523,53 @@ public sealed class WindowsMonitorController : IMonitorController
         // defaults to no rotation for the near-universal case of an unrotated monitor, and the
         // verify-and-throw below (matching this method's existing scope) does not check rotation
         // either.
+        //
+        // The topology array passed to ApplyPathInfos below must include EVERY currently-active
+        // path, not only the subset matching previousState.Paths — omitting an active-but-unlisted
+        // path silently deactivates it as a side effect of ApplyPathInfos (CCD replaces the whole
+        // active topology with exactly what it's given). previousState.Paths only ever reflects
+        // state captured BEFORE Rig Mode was entered, so it never includes an enable-set monitor
+        // (DISPLAY-05) — that monitor was still OS-disabled at capture time. If Extend above
+        // already brought such a monitor active, it must be carried through unchanged here (using
+        // its fresh, just-queried PathInfo — never a cached one), or this path reproduces the
+        // exact same "monitor silently ends up inactive, surfaces only via the next unrelated
+        // DeactivateMonitors call" failure this method exists to avoid.
         PathInfo[] postExtendActivePaths = PathInfo.GetActivePaths(virtualModeAware: false);
 
-        var corrected = new List<PathInfo>();
+        // Still-present guard first (unchanged intent/message): every device Restore() was
+        // actually asked to restore must genuinely be active after Extend.
         foreach (MonitorPathSnapshot snap in previousState.Paths)
         {
-            PathInfo? activeMatch = postExtendActivePaths.FirstOrDefault(p =>
+            bool stillActiveAfterExtend = postExtendActivePaths.Any(p =>
                 p.TargetsInfo.Any(t => t.DisplayTarget.IsAvailable && t.DisplayTarget.DevicePath == snap.DevicePath));
 
-            if (activeMatch is null)
+            if (!stillActiveAfterExtend)
             {
                 throw new InvalidOperationException(
                     $"Cannot restore '{snap.FriendlyName}' ({snap.DevicePath}) — the Extend topology switch did " +
                     "not bring it back to an active state. No further automatic recovery is attempted (D-05).");
             }
+        }
 
-            corrected.Add(new PathInfo(
-                activeMatch.DisplaySource,
-                new Point(snap.PositionX, snap.PositionY),
-                activeMatch.Resolution,
-                activeMatch.PixelFormat,
-                activeMatch.TargetsInfo));
+        // Build corrected from EVERY currently-active path: reposition the subset that matches
+        // a stored snapshot, and carry through any other active path (e.g. an enable-set
+        // monitor) completely unchanged — using its own fresh, just-queried DisplaySource/
+        // TargetsInfo, never a value cached from before Extend ran — so it is never dropped
+        // from the applied topology and never supplied with a stale Source hint.
+        var corrected = new List<PathInfo>();
+        foreach (PathInfo activePath in postExtendActivePaths)
+        {
+            MonitorPathSnapshot? snap = previousState.Paths.FirstOrDefault(s =>
+                activePath.TargetsInfo.Any(t => t.DisplayTarget.IsAvailable && t.DisplayTarget.DevicePath == s.DevicePath));
+
+            corrected.Add(snap is null
+                ? activePath
+                : new PathInfo(
+                    activePath.DisplaySource,
+                    new Point(snap.PositionX, snap.PositionY),
+                    activePath.Resolution,
+                    activePath.PixelFormat,
+                    activePath.TargetsInfo));
         }
 
         try
@@ -509,6 +590,12 @@ public sealed class WindowsMonitorController : IMonitorController
         // Pattern 4/D-03: verify-and-throw — confirm the configured target is present
         // again and matches its stored position/primary designation, AND (new,
         // 06-RESEARCH.md/T-06-05) that the restored survivor set doesn't overlap.
+        //
+        // Also confirm (rig round 2 fix) that every OTHER device this reconstruction
+        // carried through unchanged (i.e. any device active post-Extend that isn't
+        // part of previousState.Paths — a DISPLAY-05 enable-set monitor) is still
+        // active, with a specific, diagnosable error if not — rather than letting a
+        // silent drop surface only via the next unrelated DeactivateMonitors call.
         PathInfo[] verifyPaths = PathInfo.GetActivePaths(virtualModeAware: false);
         PathInfo? restoredTarget = verifyPaths.FirstOrDefault(p =>
             p.TargetsInfo.Any(t => t.DisplayTarget.DevicePath == previousState.TargetDevicePath));
@@ -519,14 +606,32 @@ public sealed class WindowsMonitorController : IMonitorController
             .Select(p => new Rectangle(p.Position, p.Resolution))
             .ToList());
 
+        var verifyActiveDevicePaths = verifyPaths
+            .SelectMany(p => p.TargetsInfo)
+            .Where(t => t.DisplayTarget.IsAvailable)
+            .Select(t => t.DisplayTarget.DevicePath)
+            .ToHashSet();
+        var extraDevicePathsNowMissing = postExtendActivePaths
+            .SelectMany(p => p.TargetsInfo)
+            .Where(t => t.DisplayTarget.IsAvailable)
+            .Select(t => t.DisplayTarget.DevicePath)
+            .Where(dp => previousState.Paths.All(s => s.DevicePath != dp))
+            .Where(dp => !verifyActiveDevicePaths.Contains(dp))
+            .ToArray();
+
         if (restoredTarget is null ||
             restoredTarget.Position.X != expectedSnap.PositionX ||
             restoredTarget.Position.Y != expectedSnap.PositionY ||
             restoredTarget.IsGDIPrimary != expectedSnap.IsPrimary ||
-            overlap)
+            overlap ||
+            extraDevicePathsNowMissing.Length > 0)
         {
             throw new InvalidOperationException(
-                "Monitor restore did not reproduce the exact prior configuration. No further automatic recovery is attempted (D-05).");
+                "Monitor restore did not reproduce the exact prior configuration" +
+                (extraDevicePathsNowMissing.Length > 0
+                    ? $" (also lost: {string.Join(", ", extraDevicePathsNowMissing)})"
+                    : "") +
+                ". No further automatic recovery is attempted (D-05).");
         }
 
         _originalPathsCache = null;
