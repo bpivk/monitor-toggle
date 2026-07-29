@@ -90,10 +90,13 @@ Plans:
   2. Rapidly double-clicking (or otherwise double-firing) the toggle trigger results in exactly one toggle executing, never two overlapping ones (CORE-06)
   3. The existing GUI toggle button's behavior (confirmation dialog, per-step outcome report) is unchanged after the refactor, confirming the extraction didn't regress the one trigger path that existed before this milestone (CORE-06)
 
-**Plans**: TBD
+**Plans**: 1 plan (wave: 1)
+Plans:
+- [ ] 07-01-PLAN.md — ToggleOrchestrator (Interlocked non-blocking busy-guard) + ToggleInProgressException + deterministic reentrancy tests, then MainForm/Program.cs routed through the orchestrator (CORE-06)
+
 **Notes**:
 
-- This phase must decide and implement the reentrancy guard design (lock vs. busy-flag vs. queue) as part of its own scope. This is the single most consequential design decision surfaced by research and is a Phase 7 deliverable, not something deferred to whichever later phase happens to notice the gap.
+- This phase must decide and implement the reentrancy guard design (lock vs. busy-flag vs. queue) as part of its own scope. This is the single most consequential design decision surfaced by research and is a Phase 7 deliverable, not something deferred to whichever later phase happens to notice the gap. Resolved during discussion (D-01/D-02): a non-blocking busy-flag (`Interlocked.CompareExchange`), one shared flag guarding both directions, rejecting the second request immediately (not a queue).
 
 ### Phase 8: Tray Residency, Autostart & Toast Notification
 
@@ -159,7 +162,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 4. Monitor Control (Production) | v1.0 | 4/4 | Complete | 2026-07-24 |
 | 5. Orchestration, Full Toggle & Packaging | v1.0 | 3/3 | Complete | 2026-07-25 |
 | 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 6/6 | Complete    | 2026-07-29 |
-| 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 0/TBD | Not started | - |
+| 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 0/1 | Not started | - |
 | 8. Tray Residency, Autostart & Toast Notification | v1.1 | 0/TBD | Not started | - |
 | 9. Global Hotkey Trigger | v1.1 | 0/TBD | Not started | - |
 | 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Not started | - |
