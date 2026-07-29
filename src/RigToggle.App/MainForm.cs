@@ -9,24 +9,25 @@ namespace RigToggle.App
     /// Main window (D-13): mode indicator, Toggle button, Settings launch. Never
     /// instantiates a concrete Windows adapter or Json store directly — everything
     /// is injected by the composition root (Program.cs, Anti-Pattern 2 in
-    /// 02-RESEARCH.md). Mode is derived from ToggleService.IsInRigMode(), which
-    /// itself derives from snapshot-file presence (D-14) — correct on startup even
-    /// after a crash while in Rig mode.
+    /// 02-RESEARCH.md). Mode is derived from ToggleOrchestrator.IsInRigMode() (07-01:
+    /// every toggle call now routes through the reentrancy-safe orchestrator rather
+    /// than ToggleService directly), which itself derives from snapshot-file presence
+    /// (D-14) — correct on startup even after a crash while in Rig mode.
     /// </summary>
     public partial class MainForm : Form
     {
-        private readonly ToggleService _toggleService;
+        private readonly ToggleOrchestrator _orchestrator;
         private readonly ISettingsStore _settingsStore;
         private readonly IMonitorController _monitorController;
         private readonly Func<SettingsForm> _settingsFormFactory;
 
         public MainForm(
-            ToggleService toggleService,
+            ToggleOrchestrator orchestrator,
             ISettingsStore settingsStore,
             IMonitorController monitorController,
             Func<SettingsForm> settingsFormFactory)
         {
-            _toggleService = toggleService ?? throw new ArgumentNullException(nameof(toggleService));
+            _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
             _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
             _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
             _settingsFormFactory = settingsFormFactory ?? throw new ArgumentNullException(nameof(settingsFormFactory));
@@ -46,7 +47,7 @@ namespace RigToggle.App
         /// </summary>
         private void RefreshUi()
         {
-            bool isInRigMode = _toggleService.IsInRigMode();
+            bool isInRigMode = _orchestrator.IsInRigMode();
             lblMode.Text = isInRigMode ? "Mode: Rig" : "Mode: Normal";
             btnToggle.Text = isInRigMode ? "Switch to Normal Mode" : "Switch to Rig Mode";
         }
@@ -57,13 +58,13 @@ namespace RigToggle.App
 
             try
             {
-                if (_toggleService.IsInRigMode())
+                if (_orchestrator.IsInRigMode())
                 {
-                    result = _toggleService.ToggleToNormalMode();
+                    result = _orchestrator.ToggleToNormalMode();
                 }
                 else
                 {
-                    if (!_toggleService.IsSettingsConfigured())
+                    if (!_orchestrator.IsSettingsConfigured())
                     {
                         // WR-01: don't let an incomplete Settings state reach ToggleToRigMode
                         // at all — redirect to Settings instead of persisting a garbage
@@ -121,7 +122,7 @@ namespace RigToggle.App
                         }
                     }
 
-                    result = _toggleService.ToggleToRigMode();
+                    result = _orchestrator.ToggleToRigMode();
                 }
 
                 RefreshUi();
