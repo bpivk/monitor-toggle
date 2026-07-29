@@ -83,6 +83,7 @@ A single reliable action that disables the primary monitor (not just powers it o
 | `Restore()`'s cache-replay fast path requires an exact `SetEquals` between cache and previous state; any enable-set monitor or stale cache routes through live reconstruction instead | Rig-confirmed: the cache can legitimately contain an enable-set monitor whose Source-ID was renumbered by an intervening CCD mutation between capture and replay, silently leaving it inactive if blindly replayed | Validated Phase 6, rig-confirmed (`.planning/debug/resolved/monitor-not-active-on-restore.md`) |
 | Settings-migration guard keys off `MonitorsToDisable is null` only, never on an empty-but-non-null list | Code review (06-REVIEW.md CR-01) found the prior null-or-empty check re-injected the legacy v1.0 monitor into the disable set on every load, even after a user deliberately emptied it (e.g. moving to enable-only) — `MonitorDevicePath` is never scrubbed post-migration, so that condition could never become permanently false | Validated Phase 6 |
 | `ToggleToNormalMode`'s companion-app minimize step wrapped in try/catch like every other restore step | Code review (06-REVIEW.md CR-02) found this was the only unguarded step, contradicting the class's own isolate-and-continue invariant — a throw here would skip `snapshot.Clear()` and permanently strand the UI showing "Mode: Rig" | Validated Phase 6 |
+| Reentrancy guard (CORE-06) is a new `ToggleOrchestrator` wrapper around `ToggleService`, not logic added inside `ToggleService` itself — a non-blocking `Interlocked.CompareExchange` busy-flag shared across both toggle directions, rejecting a second in-flight request immediately (never queuing/blocking it) | Roadmap explicitly required "rejects", not "eventually executes"; keeps `ToggleService` a pure, already-unit-tested step sequencer with no concurrency concerns, and gives Phase 8-10's future trigger sources (tray/hotkey/CLI) one obvious, already-guarded entry point instead of duplicating guard logic per trigger | Validated Phase 7 — `ToggleService.cs` confirmed byte-unchanged across the phase; 35/35 tests pass including 4 deterministic reentrancy tests |
 
 ## Evolution
 
@@ -102,4 +103,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-29 — Phase 6 (Multi-Monitor Data Model & Controller Generalization) complete: rig-validated, code-reviewed, and gap-closed.*
+*Last updated: 2026-07-29 — Phase 7 (Shared Toggle-Orchestration Helper Extraction) complete: CORE-06 reentrancy guard implemented, code-reviewed, and verified with a real `dotnet build`/`dotnet test` run (35/35 passed).*
