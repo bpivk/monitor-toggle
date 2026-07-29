@@ -84,20 +84,36 @@ public class ToggleOrchestratorTests : IDisposable
         Assert.False(orchestrator.IsInRigMode());
     }
 
+    /// <summary>
+    /// WR-03 (code review): 5s bound on every guarded-region wait. If a regression ever
+    /// makes ToggleToRigMode() fail before reaching the blocking Monitor step, the wait
+    /// fails fast with a clear assertion message instead of hanging the test run forever.
+    /// </summary>
+    private static readonly TimeSpan GuardedRegionWaitTimeout = TimeSpan.FromSeconds(5);
+
     [Fact]
     public void ToggleToRigMode_RejectsSecondCallWhileFirstInFlight_SameDirection()
     {
-        var enteredGuardedRegion = new ManualResetEventSlim(false);
-        var releaseFirstCall = new ManualResetEventSlim(false);
+        using var enteredGuardedRegion = new ManualResetEventSlim(false);
+        using var releaseFirstCall = new ManualResetEventSlim(false);
         var (orchestrator, _, _) = CreateOrchestrator(
             monitorController: new BlockingMonitorController(enteredGuardedRegion, releaseFirstCall));
 
         var firstCallTask = Task.Run(() => orchestrator.ToggleToRigMode());
-        enteredGuardedRegion.Wait(); // deterministic — no fixed-duration wait, no timing guess
+        Assert.True(enteredGuardedRegion.Wait(GuardedRegionWaitTimeout), "Blocking step was never entered.");
 
-        Assert.Throws<ToggleInProgressException>(() => orchestrator.ToggleToRigMode());
+        try
+        {
+            // WR-03: releaseFirstCall.Set() must run even if this assertion fails,
+            // otherwise a broken guard orphans the background Task.Run thread forever
+            // instead of just failing this one assertion.
+            Assert.Throws<ToggleInProgressException>(() => orchestrator.ToggleToRigMode());
+        }
+        finally
+        {
+            releaseFirstCall.Set();
+        }
 
-        releaseFirstCall.Set();
         var firstResult = firstCallTask.GetAwaiter().GetResult();
         Assert.True(firstResult.Success);
     }
@@ -107,17 +123,23 @@ public class ToggleOrchestratorTests : IDisposable
     {
         // D-02: one shared flag guards BOTH directions — a rig-mode toggle in flight
         // must also reject a normal-mode request, not just a same-direction repeat.
-        var enteredGuardedRegion = new ManualResetEventSlim(false);
-        var releaseFirstCall = new ManualResetEventSlim(false);
+        using var enteredGuardedRegion = new ManualResetEventSlim(false);
+        using var releaseFirstCall = new ManualResetEventSlim(false);
         var (orchestrator, _, _) = CreateOrchestrator(
             monitorController: new BlockingMonitorController(enteredGuardedRegion, releaseFirstCall));
 
         var firstCallTask = Task.Run(() => orchestrator.ToggleToRigMode());
-        enteredGuardedRegion.Wait();
+        Assert.True(enteredGuardedRegion.Wait(GuardedRegionWaitTimeout), "Blocking step was never entered.");
 
-        Assert.Throws<ToggleInProgressException>(() => orchestrator.ToggleToNormalMode());
+        try
+        {
+            Assert.Throws<ToggleInProgressException>(() => orchestrator.ToggleToNormalMode());
+        }
+        finally
+        {
+            releaseFirstCall.Set();
+        }
 
-        releaseFirstCall.Set();
         var firstResult = firstCallTask.GetAwaiter().GetResult();
         Assert.True(firstResult.Success);
     }
@@ -128,20 +150,26 @@ public class ToggleOrchestratorTests : IDisposable
         // D-04: pure reads, unguarded — must remain callable (and correct) while a
         // toggle is in flight, mirroring how MainForm.RefreshUi() calls IsInRigMode()
         // immediately after every toggle today.
-        var enteredGuardedRegion = new ManualResetEventSlim(false);
-        var releaseFirstCall = new ManualResetEventSlim(false);
+        using var enteredGuardedRegion = new ManualResetEventSlim(false);
+        using var releaseFirstCall = new ManualResetEventSlim(false);
         var (orchestrator, _, _) = CreateOrchestrator(
             monitorController: new BlockingMonitorController(enteredGuardedRegion, releaseFirstCall));
 
         var firstCallTask = Task.Run(() => orchestrator.ToggleToRigMode());
-        enteredGuardedRegion.Wait();
+        Assert.True(enteredGuardedRegion.Wait(GuardedRegionWaitTimeout), "Blocking step was never entered.");
 
-        // ToggleService saves the snapshot BEFORE the Monitor mutation step runs, so by
-        // the time DeactivateMonitors is blocked, IsInRigMode() already reports true.
-        Assert.True(orchestrator.IsInRigMode());
-        Assert.True(orchestrator.IsSettingsConfigured());
+        try
+        {
+            // ToggleService saves the snapshot BEFORE the Monitor mutation step runs, so by
+            // the time DeactivateMonitors is blocked, IsInRigMode() already reports true.
+            Assert.True(orchestrator.IsInRigMode());
+            Assert.True(orchestrator.IsSettingsConfigured());
+        }
+        finally
+        {
+            releaseFirstCall.Set();
+        }
 
-        releaseFirstCall.Set();
         var firstResult = firstCallTask.GetAwaiter().GetResult();
         Assert.True(firstResult.Success);
     }

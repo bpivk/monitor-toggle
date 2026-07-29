@@ -96,10 +96,15 @@ namespace RigToggle.App
                         {
                             allMonitors = _monitorController.GetAllMonitors();
                         }
-                        catch
+                        catch (Exception ex)
                         {
                             // Defensive fallback: an enumeration hiccup must never block the
-                            // confirmation — fall back to raw device paths as names.
+                            // confirmation — fall back to raw device paths as names. Traced
+                            // (WR-02, code review) for consistency with every other swallowed
+                            // failure in this codebase (see ToggleService.cs's IN-02 comments) —
+                            // otherwise a machine hitting this path leaves no diagnostic trail
+                            // even with EnableDebugLogging on.
+                            System.Diagnostics.Trace.WriteLine($"GetAllMonitors failed while resolving names for confirm dialog: {ex}");
                             allMonitors = Array.Empty<MonitorInfo>();
                         }
 
@@ -139,6 +144,24 @@ namespace RigToggle.App
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Warning);
                 }
+            }
+            catch (ToggleInProgressException ex)
+            {
+                // WR-01 (code review): a busy-rejection is an expected condition (CORE-06),
+                // not an error — refines D-05's "zero UI changes" trade-off with a dedicated
+                // branch rather than the generic "something went wrong" wording below, which
+                // would misleadingly tell the user to "check Settings" for simply clicking
+                // too fast. D-05 itself only required no NEW UI code to keep this trigger's
+                // existing behavior unchanged when no toggle is in flight — it still holds.
+                // Currently unreachable from this single-threaded UI-only trigger (the guard
+                // exists for Phase 8+'s tray/hotkey/CLI triggers), but the informational
+                // wording is correct now rather than deferred.
+                MessageBox.Show(
+                    this,
+                    ex.Message,
+                    "Rig Toggle",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {

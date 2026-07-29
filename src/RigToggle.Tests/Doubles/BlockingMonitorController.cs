@@ -48,7 +48,16 @@ public sealed class BlockingMonitorController : IMonitorController
     public void DeactivateMonitors(IReadOnlySet<string> monitorDevicePaths)
     {
         _enteredGuardedRegion.Set();
-        _releaseFirstCall.Wait();
+
+        // WR-03 (code review): bounded wait as defense-in-depth. The calling test's
+        // try/finally already guarantees _releaseFirstCall.Set() runs even if its
+        // assertion fails, but a bound here means a future caller that forgets that
+        // guarantee gets a fast, clear failure instead of an indefinitely blocked
+        // background thread.
+        if (!_releaseFirstCall.Wait(TimeSpan.FromSeconds(5)))
+        {
+            throw new TimeoutException("BlockingMonitorController.DeactivateMonitors was never released by the test.");
+        }
     }
 
     public void Restore(MonitorState previousState)

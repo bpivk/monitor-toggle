@@ -10,5 +10,7 @@ namespace RigToggle.Core;
 /// </summary>
 public sealed class ToggleInProgressException : InvalidOperationException
 {
+    public ToggleInProgressException() { }
     public ToggleInProgressException(string message) : base(message) { }
+    public ToggleInProgressException(string message, Exception innerException) : base(message, innerException) { }
 }
