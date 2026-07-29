@@ -48,7 +48,8 @@ public class ToggleServiceTests : IDisposable
         AppSettings? settings = null,
         bool audioThrowsOnRestore = false,
         bool monitorThrowsOnDisable = false,
-        bool monitorMutatesBeforeThrowingOnDisable = false)
+        bool monitorMutatesBeforeThrowingOnDisable = false,
+        bool appThrowsOnMinimize = false)
     {
         var callLog = new List<string>();
         var settingsStore = new InMemorySettingsStore(settings ?? ConfiguredSettings);
@@ -58,7 +59,7 @@ public class ToggleServiceTests : IDisposable
             throwOnDisable: monitorThrowsOnDisable,
             mutatesBeforeThrowingOnDisable: monitorMutatesBeforeThrowingOnDisable);
         var audioController = new FakeAudioController(callLog, throwOnRestore: audioThrowsOnRestore);
-        var appController = new FakeAppController(callLog);
+        var appController = new FakeAppController(callLog, throwOnMinimize: appThrowsOnMinimize);
 
         var service = new ToggleService(settingsStore, snapshotStore, monitorController, audioController, appController);
         return (service, callLog, snapshotStore);
@@ -215,6 +216,27 @@ public class ToggleServiceTests : IDisposable
         Assert.Equal(ToggleStepOutcome.Failed, audioStep.Outcome);
         Assert.False(service.IsInRigMode());
         Assert.Contains(callLog, entry => entry.StartsWith("app.MinimizeIfRunning"));
+        Assert.Contains("snapshot.Clear", callLog);
+    }
+
+    [Fact]
+    public void ToggleToNormalMode_ReturnsFailedAppStep_ButStillClears_WhenMinimizeThrows()
+    {
+        // CR-02 (code review): MinimizeIfRunning was the only step in
+        // ToggleToNormalMode not wrapped in try/catch, contradicting the class's own
+        // "isolate-and-continue... no step throws" invariant (D-05). Monitor/Audio have
+        // already been restored by this point, so a throwing minimize must be recorded
+        // as a Failed App step (not propagate) and snapshot.Clear() must still run —
+        // otherwise IsInRigMode() would stay stuck true forever.
+        var (service, callLog, _) = CreateService(appThrowsOnMinimize: true);
+        service.ToggleToRigMode();
+        callLog.Clear();
+
+        var result = service.ToggleToNormalMode();
+
+        var appStep = result.Steps.Single(s => s.StepName == "App");
+        Assert.Equal(ToggleStepOutcome.Failed, appStep.Outcome);
+        Assert.False(service.IsInRigMode());
         Assert.Contains("snapshot.Clear", callLog);
     }
 

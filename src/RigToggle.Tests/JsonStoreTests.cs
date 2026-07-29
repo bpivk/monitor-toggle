@@ -124,6 +124,32 @@ public class JsonStoreTests : IDisposable
     }
 
     [Fact]
+    public void SettingsStore_Load_DoesNotRemigrate_WhenDisableSetDeliberatelyEmptied()
+    {
+        // CR-01 (code review): a v1.1 user who has moved to an enable-only configuration
+        // saves MonitorsToDisable as an explicit empty list. MonitorDevicePath is never
+        // scrubbed post-migration (by design), so the migration guard must key off
+        // "MonitorsToDisable is null" only — an empty-but-non-null list must NOT be
+        // treated as "never migrated" and re-populated from the stale legacy field.
+        Directory.CreateDirectory(_tempDir);
+        var path = Path.Combine(_tempDir, "settings.json");
+        File.WriteAllText(path, """
+            {
+              "MonitorDevicePath": "\\\\?\\DISPLAY#PRIMARY",
+              "MonitorFriendlyName": "Primary Monitor",
+              "MonitorsToDisable": [],
+              "MonitorsToEnable": ["\\\\?\\DISPLAY#RIG"]
+            }
+            """);
+        var store = new JsonSettingsStore(path);
+
+        var loaded = store.Load();
+
+        Assert.NotNull(loaded.MonitorsToDisable);
+        Assert.Empty(loaded.MonitorsToDisable!);
+    }
+
+    [Fact]
     public void SettingsStore_Save_OverExistingFile_LeavesNoTempFileAndUpdatesContent()
     {
         var path = Path.Combine(_tempDir, "settings.json");

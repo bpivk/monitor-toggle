@@ -341,8 +341,22 @@ public sealed class ToggleService
         // even after monitor/audio were already restored successfully above.
         if (!string.IsNullOrEmpty(settings.CompanionAppPath))
         {
-            _appController.MinimizeIfRunning(settings.CompanionAppPath);
-            steps.Add(new ToggleStepResult("App", ToggleStepOutcome.Succeeded, null));
+            // CR-02 (code review): this was the only step in ToggleToNormalMode not
+            // wrapped in try/catch, contradicting the class doc's own "isolate-and-
+            // continue... no step throws" invariant (D-05). Monitor/Audio have already
+            // been restored by this point — an exception here (e.g. process gone
+            // between snapshot-load and minimize) must not propagate and skip Clear()
+            // below, which would strand IsInRigMode() reporting true forever.
+            try
+            {
+                _appController.MinimizeIfRunning(settings.CompanionAppPath);
+                steps.Add(new ToggleStepResult("App", ToggleStepOutcome.Succeeded, null));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"App minimize failed: {ex}");
+                steps.Add(new ToggleStepResult("App", ToggleStepOutcome.Failed, ex.Message));
+            }
         }
         else
         {
@@ -352,6 +366,8 @@ public sealed class ToggleService
             steps.Add(new ToggleStepResult("App", ToggleStepOutcome.NotAttempted, null));
         }
 
+        // CR-02: Clear() must run regardless of the App step's outcome above — Monitor
+        // and Audio are already restored, so the snapshot's job is done either way.
         _snapshotStore.Clear();
 
         return new ToggleResult(steps);

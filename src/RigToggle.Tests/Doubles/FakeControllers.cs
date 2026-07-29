@@ -132,11 +132,13 @@ public sealed class FakeAppController : IAppController
 {
     private readonly List<string> _callLog;
     private readonly bool _isRunning;
+    private readonly bool _throwOnMinimize;
 
-    public FakeAppController(List<string> callLog, bool isRunning = false)
+    public FakeAppController(List<string> callLog, bool isRunning = false, bool throwOnMinimize = false)
     {
         _callLog = callLog;
         _isRunning = isRunning;
+        _throwOnMinimize = throwOnMinimize;
     }
 
     public bool IsRunning(string companionAppPath)
@@ -153,5 +155,14 @@ public sealed class FakeAppController : IAppController
     public void MinimizeIfRunning(string companionAppPath)
     {
         _callLog.Add($"app.MinimizeIfRunning:{companionAppPath}");
+
+        // CR-02 test support: simulate MinimizeIfRunning throwing (e.g. the process
+        // exited between snapshot-load and minimize) so ToggleServiceTests can assert
+        // ToggleToNormalMode still records a Failed App step and still clears the
+        // snapshot, instead of letting the exception propagate out uncaught.
+        if (_throwOnMinimize)
+        {
+            throw new InvalidOperationException("Fake minimize failure (simulated process exit).");
+        }
     }
 }

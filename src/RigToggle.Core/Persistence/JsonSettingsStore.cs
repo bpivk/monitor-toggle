@@ -38,12 +38,21 @@ public sealed class JsonSettingsStore : ISettingsStore
 
             // D-08: silent v1.0->v1.1 migration. A genuine legacy file has no plural
             // fields at all (they deserialize to null); an already-migrated v1.1 file
-            // has a non-empty MonitorsToDisable, which must NOT be overwritten. Lives
-            // inside this try block on purpose — a corrupted legacy file must still
-            // hit the JsonException/IOException degrade-to-fresh-AppSettings() path
-            // below, not a second/divergent failure mode.
-            if (!string.IsNullOrEmpty(loaded.MonitorDevicePath)
-                && (loaded.MonitorsToDisable is null || loaded.MonitorsToDisable.Count == 0))
+            // has a non-null MonitorsToDisable (possibly deliberately emptied via
+            // Settings, e.g. moving to an enable-only configuration), which must NOT
+            // be overwritten. Lives inside this try block on purpose — a corrupted
+            // legacy file must still hit the JsonException/IOException degrade-to-
+            // fresh-AppSettings() path below, not a second/divergent failure mode.
+            //
+            // CR-01 (code review): the guard used to also re-trigger on an empty (but
+            // non-null) MonitorsToDisable, which meant a user who explicitly cleared
+            // the disable set via Settings had the legacy monitor silently re-injected
+            // on every subsequent load — MonitorDevicePath is never cleared post-
+            // migration (by design, see class doc), so that condition could never
+            // become permanently false. Checking null-only makes migration a true
+            // one-time event: once MonitorsToDisable has been persisted at all
+            // (including empty), it is trusted as the user's explicit choice.
+            if (!string.IsNullOrEmpty(loaded.MonitorDevicePath) && loaded.MonitorsToDisable is null)
             {
                 loaded.MonitorsToDisable = new List<string> { loaded.MonitorDevicePath };
             }
