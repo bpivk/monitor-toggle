@@ -32,7 +32,7 @@ Full phase details: `.planning/milestones/v1.0-ROADMAP.md`
 **Milestone Goal:** Remove the remaining daily-use friction (must open the GUI to toggle; only one monitor can be disabled) by adding background/automated triggering and generalizing monitor control to arbitrary multi-monitor rigs.
 
 - [x] **Phase 6: Multi-Monitor Data Model & Controller Generalization** - Independently-configurable disable/enable monitor sets, with a rig-validated CCD checkpoint and a v1.0-settings migration (completed 2026-07-29)
-- [ ] **Phase 7: Shared Toggle-Orchestration Helper Extraction** - One reentrancy-safe pipeline every trigger (button/tray/hotkey/CLI) runs through
+- [x] **Phase 7: Shared Toggle-Orchestration Helper Extraction** - One reentrancy-safe pipeline every trigger (button/tray/hotkey/CLI) runs through (completed 2026-07-29)
 - [ ] **Phase 8: Tray Residency, Autostart & Toast Notification** - Minimize-to-tray, autostart, tray context menu, and toast confirmation for headless triggers
 - [ ] **Phase 9: Global Hotkey Trigger** - Configurable Windows-wide keyboard shortcut with surfaced registration failures
 - [ ] **Phase 10: CLI Trigger + Single-Instance IPC** - Command-line toggle/status args that signal a resident instance instead of spawning duplicates
@@ -92,7 +92,7 @@ Plans:
 
 **Plans**: 1 plan (wave: 1)
 Plans:
-- [ ] 07-01-PLAN.md — ToggleOrchestrator (Interlocked non-blocking busy-guard) + ToggleInProgressException + deterministic reentrancy tests, then MainForm/Program.cs routed through the orchestrator (CORE-06)
+- [x] 07-01-PLAN.md — ToggleOrchestrator (Interlocked non-blocking busy-guard) + ToggleInProgressException + deterministic reentrancy tests, then MainForm/Program.cs routed through the orchestrator (CORE-06)
 
 **Notes**:
 
@@ -162,7 +162,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 4. Monitor Control (Production) | v1.0 | 4/4 | Complete | 2026-07-24 |
 | 5. Orchestration, Full Toggle & Packaging | v1.0 | 3/3 | Complete | 2026-07-25 |
 | 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 6/6 | Complete    | 2026-07-29 |
-| 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 0/1 | Not started | - |
+| 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 1/1 | Complete   | 2026-07-29 |
 | 8. Tray Residency, Autostart & Toast Notification | v1.1 | 0/TBD | Not started | - |
 | 9. Global Hotkey Trigger | v1.1 | 0/TBD | Not started | - |
 | 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Not started | - |
