@@ -35,7 +35,7 @@ Requirements for the v1.1 milestone (Automation & Multi-Monitor). Each maps to r
 
 ### Reliability
 
-- [ ] **CORE-06**: If a toggle is triggered while another toggle is already in progress, the app safely rejects the second request rather than risking corrupted state
+- [x] **CORE-06**: If a toggle is triggered while another toggle is already in progress, the app safely rejects the second request rather than risking corrupted state
 
 ## v2 Requirements
 
@@ -78,7 +78,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DISPLAY-06 | Phase 6 | Complete |
 | DISPLAY-07 | Phase 6 | Complete |
 | DISPLAY-08 | Phase 6 | Complete |
-| CORE-06 | Phase 7 | Pending |
+| CORE-06 | Phase 7 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 15 total

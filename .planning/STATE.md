@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Automation & Multi-Monitor
-status: executing
-stopped_at: Phase 7 context gathered
-last_updated: "2026-07-29T22:20:47.693Z"
+status: ready_to_plan
+stopped_at: Phase 7 complete (1/1) — ready to discuss Phase 8
+last_updated: 2026-07-29T22:45:55.136Z
 last_activity: 2026-07-29 -- Phase 7 execution started
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
   percent: 20
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
-**Current focus:** Phase 7 — shared-toggle-orchestration-helper-extraction
+**Current focus:** Phase 8 — tray residency, autostart & toast notification
 
 ## Current Position
 
-Phase: 7 (shared-toggle-orchestration-helper-extraction) — EXECUTING
-Plan: 1 of 1
-Status: Executing Phase 7
-Last activity: 2026-07-29 -- Phase 7 execution started
+Phase: 8
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-29
 
 Progress: [██░░░░░░░░] 20%
 
@@ -36,7 +36,7 @@ Progress: [██░░░░░░░░] 20%
 
 **Velocity:**
 
-- Total plans completed: 24
+- Total plans completed: 25
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -49,6 +49,7 @@ Progress: [██░░░░░░░░] 20%
 | 04 | 4 | - | - |
 | 5 | 3 | - | - |
 | 6 | 6 | - | - |
+| 7 | 1 | - | - |
 
 **Recent Trend:**
 
