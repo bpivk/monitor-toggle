@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Automation & Multi-Monitor
 status: planning
-stopped_at: Phase 8 context gathered
-last_updated: "2026-07-30T06:14:05.652Z"
+stopped_at: Phase 8 UI-SPEC approved
+last_updated: "2026-07-30T06:31:34.681Z"
 last_activity: 2026-07-29
 progress:
   total_phases: 5
@@ -108,9 +108,9 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-26 (pre-close
 
 ## Session Continuity
 
-Last session: 2026-07-30T06:14:05.634Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-tray-residency-autostart-toast-notification/08-CONTEXT.md
+Last session: 2026-07-30T06:31:34.663Z
+Stopped at: Phase 8 UI-SPEC approved
+Resume file: .planning/phases/08-tray-residency-autostart-toast-notification/08-UI-SPEC.md
 
 ## Operator Next Steps
 
