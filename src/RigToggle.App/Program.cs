@@ -110,15 +110,22 @@ namespace RigToggle.App
             // shown, so tray state must not depend on it.
             mainForm.InitializeTrayState();
 
-            // D-06 (corrected mechanism): Application.Run(Form) unconditionally calls
-            // Show() on the form. new ApplicationContext(mainForm) does not — the
-            // message loop still runs (so the tray icon stays responsive and
-            // Application.Exit() from the tray still terminates the process) but the
-            // window itself is never shown, giving a true no-flash hidden start for an
-            // autostart-launched (--tray) process.
+            // D-06, rig-corrected: 08-RESEARCH.md's original theory — that
+            // `new ApplicationContext(mainForm)` (passing the form in) suppresses the
+            // Show() call — was rig-tested and found FALSE for this runtime: the window
+            // still appeared under `--tray`. The actual documented/working pattern for a
+            // start-hidden WinForms tray app is to give ApplicationContext NO main form
+            // at all (`new ApplicationContext()`), so nothing in the framework ever
+            // shows a window; mainForm exists only as an object reference the tray
+            // icon's left-click/Settings/Exit handlers already hold, and is Show()'n for
+            // the first time only when the user actually requests it via the tray icon.
+            // Application.Exit() from the tray icon still terminates the message loop
+            // correctly with this parameterless ApplicationContext (Exit() closes every
+            // form and message loop on the thread; it does not depend on
+            // ApplicationContext.MainForm being set).
             if (StartupArgs.ShouldStartHidden(args))
             {
-                Application.Run(new ApplicationContext(mainForm));
+                Application.Run(new ApplicationContext());
             }
             else
             {
