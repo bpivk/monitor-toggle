@@ -123,7 +123,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 08-03-PLAN.md — Autostart Settings checkbox (registry source of truth, inline-error revert) + Program.cs args/injection/InitializeTrayState/--tray ApplicationContext hidden-start wiring (TRAY-02)
+- [x] 08-03-PLAN.md — Autostart Settings checkbox (registry source of truth, inline-error revert) + Program.cs args/injection/InitializeTrayState/--tray ApplicationContext hidden-start wiring (TRAY-02)
 
 **Wave 4** *(blocked on Wave 3)*
 
@@ -180,6 +180,6 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 5. Orchestration, Full Toggle & Packaging | v1.0 | 3/3 | Complete | 2026-07-25 |
 | 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 6/6 | Complete    | 2026-07-29 |
 | 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 1/1 | Complete    | 2026-07-29 |
-| 8. Tray Residency, Autostart & Toast Notification | v1.1 | 2/4 | In Progress|  |
+| 8. Tray Residency, Autostart & Toast Notification | v1.1 | 3/4 | In Progress|  |
 | 9. Global Hotkey Trigger | v1.1 | 0/TBD | Not started | - |
 | 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Not started | - |
