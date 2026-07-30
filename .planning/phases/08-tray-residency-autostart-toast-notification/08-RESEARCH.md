@@ -4,6 +4,8 @@
 **Domain:** WinForms tray residency (`NotifyIcon`/`ContextMenuStrip`), HKCU Registry autostart, `NotifyIcon.ShowBalloonTip` toast notifications, WinForms message-loop startup semantics
 **Confidence:** HIGH
 
+> **RIG-TESTED CORRECTION (post-implementation, 08-04 checkpoint):** This document's central claim about `Application.Run(new ApplicationContext(mainForm))` — that passing `mainForm` into the `ApplicationContext` constructor suppresses `Show()` while still hosting it — was rig-tested on real Windows and found **FALSE**: the window still appeared under `--tray` despite this mechanism, contradicting every citation below (Pattern 4, the Anti-Patterns table, the flowchart, the condensed official-pattern excerpt). The actual working mechanism, confirmed live: give `ApplicationContext` **no** main form at all — `Application.Run(new ApplicationContext())` — and hold `mainForm` only as a local object reference, shown for the first time on demand via the tray icon's own handlers. `Application.Exit()` from the tray still terminates the loop correctly without any `ApplicationContext.MainForm` wiring. Every `ApplicationContext(mainForm)` reference below is superseded by this finding; kept in place as a record of what was tried and disproven, not as guidance. See `src/RigToggle.App/Program.cs`'s current implementation for the corrected code.
+
 <user_constraints>
 ## User Constraints (from CONTEXT.md)
 
