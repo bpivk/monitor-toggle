@@ -53,6 +53,9 @@ namespace RigToggle.App
 
             this.chkEnableDebugLogging = new System.Windows.Forms.CheckBox();
 
+            this.chkStartWithWindows = new System.Windows.Forms.CheckBox();
+            this.lblAutostartWarning = new System.Windows.Forms.Label();
+
             this.btnSaveSettings = new System.Windows.Forms.Button();
             this.btnDiscardChanges = new System.Windows.Forms.Button();
 
@@ -60,12 +63,14 @@ namespace RigToggle.App
             this.errAudioNormal = new System.Windows.Forms.ErrorProvider(this.components);
             this.errAudioRig = new System.Windows.Forms.ErrorProvider(this.components);
             this.errApp = new System.Windows.Forms.ErrorProvider(this.components);
+            this.errAutostart = new System.Windows.Forms.ErrorProvider(this.components);
             this.dlgOpenExe = new System.Windows.Forms.OpenFileDialog();
 
             ((System.ComponentModel.ISupportInitialize)(this.errMonitor)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.errAudioNormal)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.errAudioRig)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.errApp)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.errAutostart)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dgvMonitors)).BeginInit();
             this.grpMonitor.SuspendLayout();
             this.grpAudioDevices.SuspendLayout();
@@ -263,10 +268,28 @@ namespace RigToggle.App
             this.chkEnableDebugLogging.Name = "chkEnableDebugLogging";
 
             //
+            // chkStartWithWindows
+            //
+            this.chkStartWithWindows.Text = "Start with Windows";
+            this.chkStartWithWindows.Location = new System.Drawing.Point(12, 532);
+            this.chkStartWithWindows.Size = new System.Drawing.Size(396, 24);
+            this.chkStartWithWindows.AutoSize = false;
+            this.chkStartWithWindows.Name = "chkStartWithWindows";
+
+            //
+            // lblAutostartWarning
+            //
+            this.lblAutostartWarning.Location = new System.Drawing.Point(12, 556);
+            this.lblAutostartWarning.Size = new System.Drawing.Size(396, 20);
+            this.lblAutostartWarning.AutoSize = false;
+            this.lblAutostartWarning.Visible = false;
+            this.lblAutostartWarning.Name = "lblAutostartWarning";
+
+            //
             // btnSaveSettings
             //
             this.btnSaveSettings.Text = "Save Settings";
-            this.btnSaveSettings.Location = new System.Drawing.Point(180, 534);
+            this.btnSaveSettings.Location = new System.Drawing.Point(180, 588);
             this.btnSaveSettings.Size = new System.Drawing.Size(110, 32);
             this.btnSaveSettings.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnSaveSettings.Name = "btnSaveSettings";
@@ -276,7 +299,7 @@ namespace RigToggle.App
             // btnDiscardChanges
             //
             this.btnDiscardChanges.Text = "Discard Changes";
-            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 534);
+            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 588);
             this.btnDiscardChanges.Size = new System.Drawing.Size(110, 32);
             this.btnDiscardChanges.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.btnDiscardChanges.Name = "btnDiscardChanges";
@@ -289,19 +312,20 @@ namespace RigToggle.App
             this.dlgOpenExe.Title = "Select Target App";
 
             //
-            // errMonitor / errAudioNormal / errAudioRig / errApp
+            // errMonitor / errAudioNormal / errAudioRig / errApp / errAutostart
             //
             this.errMonitor.ContainerControl = this;
             this.errAudioNormal.ContainerControl = this;
             this.errAudioRig.ContainerControl = this;
             this.errApp.ContainerControl = this;
+            this.errAutostart.ContainerControl = this;
 
             //
             // SettingsForm
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(420, 582);
+            this.ClientSize = new System.Drawing.Size(420, 636);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -314,6 +338,8 @@ namespace RigToggle.App
             this.Controls.Add(this.grpAudioDevices);
             this.Controls.Add(this.grpAppPath);
             this.Controls.Add(this.chkEnableDebugLogging);
+            this.Controls.Add(this.chkStartWithWindows);
+            this.Controls.Add(this.lblAutostartWarning);
             this.Controls.Add(this.btnSaveSettings);
             this.Controls.Add(this.btnDiscardChanges);
 
@@ -321,6 +347,7 @@ namespace RigToggle.App
             ((System.ComponentModel.ISupportInitialize)(this.errAudioNormal)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.errAudioRig)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.errApp)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.errAutostart)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dgvMonitors)).EndInit();
             this.grpMonitor.ResumeLayout(false);
             this.grpAudioDevices.ResumeLayout(false);
@@ -353,6 +380,9 @@ namespace RigToggle.App
 
         private System.Windows.Forms.CheckBox chkEnableDebugLogging;
 
+        private System.Windows.Forms.CheckBox chkStartWithWindows;
+        private System.Windows.Forms.Label lblAutostartWarning;
+
         private System.Windows.Forms.Button btnSaveSettings;
         private System.Windows.Forms.Button btnDiscardChanges;
 
@@ -360,6 +390,7 @@ namespace RigToggle.App
         private System.Windows.Forms.ErrorProvider errAudioNormal;
         private System.Windows.Forms.ErrorProvider errAudioRig;
         private System.Windows.Forms.ErrorProvider errApp;
+        private System.Windows.Forms.ErrorProvider errAutostart;
         private System.Windows.Forms.OpenFileDialog dlgOpenExe;
     }
 }

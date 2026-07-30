@@ -20,9 +20,18 @@ namespace RigToggle.App
         /// default non-elevated execution level is preserved (Pitfall 6) so Phase 3's
         /// cross-process window-focus call against the non-elevated companion app is
         /// not broken by UIPI.
+        ///
+        /// 08-03: also takes the process `args` so `StartupArgs.ShouldStartHidden` can
+        /// select a hidden vs. visible startup (D-06). `WindowsAutostartConfigurator` is
+        /// constructed here alongside the other Windows adapters and injected into
+        /// `SettingsForm` — the checkbox never touches the registry directly. Before
+        /// either `Application.Run` branch, `mainForm.InitializeTrayState()` is called
+        /// unconditionally (08-RESEARCH.md Pitfall 6): under `--tray`, `Form.Load` never
+        /// fires because the form is never shown, so the tray icon/menu must be primed
+        /// here instead of relying on the form's own `Load` handler.
         /// </remarks>
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
             // To customize application configuration such as set high DPI settings or default font,
             // see https://aka.ms/applicationconfiguration.
@@ -78,6 +87,7 @@ namespace RigToggle.App
             var monitorController = new WindowsMonitorController();
             var audioController = new WindowsAudioController();
             var appController = new WindowsAppController();
+            var autostartConfigurator = new WindowsAutostartConfigurator();
 
             var toggleService = new ToggleService(
                 settingsStore,
@@ -91,11 +101,29 @@ namespace RigToggle.App
             // directly — it wraps ToggleService with the CORE-06 reentrancy guard.
             var toggleOrchestrator = new ToggleOrchestrator(toggleService);
 
-            SettingsForm SettingsFormFactory() => new SettingsForm(monitorController, audioController, settingsStore);
+            SettingsForm SettingsFormFactory() => new SettingsForm(monitorController, audioController, settingsStore, autostartConfigurator);
 
             var mainForm = new MainForm(toggleOrchestrator, settingsStore, monitorController, SettingsFormFactory);
 
-            Application.Run(mainForm);
+            // Pitfall 6: prime the tray icon/menu BEFORE either Run branch — under
+            // --tray the form's own Load event never fires since the form is never
+            // shown, so tray state must not depend on it.
+            mainForm.InitializeTrayState();
+
+            // D-06 (corrected mechanism): Application.Run(Form) unconditionally calls
+            // Show() on the form. new ApplicationContext(mainForm) does not — the
+            // message loop still runs (so the tray icon stays responsive and
+            // Application.Exit() from the tray still terminates the process) but the
+            // window itself is never shown, giving a true no-flash hidden start for an
+            // autostart-launched (--tray) process.
+            if (StartupArgs.ShouldStartHidden(args))
+            {
+                Application.Run(new ApplicationContext(mainForm));
+            }
+            else
+            {
+                Application.Run(mainForm);
+            }
         }
     }
 }
