@@ -119,7 +119,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 08-02-PLAN.md — MainForm tray residency: two embedded .ico glyphs, NotifyIcon + ContextMenuStrip, close-to-tray, left-click restore, mode icon/tooltip, tray-toggle toast, FormatChecklist cleanup (TRAY-01/03/04/05, NOTIF-01)
+- [x] 08-02-PLAN.md — MainForm tray residency: two embedded .ico glyphs, NotifyIcon + ContextMenuStrip, close-to-tray, left-click restore, mode icon/tooltip, tray-toggle toast, FormatChecklist cleanup (TRAY-01/03/04/05, NOTIF-01)
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -180,6 +180,6 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 5. Orchestration, Full Toggle & Packaging | v1.0 | 3/3 | Complete | 2026-07-25 |
 | 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 6/6 | Complete    | 2026-07-29 |
 | 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 1/1 | Complete    | 2026-07-29 |
-| 8. Tray Residency, Autostart & Toast Notification | v1.1 | 1/4 | In Progress|  |
+| 8. Tray Residency, Autostart & Toast Notification | v1.1 | 2/4 | In Progress|  |
 | 9. Global Hotkey Trigger | v1.1 | 0/TBD | Not started | - |
 | 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Not started | - |
