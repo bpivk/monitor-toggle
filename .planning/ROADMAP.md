@@ -111,7 +111,24 @@ Plans:
   4. The tray icon's appearance changes to reflect the current mode, normal vs. rig (TRAY-04)
   5. Triggering a toggle without the GUI open (tray menu) shows a toast/balloon notification confirming what changed — mode plus per-step outcome — matching the GUI's existing partial-failure detail (NOTIF-01)
 
-**Plans**: TBD
+**Plans**: 4 plans (waves: 1 → 2 → 3 → 4)
+Plans:
+**Wave 1**
+
+- [ ] 08-01-PLAN.md — Core/Windows foundation: StartupArgs (--tray) + ToggleResultFormatter (checklist/mode-title/balloon-truncation) + IAutostartConfigurator + WindowsAutostartConfigurator + unit tests (TRAY-02, NOTIF-01)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 08-02-PLAN.md — MainForm tray residency: two embedded .ico glyphs, NotifyIcon + ContextMenuStrip, close-to-tray, left-click restore, mode icon/tooltip, tray-toggle toast, FormatChecklist cleanup (TRAY-01/03/04/05, NOTIF-01)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 08-03-PLAN.md — Autostart Settings checkbox (registry source of truth, inline-error revert) + Program.cs args/injection/InitializeTrayState/--tray ApplicationContext hidden-start wiring (TRAY-02)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 08-04-PLAN.md — Rig-validation checkpoint (go/no-go): tray behaviors, mode icon swap, toast, HKCU Run value, hidden-start + Exit-while-never-shown (Assumption A2)
+
 **UI hint**: yes
 
 ### Phase 9: Global Hotkey Trigger
@@ -163,6 +180,6 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 5. Orchestration, Full Toggle & Packaging | v1.0 | 3/3 | Complete | 2026-07-25 |
 | 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 6/6 | Complete    | 2026-07-29 |
 | 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 1/1 | Complete    | 2026-07-29 |
-| 8. Tray Residency, Autostart & Toast Notification | v1.1 | 0/TBD | Not started | - |
+| 8. Tray Residency, Autostart & Toast Notification | v1.1 | 0/4 | Not started | - |
 | 9. Global Hotkey Trigger | v1.1 | 0/TBD | Not started | - |
 | 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Not started | - |
