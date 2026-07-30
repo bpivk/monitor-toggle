@@ -4,8 +4,8 @@ milestone: v1.1
 milestone_name: Automation & Multi-Monitor
 status: executing
 stopped_at: Phase 8 UI-SPEC approved
-last_updated: "2026-07-30T07:07:36.846Z"
-last_activity: 2026-07-30 -- Phase 8 planning complete
+last_updated: "2026-07-30T07:08:18.875Z"
+last_activity: 2026-07-30 -- Phase 8 execution started
 progress:
   total_phases: 5
   completed_phases: 2
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
-**Current focus:** Phase 8 — tray residency, autostart & toast notification
+**Current focus:** Phase 8 — tray-residency-autostart-toast-notification
 
 ## Current Position
 
-Phase: 8
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-30 -- Phase 8 planning complete
+Phase: 8 (tray-residency-autostart-toast-notification) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 8
+Last activity: 2026-07-30 -- Phase 8 execution started
 
 Progress: [██░░░░░░░░] 20%
 

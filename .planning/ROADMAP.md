@@ -115,7 +115,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 08-01-PLAN.md — Core/Windows foundation: StartupArgs (--tray) + ToggleResultFormatter (checklist/mode-title/balloon-truncation) + IAutostartConfigurator + WindowsAutostartConfigurator + unit tests (TRAY-02, NOTIF-01)
+- [x] 08-01-PLAN.md — Core/Windows foundation: StartupArgs (--tray) + ToggleResultFormatter (checklist/mode-title/balloon-truncation) + IAutostartConfigurator + WindowsAutostartConfigurator + unit tests (TRAY-02, NOTIF-01)
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -180,6 +180,6 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 5. Orchestration, Full Toggle & Packaging | v1.0 | 3/3 | Complete | 2026-07-25 |
 | 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 6/6 | Complete    | 2026-07-29 |
 | 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 1/1 | Complete    | 2026-07-29 |
-| 8. Tray Residency, Autostart & Toast Notification | v1.1 | 0/4 | Not started | - |
+| 8. Tray Residency, Autostart & Toast Notification | v1.1 | 1/4 | In Progress|  |
 | 9. Global Hotkey Trigger | v1.1 | 0/TBD | Not started | - |
 | 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Not started | - |
