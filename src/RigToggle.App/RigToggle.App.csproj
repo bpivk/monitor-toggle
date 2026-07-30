@@ -19,4 +19,17 @@
     <ProjectReference Include="..\RigToggle.Windows\RigToggle.Windows.csproj" />
   </ItemGroup>
 
+  <!-- Tray glyphs (TRAY-04/D-01): embedded (not Content/CopyToOutput) so both icons live
+       inside the single-file publish, addressable at runtime via
+       Assembly.GetManifestResourceStream using the deterministic LogicalName below
+       rather than the namespace-mangled default resource name. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\normal.ico">
+      <LogicalName>normal.ico</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\rig.ico">
+      <LogicalName>rig.ico</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>

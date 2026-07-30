@@ -28,9 +28,22 @@ namespace RigToggle.App
         /// </summary>
         private void InitializeComponent()
         {
+            // TRAY-01..05/D-04: components was previously declared but never instantiated
+            // (dead field) -- it now owns NotifyIcon/ContextMenuStrip so Dispose(bool)'s
+            // existing components?.Dispose() call above becomes a genuine defensive
+            // backstop against the well-known "ghost tray icon" WinForms bug, on top of
+            // the explicit notifyIcon.Visible = false calls in FormClosing/Exit below.
+            this.components = new System.ComponentModel.Container();
+
             this.lblMode = new System.Windows.Forms.Label();
             this.btnToggle = new System.Windows.Forms.Button();
             this.btnSettings = new System.Windows.Forms.Button();
+            this.notifyIcon = new System.Windows.Forms.NotifyIcon(this.components);
+            this.trayContextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.trayToggleMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.traySettingsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.traySeparator = new System.Windows.Forms.ToolStripSeparator();
+            this.trayExitMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 
             this.SuspendLayout();
 
@@ -63,6 +76,56 @@ namespace RigToggle.App
             this.btnSettings.Click += new System.EventHandler(this.BtnSettings_Click);
 
             //
+            // trayToggleMenuItem
+            //
+            // Text left at a safe default; RefreshUi() overrides it every call with
+            // btnToggle.Text so the tray menu and the GUI button never drift (D-04).
+            this.trayToggleMenuItem.Text = "Switch to Rig Mode";
+            this.trayToggleMenuItem.Name = "trayToggleMenuItem";
+            this.trayToggleMenuItem.Click += new System.EventHandler(this.TrayToggleMenuItem_Click);
+
+            //
+            // traySettingsMenuItem
+            //
+            this.traySettingsMenuItem.Text = "Settings";
+            this.traySettingsMenuItem.Name = "traySettingsMenuItem";
+            this.traySettingsMenuItem.Click += new System.EventHandler(this.TraySettingsMenuItem_Click);
+
+            //
+            // traySeparator
+            //
+            this.traySeparator.Name = "traySeparator";
+
+            //
+            // trayExitMenuItem
+            //
+            this.trayExitMenuItem.Text = "Exit";
+            this.trayExitMenuItem.Name = "trayExitMenuItem";
+            this.trayExitMenuItem.Click += new System.EventHandler(this.TrayExitMenuItem_Click);
+
+            //
+            // trayContextMenu
+            //
+            // Exact order per TRAY-03/08-UI-SPEC.md: Switch mode -> Settings -> separator -> Exit.
+            this.trayContextMenu.Name = "trayContextMenu";
+            this.trayContextMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+                this.trayToggleMenuItem,
+                this.traySettingsMenuItem,
+                this.traySeparator,
+                this.trayExitMenuItem});
+
+            //
+            // notifyIcon
+            //
+            // NOT added to this.Controls -- NotifyIcon is not a Control. Icon/Text are set
+            // from RefreshUi()/InitializeTrayState() (MainForm.cs), never left at a default
+            // here, since the correct mode-reflecting glyph must be current-on-first-paint
+            // even under --tray startup (D-01, 08-RESEARCH.md Pitfall 6).
+            this.notifyIcon.ContextMenuStrip = this.trayContextMenu;
+            this.notifyIcon.Visible = true;
+            this.notifyIcon.MouseClick += new System.Windows.Forms.MouseEventHandler(this.NotifyIcon_MouseClick);
+
+            //
             // MainForm
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -74,6 +137,7 @@ namespace RigToggle.App
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Rig Toggle";
             this.Name = "MainForm";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
 
             this.Controls.Add(this.lblMode);
             this.Controls.Add(this.btnToggle);
@@ -87,5 +151,11 @@ namespace RigToggle.App
         private System.Windows.Forms.Label lblMode;
         private System.Windows.Forms.Button btnToggle;
         private System.Windows.Forms.Button btnSettings;
+        private System.Windows.Forms.NotifyIcon notifyIcon;
+        private System.Windows.Forms.ContextMenuStrip trayContextMenu;
+        private System.Windows.Forms.ToolStripMenuItem trayToggleMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem traySettingsMenuItem;
+        private System.Windows.Forms.ToolStripSeparator traySeparator;
+        private System.Windows.Forms.ToolStripMenuItem trayExitMenuItem;
     }
 }

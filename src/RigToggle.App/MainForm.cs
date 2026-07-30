@@ -13,6 +13,11 @@ namespace RigToggle.App
     /// every toggle call now routes through the reentrancy-safe orchestrator rather
     /// than ToggleService directly), which itself derives from snapshot-file presence
     /// (D-14) — correct on startup even after a crash while in Rig mode.
+    ///
+    /// Phase 8 (TRAY-01/03/04/05, NOTIF-01): also tray-resident — hosts a NotifyIcon +
+    /// ContextMenuStrip (Switch mode / Settings / Exit), redirects window Close to
+    /// hide-to-tray, restores on left-click, and fires a balloon toast on every
+    /// tray-menu toggle.
     /// </summary>
     public partial class MainForm : Form
     {
@@ -20,6 +25,9 @@ namespace RigToggle.App
         private readonly ISettingsStore _settingsStore;
         private readonly IMonitorController _monitorController;
         private readonly Func<SettingsForm> _settingsFormFactory;
+
+        private System.Drawing.Icon? _normalIcon;
+        private System.Drawing.Icon? _rigIcon;
 
         public MainForm(
             ToggleOrchestrator orchestrator,
@@ -42,6 +50,43 @@ namespace RigToggle.App
         }
 
         /// <summary>
+        /// TRAY-04/D-01, 08-RESEARCH.md Pitfall 6: Form.Load never fires unless the
+        /// form is actually shown at least once, so a `--tray` autostart launch (which
+        /// never calls Show()) would otherwise leave the tray icon in an uninitialized
+        /// state until the first toggle. Program.cs (Plan 08-03) calls this explicitly
+        /// and unconditionally right after constructing MainForm, BEFORE either
+        /// Application.Run branch — so the tray glyph/tooltip are always correct on
+        /// first paint, tray-only session or not. OnLoad's own RefreshUi() call above
+        /// is kept for the normal (non-tray) startup path; both are safe to call
+        /// (RefreshUi/LoadTrayIconsIfNeeded are idempotent).
+        /// </summary>
+        public void InitializeTrayState()
+        {
+            LoadTrayIconsIfNeeded();
+            RefreshUi();
+        }
+
+        /// <summary>
+        /// 08-RESEARCH.md Pitfall 3: loads the two pre-made embedded .ico resources
+        /// once and keeps the resulting Icon instances for the lifetime of the form —
+        /// never re-derive an Icon from a Bitmap per toggle (Icon.FromHandle leaks the
+        /// underlying GDI handle since the wrapper does not own it).
+        /// </summary>
+        private void LoadTrayIconsIfNeeded()
+        {
+            if (_normalIcon is not null && _rigIcon is not null)
+            {
+                return;
+            }
+
+            var assembly = typeof(MainForm).Assembly;
+            using var normalStream = assembly.GetManifestResourceStream("normal.ico");
+            using var rigStream = assembly.GetManifestResourceStream("rig.ico");
+            _normalIcon = new System.Drawing.Icon(normalStream!);
+            _rigIcon = new System.Drawing.Icon(rigStream!);
+        }
+
+        /// <summary>
         /// Re-derives the mode indicator (from snapshot-file presence, D-14). Called
         /// on startup and after every toggle/Settings-dialog close.
         /// </summary>
@@ -50,6 +95,17 @@ namespace RigToggle.App
             bool isInRigMode = _orchestrator.IsInRigMode();
             lblMode.Text = isInRigMode ? "Mode: Rig" : "Mode: Normal";
             btnToggle.Text = isInRigMode ? "Switch to Normal Mode" : "Switch to Rig Mode";
+
+            // TRAY-04/D-01: tray icon + tooltip must always reflect the current mode,
+            // correct on first paint even under --tray startup. Guarded on the icons
+            // being loaded (InitializeTrayState/LoadTrayIconsIfNeeded) so a hypothetical
+            // future caller of RefreshUi() before InitializeTrayState() never NREs.
+            if (_normalIcon is not null && _rigIcon is not null)
+            {
+                notifyIcon.Icon = isInRigMode ? _rigIcon : _normalIcon;
+            }
+            notifyIcon.Text = isInRigMode ? "Rig Toggle — Rig Mode" : "Rig Toggle — Normal Mode";
+            trayToggleMenuItem.Text = btnToggle.Text; // D-04: one shared source of truth
         }
 
         private void BtnToggle_Click(object? sender, EventArgs e)
@@ -139,7 +195,7 @@ namespace RigToggle.App
                     // is why RefreshUi() above always runs before this dialog is shown.
                     MessageBox.Show(
                         this,
-                        $"The toggle did not fully complete:\n\n{FormatChecklist(result)}",
+                        $"The toggle did not fully complete:\n\n{ToggleResultFormatter.FormatChecklist(result)}",
                         "Rig Toggle",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Warning);
@@ -184,23 +240,6 @@ namespace RigToggle.App
             }
         }
 
-        /// <summary>
-        /// Maps a ToggleResult's per-step outcomes to a human-readable checklist for the
-        /// partial-failure MessageBox (CORE-04). One line per step, in step order.
-        /// </summary>
-        private static string FormatChecklist(ToggleResult result)
-        {
-            return string.Join(
-                Environment.NewLine,
-                result.Steps.Select(step => step.Outcome switch
-                {
-                    ToggleStepOutcome.Succeeded => $"{step.StepName}: OK",
-                    ToggleStepOutcome.Failed => $"{step.StepName}: FAILED ({step.Reason})",
-                    ToggleStepOutcome.NotAttempted => $"{step.StepName}: not attempted",
-                    _ => $"{step.StepName}: unknown",
-                }));
-        }
-
         private void BtnSettings_Click(object? sender, EventArgs e)
         {
             // Modal (D-03): blocks Main until closed. New settings apply on the NEXT
@@ -209,6 +248,123 @@ namespace RigToggle.App
             using var settingsForm = _settingsFormFactory();
             settingsForm.ShowDialog(this);
             RefreshUi();
+        }
+
+        /// <summary>
+        /// TRAY-01/D-03: only the window's own Close (X button, Alt+F4, or a plain
+        /// this.Close() call) is intercepted and redirected to hide-to-tray —
+        /// CloseReason.UserClosing is the specific, documented enum value raised for
+        /// exactly that case (08-RESEARCH.md Pattern 1). Deliberately does NOT gate on
+        /// any other CloseReason: the tray's own "Exit" menu item calls
+        /// Application.Exit() directly, which raises the distinct
+        /// CloseReason.ApplicationExitCall and must be allowed to proceed through this
+        /// same handler with no extra flag — do NOT "fix" this into symmetry with a
+        /// custom _isExiting boolean. WindowsShutDown/TaskManagerClosing must also be
+        /// allowed through, or the OS/Task Manager could never actually terminate the
+        /// process.
+        /// </summary>
+        private void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
+        {
+            if (e.CloseReason == CloseReason.UserClosing)
+            {
+                e.Cancel = true;
+                Hide();
+                return;
+            }
+
+            // ApplicationExitCall (tray Exit), WindowsShutDown, TaskManagerClosing, etc.
+            // T-08-GHOST: belt-and-suspenders ghost-icon prevention alongside the
+            // explicit notifyIcon.Visible = false already set in TrayExitMenuItem_Click.
+            notifyIcon.Visible = false;
+        }
+
+        /// <summary>
+        /// TRAY-05/D-02: NotifyIcon.MouseClick (not the button-agnostic Click event,
+        /// which fires for both mouse buttons per 08-RESEARCH.md Pitfall 2) restores
+        /// and focuses the main window on a LEFT click only — a right-click here must
+        /// only open the context menu, not also restore the window.
+        /// </summary>
+        private void NotifyIcon_MouseClick(object? sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                Show();
+                WindowState = FormWindowState.Normal;
+                Activate();
+            }
+        }
+
+        private void TraySettingsMenuItem_Click(object? sender, EventArgs e)
+        {
+            using var settingsForm = _settingsFormFactory();
+            settingsForm.ShowDialog(this);
+            RefreshUi();
+        }
+
+        /// <summary>
+        /// TRAY-03/D-04: explicitly hide the tray icon before Application.Exit() — an
+        /// undisposed/still-visible NotifyIcon is a well-known WinForms bug (T-08-GHOST)
+        /// that leaves a stale, unclickable ghost icon in the tray until the user
+        /// hovers over it. components.Dispose() (Dispose(bool)) is a backstop, not a
+        /// substitute, for this explicit call.
+        /// </summary>
+        private void TrayExitMenuItem_Click(object? sender, EventArgs e)
+        {
+            notifyIcon.Visible = false;
+            Application.Exit();
+        }
+
+        /// <summary>
+        /// TRAY-03/NOTIF-01, D-08/D-09: the tray-menu toggle handler — the second-ever
+        /// caller of Phase 7's ToggleOrchestrator, validating that extraction. Skips
+        /// the GUI-only WR-01 config guard and DISPLAY-07 confirm dialog on purpose
+        /// (inappropriate for a background trigger with no guaranteed-visible window).
+        /// CRITICAL (D-08 no-chrome guarantee): every branch below — both exception
+        /// handlers and the final result toast — routes through
+        /// notifyIcon.ShowBalloonTip, NEVER MessageBox.Show. A tray-triggered toggle
+        /// must never surface GUI chrome, since the main window may be hidden to tray
+        /// at the moment this runs. The final result toast fires UNCONDITIONALLY
+        /// (regardless of whether the window happens to be visible right now) by
+        /// design — do not add a visibility check here; a future editor might assume
+        /// the toast is redundant when the window is already visible, but D-08 requires
+        /// it every time regardless.
+        /// </summary>
+        private void TrayToggleMenuItem_Click(object? sender, EventArgs e)
+        {
+            ToggleResult result;
+
+            try
+            {
+                result = _orchestrator.IsInRigMode()
+                    ? _orchestrator.ToggleToNormalMode()
+                    : _orchestrator.ToggleToRigMode();
+            }
+            catch (ToggleInProgressException ex)
+            {
+                notifyIcon.ShowBalloonTip(
+                    3000,
+                    "Rig Toggle",
+                    ToggleResultFormatter.TruncateForBalloon(ex.Message),
+                    ToolTipIcon.Warning);
+                return;
+            }
+            catch (Exception ex)
+            {
+                notifyIcon.ShowBalloonTip(
+                    3000,
+                    "Rig Toggle",
+                    ToggleResultFormatter.TruncateForBalloon($"Something went wrong while toggling: {ex.GetType().Name}: {ex.Message}"),
+                    ToolTipIcon.Warning);
+                return;
+            }
+
+            RefreshUi();
+
+            notifyIcon.ShowBalloonTip(
+                3000,
+                ToggleResultFormatter.FormatModeTitle(_orchestrator.IsInRigMode()),
+                ToggleResultFormatter.TruncateForBalloon(ToggleResultFormatter.FormatChecklist(result)),
+                result.Success ? ToolTipIcon.Info : ToolTipIcon.Warning);
         }
     }
 }
