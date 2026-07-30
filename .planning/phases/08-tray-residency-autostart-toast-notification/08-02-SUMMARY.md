@@ -131,3 +131,15 @@ None — no external service configuration required. (Interactive tray behavior 
 ---
 *Phase: 08-tray-residency-autostart-toast-notification*
 *Completed: 2026-07-30*
+
+## Self-Check: PASSED
+
+- FOUND: `src/RigToggle.App/Resources/normal.ico`
+- FOUND: `src/RigToggle.App/Resources/rig.ico`
+- FOUND: `src/RigToggle.App/RigToggle.App.csproj`
+- FOUND: `src/RigToggle.App/MainForm.Designer.cs`
+- FOUND: `src/RigToggle.App/MainForm.cs`
+- FOUND: `.planning/phases/08-tray-residency-autostart-toast-notification/08-02-SUMMARY.md`
+- FOUND commit `908fef7` (Task 1: icon assets)
+- FOUND commit `a0ba545` (Task 2: tray wiring)
+- FOUND commit `b7c3a67` (docs: SUMMARY.md)
