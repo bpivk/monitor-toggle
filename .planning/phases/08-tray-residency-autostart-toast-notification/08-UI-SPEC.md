@@ -45,15 +45,18 @@ This app has no CSS-style spacing scale — layout is absolute `Location`/`Size`
 
 ### New `SettingsForm` Control Placement (prescriptive)
 
-The new "Start with Windows" checkbox (`chkStartWithWindows`) is inserted directly below the existing `chkEnableDebugLogging`, pushing the Save/Discard buttons and the form's bottom edge down by the same amount. Recommended exact values (planner/executor may adjust by a few px to satisfy WinForms Designer snapping, but must preserve this order, the 8px gap convention, and full 396px width):
+The new "Start with Windows" checkbox (`chkStartWithWindows`) is inserted directly below the existing `chkEnableDebugLogging`, followed by a dedicated (normally hidden) inline-warning label directly beneath it, pushing the Save/Discard buttons and the form's bottom edge down. Recommended exact values (planner/executor may adjust by a few px to satisfy WinForms Designer snapping, but must preserve this order, the 8px gap convention, and full 396px width):
 
 | Control | Location | Size |
 |---------|----------|------|
 | `chkEnableDebugLogging` (unchanged) | `(12, 484)` | `(396, 40)` |
 | `chkStartWithWindows` (**new**) | `(12, 532)` | `(396, 24)` |
-| `btnSaveSettings` (moves down) | `(180, 566)` | `(110, 32)` (unchanged size) |
-| `btnDiscardChanges` (moves down) | `(298, 566)` | `(110, 32)` (unchanged size) |
-| `SettingsForm.ClientSize` (grows) | — | `(420, 614)` (was `420, 582`) |
+| `lblAutostartWarning` (**new**, `Visible=false` until an autostart write fails) | `(12, 556)` | `(396, 20)` |
+| `btnSaveSettings` (moves down) | `(180, 588)` | `(110, 32)` (unchanged size) |
+| `btnDiscardChanges` (moves down) | `(298, 588)` | `(110, 32)` (unchanged size) |
+| `SettingsForm.ClientSize` (grows) | — | `(420, 636)` (was `420, 582`) |
+
+The autostart write-failure warning MUST use its own dedicated control pair — a new `lblAutostartWarning` Label plus a new `errAutostart` ErrorProvider instance — placed adjacent to `chkStartWithWindows` as tabulated above. It must NOT reuse `errApp`/`lblAppWarning`, which are Designer-fixed inside `grpAppPath` (the App Path group box, ~y=48 within that box) and would surface the autostart error far from its checkbox.
 
 Checkbox text: `"Start with Windows"` — short enough for one line, unlike `chkEnableDebugLogging`'s wrapped two-line label; no tooltip needed (the label is self-explanatory, matching the plain, unadorned style of the existing checkbox).
 
