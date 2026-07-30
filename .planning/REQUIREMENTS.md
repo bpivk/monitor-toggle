@@ -9,11 +9,11 @@ Requirements for the v1.1 milestone (Automation & Multi-Monitor). Each maps to r
 
 ### Tray & Automation
 
-- [ ] **TRAY-01**: User can run the app tray-resident — closing the main window minimizes it to the tray instead of exiting
+- [x] **TRAY-01**: User can run the app tray-resident — closing the main window minimizes it to the tray instead of exiting
 - [ ] **TRAY-02**: User can enable "start with Windows" via a Settings checkbox (off by default)
-- [ ] **TRAY-03**: User can right-click the tray icon for a context menu (Switch to Rig/Normal Mode, Settings, Exit)
-- [ ] **TRAY-04**: The tray icon visually reflects the current mode (normal vs. rig)
-- [ ] **TRAY-05**: Left-clicking the tray icon restores the main window
+- [x] **TRAY-03**: User can right-click the tray icon for a context menu (Switch to Rig/Normal Mode, Settings, Exit)
+- [x] **TRAY-04**: The tray icon visually reflects the current mode (normal vs. rig)
+- [x] **TRAY-05**: Left-clicking the tray icon restores the main window
 
 ### Trigger
 
@@ -23,7 +23,7 @@ Requirements for the v1.1 milestone (Automation & Multi-Monitor). Each maps to r
 
 ### Notification
 
-- [ ] **NOTIF-01**: User sees a toast/status notification confirming a toggle when it's triggered without the GUI open (hotkey/CLI/tray menu), showing what changed (mode + per-step outcome), matching the GUI's existing partial-failure detail
+- [x] **NOTIF-01**: User sees a toast/status notification confirming a toggle when it's triggered without the GUI open (hotkey/CLI/tray menu), showing what changed (mode + per-step outcome), matching the GUI's existing partial-failure detail
 
 ### Display
 
@@ -64,15 +64,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TRAY-01 | Phase 8 | Pending |
+| TRAY-01 | Phase 8 | Complete |
 | TRAY-02 | Phase 8 | Pending |
-| TRAY-03 | Phase 8 | Pending |
-| TRAY-04 | Phase 8 | Pending |
-| TRAY-05 | Phase 8 | Pending |
+| TRAY-03 | Phase 8 | Complete |
+| TRAY-04 | Phase 8 | Complete |
+| TRAY-05 | Phase 8 | Complete |
 | TRIG-01 | Phase 9 | Pending |
 | TRIG-02 | Phase 10 | Pending |
 | TRIG-03 | Phase 10 | Pending |
-| NOTIF-01 | Phase 8 | Pending |
+| NOTIF-01 | Phase 8 | Complete |
 | DISPLAY-04 | Phase 6 | Complete |
 | DISPLAY-05 | Phase 6 | Complete |
 | DISPLAY-06 | Phase 6 | Complete |
