@@ -14,6 +14,7 @@ namespace RigToggle.App
         private readonly IMonitorController _monitorController;
         private readonly IAudioController _audioController;
         private readonly ISettingsStore _settingsStore;
+        private readonly IAutostartConfigurator _autostartConfigurator;
 
         private AppSettings _settings = new();
 
@@ -33,11 +34,12 @@ namespace RigToggle.App
         /// </summary>
         private sealed record PickerItem(string Id, string DisplayLabel);
 
-        public SettingsForm(IMonitorController monitorController, IAudioController audioController, ISettingsStore settingsStore)
+        public SettingsForm(IMonitorController monitorController, IAudioController audioController, ISettingsStore settingsStore, IAutostartConfigurator autostartConfigurator)
         {
             _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
             _audioController = audioController ?? throw new ArgumentNullException(nameof(audioController));
             _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
+            _autostartConfigurator = autostartConfigurator ?? throw new ArgumentNullException(nameof(autostartConfigurator));
 
             InitializeComponent();
 
@@ -62,6 +64,11 @@ namespace RigToggle.App
             PopulateAudioPickers();
             PopulateAppPathField();
             chkEnableDebugLogging.Checked = _settings.EnableDebugLogging;
+
+            // D-05: the HKCU Run key is the single source of truth for autostart state —
+            // no AppSettings.StartWithWindows mirror field exists to read instead.
+            chkStartWithWindows.Checked = _autostartConfigurator.IsEnabled();
+
             ValidateSettingsForm();
         }
 
@@ -549,6 +556,34 @@ namespace RigToggle.App
             // Discard/close requires no handler — CancelButton wiring (constructor)
             // produces DialogResult.Cancel with nothing persisted.
             _settingsStore.Save(settingsToSave);
+
+            // T-08-LIE: apply the autostart registry write AFTER settings persist
+            // succeeds. A failure here must never claim a success that did not happen —
+            // revert the checkbox to the actual registry state and surface an inline
+            // warning next to it (dedicated errAutostart/lblAutostartWarning pair, not
+            // the unrelated App Path section's errApp/lblAppWarning).
+            try
+            {
+                errAutostart.SetError(chkStartWithWindows, string.Empty);
+                lblAutostartWarning.Visible = false;
+
+                if (chkStartWithWindows.Checked)
+                {
+                    _autostartConfigurator.Enable();
+                }
+                else
+                {
+                    _autostartConfigurator.Disable();
+                }
+            }
+            catch (Exception ex)
+            {
+                string message = $"Could not enable Start with Windows: {ex.Message}";
+                lblAutostartWarning.Text = message;
+                lblAutostartWarning.Visible = true;
+                errAutostart.SetError(chkStartWithWindows, message);
+                chkStartWithWindows.Checked = _autostartConfigurator.IsEnabled();
+            }
         }
     }
 }
