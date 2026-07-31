@@ -105,4 +105,18 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetWindowPlacement(IntPtr hWnd, ref WindowPlacement lpwndpl);
+
+    // TRIG-01 global-hotkey P/Invoke surface: registers/unregisters a system-wide hotkey
+    // on a caller-owned message-pump window handle (MainForm's, in this project). Kept
+    // internal like the rest of this class -- RigToggle.App has no InternalsVisibleTo
+    // grant to this assembly (see AssemblyInfo.cs), so it cannot call these directly.
+    // Exposed to RigToggle.App only through the public GlobalHotkey wrapper (GlobalHotkey.cs
+    // in this same namespace), never through a new InternalsVisibleTo grant.
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 }
