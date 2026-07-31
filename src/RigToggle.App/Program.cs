@@ -101,7 +101,12 @@ namespace RigToggle.App
             // directly — it wraps ToggleService with the CORE-06 reentrancy guard.
             var toggleOrchestrator = new ToggleOrchestrator(toggleService);
 
-            SettingsForm SettingsFormFactory() => new SettingsForm(monitorController, audioController, settingsStore, autostartConfigurator);
+            // TRIG-01: SettingsFormFactory is a local function, so it may reference
+            // mainForm even though it's declared textually above the `var mainForm = ...`
+            // line below — the method group `mainForm.TryRegisterConfiguredHotkey` is only
+            // evaluated when the factory is actually invoked (after mainForm is assigned),
+            // no forward-declaration hack needed.
+            SettingsForm SettingsFormFactory() => new SettingsForm(monitorController, audioController, settingsStore, autostartConfigurator, mainForm.TryRegisterConfiguredHotkey);
 
             var mainForm = new MainForm(toggleOrchestrator, settingsStore, monitorController, SettingsFormFactory);
 
@@ -109,6 +114,14 @@ namespace RigToggle.App
             // --tray the form's own Load event never fires since the form is never
             // shown, so tray state must not depend on it.
             mainForm.InitializeTrayState();
+
+            // TRIG-01/D-04: registers the configured global hotkey unconditionally for
+            // BOTH the visible and --tray startup paths, exactly mirroring how
+            // InitializeTrayState() above must run before either Application.Run branch.
+            // RegisterHotkeyAtStartup is best-effort (traces + toasts on failure, never
+            // throws) so it cannot block startup — same posture as the trace-listener
+            // block above.
+            mainForm.RegisterHotkeyAtStartup();
 
             // D-06, rig-corrected: 08-RESEARCH.md's original theory — that
             // `new ApplicationContext(mainForm)` (passing the form in) suppresses the
