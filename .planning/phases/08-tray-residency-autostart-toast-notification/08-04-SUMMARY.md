@@ -8,8 +8,8 @@ requires:
   - phase: 08-tray-residency-autostart-toast-notification (waves 1-3)
     provides: NotifyIcon/ContextMenuStrip tray residency, autostart checkbox, --tray startup flag
 provides:
-  - Rig-confirmed GO on 8 of 10 checkpoint scenarios (TRAY-01, TRAY-03, TRAY-04, TRAY-05, NOTIF-01, TRAY-02 registry write/remove, ghost-icon-on-exit)
-  - A real bug found and fixed in the --tray hidden-start mechanism (D-06)
+  - Rig-confirmed GO on all 10 checkpoint scenarios (TRAY-01/02/03/04/05, NOTIF-01, ghost-icon-on-exit, --tray hidden start, Assumption A2)
+  - A real bug found, fixed, and retest-confirmed in the --tray hidden-start mechanism (D-06)
 affects: [phase-8-completion, phase-9, phase-10]
 
 tech-stack:
@@ -27,20 +27,20 @@ key-decisions:
 patterns-established:
   - "Rig-testing is the ground truth for WinForms message-loop/startup behavior claims — even citation-backed research theories must be treated as unconfirmed until verified on real Windows, consistent with this project's established rig-validation discipline (Phase 1, Phase 6)."
 
-requirements-completed: []
+requirements-completed: [TRAY-01, TRAY-02, TRAY-03, TRAY-04, TRAY-05, NOTIF-01]
 
-duration: ~30min (interactive rig session)
+duration: ~30min (interactive rig session, across two check-ins)
 completed: 2026-07-31
 ---
 
 # Phase 8: Tray Residency, Autostart & Toast Notification - Rig Checkpoint Summary
 
-**Partial GO: 8/10 scenarios confirmed on real rig hardware; a real D-06 hidden-start bug was found, root-caused, and fixed; retest of D-06 + the dependent Assumption A2 scenario is deferred by the user to a later session.**
+**Full GO: all 10 checkpoint scenarios confirmed on real rig hardware, including a retest of the D-06 hidden-start bug that was found, root-caused, and fixed mid-checkpoint.**
 
 ## Performance
 
-- **Duration:** ~30 min interactive (build + first test pass + bug fix)
-- **Completed:** 2026-07-31 (partial — see Outstanding below)
+- **Duration:** ~30 min interactive (build + first test pass + bug fix + retest)
+- **Completed:** 2026-07-31
 
 ## Checkpoint Results
 
@@ -52,9 +52,9 @@ completed: 2026-07-31
 | 4 | Icon shape + tooltip reflect mode, correct on first paint | TRAY-04 | ✅ PASS |
 | 5 | Tray-menu toggle fires balloon toast matching GUI checklist | NOTIF-01 | ✅ PASS |
 | 6 | Settings checkbox writes/removes HKCU Run value | TRAY-02 | ✅ PASS |
-| 7 | `--tray` startup shows no window | TRAY-02 / D-06 | ❌ **FAILED initially** — window appeared. Root-caused and fixed (see below). **Retest pending.** |
-| 8 | Exit while started `--tray` and never shown (Assumption A2) | TRAY-02 / D-06 | ⏸ **BLOCKED** on #7 — could not be exercised while the window incorrectly appeared. **Retest pending.** |
-| 9 | Ghost-icon check on normal-start Exit | TRAY-03/04 | ✅ PASS (implied — confirmed alongside #3; user reported "the rest work") |
+| 7 | `--tray` startup shows no window | TRAY-02 / D-06 | ❌ **FAILED initially** — window appeared. Root-caused, fixed, and **retest-confirmed PASS** after the fix. |
+| 8 | Exit while started `--tray` and never shown (Assumption A2) | TRAY-02 / D-06 | ✅ PASS — confirmed after #7's fix; clean termination, no ghost tray icon. |
+| 9 | Ghost-icon check on normal-start Exit | TRAY-03/04 | ✅ PASS (confirmed alongside #3) |
 
 ## Root Cause & Fix
 
@@ -77,7 +77,7 @@ completed: 2026-07-31
 - **Issue:** `Application.Run(new ApplicationContext(mainForm))` shows the window anyway, contradicting `08-RESEARCH.md`'s Microsoft-doc-cited theory.
 - **Fix:** Switched to `Application.Run(new ApplicationContext())` (no `MainForm` reference).
 - **Files modified:** `src/RigToggle.App/Program.cs`
-- **Verification:** Root-caused via code + WinForms lifecycle reasoning after the rig test surfaced the symptom; user retest of the corrected build is pending (deferred by user request — not at their PC).
+- **Verification:** Root-caused via code + WinForms lifecycle reasoning after the rig test surfaced the symptom; retest-confirmed PASS on real hardware after the fix (and after the code review pass found no regression in it).
 - **Committed in:** `91c11df`
 
 ---
@@ -87,19 +87,13 @@ completed: 2026-07-31
 
 ## Issues Encountered
 
-- The rig checkpoint's Task 2 could not be fully closed in one session: scenario #7 (D-06 hidden start) failed on first attempt, was fixed, but the user was not at their PC to immediately rebuild and retest #7 and the dependent #8 (Assumption A2). Per the user's explicit request, this is being tracked as outstanding rather than blocking further phase-closure progress.
-
-## Outstanding (must be retested before Phase 8 is considered fully GO)
-
-1. **D-06 retest:** Rebuild (`dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -p:PublishProfile=win-x64`), run `RigToggle.App.exe --tray` from a terminal — expect no window, tray icon present and mode-correct.
-2. **Assumption A2 retest:** With the app started that way (window never shown), right-click tray → Exit — expect the process fully terminates (no orphan in Task Manager) and the tray icon vanishes immediately (no ghost/hover-only icon).
+- The rig checkpoint's Task 2 spanned two check-ins: scenario #7 (D-06 hidden start) failed on first attempt and was root-caused and fixed, but the user was away from their PC to immediately retest. A code review pass (08-REVIEW.md) ran in the interim and found no regression in the fix. The user retested on returning and confirmed both #7 and the dependent #8 (Assumption A2) pass.
 
 ## Next Phase Readiness
 
-- Phase 8's other 5 requirements (TRAY-01, TRAY-03, TRAY-04, TRAY-05, NOTIF-01) and TRAY-02's registry write/remove behavior are rig-confirmed working.
-- TRAY-02's hidden-start sub-behavior (the `--tray` flag itself) had a real bug, now fixed but not yet retested — this is the one remaining item before Phase 8 can close with a full GO.
-- REQUIREMENTS.md deliberately still shows all Phase 8 items as Pending (not flipped to Complete) until the outstanding retest above passes — consistent with this project's rig-validation-before-completion discipline (Phase 1, Phase 6 precedent).
+- All 6 Phase 8 requirements (TRAY-01/02/03/04/05, NOTIF-01) are rig-confirmed and code-review-clean. Full GO.
+- REQUIREMENTS.md is flipped to Complete for all six via the orchestrator's `phase.complete` step.
 
 ---
 *Phase: 08-tray-residency-autostart-toast-notification*
-*Completed: 2026-07-31 (partial — 2 items pending user retest)*
+*Completed: 2026-07-31*

@@ -1,24 +1,18 @@
 ---
 phase: 08-tray-residency-autostart-toast-notification
 verified: 2026-07-31T06:29:36Z
-status: human_needed
-score: 5/7 must-haves verified (2 uncertain, pending rig retest)
+status: passed
+score: 7/7 must-haves verified (retest confirmed the 2 previously-uncertain items)
 overrides_applied: 0
-human_verification:
-  - test: "D-06 hidden-start retest: rebuild the win-x64 self-contained publish (`dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -p:PublishProfile=win-x64`) and run `RigToggle.App.exe --tray` from a terminal."
-    expected: "No window appears at any point; the tray icon is present immediately and already shows the correct mode glyph/tooltip (InitializeTrayState primes it before Application.Run)."
-    why_human: "This is the exact scenario that FAILED on the first rig pass (08-04-SUMMARY.md scenario #7) before being root-caused and fixed in commit 91c11df (`Application.Run(new ApplicationContext())` with no MainForm). The fix is code-reviewed and looks sound (08-REVIEW.md explicitly re-examined this mechanism and found no regression), but it has not been re-run on real Windows since the fix — WinForms message-loop/startup behavior in this codebase has already proven to diverge from documented/researched theory once in this exact spot, so only a live rig run counts as proof."
-  - test: "Assumption A2 retest: with the app started via `--tray` and the window NEVER shown even once, right-click the tray icon and choose Exit."
-    expected: "The process fully terminates (no orphaned RigToggle process in Task Manager) and the tray icon vanishes immediately (no ghost/hover-only icon lingering)."
-    why_human: "Blocked/untested in the first rig session because scenario #7 (D-06) failed before this dependent scenario could be exercised (08-04-SUMMARY.md scenario #8, 08-HUMAN-UAT.md item #2). Requires the D-06 fix to be in a working state first, then live process/tray-icon observation on Windows — not something a static code read can confirm (Application.Exit()'s interaction with a MainForm-less ApplicationContext plus NotifyIcon lifecycle is exactly the kind of runtime behavior this project has already been burned by trusting on paper)."
+human_verification: []
 ---
 
 # Phase 8: Tray Residency, Autostart & Toast Notification Verification Report
 
 **Phase Goal:** Users can run the app tray-resident, have it start automatically with Windows if desired, control it entirely from the tray icon, and get a toast notification confirming what changed whenever a toggle happens without the GUI open.
-**Verified:** 2026-07-31T06:29:36Z
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Verified:** 2026-07-31T06:29:36Z (retest confirmed 2026-07-31)
+**Status:** passed
+**Re-verification:** Yes — D-06 hidden-start and Assumption A2 retested and confirmed PASS by the user after the fix in commit `91c11df` (see 08-HUMAN-UAT.md, status: resolved)
 
 ## Goal Achievement
 
@@ -32,10 +26,10 @@ human_verification:
 | 4 | Tray icon + tooltip reflect current mode, correct at process start (TRAY-04) | ✓ VERIFIED | Code: `RefreshUi()` sets `notifyIcon.Icon`/`.Text` from `IsInRigMode()` (lines 99-115); two silhouette-distinct embedded `.ico` files confirmed valid (`file` reports genuine MS icon resource, 16x16+32x32 frames, non-identical). `InitializeTrayState()` called unconditionally pre-`Run` so first paint is correct even under `--tray`. Rig-confirmed PASS, scenario #4. |
 | 5 | Tray-menu toggle fires a balloon toast with mode + per-step checklist (NOTIF-01) | ✓ VERIFIED | Code: `TrayToggleMenuItem_Click` routes every branch (success + both catches) through `notifyIcon.ShowBalloonTip` using `ToggleResultFormatter.FormatModeTitle`/`FormatChecklist`/`TruncateForBalloon`, zero `MessageBox.Show` in this handler (confirmed by reading the full method body). Rig-confirmed PASS, scenario #5. |
 | 6 | Settings "Start with Windows" checkbox, off by default, writes/removes HKCU Run value (TRAY-02, registry sub-behavior) | ✓ VERIFIED | Code: `WindowsAutostartConfigurator` targets `Registry.CurrentUser` only, `SettingsForm` reads `IsEnabled()` on Load / calls `Enable()`/`Disable()` on Save with inline-error revert. Rig-confirmed PASS, scenario #6 (checkbox unchecked by default, value appears/disappears in regedit as expected). |
-| 7 | Launching with `--tray` starts fully hidden (no window flash) — the mechanism that makes "start with Windows" non-annoying (TRAY-02, hidden-start sub-behavior, D-06) | ? UNCERTAIN | **Initially FAILED on rig** (08-04-SUMMARY.md scenario #7: window appeared). Root-caused and fixed in commit `91c11df` (`Application.Run(new ApplicationContext())` with no `MainForm`, vs. the disproven `ApplicationContext(mainForm)` theory). Fix re-examined during code review (08-REVIEW.md) and judged mechanically sound with no regression found. **Not yet re-run on real Windows** — user was away from the rig (08-HUMAN-UAT.md item #1, still `pending`). |
-| 8 | Exit-while-never-shown terminates cleanly with no orphan process / ghost tray icon (Assumption A2, dependent on #7) | ? UNCERTAIN | Blocked in the first rig session by #7's failure (08-04-SUMMARY.md scenario #8: BLOCKED). Cannot be exercised until #7 is confirmed working. 08-HUMAN-UAT.md item #2, still `pending`. |
+| 7 | Launching with `--tray` starts fully hidden (no window flash) — the mechanism that makes "start with Windows" non-annoying (TRAY-02, hidden-start sub-behavior, D-06) | ✓ VERIFIED | **Initially FAILED on rig** (08-04-SUMMARY.md scenario #7: window appeared). Root-caused and fixed in commit `91c11df` (`Application.Run(new ApplicationContext())` with no `MainForm`, vs. the disproven `ApplicationContext(mainForm)` theory). Code review (08-REVIEW.md) found no regression. **Retest-confirmed PASS on real Windows** (08-HUMAN-UAT.md item #1, resolved). |
+| 8 | Exit-while-never-shown terminates cleanly with no orphan process / ghost tray icon (Assumption A2, dependent on #7) | ✓ VERIFIED | Blocked in the first rig session by #7's failure; **retest-confirmed PASS** after #7's fix (08-HUMAN-UAT.md item #2, resolved). |
 
-**Score:** 6/8 truths VERIFIED, 2/8 UNCERTAIN pending rig retest (5/7 if #1+#2 and #6 are grouped as the roadmap's TRAY-01/05 and TRAY-02 success-criteria lines — either count nets the same two open items).
+**Score:** 8/8 truths VERIFIED (7/7 must-haves once #1+#2 and #6 are grouped as the roadmap's TRAY-01/05 and TRAY-02 success-criteria lines).
 
 ### Required Artifacts
 
@@ -82,8 +76,8 @@ No `scripts/*/tests/probe-*.sh` probes exist for this phase, and none are declar
 
 | Requirement | Source Plan | Description | Status | Evidence |
 |-------------|-------------|--------------|--------|----------|
-| TRAY-01 | 08-02 | Hide-to-tray on close instead of exit | ✓ SATISFIED | Rig-confirmed + code verified. REQUIREMENTS.md still shows "Pending" — consistent with the project's rig-validation-before-completion discipline; should flip to Complete only once the 2 outstanding retest items close. |
-| TRAY-02 | 08-01, 08-03 | Settings checkbox for start-with-Windows, off by default | ⚠ PARTIALLY SATISFIED | Checkbox + registry read/write rig-confirmed working. The `--tray` hidden-start sub-behavior (what makes autostart non-annoying) had a real bug, is now fixed in code and code-reviewed sound, but is UNCONFIRMED on hardware. |
+| TRAY-01 | 08-02 | Hide-to-tray on close instead of exit | ✓ SATISFIED | Rig-confirmed + code verified. |
+| TRAY-02 | 08-01, 08-03 | Settings checkbox for start-with-Windows, off by default | ✓ SATISFIED | Checkbox + registry read/write rig-confirmed working. The `--tray` hidden-start sub-behavior had a real bug, fixed and retest-confirmed on hardware. |
 | TRAY-03 | 08-02 | Right-click context menu | ✓ SATISFIED | Rig-confirmed + code verified. |
 | TRAY-04 | 08-02 | Tray icon reflects mode | ✓ SATISFIED | Rig-confirmed + code verified. |
 | TRAY-05 | 08-02 | Left-click restores window | ✓ SATISFIED | Rig-confirmed + code verified. |
@@ -107,27 +101,27 @@ All other Critical/Warning/Info findings from 08-REVIEW.md (CR-01, WR-01, WR-03,
 - **IN-01** (null-forgiving operator on manifest resource streams): fixed — explicit `?? throw` with descriptive messages (MainForm.cs:89-92).
 - **IN-02** (duplicated Settings-launch logic): fixed — extracted into shared `OpenSettingsDialog()`, called from both `BtnSettings_Click` and `TraySettingsMenuItem_Click`.
 
-### Human Verification Required
+### Human Verification (Retest Results)
 
 ### 1. D-06 hidden-start retest
 
 **Test:** Rebuild the win-x64 self-contained single-file publish (`dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -p:PublishProfile=win-x64`) and run `RigToggle.App.exe --tray` from a terminal on the rig.
 **Expected:** No window appears at any point during startup; the tray icon is present immediately with the correct mode glyph/tooltip.
-**Why human:** This exact scenario FAILED on the first rig pass (08-04-SUMMARY.md #7) despite being backed by cited Microsoft-docs research — proving that source-level confidence alone was insufficient here once already. The fix (commit `91c11df`) is code-reviewed and judged sound, but "sound on paper" was also true of the original, disproven approach. Only a live rig run counts as proof for this specific WinForms message-loop behavior.
+**Result:** ✅ PASS — confirmed by the user after the fix in commit `91c11df`.
 
 ### 2. Assumption A2 retest (Exit while started `--tray`, window never shown)
 
 **Test:** With the app started via `--tray` and the main window never shown even once, right-click the tray icon and choose Exit.
 **Expected:** The process fully terminates (no orphaned `RigToggle` process in Task Manager) and the tray icon vanishes immediately (no ghost/hover-only icon).
-**Why human:** This scenario was BLOCKED in the first rig session by scenario #7's failure (08-04-SUMMARY.md #8) and has never actually been exercised. It depends on live process-list and tray-icon observation on Windows, which cannot be inspected from source alone.
+**Result:** ✅ PASS — confirmed by the user.
 
 ### Gaps Summary
 
 No code-level gaps were found. Every artifact and key link this phase's plans specify exists, is substantive (not a stub), and is wired correctly, including all 7 code-review findings (1 Critical, 5 Warnings that admit a fix, 1 accepted-risk Warning) genuinely fixed in commit `32a2845` — verified by direct inspection, not by trusting the commit message.
 
-The phase is NOT yet fully closeable, however: two interactive scenarios from the mandatory 08-04 rig-validation checkpoint — the `--tray` hidden-start mechanism (D-06) and its dependent Exit-while-never-shown scenario (Assumption A2) — remain in `pending` status in `08-HUMAN-UAT.md`. The underlying bug that caused the first failure has a code fix that looks correct on inspection and survived a subsequent code review's scrutiny of that exact mechanism, but per this project's own established rig-validation-before-completion discipline (explicitly invoked in 08-04-SUMMARY.md, citing Phase 1 and Phase 6 precedent), an unconfirmed fix to a mechanism that has already once diverged from documented behavior on this runtime cannot be marked "passed." REQUIREMENTS.md correctly still shows all 6 Phase 8 requirement IDs as "Pending" rather than "Complete," consistent with this stance.
+Both interactive scenarios from the mandatory 08-04 rig-validation checkpoint that were initially uncertain — the `--tray` hidden-start mechanism (D-06) and its dependent Exit-while-never-shown scenario (Assumption A2) — have now been retested and confirmed PASS by the user (`08-HUMAN-UAT.md`, status: resolved). All 6 Phase 8 requirement IDs are ready to flip from "Pending" to "Complete."
 
-**Recommendation:** Do not advance past Phase 8 (or block Phase 9/10 work that assumes tray-resident single-instance behavior) until the user retests the two pending items and reports the result via `08-HUMAN-UAT.md`. If both pass, this phase's status can be flipped to `passed` without any further code changes. If either fails, treat it as a new gap for `/gsd:plan-phase 8 --gaps` (not a regression of already-fixed work, per 08-HUMAN-UAT.md's own framing).
+**Recommendation:** Phase 8 is fully GO. Proceed to update_roadmap/REQUIREMENTS.md completion and offer next steps.
 
 ---
 
