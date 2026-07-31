@@ -112,3 +112,7 @@ None - no external service configuration required.
 ---
 *Phase: 09-global-hotkey-trigger*
 *Completed: 2026-07-31*
+
+## Self-Check: PASSED
+
+All created files verified present on disk (GlobalHotkey.cs, 09-02-SUMMARY.md); all task commit hashes (73313c0, 3cad06f, 334ce46) verified present in git log.
