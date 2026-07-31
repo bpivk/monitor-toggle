@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Automation & Multi-Monitor
-status: executing
-stopped_at: Phase 8 all plans executed — awaiting human rig retest (D-06/A2) before close
-last_updated: "2026-07-31T00:00:00.000Z"
+status: ready_to_plan
+stopped_at: Phase 8 complete (4/4) — ready to discuss Phase 9
+last_updated: 2026-07-31T14:34:12.337Z
 last_activity: 2026-07-31 -- Phase 8 code review fixed, verification returned human_needed
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 11
-  completed_plans: 7
-  percent: 40
+  completed_plans: 11
+  percent: 60
 ---
 
 # Project State
@@ -21,22 +21,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
-**Current focus:** Phase 8 — tray-residency-autostart-toast-notification
+**Current focus:** Phase 9 — global hotkey trigger
 
 ## Current Position
 
-Phase: 8 (tray-residency-autostart-toast-notification) — AWAITING HUMAN RETEST
-Plan: 4 of 4 (all executed; rig checkpoint 08-04 partial, code review 08-REVIEW.md fixed)
-Status: Verification returned human_needed — 2 items pending (see below)
-Last activity: 2026-07-31 -- code review fixes committed (32a2845), verification recorded human_needed (7174d01)
+Phase: 9
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-31
 
-Progress: [██░░░░░░░░] 20%
+Progress: [██████░░░░] 60%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 25
+- Total plans completed: 29
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -50,6 +50,7 @@ Progress: [██░░░░░░░░] 20%
 | 5 | 3 | - | - |
 | 6 | 6 | - | - |
 | 7 | 1 | - | - |
+| 8 | 4 | - | - |
 
 **Recent Trend:**
 
@@ -83,7 +84,7 @@ None.
 
 - [Phase 6, resolved] The two CCD scenarios (long-idle/reboot monitor re-enable; combined disable+enable topology) are rig-validated: final **GO** recorded in `06-06-SUMMARY.md` after two gap-closure rounds (`GetAllMonitors()` dedup fix, `Restore()` Source-staleness fix). Post-validation code review (`06-REVIEW.md`) then found and fixed two further Critical bugs (settings-migration re-corruption of a deliberately-emptied disable set; a non-exception-safe companion-app minimize step) — both fixed with regression tests in commit `9d891a8`. Phase 6 formally verified `passed` 5/5 in `06-VERIFICATION.md`.
 - Phase 9's `RegisterHotKey` must be rig-tested with Moza Companion actually running, since silent conflicts with other rig software are the realistic failure mode this requirement (TRIG-01) exists to catch.
-- **[Phase 8, ACTIVE — REMINDER]** Rig checkpoint `08-04` found the `--tray` hidden-start mechanism (D-06) genuinely broken (`Application.Run(new ApplicationContext(mainForm))` did not suppress `Show()` on this runtime, contradicting `08-RESEARCH.md`'s cited theory). Root-caused and fixed in commit `91c11df` (now `Application.Run(new ApplicationContext())` with no `MainForm` reference), and code review found no regression in that fix. **Not yet retested on the rig** — user was away from their PC. Two items remain pending in `08-HUMAN-UAT.md`: (1) `--tray` startup shows no window, (2) Exit while started `--tray` and never shown (Assumption A2) terminates cleanly with no ghost tray icon. Rebuild via `dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -p:PublishProfile=win-x64` and retest both before Phase 8 can close. All other Phase 8 requirements (TRAY-01/03/04/05, NOTIF-01) are rig-confirmed and code-review-clean.
+- [Phase 8, resolved] Rig checkpoint `08-04` found the `--tray` hidden-start mechanism (D-06) genuinely broken (`Application.Run(new ApplicationContext(mainForm))` did not suppress `Show()` on this runtime, contradicting `08-RESEARCH.md`'s cited theory). Root-caused and fixed in commit `91c11df` (`Application.Run(new ApplicationContext())` with no `MainForm` reference). Post-validation code review (`08-REVIEW.md`) then found and fixed one further Critical bug (autostart save-failure recovery could itself throw unhandled) plus 5 warnings — all fixed in commit `32a2845`. User retested D-06 and the dependent Assumption A2 (Exit while started `--tray`, never shown) after the fix — both confirmed PASS. Phase 8 formally verified `passed` in `08-VERIFICATION.md`.
 
 ### Quick Tasks Completed
 
@@ -109,12 +110,12 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-26 (pre-close
 
 ## Session Continuity
 
-Last session: 2026-07-30T06:31:34.663Z
-Stopped at: Phase 8 UI-SPEC approved
-Resume file: .planning/phases/08-tray-residency-autostart-toast-notification/08-UI-SPEC.md
+Last session: 2026-07-31T14:34:12.337Z
+Stopped at: Phase 8 complete (4/4), ready to discuss Phase 9
+Resume file: None
 
 ## Operator Next Steps
 
-- `/gsd:plan-phase 7` — plan Phase 7 (Shared Toggle-Orchestration Helper Extraction); 07-CONTEXT.md is ready
+- `/gsd:discuss-phase 9` — gather context for Phase 9 (Global Hotkey Trigger)
 
 </content>
