@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Automation & Multi-Monitor
-status: executing
-stopped_at: Phase 9 UI-SPEC approved
-last_updated: "2026-07-31T18:31:38.869Z"
+status: ready_to_plan
+stopped_at: Phase 09 complete (4/4) — ready to discuss Phase 10
+last_updated: 2026-07-31T19:42:59.270Z
 last_activity: 2026-07-31 -- Phase 09 execution started
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 15
-  completed_plans: 11
+  completed_plans: 15
   percent: 60
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
-**Current focus:** Phase 09 — global-hotkey-trigger
+**Current focus:** Phase 10 — cli trigger + single instance ipc
 
 ## Current Position
 
-Phase: 09 (global-hotkey-trigger) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 09
-Last activity: 2026-07-31 -- Phase 09 execution started
+Phase: 10
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-31
 
 Progress: [██████░░░░] 60%
 
@@ -36,7 +36,7 @@ Progress: [██████░░░░] 60%
 
 **Velocity:**
 
-- Total plans completed: 29
+- Total plans completed: 33
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -51,6 +51,7 @@ Progress: [██████░░░░] 60%
 | 6 | 6 | - | - |
 | 7 | 1 | - | - |
 | 8 | 4 | - | - |
+| 09 | 4 | - | - |
 
 **Recent Trend:**
 
