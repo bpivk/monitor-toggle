@@ -1,3 +1,4 @@
+using RigToggle.Core;
 using RigToggle.Core.Models;
 using RigToggle.Core.Persistence;
 using Xunit;
@@ -41,6 +42,44 @@ public class JsonStoreTests : IDisposable
         Assert.Null(settings.RigAudioDeviceId);
         Assert.Null(settings.RigAudioDeviceName);
         Assert.Null(settings.CompanionAppPath);
+        Assert.Null(settings.HotkeyModifiers);
+        Assert.Null(settings.HotkeyKey);
+    }
+
+    [Fact]
+    public void SettingsStore_Save_ThenLoad_RoundTripsHotkeyFields()
+    {
+        var path = Path.Combine(_tempDir, "settings.json");
+        var store = new JsonSettingsStore(path);
+        var original = new AppSettings
+        {
+            HotkeyModifiers = HotkeyCombo.ModControl | HotkeyCombo.ModAlt,
+            HotkeyKey = 0x52,
+        };
+
+        store.Save(original);
+        var loaded = store.Load();
+
+        Assert.Equal(original.HotkeyModifiers, loaded.HotkeyModifiers);
+        Assert.Equal(original.HotkeyKey, loaded.HotkeyKey);
+    }
+
+    [Fact]
+    public void SettingsStore_Save_WithNullHotkeyFields_LoadsBackAsNull()
+    {
+        var path = Path.Combine(_tempDir, "settings.json");
+        var store = new JsonSettingsStore(path);
+        var original = new AppSettings
+        {
+            HotkeyModifiers = null,
+            HotkeyKey = null,
+        };
+
+        store.Save(original);
+        var loaded = store.Load();
+
+        Assert.Null(loaded.HotkeyModifiers);
+        Assert.Null(loaded.HotkeyKey);
     }
 
     [Fact]
