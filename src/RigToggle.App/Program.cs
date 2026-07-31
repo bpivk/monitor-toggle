@@ -101,14 +101,19 @@ namespace RigToggle.App
             // directly — it wraps ToggleService with the CORE-06 reentrancy guard.
             var toggleOrchestrator = new ToggleOrchestrator(toggleService);
 
-            // TRIG-01: SettingsFormFactory is a local function, so it may reference
-            // mainForm even though it's declared textually above the `var mainForm = ...`
-            // line below — the method group `mainForm.TryRegisterConfiguredHotkey` is only
-            // evaluated when the factory is actually invoked (after mainForm is assigned),
-            // no forward-declaration hack needed.
+            // TRIG-01: mainForm and SettingsFormFactory are mutually dependent (the
+            // factory needs mainForm.TryRegisterConfiguredHotkey; MainForm's constructor
+            // needs the factory). C# local-variable scope is strictly textual — a local
+            // function cannot reference a variable declared later in the same block, even
+            // though it's only invoked after that variable is assigned (CS0841/CS0165,
+            // caught on rig build). Pre-declaring mainForm with null! and assigning it
+            // after the factory is defined breaks the cycle: the factory captures
+            // mainForm by reference, and by the time it's actually invoked (Settings is
+            // opened), mainForm already holds the real instance.
+            MainForm mainForm = null!;
             SettingsForm SettingsFormFactory() => new SettingsForm(monitorController, audioController, settingsStore, autostartConfigurator, mainForm.TryRegisterConfiguredHotkey);
 
-            var mainForm = new MainForm(toggleOrchestrator, settingsStore, monitorController, SettingsFormFactory);
+            mainForm = new MainForm(toggleOrchestrator, settingsStore, monitorController, SettingsFormFactory);
 
             // Pitfall 6: prime the tray icon/menu BEFORE either Run branch — under
             // --tray the form's own Load event never fires since the form is never
