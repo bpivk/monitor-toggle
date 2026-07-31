@@ -34,7 +34,7 @@ Full phase details: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 6: Multi-Monitor Data Model & Controller Generalization** - Independently-configurable disable/enable monitor sets, with a rig-validated CCD checkpoint and a v1.0-settings migration (completed 2026-07-29)
 - [x] **Phase 7: Shared Toggle-Orchestration Helper Extraction** - One reentrancy-safe pipeline every trigger (button/tray/hotkey/CLI) runs through (completed 2026-07-29)
 - [x] **Phase 8: Tray Residency, Autostart & Toast Notification** - Minimize-to-tray, autostart, tray context menu, and toast confirmation for headless triggers (completed 2026-07-31)
-- [ ] **Phase 9: Global Hotkey Trigger** - Configurable Windows-wide keyboard shortcut with surfaced registration failures
+- [x] **Phase 9: Global Hotkey Trigger** - Configurable Windows-wide keyboard shortcut with surfaced registration failures (completed 2026-07-31)
 - [ ] **Phase 10: CLI Trigger + Single-Instance IPC** - Command-line toggle/status args that signal a resident instance instead of spawning duplicates
 
 ## Phase Details
@@ -158,7 +158,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 09-04-PLAN.md — Mandatory rig-validation checkpoint (go/no-go): capture UX, toggle-from-anywhere incl. tray-hidden, conflict surfacing with Moza Companion running, Settings-race (TRIG-01)
+- [x] 09-04-PLAN.md — Mandatory rig-validation checkpoint (go/no-go): capture UX, toggle-from-anywhere incl. tray-hidden, conflict surfacing with Moza Companion running, Settings-race (TRIG-01)
 **UI hint**: yes
 **Notes**:
 
@@ -197,5 +197,5 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 6/6 | Complete    | 2026-07-29 |
 | 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 1/1 | Complete    | 2026-07-29 |
 | 8. Tray Residency, Autostart & Toast Notification | v1.1 | 4/4 | Complete    | 2026-07-31 |
-| 9. Global Hotkey Trigger | v1.1 | 3/4 | In Progress|  |
+| 9. Global Hotkey Trigger | v1.1 | 4/4 | Complete   | 2026-07-31 |
 | 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Not started | - |
