@@ -142,7 +142,23 @@ Plans:
   2. If the configured hotkey fails to register — e.g. it conflicts with Moza Companion or other rig software already using that combination — the failure is surfaced to the user in Settings, not silently swallowed (TRIG-01)
   3. Pressing the hotkey while the Settings dialog is open has defined, non-corrupting behavior (explicitly suppressed or queued, not left to race the in-progress edit) (TRIG-01)
 
-**Plans**: TBD
+**Plans**: 4 plans (waves: 1 → 2 → 3 → 4)
+Plans:
+**Wave 1**
+
+- [ ] 09-01-PLAN.md — Hotkey combo model + friendly-string formatter + AppSettings fields (Core, TDD) (TRIG-01)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 09-02-PLAN.md — RegisterHotKey/UnregisterHotKey P/Invoke + MainForm WndProc/WM_HOTKEY handler + shared registration helpers + Settings-dialog bracketing (D-03/D-04/D-06/D-07) (TRIG-01)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 09-03-PLAN.md — SettingsForm recording-textbox capture UI + load/save + inline registration-failure warning + Program.cs startup/factory wiring (D-01/D-02/D-05) (TRIG-01)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 09-04-PLAN.md — Mandatory rig-validation checkpoint (go/no-go): capture UX, toggle-from-anywhere incl. tray-hidden, conflict surfacing with Moza Companion running, Settings-race (TRIG-01)
 **UI hint**: yes
 **Notes**:
 
@@ -181,5 +197,5 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 6/6 | Complete    | 2026-07-29 |
 | 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 1/1 | Complete    | 2026-07-29 |
 | 8. Tray Residency, Autostart & Toast Notification | v1.1 | 4/4 | Complete    | 2026-07-31 |
-| 9. Global Hotkey Trigger | v1.1 | 0/TBD | Not started | - |
+| 9. Global Hotkey Trigger | v1.1 | 0/4 | Planned | - |
 | 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Not started | - |
