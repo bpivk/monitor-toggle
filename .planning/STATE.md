@@ -4,8 +4,8 @@ milestone: v1.1
 milestone_name: Automation & Multi-Monitor
 status: executing
 stopped_at: Phase 9 UI-SPEC approved
-last_updated: "2026-07-31T16:50:01.583Z"
-last_activity: 2026-07-31 -- Phase 09 planning complete
+last_updated: "2026-07-31T18:31:38.869Z"
+last_activity: 2026-07-31 -- Phase 09 execution started
 progress:
   total_phases: 5
   completed_phases: 3
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
-**Current focus:** Phase 9 — global hotkey trigger
+**Current focus:** Phase 09 — global-hotkey-trigger
 
 ## Current Position
 
-Phase: 9
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-31 -- Phase 09 planning complete
+Phase: 09 (global-hotkey-trigger) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 09
+Last activity: 2026-07-31 -- Phase 09 execution started
 
 Progress: [██████░░░░] 60%
 
