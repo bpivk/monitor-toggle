@@ -116,6 +116,6 @@ Resume file: .planning/phases/09-global-hotkey-trigger/09-CONTEXT.md
 
 ## Operator Next Steps
 
-- `/gsd:discuss-phase 9` — gather context for Phase 9 (Global Hotkey Trigger)
+- `/gsd:plan-phase 9` — plan Phase 9 (Global Hotkey Trigger); 09-CONTEXT.md is ready
 
 </content>
