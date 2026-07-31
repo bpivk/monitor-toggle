@@ -1,3 +1,4 @@
+using RigToggle.Core;
 using RigToggle.Core.Abstractions;
 using RigToggle.Core.Models;
 
@@ -15,8 +16,20 @@ namespace RigToggle.App
         private readonly IAudioController _audioController;
         private readonly ISettingsStore _settingsStore;
         private readonly IAutostartConfigurator _autostartConfigurator;
+        private readonly Func<bool> _tryRegisterConfiguredHotkey;
 
         private AppSettings _settings = new();
+
+        // TRIG-01/D-01: the working (not-yet-saved) hotkey combo, initialized from
+        // _settings on Load and mutated only by the capture state machine below. Null
+        // means "no hotkey configured" (D-02 — no default is pre-filled).
+        private int? _pendingHotkeyModifiers;
+        private int? _pendingHotkeyKey;
+
+        // Reentrancy/mode-tracking guard for the txtHotkey capture state machine —
+        // mirrors the _updatingMonitorGridProgrammatically boolean-flag idiom already
+        // established for the monitor grid's own programmatic-write guard.
+        private bool _recordingHotkey;
 
         // Enumerated (active + OS-disabled) monitors backing the grid — cached from the
         // last PopulateMonitorGrid() call so validation/save can re-read it without a
@@ -34,12 +47,13 @@ namespace RigToggle.App
         /// </summary>
         private sealed record PickerItem(string Id, string DisplayLabel);
 
-        public SettingsForm(IMonitorController monitorController, IAudioController audioController, ISettingsStore settingsStore, IAutostartConfigurator autostartConfigurator)
+        public SettingsForm(IMonitorController monitorController, IAudioController audioController, ISettingsStore settingsStore, IAutostartConfigurator autostartConfigurator, Func<bool> tryRegisterConfiguredHotkey)
         {
             _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
             _audioController = audioController ?? throw new ArgumentNullException(nameof(audioController));
             _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
             _autostartConfigurator = autostartConfigurator ?? throw new ArgumentNullException(nameof(autostartConfigurator));
+            _tryRegisterConfiguredHotkey = tryRegisterConfiguredHotkey ?? throw new ArgumentNullException(nameof(tryRegisterConfiguredHotkey));
 
             InitializeComponent();
 
@@ -54,6 +68,13 @@ namespace RigToggle.App
             dgvMonitors.CellValueChanged += OnMonitorCellValueChanged;
             cboAudioNormal.SelectedIndexChanged += OnPickerChanged;
             cboAudioRig.SelectedIndexChanged += OnPickerChanged;
+
+            // D-01: capture mode must only ever begin via an explicit mouse click, never
+            // via GotFocus alone (UI-SPEC Interaction States) — MouseDown fires before
+            // any focus-change side effects, matching the UI-SPEC's own wording.
+            txtHotkey.MouseDown += TxtHotkey_MouseDown;
+            txtHotkey.KeyDown += TxtHotkey_KeyDown;
+            txtHotkey.LostFocus += TxtHotkey_LostFocus;
         }
 
         private void SettingsForm_Load(object? sender, EventArgs e)
@@ -64,6 +85,15 @@ namespace RigToggle.App
             PopulateAudioPickers();
             PopulateAppPathField();
             chkEnableDebugLogging.Checked = _settings.EnableDebugLogging;
+
+            // TRIG-01/D-02: no default hotkey is pre-filled — a null pair renders as the
+            // Unconfigured idle state below, not a fabricated combo.
+            _pendingHotkeyModifiers = _settings.HotkeyModifiers;
+            _pendingHotkeyKey = _settings.HotkeyKey;
+            _recordingHotkey = false;
+            errHotkey.SetError(txtHotkey, string.Empty);
+            lblHotkeyWarning.Visible = false;
+            RenderHotkeyIdleDisplay();
 
             // D-05: the HKCU Run key is the single source of truth for autostart state —
             // no AppSettings.StartWithWindows mirror field exists to read instead.
@@ -86,6 +116,112 @@ namespace RigToggle.App
         }
 
         private void OnPickerChanged(object? sender, EventArgs e) => ValidateSettingsForm();
+
+        // TRIG-01/D-01, UI-SPEC "Interaction States — txtHotkey": renders the idle
+        // (non-Recording) display from the current _pendingHotkeyModifiers/_pendingHotkeyKey
+        // pair — Configured (both set) or Unconfigured (either null). Called on Load and
+        // whenever a Recording attempt ends without producing a Configured state that
+        // needs its own explicit render (capture/Escape branches set their own text).
+        private void RenderHotkeyIdleDisplay()
+        {
+            if (_pendingHotkeyModifiers is int modifiers && _pendingHotkeyKey is int key)
+            {
+                txtHotkey.Text = HotkeyFormatter.ToDisplayString(modifiers, key);
+                txtHotkey.BackColor = SystemColors.Window;
+                txtHotkey.ForeColor = SystemColors.WindowText;
+            }
+            else
+            {
+                txtHotkey.Text = "(No hotkey set — click to configure)";
+                txtHotkey.BackColor = SystemColors.Window;
+                txtHotkey.ForeColor = SystemColors.GrayText;
+            }
+        }
+
+        // UI-SPEC "Recording" state — entered only via an explicit mouse click on
+        // txtHotkey (D-01), never via GotFocus alone (see MouseDown wiring in the
+        // constructor). SystemColors.Info is the one Accent color use this phase
+        // permits (09-UI-SPEC.md Color).
+        private void TxtHotkey_MouseDown(object? sender, MouseEventArgs e)
+        {
+            _recordingHotkey = true;
+            txtHotkey.Text = "Press a key combination… (Esc to clear)";
+            txtHotkey.BackColor = SystemColors.Info;
+            txtHotkey.ForeColor = SystemColors.WindowText;
+        }
+
+        // UI-SPEC "Interaction States — txtHotkey": the capture state machine. Suppresses
+        // every key from reaching normal dialog processing while Recording (e.SuppressKeyPress
+        // / e.Handled) so a captured key can never double as e.g. Enter-accepts-dialog.
+        private void TxtHotkey_KeyDown(object? sender, KeyEventArgs e)
+        {
+            e.SuppressKeyPress = true;
+            e.Handled = true;
+
+            if (!_recordingHotkey)
+            {
+                return;
+            }
+
+            if (e.KeyCode == Keys.Escape)
+            {
+                // D-01: Escape always clears, never just "cancels back to the old value."
+                _pendingHotkeyModifiers = null;
+                _pendingHotkeyKey = null;
+                _recordingHotkey = false;
+                RenderHotkeyIdleDisplay();
+                return;
+            }
+
+            if (HotkeyCombo.IsModifierVirtualKey((int)e.KeyCode))
+            {
+                // D-01: a bare modifier press alone is not accepted — stay in Recording,
+                // waiting for a real non-modifier key while the modifier(s) are held.
+                return;
+            }
+
+            int capturedModifiers = 0;
+            if (e.Control)
+            {
+                capturedModifiers |= HotkeyCombo.ModControl;
+            }
+            if (e.Alt)
+            {
+                capturedModifiers |= HotkeyCombo.ModAlt;
+            }
+            if (e.Shift)
+            {
+                capturedModifiers |= HotkeyCombo.ModShift;
+            }
+
+            if (capturedModifiers == 0)
+            {
+                // D-01: require at least one modifier held — an unmodified key stays in
+                // Recording rather than being accepted as a bare-key "hotkey."
+                return;
+            }
+
+            _pendingHotkeyModifiers = capturedModifiers;
+            _pendingHotkeyKey = (int)e.KeyCode;
+            _recordingHotkey = false;
+
+            txtHotkey.BackColor = SystemColors.Window;
+            txtHotkey.ForeColor = SystemColors.WindowText;
+            txtHotkey.Text = HotkeyFormatter.ToDisplayString(capturedModifiers, (int)e.KeyCode);
+        }
+
+        // UI-SPEC "Recording → focus lost without a completed capture or Escape": losing
+        // focus mid-Recording is a silent cancel back to whatever was shown before this
+        // Recording attempt started — never a clear. Only an explicit Escape clears an
+        // existing configured value (see TxtHotkey_KeyDown's Escape branch above).
+        private void TxtHotkey_LostFocus(object? sender, EventArgs e)
+        {
+            if (_recordingHotkey)
+            {
+                _recordingHotkey = false;
+                RenderHotkeyIdleDisplay();
+            }
+        }
 
         // D-03: one grid row per monitor from GetAllMonitors() (active + OS-disabled) —
         // NOT GetActiveMonitors(), which structurally cannot show a monitor DISPLAY-05's
@@ -563,6 +699,12 @@ namespace RigToggle.App
                 CompanionAppPath = txtAppPath.Text,
                 SkipMonitorConfirmation = monitorsChanged ? false : _settings.SkipMonitorConfirmation,
                 EnableDebugLogging = chkEnableDebugLogging.Checked,
+                // TRIG-01/D-05: persist the chosen combo regardless of registration
+                // outcome below — the user's chosen combination is the source of truth
+                // even if it can't currently be registered (they may be about to close
+                // the conflicting app).
+                HotkeyModifiers = _pendingHotkeyModifiers,
+                HotkeyKey = _pendingHotkeyKey,
             };
 
             // Persist before the declarative DialogResult.OK closes the dialog.
@@ -611,6 +753,28 @@ namespace RigToggle.App
                     // the user the write failed; leaving the checkbox state as-is is
                     // strictly better than crashing.
                 }
+            }
+
+            // TRIG-01/D-04/D-05: attempt registration of whatever combo was just saved
+            // above. Unlike the autostart block, a failure here does NOT roll back the
+            // save and does NOT attempt to resync any UI state from an external source —
+            // the user's chosen combination (already persisted) is the source of truth
+            // regardless of whether it's currently active (they may be about to close
+            // the conflicting app). Instead, DialogResult is reset to None so the dialog
+            // stays open with the warning visible, letting the user retry ("click Save
+            // again") without losing their place. Do NOT "fix" this into a blocking
+            // validation that reverts the field or prevents Save — that would contradict
+            // D-05's explicit non-blocking-Save decision.
+            errHotkey.SetError(txtHotkey, string.Empty);
+            lblHotkeyWarning.Visible = false;
+
+            if (!_tryRegisterConfiguredHotkey())
+            {
+                string message = "Could not register hotkey — it may already be in use by another application. Choose a different combination or close the conflicting app, then click Save again.";
+                lblHotkeyWarning.Text = message;
+                lblHotkeyWarning.Visible = true;
+                errHotkey.SetError(txtHotkey, message);
+                this.DialogResult = DialogResult.None;
             }
         }
     }
