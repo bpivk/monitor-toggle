@@ -150,7 +150,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 09-02-PLAN.md — RegisterHotKey/UnregisterHotKey P/Invoke + MainForm WndProc/WM_HOTKEY handler + shared registration helpers + Settings-dialog bracketing (D-03/D-04/D-06/D-07) (TRIG-01)
+- [x] 09-02-PLAN.md — RegisterHotKey/UnregisterHotKey P/Invoke + MainForm WndProc/WM_HOTKEY handler + shared registration helpers + Settings-dialog bracketing (D-03/D-04/D-06/D-07) (TRIG-01)
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -197,5 +197,5 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 6. Multi-Monitor Data Model & Controller Generalization | v1.1 | 6/6 | Complete    | 2026-07-29 |
 | 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 1/1 | Complete    | 2026-07-29 |
 | 8. Tray Residency, Autostart & Toast Notification | v1.1 | 4/4 | Complete    | 2026-07-31 |
-| 9. Global Hotkey Trigger | v1.1 | 1/4 | In Progress|  |
+| 9. Global Hotkey Trigger | v1.1 | 2/4 | In Progress|  |
 | 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Not started | - |
