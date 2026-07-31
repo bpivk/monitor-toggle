@@ -2,6 +2,7 @@ using System.Linq;
 using RigToggle.Core;
 using RigToggle.Core.Abstractions;
 using RigToggle.Core.Models;
+using RigToggle.Windows;
 
 namespace RigToggle.App
 {
@@ -29,6 +30,15 @@ namespace RigToggle.App
         private System.Drawing.Icon? _normalIcon;
         private System.Drawing.Icon? _rigIcon;
 
+        // TRIG-01: fixed hotkey id -- only one global hotkey exists in this app, so a
+        // single constant id is sufficient (RegisterHotKey/UnregisterHotKey key off this
+        // id, not a key/modifier combination, to unregister). _hotkeyRegistered tracks
+        // whether GlobalHotkey.Register currently holds this id so
+        // UnregisterConfiguredHotkey stays idempotent (safe to call when nothing is
+        // registered, e.g. before the very first registration attempt).
+        private const int GlobalHotkeyId = 0x9001;
+        private bool _hotkeyRegistered;
+
         public MainForm(
             ToggleOrchestrator orchestrator,
             ISettingsStore settingsStore,
@@ -47,6 +57,24 @@ namespace RigToggle.App
         {
             base.OnLoad(e);
             RefreshUi();
+        }
+
+        /// <summary>
+        /// TRIG-01: intercepts WM_HOTKEY, the message user32.dll posts to this window
+        /// once GlobalHotkey.Register has bound GlobalHotkeyId to it. base.WndProc MUST
+        /// run unconditionally for every message, not just when the id doesn't match --
+        /// skipping it (e.g. inside an early-return branch) would silently break WinForms'
+        /// own focus/tray/paint message handling for this window. Do not "optimize" this
+        /// into a conditional base call.
+        /// </summary>
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == GlobalHotkey.WmHotkey && (int)m.WParam == GlobalHotkeyId)
+            {
+                HandleHotkeyToggle();
+            }
+
+            base.WndProc(ref m);
         }
 
         /// <summary>
@@ -253,11 +281,20 @@ namespace RigToggle.App
         /// toggle, not mid-flight — RefreshUi() below only updates the status line, it
         /// does not re-run any toggle logic. Shared by BtnSettings_Click and
         /// TraySettingsMenuItem_Click (IN-02, code review) so the two paths can't drift.
+        ///
+        /// TRIG-01/D-07: unregisters the global hotkey for the entire Settings dialog
+        /// lifetime and re-registers on close (reflecting whatever the user saved or
+        /// discarded). Unregistering for the whole lifetime is deliberately simpler and
+        /// more robust than queuing/ignoring a mid-edit WM_HOTKEY -- it guarantees zero
+        /// chance of a toggle racing an in-progress Settings edit. Do not "fix" this by
+        /// re-adding mid-edit hotkey handling.
         /// </summary>
         private void OpenSettingsDialog()
         {
+            UnregisterConfiguredHotkey();
             using var settingsForm = _settingsFormFactory();
             settingsForm.ShowDialog(this);
+            TryRegisterConfiguredHotkey();
             RefreshUi();
         }
 
@@ -379,6 +416,134 @@ namespace RigToggle.App
                 ToggleResultFormatter.FormatModeTitle(_orchestrator.IsInRigMode()),
                 ToggleResultFormatter.TruncateForBalloon(ToggleResultFormatter.FormatChecklist(result)),
                 result.Success ? ToolTipIcon.Info : ToolTipIcon.Warning);
+        }
+
+        /// <summary>
+        /// TRIG-01: the global-hotkey toggle handler, dispatched from WndProc on
+        /// WM_HOTKEY. Structurally identical to TrayToggleMenuItem_Click (D-03) --
+        /// same skip-the-GUI posture (no DISPLAY-07 confirm dialog, no WR-01 config
+        /// guard, since the main window may be hidden to tray or the hotkey pressed
+        /// mid-game). CRITICAL (D-08 no-chrome guarantee): every branch below routes
+        /// through notifyIcon.ShowBalloonTip, NEVER MessageBox.Show -- a hotkey-triggered
+        /// toggle must never surface GUI chrome.
+        /// </summary>
+        private void HandleHotkeyToggle()
+        {
+            ToggleResult result;
+
+            try
+            {
+                result = _orchestrator.IsInRigMode()
+                    ? _orchestrator.ToggleToNormalMode()
+                    : _orchestrator.ToggleToRigMode();
+            }
+            catch (ToggleInProgressException ex)
+            {
+                notifyIcon.ShowBalloonTip(
+                    3000,
+                    "Rig Toggle",
+                    ToggleResultFormatter.TruncateForBalloon(ex.Message),
+                    ToolTipIcon.Warning);
+                return;
+            }
+            catch (Exception ex)
+            {
+                notifyIcon.ShowBalloonTip(
+                    3000,
+                    "Rig Toggle",
+                    ToggleResultFormatter.TruncateForBalloon($"Something went wrong while toggling: {ex.GetType().Name}: {ex.Message}"),
+                    ToolTipIcon.Warning);
+                return;
+            }
+
+            RefreshUi();
+
+            notifyIcon.ShowBalloonTip(
+                3000,
+                ToggleResultFormatter.FormatModeTitle(_orchestrator.IsInRigMode()),
+                ToggleResultFormatter.TruncateForBalloon(ToggleResultFormatter.FormatChecklist(result)),
+                result.Success ? ToolTipIcon.Info : ToolTipIcon.Warning);
+        }
+
+        /// <summary>
+        /// TRIG-01/D-04: (re)registers the configured global hotkey on this window's
+        /// handle, unregister-first so it is safe to call repeatedly -- this is what
+        /// keeps both the D-04 Settings-Save path and the D-07 re-register-on-close path
+        /// correct without double-register bugs. Do NOT "simplify" this into a
+        /// register-only call; a stale registration left behind by a prior call would
+        /// otherwise make a subsequent RegisterHotKey call fail spuriously (Windows
+        /// rejects registering the same id twice on the same window without first
+        /// unregistering it).
+        /// Returns true if nothing is configured (nothing to register) OR registration
+        /// succeeded; false if a configured hotkey failed to register (e.g. already
+        /// claimed by another application).
+        /// </summary>
+        public bool TryRegisterConfiguredHotkey()
+        {
+            GlobalHotkey.Unregister(Handle, GlobalHotkeyId);
+            _hotkeyRegistered = false;
+
+            var settings = _settingsStore.Load();
+            if (settings.HotkeyModifiers is not int modifiers || settings.HotkeyKey is not int key)
+            {
+                return true; // nothing configured -- nothing to register, not a failure
+            }
+
+            bool registered = GlobalHotkey.Register(
+                Handle,
+                GlobalHotkeyId,
+                (uint)modifiers | GlobalHotkey.ModNoRepeat,
+                (uint)key);
+
+            _hotkeyRegistered = registered;
+            return registered;
+        }
+
+        /// <summary>
+        /// TRIG-01/D-07: unregisters the global hotkey if currently registered; no-op
+        /// otherwise, so callers (OpenSettingsDialog, FormClosing paths) never need to
+        /// track registration state themselves.
+        /// </summary>
+        public void UnregisterConfiguredHotkey()
+        {
+            if (_hotkeyRegistered)
+            {
+                GlobalHotkey.Unregister(Handle, GlobalHotkeyId);
+                _hotkeyRegistered = false;
+            }
+        }
+
+        /// <summary>
+        /// TRIG-01/D-06: best-effort startup registration. Never rethrows -- this is a
+        /// startup side effect, not a critical path, and must never block
+        /// Application.Run (mirroring Program.cs's own trace-listener try/catch
+        /// convention). A false return OR a caught exception is traced and surfaced via
+        /// a warning balloon toast using the exact D-06 wording from the 09-UI-SPEC
+        /// Copywriting Contract.
+        /// </summary>
+        public void RegisterHotkeyAtStartup()
+        {
+            try
+            {
+                if (!TryRegisterConfiguredHotkey())
+                {
+                    System.Diagnostics.Trace.WriteLine("RegisterHotkeyAtStartup: TryRegisterConfiguredHotkey returned false -- the configured hotkey could not be registered.");
+                    notifyIcon.ShowBalloonTip(
+                        3000,
+                        "Rig Toggle",
+                        ToggleResultFormatter.TruncateForBalloon("Rig Toggle: the configured hotkey could not be registered — it may already be in use by another application."),
+                        ToolTipIcon.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"RegisterHotkeyAtStartup: exception while registering configured hotkey: {ex}");
+                notifyIcon.ShowBalloonTip(
+                    3000,
+                    "Rig Toggle",
+                    ToggleResultFormatter.TruncateForBalloon("Rig Toggle: the configured hotkey could not be registered — it may already be in use by another application."),
+                    ToolTipIcon.Warning);
+            }
         }
     }
 }
