@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Automation & Multi-Monitor
 status: executing
-stopped_at: Phase 8 UI-SPEC approved
-last_updated: "2026-07-30T07:08:18.875Z"
-last_activity: 2026-07-30 -- Phase 8 execution started
+stopped_at: Phase 8 all plans executed — awaiting human rig retest (D-06/A2) before close
+last_updated: "2026-07-31T00:00:00.000Z"
+last_activity: 2026-07-31 -- Phase 8 code review fixed, verification returned human_needed
 progress:
   total_phases: 5
   completed_phases: 2
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-07-26)
 
 ## Current Position
 
-Phase: 8 (tray-residency-autostart-toast-notification) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 8
-Last activity: 2026-07-30 -- Phase 8 execution started
+Phase: 8 (tray-residency-autostart-toast-notification) — AWAITING HUMAN RETEST
+Plan: 4 of 4 (all executed; rig checkpoint 08-04 partial, code review 08-REVIEW.md fixed)
+Status: Verification returned human_needed — 2 items pending (see below)
+Last activity: 2026-07-31 -- code review fixes committed (32a2845), verification recorded human_needed (7174d01)
 
 Progress: [██░░░░░░░░] 20%
 
@@ -83,6 +83,7 @@ None.
 
 - [Phase 6, resolved] The two CCD scenarios (long-idle/reboot monitor re-enable; combined disable+enable topology) are rig-validated: final **GO** recorded in `06-06-SUMMARY.md` after two gap-closure rounds (`GetAllMonitors()` dedup fix, `Restore()` Source-staleness fix). Post-validation code review (`06-REVIEW.md`) then found and fixed two further Critical bugs (settings-migration re-corruption of a deliberately-emptied disable set; a non-exception-safe companion-app minimize step) — both fixed with regression tests in commit `9d891a8`. Phase 6 formally verified `passed` 5/5 in `06-VERIFICATION.md`.
 - Phase 9's `RegisterHotKey` must be rig-tested with Moza Companion actually running, since silent conflicts with other rig software are the realistic failure mode this requirement (TRIG-01) exists to catch.
+- **[Phase 8, ACTIVE — REMINDER]** Rig checkpoint `08-04` found the `--tray` hidden-start mechanism (D-06) genuinely broken (`Application.Run(new ApplicationContext(mainForm))` did not suppress `Show()` on this runtime, contradicting `08-RESEARCH.md`'s cited theory). Root-caused and fixed in commit `91c11df` (now `Application.Run(new ApplicationContext())` with no `MainForm` reference), and code review found no regression in that fix. **Not yet retested on the rig** — user was away from their PC. Two items remain pending in `08-HUMAN-UAT.md`: (1) `--tray` startup shows no window, (2) Exit while started `--tray` and never shown (Assumption A2) terminates cleanly with no ghost tray icon. Rebuild via `dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -p:PublishProfile=win-x64` and retest both before Phase 8 can close. All other Phase 8 requirements (TRAY-01/03/04/05, NOTIF-01) are rig-confirmed and code-review-clean.
 
 ### Quick Tasks Completed
 
