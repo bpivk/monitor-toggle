@@ -67,7 +67,20 @@ namespace RigToggle.App
 
             // D-05: the HKCU Run key is the single source of truth for autostart state —
             // no AppSettings.StartWithWindows mirror field exists to read instead.
-            chkStartWithWindows.Checked = _autostartConfigurator.IsEnabled();
+            // WR-01 (code review): guarded like every other Load-time enumeration in this
+            // method — a registry read failure (permissions, hive corruption) must degrade
+            // the checkbox to unchecked with an inline warning, not crash the dialog on open.
+            try
+            {
+                chkStartWithWindows.Checked = _autostartConfigurator.IsEnabled();
+            }
+            catch (Exception ex)
+            {
+                chkStartWithWindows.Checked = false;
+                lblAutostartWarning.Text = $"Could not read Start with Windows state: {ex.Message}";
+                lblAutostartWarning.Visible = true;
+                errAutostart.SetError(chkStartWithWindows, lblAutostartWarning.Text);
+            }
 
             ValidateSettingsForm();
         }
@@ -582,7 +595,22 @@ namespace RigToggle.App
                 lblAutostartWarning.Text = message;
                 lblAutostartWarning.Visible = true;
                 errAutostart.SetError(chkStartWithWindows, message);
-                chkStartWithWindows.Checked = _autostartConfigurator.IsEnabled();
+
+                // CR-01 (code review): this recovery read must never itself throw — it
+                // exists specifically to guarantee the checkbox never claims a success
+                // that did not happen. A second registry failure here (same underlying
+                // cause, or unrelated) must degrade to leaving the checkbox as the user
+                // left it, not crash the app from inside its own error-recovery path.
+                try
+                {
+                    chkStartWithWindows.Checked = _autostartConfigurator.IsEnabled();
+                }
+                catch
+                {
+                    // Best-effort UI sync only — the inline warning above already told
+                    // the user the write failed; leaving the checkbox state as-is is
+                    // strictly better than crashing.
+                }
             }
         }
     }

@@ -39,7 +39,11 @@ public sealed class WindowsAutostartConfigurator : IAutostartConfigurator
         // Re-written unconditionally on every call so a stale path (e.g. after moving
         // the exe) self-heals the next time the user re-confirms autostart in Settings.
         // The --tray suffix ties this Run entry to Plan 08-03's hidden-startup branch.
-        using var key = Registry.CurrentUser.CreateSubKey(RunKeyPath, writable: true);
+        // WR-05 (code review): CreateSubKey can return null on failure without
+        // throwing; guard it the same way Disable() already guards OpenSubKey, rather
+        // than dereferencing unconditionally.
+        using var key = Registry.CurrentUser.CreateSubKey(RunKeyPath, writable: true)
+            ?? throw new InvalidOperationException("Could not create or open the Run registry key.");
         key.SetValue(ValueName, $"\"{exePath}\" --tray");
         Log($"Enable: wrote Run value '{ValueName}' = \"{exePath}\" --tray");
     }

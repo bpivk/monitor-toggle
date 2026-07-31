@@ -20,4 +20,13 @@ public class StartupArgsTests
     {
         Assert.Equal(expected, StartupArgs.ShouldStartHidden(args));
     }
+
+    [Fact]
+    public void ShouldStartHidden_NullArgs_ReturnsFalseWithoutThrowing()
+    {
+        // WR-04 (code review): the documented "never throws on null" contract was
+        // previously unfulfilled and untested — Enumerable.Contains throws on a null
+        // source. Guard added in StartupArgs.cs; this proves it holds.
+        Assert.False(StartupArgs.ShouldStartHidden(null));
+    }
 }

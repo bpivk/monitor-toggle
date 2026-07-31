@@ -17,6 +17,15 @@ namespace RigToggle.App
             {
                 components.Dispose();
             }
+
+            // WR-03 (code review): _normalIcon/_rigIcon (MainForm.cs) are plain fields,
+            // not components-owned, so they need explicit deterministic disposal here
+            // rather than relying on Icon's finalizer.
+            if (disposing)
+            {
+                _normalIcon?.Dispose();
+                _rigIcon?.Dispose();
+            }
             base.Dispose(disposing);
         }
 

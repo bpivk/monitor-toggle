@@ -18,6 +18,6 @@ public static class StartupArgs
     /// Never indexes into args and never throws — an empty array, a garbage array, or
     /// any combination of unrelated tokens simply yields false.
     /// </summary>
-    public static bool ShouldStartHidden(string[] args) =>
-        args.Contains(TrayFlag, StringComparer.OrdinalIgnoreCase);
+    public static bool ShouldStartHidden(string[]? args) =>
+        args is not null && args.Contains(TrayFlag, StringComparer.OrdinalIgnoreCase);
 }

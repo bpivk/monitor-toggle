@@ -82,8 +82,14 @@ namespace RigToggle.App
             var assembly = typeof(MainForm).Assembly;
             using var normalStream = assembly.GetManifestResourceStream("normal.ico");
             using var rigStream = assembly.GetManifestResourceStream("rig.ico");
-            _normalIcon = new System.Drawing.Icon(normalStream!);
-            _rigIcon = new System.Drawing.Icon(rigStream!);
+            // IN-01 (code review): explicit null-check with a descriptive message
+            // instead of the null-forgiving operator — a missing/renamed embedded
+            // resource should fail with a clear diagnostic, not an opaque exception
+            // from the Icon constructor at startup, before any window exists.
+            _normalIcon = new System.Drawing.Icon(normalStream
+                ?? throw new InvalidOperationException("Embedded resource 'normal.ico' not found."));
+            _rigIcon = new System.Drawing.Icon(rigStream
+                ?? throw new InvalidOperationException("Embedded resource 'rig.ico' not found."));
         }
 
         /// <summary>
@@ -240,11 +246,16 @@ namespace RigToggle.App
             }
         }
 
-        private void BtnSettings_Click(object? sender, EventArgs e)
+        private void BtnSettings_Click(object? sender, EventArgs e) => OpenSettingsDialog();
+
+        /// <summary>
+        /// Modal (D-03): blocks Main until closed. New settings apply on the NEXT
+        /// toggle, not mid-flight — RefreshUi() below only updates the status line, it
+        /// does not re-run any toggle logic. Shared by BtnSettings_Click and
+        /// TraySettingsMenuItem_Click (IN-02, code review) so the two paths can't drift.
+        /// </summary>
+        private void OpenSettingsDialog()
         {
-            // Modal (D-03): blocks Main until closed. New settings apply on the NEXT
-            // toggle, not mid-flight — RefreshUi() below only updates the status line,
-            // it does not re-run any toggle logic.
             using var settingsForm = _settingsFormFactory();
             settingsForm.ShowDialog(this);
             RefreshUi();
@@ -294,12 +305,7 @@ namespace RigToggle.App
             }
         }
 
-        private void TraySettingsMenuItem_Click(object? sender, EventArgs e)
-        {
-            using var settingsForm = _settingsFormFactory();
-            settingsForm.ShowDialog(this);
-            RefreshUi();
-        }
+        private void TraySettingsMenuItem_Click(object? sender, EventArgs e) => OpenSettingsDialog();
 
         /// <summary>
         /// TRAY-03/D-04: explicitly hide the tray icon before Application.Exit() — an
@@ -319,6 +325,14 @@ namespace RigToggle.App
         /// caller of Phase 7's ToggleOrchestrator, validating that extraction. Skips
         /// the GUI-only WR-01 config guard and DISPLAY-07 confirm dialog on purpose
         /// (inappropriate for a background trigger with no guaranteed-visible window).
+        /// ACCEPTED RISK (WR-02, 08-REVIEW.md, reviewed and knowingly kept): this means
+        /// a user who configures Settings entirely via the tray's own Settings item and
+        /// then toggles for the very first time from the tray menu never sees the
+        /// DISPLAY-07 informed-consent dialog naming which monitors will be
+        /// disabled/enabled. This is the intentional cost of "control entirely from the
+        /// tray icon" (TRAY-03's own goal); it is not an oversight and should not be
+        /// silently "fixed" by re-adding the dialog here, which would defeat the
+        /// tray-only convenience this handler exists for.
         /// CRITICAL (D-08 no-chrome guarantee): every branch below — both exception
         /// handlers and the final result toast — routes through
         /// notifyIcon.ShowBalloonTip, NEVER MessageBox.Show. A tray-triggered toggle
