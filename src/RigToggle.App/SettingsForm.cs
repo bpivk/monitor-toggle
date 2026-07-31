@@ -73,6 +73,7 @@ namespace RigToggle.App
             // via GotFocus alone (UI-SPEC Interaction States) — MouseDown fires before
             // any focus-change side effects, matching the UI-SPEC's own wording.
             txtHotkey.MouseDown += TxtHotkey_MouseDown;
+            txtHotkey.PreviewKeyDown += TxtHotkey_PreviewKeyDown;
             txtHotkey.KeyDown += TxtHotkey_KeyDown;
             txtHotkey.LostFocus += TxtHotkey_LostFocus;
         }
@@ -148,6 +149,25 @@ namespace RigToggle.App
             txtHotkey.Text = "Press a key combination… (Esc to clear)";
             txtHotkey.BackColor = SystemColors.Info;
             txtHotkey.ForeColor = SystemColors.WindowText;
+        }
+
+        // Rig checkpoint 09-04 fix: Escape was clearing the field AND closing the dialog
+        // (CancelButton = btnDiscardChanges). Root cause — WinForms routes "dialog keys"
+        // (Escape, Enter, Tab, arrows) through Form.ProcessDialogKey/CancelButton BEFORE
+        // OnKeyDown ever fires, gated by Control.IsInputKey; TxtHotkey_KeyDown's own
+        // e.Handled/e.SuppressKeyPress only affect processing AFTER that point, so they
+        // could never stop the Escape from also triggering CancelButton. Setting
+        // PreviewKeyDownEventArgs.IsInputKey = true while actively recording claims every
+        // key (not just Escape — Enter/Tab/arrows are all valid recordable hotkey keys
+        // too) as ordinary input, routing it to TxtHotkey_KeyDown instead of dialog-key
+        // processing. Guarded on _recordingHotkey so idle-state Escape/Enter/Tab still
+        // behave as normal dialog navigation/cancel.
+        private void TxtHotkey_PreviewKeyDown(object? sender, PreviewKeyDownEventArgs e)
+        {
+            if (_recordingHotkey)
+            {
+                e.IsInputKey = true;
+            }
         }
 
         // UI-SPEC "Interaction States — txtHotkey": the capture state machine. Suppresses
