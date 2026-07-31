@@ -9,6 +9,9 @@ namespace RigToggle.Core.Models;
 /// strings) applied on toggle-to-rig and mirrored on toggle-back (06-RESEARCH.md).
 /// MonitorDevicePath/MonitorFriendlyName are retained ONLY as the legacy v1.0 migration
 /// source (JsonSettingsStore.Load(), D-08) — do not delete or repurpose them.
+/// HotkeyModifiers/HotkeyKey are both null-until-configured per D-02 (no default global
+/// hotkey) and, together, hold the Win32 modifier bit-mask (see HotkeyCombo.Mod*) and
+/// virtual-key code of the configured global hotkey (TRIG-01).
 /// </summary>
 public sealed class AppSettings
 {
@@ -23,4 +26,6 @@ public sealed class AppSettings
     public string? CompanionAppPath { get; set; }
     public bool SkipMonitorConfirmation { get; set; }
     public bool EnableDebugLogging { get; set; }
+    public int? HotkeyModifiers { get; set; }
+    public int? HotkeyKey { get; set; }
 }
