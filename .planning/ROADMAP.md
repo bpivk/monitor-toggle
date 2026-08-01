@@ -205,7 +205,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 **Goal:** User can independently configure whether closing the main window (X) minimizes to tray or exits the app, and whether the minimize button also minimizes to tray, instead of the current fixed always-minimize-to-tray behavior from Phase 8.
 **Requirements**: TRAY-01 (revises Phase 8's fixed close-to-tray behavior into a user preference; no net-new REQ-ID)
 **Depends on:** Phase 8 (revises TRAY-01's fixed close-to-tray behavior into a Settings preference)
-**Plans:** 2/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 **Wave 1**
@@ -218,7 +218,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 11-03-PLAN.md — SettingsForm two checkboxes (chkEnableDebugLogging behavior template + UI-SPEC layout) + Load/Save + injected live-apply Action + Program.cs wiring (D-03/D-06/D-07/D-08)
+- [x] 11-03-PLAN.md — SettingsForm two checkboxes (chkEnableDebugLogging behavior template + UI-SPEC layout) + Load/Save + injected live-apply Action + Program.cs wiring (D-03/D-06/D-07/D-08)
 
 **Wave 4** *(blocked on Wave 3)*
 
