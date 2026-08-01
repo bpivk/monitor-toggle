@@ -129,9 +129,13 @@ namespace RigToggle.App
             // NOT added to this.Controls -- NotifyIcon is not a Control. Icon/Text are set
             // from RefreshUi()/InitializeTrayState() (MainForm.cs), never left at a default
             // here, since the correct mode-reflecting glyph must be current-on-first-paint
-            // even under --tray startup (D-01, 08-RESEARCH.md Pitfall 6).
+            // even under --tray startup (D-01, 08-RESEARCH.md Pitfall 6). Visible defaults
+            // to false (Phase 11/D-08/D-11): actual visibility is derived by
+            // ApplyTrayVisibility() at startup from CloseMinimizesToTray || MinimizeToTray,
+            // not hardcoded on -- this prevents a ghost tray icon flashing on a
+            // both-settings-off launch before the derived rule runs.
             this.notifyIcon.ContextMenuStrip = this.trayContextMenu;
-            this.notifyIcon.Visible = true;
+            this.notifyIcon.Visible = false;
             this.notifyIcon.MouseClick += new System.Windows.Forms.MouseEventHandler(this.NotifyIcon_MouseClick);
 
             //
@@ -147,6 +151,7 @@ namespace RigToggle.App
             this.Text = "Rig Toggle";
             this.Name = "MainForm";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
+            this.Resize += new System.EventHandler(this.MainForm_Resize);
 
             this.Controls.Add(this.lblMode);
             this.Controls.Add(this.btnToggle);
