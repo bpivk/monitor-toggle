@@ -1,7 +1,7 @@
 ---
 phase: 11-configurable-tray-close-minimize-behavior-user-selectable-op
 verified: 2026-08-01T21:00:00Z
-status: human_needed
+status: passed
 score: 11/11 must-haves verified
 overrides_applied: 0
 re_verification:
@@ -11,6 +11,11 @@ re_verification:
     - "The CR-01 lockout-guard fix (MainForm.ApplyTrayVisibility) prevents the app from becoming unreachable via any UI surface when both tray preferences are disabled — including the --tray-autostart + tray-Settings-disable-both path that commit e317323 missed"
   gaps_remaining: []
   regressions: []
+human_verification:
+  status: confirmed
+  confirmed_at: 2026-08-01T22:20:00Z
+  source: 11-HUMAN-UAT.md
+  result: "Both pending scenarios (CR-01 lockout-guard fix re-verification, 11-04 regression spot-check) passed on the real rig."
 ---
 
 # Phase 11: Configurable Tray Close/Minimize Behavior Verification Report
