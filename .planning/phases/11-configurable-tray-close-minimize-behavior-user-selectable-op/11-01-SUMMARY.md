@@ -115,6 +115,16 @@ This sandbox has no `dotnet` SDK installed (`which dotnet` fails; no binary unde
 - `CloseMinimizesToTray` and `MinimizeToTray` are now settled Core-layer identifiers ready for the MainForm close/minimize/tray-visibility logic plan and the SettingsForm checkbox UI plan to consume directly — no downstream plan needs to guess field names or default semantics.
 - No blockers.
 
+## Self-Check: PASSED
+
+- FOUND: src/RigToggle.Core/Models/AppSettings.cs
+- FOUND: src/RigToggle.Tests/JsonStoreTests.cs
+- FOUND: .planning/phases/11-configurable-tray-close-minimize-behavior-user-selectable-op/11-01-SUMMARY.md
+- FOUND commit: cd4f047 (Task 1)
+- FOUND commit: 7e453d6 (Task 2)
+- FOUND commit: c81d546 (Rule 1 auto-fix)
+- FOUND commit: 4dc82ac (SUMMARY.md metadata commit)
+
 ---
 *Phase: 11-configurable-tray-close-minimize-behavior-user-selectable-op*
 *Completed: 2026-08-01*
