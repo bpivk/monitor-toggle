@@ -205,12 +205,12 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 **Goal:** User can independently configure whether closing the main window (X) minimizes to tray or exits the app, and whether the minimize button also minimizes to tray, instead of the current fixed always-minimize-to-tray behavior from Phase 8.
 **Requirements**: TRAY-01 (revises Phase 8's fixed close-to-tray behavior into a user preference; no net-new REQ-ID)
 **Depends on:** Phase 8 (revises TRAY-01's fixed close-to-tray behavior into a Settings preference)
-**Plans:** 4 plans (waves: 1 → 2 → 3 → 4)
+**Plans:** 1/4 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 11-01-PLAN.md — AppSettings CloseMinimizesToTray/MinimizeToTray bool fields + JsonStore round-trip/default-false-on-upgrade tests (D-01/D-02/D-04/D-05)
+- [x] 11-01-PLAN.md — AppSettings CloseMinimizesToTray/MinimizeToTray bool fields + JsonStore round-trip/default-false-on-upgrade tests (D-01/D-02/D-04/D-05)
 
 **Wave 2** *(blocked on Wave 1)*
 

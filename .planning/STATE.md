@@ -4,8 +4,8 @@ milestone: v1.1
 milestone_name: Automation & Multi-Monitor
 status: executing
 stopped_at: Phase 11 UI-SPEC approved
-last_updated: "2026-08-01T19:09:54.523Z"
-last_activity: 2026-08-01 -- Phase 11 planning complete
+last_updated: "2026-08-01T19:24:34.797Z"
+last_activity: 2026-08-01 -- Phase 11 execution started
 progress:
   total_phases: 6
   completed_phases: 4
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-26)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
-**Current focus:** Phase 10 — cli trigger + single instance ipc
+**Current focus:** Phase 11 — configurable-tray-close-minimize-behavior-user-selectable-op
 
 ## Current Position
 
-Phase: 10
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-08-01 -- Phase 11 planning complete
+Phase: 11 (configurable-tray-close-minimize-behavior-user-selectable-op) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 11
+Last activity: 2026-08-01 -- Phase 11 execution started
 
 Progress: [██████░░░░] 60%
 
