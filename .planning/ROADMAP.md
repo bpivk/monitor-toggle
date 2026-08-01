@@ -203,9 +203,25 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 ### Phase 11: Configurable Tray Close/Minimize Behavior
 
 **Goal:** User can independently configure whether closing the main window (X) minimizes to tray or exits the app, and whether the minimize button also minimizes to tray, instead of the current fixed always-minimize-to-tray behavior from Phase 8.
-**Requirements**: TBD
+**Requirements**: TRAY-01 (revises Phase 8's fixed close-to-tray behavior into a user preference; no net-new REQ-ID)
 **Depends on:** Phase 8 (revises TRAY-01's fixed close-to-tray behavior into a Settings preference)
-**Plans:** 0 plans
+**Plans:** 4 plans (waves: 1 → 2 → 3 → 4)
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 11 to break down)
+**Wave 1**
+
+- [ ] 11-01-PLAN.md — AppSettings CloseMinimizesToTray/MinimizeToTray bool fields + JsonStore round-trip/default-false-on-upgrade tests (D-01/D-02/D-04/D-05)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 11-02-PLAN.md — MainForm: shared SendToTray helper, conditional FormClosing (D-01), derived ApplyTrayVisibility (D-08/D-09/D-11), MainForm_Resize minimize-to-tray handler (D-04), Designer wiring
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 11-03-PLAN.md — SettingsForm two checkboxes (chkEnableDebugLogging behavior template + UI-SPEC layout) + Load/Save + injected live-apply Action + Program.cs wiring (D-03/D-06/D-07/D-08)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 11-04-PLAN.md — Human-verify checkpoint (go/no-go): fresh-upgrade default (X exits, no tray icon), close-to-tray, minimize-to-tray, live tray-icon existence on Save
+
+**UI hint**: yes
