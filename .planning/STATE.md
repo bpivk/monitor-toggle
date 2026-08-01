@@ -1,36 +1,36 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Automation & Multi-Monitor
-status: milestone_complete
-stopped_at: Milestone complete (Phase 11 was final phase)
-last_updated: 2026-08-01T22:05:14.666Z
-last_activity: 2026-08-01 -- Phase 11 execution started
+milestone: none
+milestone_name: Awaiting next milestone (v1.1 archived)
+status: milestone_archived
+stopped_at: v1.1 archived; run /gsd:new-milestone to scope the next one
+last_updated: 2026-08-01T22:25:00.000Z
+last_activity: 2026-08-01 -- v1.1 milestone archived
 progress:
-  total_phases: 6
-  completed_phases: 4
-  total_plans: 19
-  completed_plans: 19
-  percent: 67
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-26)
+See: .planning/PROJECT.md (updated 2026-08-01)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
-**Current focus:** Milestone complete
+**Current focus:** Awaiting next milestone scope (`/gsd:new-milestone`)
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
-Status: Milestone complete
+Phase: none
+Plan: none
+Status: v1.1 archived — awaiting next milestone
 Last activity: 2026-08-01
 
-Progress: [██████░░░░] 60%
+Progress: v1.1 shipped, archived to `.planning/milestones/v1.1-ROADMAP.md`
 
 ## Performance Metrics
 
@@ -105,23 +105,29 @@ Items acknowledged and carried forward from previous milestone close:
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| v2 | LOG-01 (toggle history/log) | Still deferred | Initial requirements definition (v1.0); re-deferred at v1.1 scoping |
+| v2 | LOG-01 (toggle history/log) | Still deferred | Initial requirements definition (v1.0); re-deferred at v1.1 scoping and again at v1.1 close |
+| v2 | TRIG-02 (CLI toggle argument) | Dropped from v1.1 delivered scope | v1.1 milestone close 2026-08-01 — Phase 10 never planned/executed; tray+hotkey triggers cover the daily-use need |
+| v2 | TRIG-03 (CLI status query argument) | Dropped from v1.1 delivered scope | v1.1 milestone close 2026-08-01 — same as TRIG-02 |
 
-Items acknowledged and deferred at v1.0 milestone close on 2026-07-26 (pre-close artifact audit — both are scanner false positives, not real gaps, confirmed by direct inspection):
+Items acknowledged and deferred at v1.0 milestone close on 2026-07-26, reconfirmed at v1.1 close on 2026-08-01 (pre-close artifact audit — both are scanner false positives, not real gaps, confirmed by direct inspection):
 
 | Category | Item | Status |
 |----------|------|--------|
 | debug | knowledge-base | `.planning/debug/knowledge-base.md` is a persistent reference doc (not a debug session) sitting directly in `.planning/debug/`; the audit scanner treats every `.md` file in that directory as a session and flags it "unknown" for lacking a `status:` field. Not an open investigation — acknowledged and left as-is. |
 | uat_gap | Phase 05 (05-HUMAN-UAT.md) | File's own frontmatter already reads `status: resolved` with 0 pending scenarios; the scanner surfaces any existing UAT file regardless of resolution. Already resolved — acknowledged, no action needed. |
+| quick_task | 260728-qj1-fix-windowsmonitorcontroller-getallmonit | Scanner flags "missing" status, but `260728-qj1-SUMMARY.md` exists and STATE.md's Quick Tasks Completed table confirms it shipped in commit `fe0aee7`. False positive — the scanner's completion check doesn't recognize this quick-task's status format. |
+| quick_task | 260728-rmp-improve-settings-monitor-grid-clarity-re | Same false-positive pattern as above; shipped in commit `d76b5db`, confirmed via `260728-rmp-SUMMARY.md` and the Quick Tasks Completed table. |
+
+Resolved at v1.1 close (2026-08-01): Phase 11's `11-HUMAN-UAT.md` (2 pending human-verify scenarios — CR-01 lockout-guard re-verification, tray-behavior regression spot-check) — both confirmed pass on the real rig; `11-VERIFICATION.md` status updated `human_needed` → `passed`. No longer an open item.
 
 ## Session Continuity
 
-Last session: 2026-08-01T13:41:16.040Z
-Stopped at: Phase 11 UI-SPEC approved
-Resume file: .planning/phases/11-configurable-tray-close-minimize-behavior-user-selectable-op/11-UI-SPEC.md
+Last session: 2026-08-01T22:25:00.000Z
+Stopped at: v1.1 milestone archived
+Resume file: none — start next milestone
 
 ## Operator Next Steps
 
-- `/gsd:plan-phase 9` — plan Phase 9 (Global Hotkey Trigger); 09-CONTEXT.md is ready
+- `/gsd:new-milestone` — scope v1.2/v2.0 (candidates: TRIG-02/TRIG-03 CLI trigger, LOG-01 toggle history/log)
 
 </content>

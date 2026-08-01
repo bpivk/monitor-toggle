@@ -1,5 +1,26 @@
 # Milestones
 
+## v1.1 Automation & Multi-Monitor (Shipped: 2026-08-01)
+
+**Phases completed:** 5 phases (6, 7, 8, 9, 11), 19 plans + 2 gap-closure quick tasks
+**Git range:** v1.0 → HEAD (186 commits, 190 files changed, +17,214/-1,172 lines)
+**Timeline:** 2026-07-26 → 2026-08-01 (6 days)
+
+**Key accomplishments:**
+
+- Generalized monitor control from one hardcoded primary monitor to independently-configurable N-monitor disable/enable sets, with a silent v1.0→v1.1 settings migration and a rig-validated CCD checkpoint covering reboot/sleep re-enable and combined disable+enable topology (Phase 6, DISPLAY-04 through DISPLAY-08)
+- Extracted a shared, reentrancy-safe `ToggleOrchestrator` (non-blocking busy-flag guard) that every trigger — button, tray, hotkey — now routes through, so a toggle already in progress can never be corrupted by a second concurrent request (Phase 7, CORE-06)
+- Added full tray residency: close-to-tray, autostart with Windows, tray context menu, mode-reflecting tray icon, and toast notifications for toggles triggered without the GUI open (Phase 8, TRAY-01 through TRAY-05, NOTIF-01)
+- Added a configurable global hotkey that toggles the mode from anywhere in Windows, including while hidden in the tray, with registration-conflict failures surfaced in Settings instead of silently swallowed (Phase 9, TRIG-01)
+- Made tray close/minimize behavior a genuine user preference — independent `CloseMinimizesToTray` and `MinimizeToTray` Settings checkboxes replacing Phase 8's fixed always-minimize-to-tray default, including a critical lockout bug found by code review, fixed, and rig-reverified at milestone close (Phase 11, revises TRAY-01)
+- Nine real rig-discovered or code-review-found bugs fixed and verified across the milestone, including a `--tray` hidden-startup mechanism that silently failed to suppress the window and a settings-migration guard that could re-corrupt a deliberately-emptied monitor set
+
+**Known gap:** Phase 10 (CLI Trigger + Single-Instance IPC, TRIG-02/TRIG-03) was in the original v1.1 roadmap scope but was never planned or executed — Phase 11 was prioritized ahead of it after surfacing during Phase 9's rig checkpoint. Reviewed and dropped to the v2 backlog at milestone close rather than delivered; tray + hotkey triggers already cover the daily-use need. Full detail: `.planning/milestones/v1.1-REQUIREMENTS.md`.
+
+Full milestone detail: `.planning/milestones/v1.1-ROADMAP.md`, `.planning/milestones/v1.1-REQUIREMENTS.md`
+
+---
+
 ## v1.0 MVP (Shipped: 2026-07-26)
 
 **Phases completed:** 5 phases, 18 plans, 49 tasks
