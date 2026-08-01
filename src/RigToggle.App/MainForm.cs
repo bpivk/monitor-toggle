@@ -39,6 +39,14 @@ namespace RigToggle.App
         private const int GlobalHotkeyId = 0x9001;
         private bool _hotkeyRegistered;
 
+        // Code review CR-01: distinguishes "never shown this session" (true --tray
+        // autostart, D-10's accepted no-tray-icon-until-manually-relaunched state) from
+        // "was shown, then hidden to tray via user action" (the lockout scenario
+        // ApplyTrayVisibility must guard against). OnLoad only fires on the visible
+        // startup path -- under --tray the form's Load event never fires (see Program.cs) --
+        // so this flag stays false for the entire life of a true --tray session.
+        private bool _windowEverShown;
+
         public MainForm(
             ToggleOrchestrator orchestrator,
             ISettingsStore settingsStore,
@@ -56,6 +64,7 @@ namespace RigToggle.App
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
+            _windowEverShown = true;
             RefreshUi();
         }
 
@@ -107,11 +116,41 @@ namespace RigToggle.App
         /// never need a null/existence guard. Accepted consequence of D-11: toasts render
         /// nothing while both settings are off, since ShowBalloonTip requires Visible ==
         /// true to actually display — this is an intentional tradeoff, not a bug.
+        ///
+        /// Lockout guard (code review CR-01): D-09 keeps Settings reachable from the tray
+        /// context menu even while MainForm is Hide()'d. If the user disables both prefs
+        /// from that Settings session, dropping notifyIcon.Visible while the window is
+        /// still hidden would leave zero UI surface reachable (no tray icon, no taskbar
+        /// entry) — recoverable only via Task Manager. Force the window back into view
+        /// before losing the tray icon in that case.
+        ///
+        /// The guard only fires when _windowEverShown is true (the window was visible at
+        /// some point this session, then hidden via SendToTray) — NOT on a true --tray
+        /// autostart where the window was never shown at all. That combination (D-10) is
+        /// an accepted, deliberate state: the app starts hidden with no tray icon and can
+        /// only be relaunched manually. Do not "fix" that case by forcing a Show() here.
         /// </summary>
         public void ApplyTrayVisibility()
         {
-            var settings = _settingsStore.Load();
-            notifyIcon.Visible = settings.CloseMinimizesToTray || settings.MinimizeToTray;
+            AppSettings settings;
+            try
+            {
+                settings = _settingsStore.Load();
+            }
+            catch
+            {
+                settings = new AppSettings();
+            }
+
+            bool shouldBeVisible = settings.CloseMinimizesToTray || settings.MinimizeToTray;
+
+            if (!shouldBeVisible && !Visible && _windowEverShown)
+            {
+                Show();
+                WindowState = FormWindowState.Normal;
+            }
+
+            notifyIcon.Visible = shouldBeVisible;
         }
 
         /// <summary>
@@ -347,7 +386,19 @@ namespace RigToggle.App
         /// </summary>
         private void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
         {
-            var settings = _settingsStore.Load();
+            // WR-01 (code review): Load() is unguarded elsewhere for best-effort, low-frequency
+            // callers, but Close is a core, everyday interaction — degrade to "never configured"
+            // defaults (X exits, matching first-run behavior) rather than let a settings.json
+            // read failure (e.g. UnauthorizedAccessException) propagate out of this handler.
+            AppSettings settings;
+            try
+            {
+                settings = _settingsStore.Load();
+            }
+            catch
+            {
+                settings = new AppSettings();
+            }
 
             if (e.CloseReason == CloseReason.UserClosing && settings.CloseMinimizesToTray)
             {
@@ -374,11 +425,22 @@ namespace RigToggle.App
         /// rather than duplicating Hide(). When MinimizeToTray is false (D-05 default),
         /// this handler does nothing and the standard OS minimize-to-taskbar proceeds
         /// unchanged. Restore happens through the existing NotifyIcon_MouseClick
-        /// left-click path (WindowState = Normal; Show(); Activate()), not from here.
+        /// left-click path (Show(); WindowState = Normal; Activate()), not from here.
         /// </summary>
         private void MainForm_Resize(object? sender, EventArgs e)
         {
-            var settings = _settingsStore.Load();
+            // WR-01 (code review): same defensive Load() as MainForm_FormClosing — Minimize
+            // is a core, everyday interaction and should degrade to standard OS minimize
+            // rather than throw if settings.json is unreadable.
+            AppSettings settings;
+            try
+            {
+                settings = _settingsStore.Load();
+            }
+            catch
+            {
+                settings = new AppSettings();
+            }
 
             if (WindowState == FormWindowState.Minimized && settings.MinimizeToTray)
             {
