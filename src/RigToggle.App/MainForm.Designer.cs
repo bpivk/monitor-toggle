@@ -151,6 +151,7 @@ namespace RigToggle.App
             this.Text = "Rig Toggle";
             this.Name = "MainForm";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
+            this.Resize += new System.EventHandler(this.MainForm_Resize);
 
             this.Controls.Add(this.lblMode);
             this.Controls.Add(this.btnToggle);

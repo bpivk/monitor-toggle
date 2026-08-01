@@ -366,6 +366,27 @@ namespace RigToggle.App
         }
 
         /// <summary>
+        /// TRAY-01/D-04/D-05: intercepts the window minimize action. When
+        /// AppSettings.MinimizeToTray is true, a minimize hides the window to tray via
+        /// the same shared SendToTray() helper used by the Close path — the window's
+        /// hidden appearance is pixel-identical to the closed-to-tray state, so no new
+        /// visual variant is introduced, and this deliberately reuses SendToTray()
+        /// rather than duplicating Hide(). When MinimizeToTray is false (D-05 default),
+        /// this handler does nothing and the standard OS minimize-to-taskbar proceeds
+        /// unchanged. Restore happens through the existing NotifyIcon_MouseClick
+        /// left-click path (WindowState = Normal; Show(); Activate()), not from here.
+        /// </summary>
+        private void MainForm_Resize(object? sender, EventArgs e)
+        {
+            var settings = _settingsStore.Load();
+
+            if (WindowState == FormWindowState.Minimized && settings.MinimizeToTray)
+            {
+                SendToTray();
+            }
+        }
+
+        /// <summary>
         /// TRAY-05/D-02: NotifyIcon.MouseClick (not the button-agnostic Click event,
         /// which fires for both mouse buttons per 08-RESEARCH.md Pitfall 2) restores
         /// and focuses the main window on a LEFT click only — a right-click here must
