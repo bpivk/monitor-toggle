@@ -92,6 +92,26 @@ namespace RigToggle.App
         {
             LoadTrayIconsIfNeeded();
             RefreshUi();
+            ApplyTrayVisibility();
+        }
+
+        /// <summary>
+        /// TRAY-01/D-08/D-09: derives notifyIcon.Visible from the OR of the two Phase 11
+        /// preferences — the tray icon is shown whenever EITHER CloseMinimizesToTray OR
+        /// MinimizeToTray is true, and absent only when BOTH are false (D-09). Idempotent
+        /// and safe to call repeatedly (called at startup via InitializeTrayState() and
+        /// again on demand, e.g. after Settings-Save, so the icon's presence updates live
+        /// without requiring an app restart). D-11: the NotifyIcon component itself is
+        /// always instantiated regardless of these settings — only its .Visible is
+        /// derived here, so ShowBalloonTip calls elsewhere (tray/hotkey toggle toasts)
+        /// never need a null/existence guard. Accepted consequence of D-11: toasts render
+        /// nothing while both settings are off, since ShowBalloonTip requires Visible ==
+        /// true to actually display — this is an intentional tradeoff, not a bug.
+        /// </summary>
+        public void ApplyTrayVisibility()
+        {
+            var settings = _settingsStore.Load();
+            notifyIcon.Visible = settings.CloseMinimizesToTray || settings.MinimizeToTray;
         }
 
         /// <summary>
@@ -299,30 +319,49 @@ namespace RigToggle.App
         }
 
         /// <summary>
-        /// TRAY-01/D-03: only the window's own Close (X button, Alt+F4, or a plain
-        /// this.Close() call) is intercepted and redirected to hide-to-tray —
+        /// TRAY-01/D-01: the single shared "send to tray" mechanism used by both the
+        /// Close (MainForm_FormClosing) and Minimize (MainForm_Resize) hide-to-tray
+        /// paths — do NOT duplicate the Hide() call in either caller; both must route
+        /// through here so the two paths can never drift apart.
+        /// </summary>
+        private void SendToTray()
+        {
+            Hide();
+        }
+
+        /// <summary>
+        /// TRAY-01/D-01: only the window's own Close (X button, Alt+F4, or a plain
+        /// this.Close() call) is ever considered for hide-to-tray —
         /// CloseReason.UserClosing is the specific, documented enum value raised for
-        /// exactly that case (08-RESEARCH.md Pattern 1). Deliberately does NOT gate on
-        /// any other CloseReason: the tray's own "Exit" menu item calls
-        /// Application.Exit() directly, which raises the distinct
-        /// CloseReason.ApplicationExitCall and must be allowed to proceed through this
-        /// same handler with no extra flag — do NOT "fix" this into symmetry with a
-        /// custom _isExiting boolean. WindowsShutDown/TaskManagerClosing must also be
-        /// allowed through, or the OS/Task Manager could never actually terminate the
-        /// process.
+        /// exactly that case (08-RESEARCH.md Pattern 1). Phase 11 (D-01) makes this
+        /// redirect CONDITIONAL on AppSettings.CloseMinimizesToTray (default false,
+        /// D-02) rather than the previously-unconditional Phase-8 behavior: when the
+        /// setting is on, X hides to tray exactly as before; when off, X now lets the
+        /// close proceed and the app exits. Deliberately does NOT gate on any other
+        /// CloseReason: the tray's own "Exit" menu item calls Application.Exit()
+        /// directly, which raises the distinct CloseReason.ApplicationExitCall and
+        /// must be allowed to proceed through this same handler with no extra flag —
+        /// do NOT "fix" this into symmetry with a custom _isExiting boolean.
+        /// WindowsShutDown/TaskManagerClosing must also be allowed through, or the
+        /// OS/Task Manager could never actually terminate the process.
         /// </summary>
         private void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
         {
-            if (e.CloseReason == CloseReason.UserClosing)
+            var settings = _settingsStore.Load();
+
+            if (e.CloseReason == CloseReason.UserClosing && settings.CloseMinimizesToTray)
             {
                 e.Cancel = true;
-                Hide();
+                SendToTray();
                 return;
             }
 
-            // ApplicationExitCall (tray Exit), WindowsShutDown, TaskManagerClosing, etc.
-            // T-08-GHOST: belt-and-suspenders ghost-icon prevention alongside the
-            // explicit notifyIcon.Visible = false already set in TrayExitMenuItem_Click.
+            // UserClosing with CloseMinimizesToTray false (D-01: X now exits the app),
+            // or any non-UserClosing reason (ApplicationExitCall from tray Exit,
+            // WindowsShutDown, TaskManagerClosing, etc.) falls through here and the
+            // close proceeds. T-08-GHOST: belt-and-suspenders ghost-icon prevention
+            // alongside the explicit notifyIcon.Visible = false already set in
+            // TrayExitMenuItem_Click.
             notifyIcon.Visible = false;
         }
 
