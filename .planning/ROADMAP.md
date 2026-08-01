@@ -205,7 +205,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 **Goal:** User can independently configure whether closing the main window (X) minimizes to tray or exits the app, and whether the minimize button also minimizes to tray, instead of the current fixed always-minimize-to-tray behavior from Phase 8.
 **Requirements**: TRAY-01 (revises Phase 8's fixed close-to-tray behavior into a user preference; no net-new REQ-ID)
 **Depends on:** Phase 8 (revises TRAY-01's fixed close-to-tray behavior into a Settings preference)
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 
 Plans:
 **Wave 1**
@@ -222,6 +222,6 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 11-04-PLAN.md — Human-verify checkpoint (go/no-go): fresh-upgrade default (X exits, no tray icon), close-to-tray, minimize-to-tray, live tray-icon existence on Save
+- [x] 11-04-PLAN.md — Human-verify checkpoint (go/no-go): fresh-upgrade default (X exits, no tray icon), close-to-tray, minimize-to-tray, live tray-icon existence on Save
 
 **UI hint**: yes
