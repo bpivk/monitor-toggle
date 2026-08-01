@@ -1,10 +1,11 @@
 ---
 phase: 11
 slug: configurable-tray-close-minimize-behavior-user-selectable-op
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-08-01
+reviewed_at: 2026-08-01
 ---
 
 # Phase 11 — UI Design Contract
