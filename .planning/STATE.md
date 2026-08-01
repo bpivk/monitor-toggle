@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Automation & Multi-Monitor
-status: ready_to_plan
-stopped_at: Phase 09 complete (4/4) — ready to discuss Phase 10
-last_updated: 2026-07-31T19:42:59.270Z
-last_activity: 2026-07-31 -- Phase 09 execution started
+status: planning
+stopped_at: Phase 11 context gathered
+last_updated: "2026-08-01T12:54:46.891Z"
+last_activity: 2026-07-31
 progress:
-  total_phases: 5
-  completed_phases: 3
+  total_phases: 6
+  completed_phases: 4
   total_plans: 15
   completed_plans: 15
-  percent: 60
+  percent: 67
 ---
 
 # Project State
@@ -62,6 +62,10 @@ Progress: [██████░░░░] 60%
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 11 edited: edited fields: title, goal, depends_on (corrected from Phase 10 to Phase 8)
+
 ### Decisions
 
 Full decision log lives in PROJECT.md's Key Decisions table (all v1.0 decisions, including post-ship hardening, recorded there as of the v1.0 milestone close).
@@ -111,9 +115,9 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-26 (pre-close
 
 ## Session Continuity
 
-Last session: 2026-07-31T16:23:29.051Z
-Stopped at: Phase 9 UI-SPEC approved
-Resume file: .planning/phases/09-global-hotkey-trigger/09-UI-SPEC.md
+Last session: 2026-08-01T12:54:46.861Z
+Stopped at: Phase 11 context gathered
+Resume file: .planning/phases/11-configurable-tray-close-minimize-behavior-user-selectable-op/11-CONTEXT.md
 
 ## Operator Next Steps
 
