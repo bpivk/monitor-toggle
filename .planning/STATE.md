@@ -1,11 +1,10 @@
 ---
 gsd_state_version: 1.0
-milestone: none
-milestone_name: Awaiting next milestone (v1.1 archived)
-status: milestone_archived
-stopped_at: v1.1 archived; run /gsd:new-milestone to scope the next one
-last_updated: 2026-08-01T22:25:00.000Z
-last_activity: 2026-08-01 -- v1.1 milestone archived
+milestone: v1.2
+milestone_name: Visual Polish & Documentation
+status: planning
+last_updated: "2026-08-01T23:18:23.956Z"
+last_activity: 2026-08-01
 progress:
   total_phases: 0
   completed_phases: 0
@@ -25,12 +24,10 @@ See: .planning/PROJECT.md (updated 2026-08-01)
 
 ## Current Position
 
-Phase: none
-Plan: none
-Status: v1.1 archived — awaiting next milestone
-Last activity: 2026-08-01
-
-Progress: v1.1 shipped, archived to `.planning/milestones/v1.1-ROADMAP.md`
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-08-01 — Milestone v1.2 started
 
 ## Performance Metrics
 

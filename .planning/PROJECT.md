@@ -16,9 +16,18 @@ v1.1 removed the daily-use friction that remained after v1.0: the app no longer 
 
 **Scope decision, not a gap:** CLI trigger + single-instance IPC (TRIG-02/TRIG-03) was scoped for v1.1 but never built, and after review was decided permanently out of scope rather than deferred — tray and hotkey triggers already cover every trigger path this project needs. Full detail: `.planning/milestones/v1.1-REQUIREMENTS.md`.
 
-## Next Milestone Goals
+## Current Milestone: v1.2 Visual Polish & Documentation
 
-Not yet defined. Run `/gsd:new-milestone` to scope v1.2 (or v2.0). Candidate carried in the v2 backlog: toggle history/log (LOG-01).
+**Goal:** Replace the default-WinForms look with a theme-aware, modern UI and give the tray icons real visual distinction, plus a GitHub-ready README.
+
+**Target features:**
+- GUI restyle: modern flat controls following Windows system light/dark mode (title bar via DWM API + re-themed controls), applied to MainForm and SettingsForm
+- Redesigned tray icon pair: visually distinct, well-designed icons for rig mode vs. normal mode (replaces the current functional-but-plain pair)
+- New README.md: feature overview + screenshots, install/build instructions, badges (build status, license, latest release)
+
+**Key context:** System-theme-following in WinForms has no built-in support — requires manual DWM API calls for the title bar plus re-coloring every control by hand; accepted as worthwhile complexity per explicit user call. Screenshots must be supplied by the user from the real rig (no Windows GUI available in this build environment) — placeholders will be marked in the README for the user to fill in.
+
+**Deferred from this milestone:** LOG-01 (toggle history/log) — still a nice-to-have, lower priority than visual polish.
 
 <details>
 <summary>Archived: v1.0 and v1.1 milestone framing (superseded)</summary>
@@ -128,4 +137,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-01 after v1.1 milestone close. v1.1 shipped tray residency, global hotkey trigger, multi-monitor sets, and reentrancy-safe orchestration; Phase 10 (CLI trigger) dropped to v2 backlog. Next: `/gsd:new-milestone`.*
+*Last updated: 2026-08-01 — milestone v1.2 (Visual Polish & Documentation) started after v1.1 close.*
