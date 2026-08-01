@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1-5 (shipped 2026-07-26)
-- ✅ **v1.1 Automation & Multi-Monitor** — Phases 6-9, 11 (shipped 2026-08-01) — Phase 10 (CLI trigger) dropped to v2
+- ✅ **v1.1 Automation & Multi-Monitor** — Phases 6-9, 11 (shipped 2026-08-01) — Phase 10 (CLI trigger) removed, out of scope
 
 Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 
@@ -36,7 +36,7 @@ Full phase details: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] Phase 7: Shared Toggle-Orchestration Helper Extraction (1/1 plans) — completed 2026-07-29
 - [x] Phase 8: Tray Residency, Autostart & Toast Notification (4/4 plans) — completed 2026-07-31
 - [x] Phase 9: Global Hotkey Trigger (4/4 plans) — completed 2026-07-31
-- [~] Phase 10: CLI Trigger + Single-Instance IPC — scoped, not delivered, dropped to v2 (TRIG-02/TRIG-03)
+- [~] Phase 10: CLI Trigger + Single-Instance IPC — scoped, not delivered, decided permanently out of scope (TRIG-02/TRIG-03)
 - [x] Phase 11: Configurable Tray Close/Minimize Behavior (4/4 plans) — completed 2026-08-01
 
 Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
@@ -56,12 +56,12 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 | 7. Shared Toggle-Orchestration Helper Extraction | v1.1 | 1/1 | Complete | 2026-07-29 |
 | 8. Tray Residency, Autostart & Toast Notification | v1.1 | 4/4 | Complete | 2026-07-31 |
 | 9. Global Hotkey Trigger | v1.1 | 4/4 | Complete | 2026-07-31 |
-| 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Dropped → v2 | - |
+| 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Removed — out of scope | - |
 | 11. Configurable Tray Close/Minimize Behavior | v1.1 | 4/4 | Complete | 2026-08-01 |
 
 ## Backlog
 
-Requirements not yet scoped into a milestone. See `.planning/milestones/v1.1-REQUIREMENTS.md` "v2 Requirements" for the current deferred list (LOG-01, TRIG-02, TRIG-03).
+Requirements not yet scoped into a milestone. See `.planning/milestones/v1.1-REQUIREMENTS.md` "v2 Requirements" for the current deferred list (LOG-01 only — CLI trigger/TRIG-02/TRIG-03 was reviewed at v1.1 close and decided permanently out of scope, not carried forward).
 
 ---
 *Next milestone: run `/gsd:new-milestone` to define v1.2/v2.0 scope.*

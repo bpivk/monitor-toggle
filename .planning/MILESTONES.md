@@ -15,7 +15,7 @@
 - Made tray close/minimize behavior a genuine user preference — independent `CloseMinimizesToTray` and `MinimizeToTray` Settings checkboxes replacing Phase 8's fixed always-minimize-to-tray default, including a critical lockout bug found by code review, fixed, and rig-reverified at milestone close (Phase 11, revises TRAY-01)
 - Nine real rig-discovered or code-review-found bugs fixed and verified across the milestone, including a `--tray` hidden-startup mechanism that silently failed to suppress the window and a settings-migration guard that could re-corrupt a deliberately-emptied monitor set
 
-**Known gap:** Phase 10 (CLI Trigger + Single-Instance IPC, TRIG-02/TRIG-03) was in the original v1.1 roadmap scope but was never planned or executed — Phase 11 was prioritized ahead of it after surfacing during Phase 9's rig checkpoint. Reviewed and dropped to the v2 backlog at milestone close rather than delivered; tray + hotkey triggers already cover the daily-use need. Full detail: `.planning/milestones/v1.1-REQUIREMENTS.md`.
+**Scope decision:** Phase 10 (CLI Trigger + Single-Instance IPC, TRIG-02/TRIG-03) was in the original v1.1 roadmap scope but was never planned or executed — Phase 11 was prioritized ahead of it after surfacing during Phase 9's rig checkpoint. Reviewed at milestone close and decided permanently out of scope rather than delivered or deferred: tray + hotkey triggers already cover every trigger path this project needs. Full detail: `.planning/milestones/v1.1-REQUIREMENTS.md`.
 
 Full milestone detail: `.planning/milestones/v1.1-ROADMAP.md`, `.planning/milestones/v1.1-REQUIREMENTS.md`
 

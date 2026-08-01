@@ -12,13 +12,13 @@ A single reliable action that disables the primary monitor (not just powers it o
 
 **Shipped: v1.1 Automation & Multi-Monitor (2026-08-01)**
 
-v1.1 removed the daily-use friction that remained after v1.0: the app no longer requires opening the GUI to toggle (tray residency + global hotkey), and monitor control generalized from one hardcoded primary monitor to arbitrary independently-configurable disable/enable sets. A shared reentrancy-safe orchestration helper (`ToggleOrchestrator`) now guards every trigger path against corrupted state from concurrent toggles. A late-breaking real need — independently configurable tray close/minimize behavior — was scoped and shipped as Phase 11, ahead of the originally-planned Phase 10 (CLI trigger), which was reviewed and dropped to the v2 backlog at milestone close rather than delivered (see Requirements below).
+v1.1 removed the daily-use friction that remained after v1.0: the app no longer requires opening the GUI to toggle (tray residency + global hotkey), and monitor control generalized from one hardcoded primary monitor to arbitrary independently-configurable disable/enable sets. A shared reentrancy-safe orchestration helper (`ToggleOrchestrator`) now guards every trigger path against corrupted state from concurrent toggles. A late-breaking real need — independently configurable tray close/minimize behavior — was scoped and shipped as Phase 11, ahead of the originally-planned Phase 10 (CLI trigger), which was reviewed and permanently dropped at milestone close rather than delivered (see Requirements below).
 
-**Known gap carried forward:** CLI trigger + single-instance IPC (TRIG-02/TRIG-03) was scoped for v1.1 but never built. Tray and hotkey triggers already cover the "toggle without opening the GUI" need; CLI/IPC is now a nice-to-have for external tools (macro pads, Stream Deck), not a core-value gap. Full detail: `.planning/milestones/v1.1-REQUIREMENTS.md`.
+**Scope decision, not a gap:** CLI trigger + single-instance IPC (TRIG-02/TRIG-03) was scoped for v1.1 but never built, and after review was decided permanently out of scope rather than deferred — tray and hotkey triggers already cover every trigger path this project needs. Full detail: `.planning/milestones/v1.1-REQUIREMENTS.md`.
 
 ## Next Milestone Goals
 
-Not yet defined. Run `/gsd:new-milestone` to scope v1.2 (or v2.0). Candidates carried in the v2 backlog: CLI trigger + single-instance IPC (TRIG-02/TRIG-03), toggle history/log (LOG-01).
+Not yet defined. Run `/gsd:new-milestone` to scope v1.2 (or v2.0). Candidate carried in the v2 backlog: toggle history/log (LOG-01).
 
 <details>
 <summary>Archived: v1.0 and v1.1 milestone framing (superseded)</summary>
@@ -67,9 +67,8 @@ None currently — fresh milestone requirements to be defined via `/gsd:new-mile
 - Hotkey chord/sequence engine — unused complexity for a single binding, single action
 - Full Windows App SDK / MSIX toast packaging — conflicts with the standalone self-contained-.exe distribution constraint
 - Per-monitor sets keyed by index/position instead of stable `DevicePath` — already burned once in v1.0
-- CLI trigger that force-launches a brand-new process per invocation — defeats tray residency; any future CLI trigger must signal the resident instance via IPC
 - Toggle history/log (LOG-01) — deferred twice now (v1.0, v1.1); tracked in v2 backlog, still lower priority
-- CLI trigger + single-instance IPC (TRIG-02/TRIG-03) — scoped for v1.1, dropped at milestone close; tray + hotkey triggers already cover the daily-use need. Tracked in v2 backlog for reconsideration, not permanently excluded.
+- CLI trigger + single-instance IPC (TRIG-02/TRIG-03) — scoped as Phase 10 for v1.1, never built. Tray (Phase 8) and global hotkey (Phase 9) already cover toggling without the GUI open; decided permanently out of scope at v1.1 close, not a v2 candidate.
 
 ## Context
 
@@ -109,7 +108,7 @@ None currently — fresh milestone requirements to be defined via `/gsd:new-mile
 | Reentrancy guard (CORE-06) is a new `ToggleOrchestrator` wrapper, not logic inside `ToggleService` | Keeps `ToggleService` a pure, unit-tested step sequencer; gives every future trigger source one obvious, already-guarded entry point | Validated Phase 7, 35/35 tests pass |
 | `--tray` hidden-startup uses `Application.Run(new ApplicationContext())` with no `MainForm` reference | The Microsoft-doc-cited `ApplicationContext(mainForm)` pattern did not actually suppress `Show()` on this runtime | Validated Phase 8, rig-confirmed |
 | Tray icon existence derived as `CloseMinimizesToTray \|\| MinimizeToTray`, applied live on Settings-Save | Lets close-to-tray and minimize-to-tray be configured as two independent preferences instead of one combined flag | Validated Phase 11, rig-confirmed after fixing a lockout bug found by code review |
-| Phase 10 (CLI trigger + single-instance IPC) dropped from delivered v1.1 scope at milestone close | Phase 8/9's tray and hotkey triggers already deliver the "toggle without opening the GUI" core value this milestone targeted; CLI/IPC downgraded to nice-to-have | Decided at v1.1 close 2026-08-01 — moved to v2 backlog (TRIG-02/TRIG-03) |
+| Phase 10 (CLI trigger + single-instance IPC, TRIG-02/TRIG-03) permanently out of scope, not delivered | Phase 8/9's tray and hotkey triggers already deliver the "toggle without opening the GUI" core value this milestone targeted; a CLI/IPC path for external tools was judged not needed | Decided at v1.1 close 2026-08-01 |
 
 ## Evolution
 

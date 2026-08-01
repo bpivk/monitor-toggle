@@ -106,8 +106,13 @@ Items acknowledged and carried forward from previous milestone close:
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
 | v2 | LOG-01 (toggle history/log) | Still deferred | Initial requirements definition (v1.0); re-deferred at v1.1 scoping and again at v1.1 close |
-| v2 | TRIG-02 (CLI toggle argument) | Dropped from v1.1 delivered scope | v1.1 milestone close 2026-08-01 — Phase 10 never planned/executed; tray+hotkey triggers cover the daily-use need |
-| v2 | TRIG-03 (CLI status query argument) | Dropped from v1.1 delivered scope | v1.1 milestone close 2026-08-01 — same as TRIG-02 |
+
+Permanently out of scope (not v2 candidates):
+
+| Category | Item | Status | Decided At |
+|----------|------|--------|-------------|
+| out-of-scope | TRIG-02 (CLI toggle argument) | Removed — not needed | v1.1 milestone close 2026-08-01 — Phase 10 never planned/executed; tray+hotkey triggers already cover the daily-use need, user confirmed CLI trigger unnecessary |
+| out-of-scope | TRIG-03 (CLI status query argument) | Removed — not needed | v1.1 milestone close 2026-08-01 — same as TRIG-02 |
 
 Items acknowledged and deferred at v1.0 milestone close on 2026-07-26, reconfirmed at v1.1 close on 2026-08-01 (pre-close artifact audit — both are scanner false positives, not real gaps, confirmed by direct inspection):
 
