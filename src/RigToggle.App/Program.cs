@@ -111,7 +111,7 @@ namespace RigToggle.App
             // mainForm by reference, and by the time it's actually invoked (Settings is
             // opened), mainForm already holds the real instance.
             MainForm mainForm = null!;
-            SettingsForm SettingsFormFactory() => new SettingsForm(monitorController, audioController, settingsStore, autostartConfigurator, mainForm.TryRegisterConfiguredHotkey);
+            SettingsForm SettingsFormFactory() => new SettingsForm(monitorController, audioController, settingsStore, autostartConfigurator, mainForm.TryRegisterConfiguredHotkey, mainForm.ApplyTrayVisibility);
 
             mainForm = new MainForm(toggleOrchestrator, settingsStore, monitorController, SettingsFormFactory);
 

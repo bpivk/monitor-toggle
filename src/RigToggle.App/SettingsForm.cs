@@ -17,6 +17,7 @@ namespace RigToggle.App
         private readonly ISettingsStore _settingsStore;
         private readonly IAutostartConfigurator _autostartConfigurator;
         private readonly Func<bool> _tryRegisterConfiguredHotkey;
+        private readonly Action _applyTrayVisibility;
 
         private AppSettings _settings = new();
 
@@ -47,13 +48,14 @@ namespace RigToggle.App
         /// </summary>
         private sealed record PickerItem(string Id, string DisplayLabel);
 
-        public SettingsForm(IMonitorController monitorController, IAudioController audioController, ISettingsStore settingsStore, IAutostartConfigurator autostartConfigurator, Func<bool> tryRegisterConfiguredHotkey)
+        public SettingsForm(IMonitorController monitorController, IAudioController audioController, ISettingsStore settingsStore, IAutostartConfigurator autostartConfigurator, Func<bool> tryRegisterConfiguredHotkey, Action applyTrayVisibility)
         {
             _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
             _audioController = audioController ?? throw new ArgumentNullException(nameof(audioController));
             _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
             _autostartConfigurator = autostartConfigurator ?? throw new ArgumentNullException(nameof(autostartConfigurator));
             _tryRegisterConfiguredHotkey = tryRegisterConfiguredHotkey ?? throw new ArgumentNullException(nameof(tryRegisterConfiguredHotkey));
+            _applyTrayVisibility = applyTrayVisibility ?? throw new ArgumentNullException(nameof(applyTrayVisibility));
 
             InitializeComponent();
 
@@ -86,6 +88,8 @@ namespace RigToggle.App
             PopulateAudioPickers();
             PopulateAppPathField();
             chkEnableDebugLogging.Checked = _settings.EnableDebugLogging;
+            chkCloseMinimizesToTray.Checked = _settings.CloseMinimizesToTray;
+            chkMinimizeToTray.Checked = _settings.MinimizeToTray;
 
             // TRIG-01/D-02: no default hotkey is pre-filled — a null pair renders as the
             // Unconfigured idle state below, not a fabricated combo.
@@ -719,6 +723,8 @@ namespace RigToggle.App
                 CompanionAppPath = txtAppPath.Text,
                 SkipMonitorConfirmation = monitorsChanged ? false : _settings.SkipMonitorConfirmation,
                 EnableDebugLogging = chkEnableDebugLogging.Checked,
+                CloseMinimizesToTray = chkCloseMinimizesToTray.Checked,
+                MinimizeToTray = chkMinimizeToTray.Checked,
                 // TRIG-01/D-05: persist the chosen combo regardless of registration
                 // outcome below — the user's chosen combination is the source of truth
                 // even if it can't currently be registered (they may be about to close
@@ -731,6 +737,12 @@ namespace RigToggle.App
             // Discard/close requires no handler — CancelButton wiring (constructor)
             // produces DialogResult.Cancel with nothing persisted.
             _settingsStore.Save(settingsToSave);
+
+            // D-08: apply the derived tray-icon visibility live, the moment settings
+            // persist — must run here (not gated behind the autostart/hotkey blocks
+            // below) so it still executes even if the later hotkey-registration step
+            // resets DialogResult to None and keeps the dialog open.
+            _applyTrayVisibility();
 
             // T-08-LIE: apply the autostart registry write AFTER settings persist
             // succeeds. A failure here must never claim a success that did not happen —
