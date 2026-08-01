@@ -199,3 +199,13 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 8. Tray Residency, Autostart & Toast Notification | v1.1 | 4/4 | Complete    | 2026-07-31 |
 | 9. Global Hotkey Trigger | v1.1 | 4/4 | Complete   | 2026-07-31 |
 | 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Not started | - |
+
+### Phase 11: Configurable Tray Close/Minimize Behavior
+
+**Goal:** User can independently configure whether closing the main window (X) minimizes to tray or exits the app, and whether the minimize button also minimizes to tray, instead of the current fixed always-minimize-to-tray behavior from Phase 8.
+**Requirements**: TBD
+**Depends on:** Phase 8 (revises TRAY-01's fixed close-to-tray behavior into a Settings preference)
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 11 to break down)
