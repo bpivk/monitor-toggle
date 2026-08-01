@@ -39,14 +39,6 @@ namespace RigToggle.App
         private const int GlobalHotkeyId = 0x9001;
         private bool _hotkeyRegistered;
 
-        // Code review CR-01: distinguishes "never shown this session" (true --tray
-        // autostart, D-10's accepted no-tray-icon-until-manually-relaunched state) from
-        // "was shown, then hidden to tray via user action" (the lockout scenario
-        // ApplyTrayVisibility must guard against). OnLoad only fires on the visible
-        // startup path -- under --tray the form's Load event never fires (see Program.cs) --
-        // so this flag stays false for the entire life of a true --tray session.
-        private bool _windowEverShown;
-
         public MainForm(
             ToggleOrchestrator orchestrator,
             ISettingsStore settingsStore,
@@ -64,7 +56,6 @@ namespace RigToggle.App
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
-            _windowEverShown = true;
             RefreshUi();
         }
 
@@ -117,18 +108,23 @@ namespace RigToggle.App
         /// nothing while both settings are off, since ShowBalloonTip requires Visible ==
         /// true to actually display — this is an intentional tradeoff, not a bug.
         ///
-        /// Lockout guard (code review CR-01): D-09 keeps Settings reachable from the tray
-        /// context menu even while MainForm is Hide()'d. If the user disables both prefs
-        /// from that Settings session, dropping notifyIcon.Visible while the window is
-        /// still hidden would leave zero UI surface reachable (no tray icon, no taskbar
-        /// entry) — recoverable only via Task Manager. Force the window back into view
-        /// before losing the tray icon in that case.
+        /// Lockout guard (code review CR-01, tightened after VERIFICATION.md gap):
+        /// D-09 keeps Settings reachable from the tray context menu even while MainForm
+        /// is Hide()'d -- reachable BOTH when the window was explicitly hidden via
+        /// SendToTray() and when a --tray autostart with MinimizeToTray=true never
+        /// showed the window at all (notifyIcon.Visible is already true from
+        /// InitializeTrayState() in that case). If the user disables both prefs from
+        /// that Settings session, dropping notifyIcon.Visible while the window is still
+        /// not Visible would leave zero UI surface reachable (no tray icon, no taskbar
+        /// entry) -- recoverable only via Task Manager.
         ///
-        /// The guard only fires when _windowEverShown is true (the window was visible at
-        /// some point this session, then hidden via SendToTray) — NOT on a true --tray
-        /// autostart where the window was never shown at all. That combination (D-10) is
-        /// an accepted, deliberate state: the app starts hidden with no tray icon and can
-        /// only be relaunched manually. Do not "fix" that case by forcing a Show() here.
+        /// The guard therefore keys off notifyIcon.Visible's value BEFORE this call
+        /// overwrites it -- "was there a reachable tray icon a moment ago that is about
+        /// to disappear while the window is still not Visible" -- not on whether the
+        /// window itself was ever shown. This correctly leaves the true --tray-autostart
+        /// -with-both-settings-off case (D-10, accepted: app starts hidden with no tray
+        /// icon, must be relaunched manually) untouched, since notifyIcon.Visible starts
+        /// false in that case and there is nothing to lose.
         /// </summary>
         public void ApplyTrayVisibility()
         {
@@ -142,9 +138,10 @@ namespace RigToggle.App
                 settings = new AppSettings();
             }
 
+            bool wasVisible = notifyIcon.Visible;
             bool shouldBeVisible = settings.CloseMinimizesToTray || settings.MinimizeToTray;
 
-            if (!shouldBeVisible && !Visible && _windowEverShown)
+            if (wasVisible && !shouldBeVisible && !Visible)
             {
                 Show();
                 WindowState = FormWindowState.Normal;
