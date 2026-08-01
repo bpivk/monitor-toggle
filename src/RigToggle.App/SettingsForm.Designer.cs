@@ -57,6 +57,9 @@ namespace RigToggle.App
             this.txtHotkey = new System.Windows.Forms.TextBox();
             this.lblHotkeyWarning = new System.Windows.Forms.Label();
 
+            this.chkCloseMinimizesToTray = new System.Windows.Forms.CheckBox();
+            this.chkMinimizeToTray = new System.Windows.Forms.CheckBox();
+
             this.chkStartWithWindows = new System.Windows.Forms.CheckBox();
             this.lblAutostartWarning = new System.Windows.Forms.Label();
 
@@ -309,10 +312,28 @@ namespace RigToggle.App
             this.lblHotkeyWarning.Name = "lblHotkeyWarning";
 
             //
+            // chkCloseMinimizesToTray
+            //
+            this.chkCloseMinimizesToTray.Text = "Closing the window (X) minimizes to tray";
+            this.chkCloseMinimizesToTray.Location = new System.Drawing.Point(12, 600);
+            this.chkCloseMinimizesToTray.Size = new System.Drawing.Size(396, 24);
+            this.chkCloseMinimizesToTray.AutoSize = false;
+            this.chkCloseMinimizesToTray.Name = "chkCloseMinimizesToTray";
+
+            //
+            // chkMinimizeToTray
+            //
+            this.chkMinimizeToTray.Text = "Minimizing the window also sends it to tray";
+            this.chkMinimizeToTray.Location = new System.Drawing.Point(12, 632);
+            this.chkMinimizeToTray.Size = new System.Drawing.Size(396, 24);
+            this.chkMinimizeToTray.AutoSize = false;
+            this.chkMinimizeToTray.Name = "chkMinimizeToTray";
+
+            //
             // chkStartWithWindows
             //
             this.chkStartWithWindows.Text = "Start with Windows";
-            this.chkStartWithWindows.Location = new System.Drawing.Point(12, 600);
+            this.chkStartWithWindows.Location = new System.Drawing.Point(12, 664);
             this.chkStartWithWindows.Size = new System.Drawing.Size(396, 24);
             this.chkStartWithWindows.AutoSize = false;
             this.chkStartWithWindows.Name = "chkStartWithWindows";
@@ -320,7 +341,7 @@ namespace RigToggle.App
             //
             // lblAutostartWarning
             //
-            this.lblAutostartWarning.Location = new System.Drawing.Point(12, 624);
+            this.lblAutostartWarning.Location = new System.Drawing.Point(12, 688);
             this.lblAutostartWarning.Size = new System.Drawing.Size(396, 20);
             this.lblAutostartWarning.AutoSize = false;
             this.lblAutostartWarning.Visible = false;
@@ -330,7 +351,7 @@ namespace RigToggle.App
             // btnSaveSettings
             //
             this.btnSaveSettings.Text = "Save Settings";
-            this.btnSaveSettings.Location = new System.Drawing.Point(180, 656);
+            this.btnSaveSettings.Location = new System.Drawing.Point(180, 720);
             this.btnSaveSettings.Size = new System.Drawing.Size(110, 32);
             this.btnSaveSettings.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnSaveSettings.Name = "btnSaveSettings";
@@ -340,7 +361,7 @@ namespace RigToggle.App
             // btnDiscardChanges
             //
             this.btnDiscardChanges.Text = "Discard Changes";
-            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 656);
+            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 720);
             this.btnDiscardChanges.Size = new System.Drawing.Size(110, 32);
             this.btnDiscardChanges.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.btnDiscardChanges.Name = "btnDiscardChanges";
@@ -367,7 +388,7 @@ namespace RigToggle.App
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(420, 704);
+            this.ClientSize = new System.Drawing.Size(420, 768);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -383,6 +404,8 @@ namespace RigToggle.App
             this.Controls.Add(this.lblHotkeyCaption);
             this.Controls.Add(this.txtHotkey);
             this.Controls.Add(this.lblHotkeyWarning);
+            this.Controls.Add(this.chkCloseMinimizesToTray);
+            this.Controls.Add(this.chkMinimizeToTray);
             this.Controls.Add(this.chkStartWithWindows);
             this.Controls.Add(this.lblAutostartWarning);
             this.Controls.Add(this.btnSaveSettings);
@@ -429,6 +452,9 @@ namespace RigToggle.App
         private System.Windows.Forms.Label lblHotkeyCaption;
         private System.Windows.Forms.TextBox txtHotkey;
         private System.Windows.Forms.Label lblHotkeyWarning;
+
+        private System.Windows.Forms.CheckBox chkCloseMinimizesToTray;
+        private System.Windows.Forms.CheckBox chkMinimizeToTray;
 
         private System.Windows.Forms.CheckBox chkStartWithWindows;
         private System.Windows.Forms.Label lblAutostartWarning;
