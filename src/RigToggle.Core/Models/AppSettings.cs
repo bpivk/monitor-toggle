@@ -12,6 +12,9 @@ namespace RigToggle.Core.Models;
 /// HotkeyModifiers/HotkeyKey are both null-until-configured per D-02 (no default global
 /// hotkey) and, together, hold the Win32 modifier bit-mask (see HotkeyCombo.Mod*) and
 /// virtual-key code of the configured global hotkey (TRIG-01).
+/// CloseMinimizesToTray true = window Close (X) hides to tray, false = Close exits the
+/// app (default-false on upgrade, D-02); MinimizeToTray true = the minimize button also
+/// hides to tray, false = standard OS minimize (default-false, D-05).
 /// </summary>
 public sealed class AppSettings
 {
@@ -26,6 +29,8 @@ public sealed class AppSettings
     public string? CompanionAppPath { get; set; }
     public bool SkipMonitorConfirmation { get; set; }
     public bool EnableDebugLogging { get; set; }
+    public bool CloseMinimizesToTray { get; set; }
+    public bool MinimizeToTray { get; set; }
     public int? HotkeyModifiers { get; set; }
     public int? HotkeyKey { get; set; }
 }
