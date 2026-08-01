@@ -205,7 +205,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 **Goal:** User can independently configure whether closing the main window (X) minimizes to tray or exits the app, and whether the minimize button also minimizes to tray, instead of the current fixed always-minimize-to-tray behavior from Phase 8.
 **Requirements**: TRAY-01 (revises Phase 8's fixed close-to-tray behavior into a user preference; no net-new REQ-ID)
 **Depends on:** Phase 8 (revises TRAY-01's fixed close-to-tray behavior into a Settings preference)
-**Plans:** 1/4 plans executed
+**Plans:** 2/4 plans executed
 
 Plans:
 **Wave 1**
@@ -214,7 +214,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 11-02-PLAN.md — MainForm: shared SendToTray helper, conditional FormClosing (D-01), derived ApplyTrayVisibility (D-08/D-09/D-11), MainForm_Resize minimize-to-tray handler (D-04), Designer wiring
+- [x] 11-02-PLAN.md — MainForm: shared SendToTray helper, conditional FormClosing (D-01), derived ApplyTrayVisibility (D-08/D-09/D-11), MainForm_Resize minimize-to-tray handler (D-04), Designer wiring
 
 **Wave 3** *(blocked on Wave 2)*
 
