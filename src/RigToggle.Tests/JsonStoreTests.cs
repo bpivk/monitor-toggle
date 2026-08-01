@@ -111,6 +111,61 @@ public class JsonStoreTests : IDisposable
     }
 
     [Fact]
+    public void SettingsStore_Save_ThenLoad_RoundTripsTrayBehaviorFlags()
+    {
+        var path = Path.Combine(_tempDir, "settings.json");
+        var store = new JsonSettingsStore(path);
+        var original = new AppSettings
+        {
+            CloseMinimizesToTray = true,
+            MinimizeToTray = true,
+        };
+
+        store.Save(original);
+        var loaded = store.Load();
+
+        Assert.True(loaded.CloseMinimizesToTray);
+        Assert.True(loaded.MinimizeToTray);
+    }
+
+    [Fact]
+    public void SettingsStore_Save_WithDefaultTrayBehaviorFlags_LoadsBackFalse()
+    {
+        var path = Path.Combine(_tempDir, "settings.json");
+        var store = new JsonSettingsStore(path);
+        var original = new AppSettings();
+
+        store.Save(original);
+        var loaded = store.Load();
+
+        Assert.False(loaded.CloseMinimizesToTray);
+        Assert.False(loaded.MinimizeToTray);
+    }
+
+    [Fact]
+    public void SettingsStore_Load_LegacyFileWithoutTrayFlags_DefaultsBothFalse()
+    {
+        // Genuine pre-Phase-11-shape JSON: only pre-existing keys, NO tray-flag keys at
+        // all (proves this is a real legacy file, not a hand-seeded false value) — the
+        // executable proof of the D-02/D-05 upgrade default.
+        Directory.CreateDirectory(_tempDir);
+        var path = Path.Combine(_tempDir, "settings.json");
+        File.WriteAllText(path, """
+            {
+              "MonitorsToDisable": ["\\\\?\\DISPLAY#PRIMARY"],
+              "MonitorsToEnable": [],
+              "CompanionAppPath": "C:\\Apps\\MozaCompanion.exe"
+            }
+            """);
+        var store = new JsonSettingsStore(path);
+
+        var loaded = store.Load();
+
+        Assert.False(loaded.CloseMinimizesToTray);
+        Assert.False(loaded.MinimizeToTray);
+    }
+
+    [Fact]
     public void SettingsStore_Load_MigratesLegacyMonitorDevicePath_IntoDisableSet()
     {
         // Genuine v1.0-shape JSON: only legacy singular fields, NO plural fields at all
