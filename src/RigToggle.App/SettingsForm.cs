@@ -16,6 +16,7 @@ namespace RigToggle.App
         private readonly IAudioController _audioController;
         private readonly ISettingsStore _settingsStore;
         private readonly IAutostartConfigurator _autostartConfigurator;
+        private readonly IThemeProvider _themeProvider;
         private readonly Func<bool> _tryRegisterConfiguredHotkey;
         private readonly Action _applyTrayVisibility;
 
@@ -48,12 +49,16 @@ namespace RigToggle.App
         /// </summary>
         private sealed record PickerItem(string Id, string DisplayLabel);
 
-        public SettingsForm(IMonitorController monitorController, IAudioController audioController, ISettingsStore settingsStore, IAutostartConfigurator autostartConfigurator, Func<bool> tryRegisterConfiguredHotkey, Action applyTrayVisibility)
+        // 12-02: ctor param + field only in this plan -- SettingsForm's own
+        // subscribe/OnThemeChanged/per-control theming lands in plan 12-03. Threaded
+        // here so the composition root (Program.cs SettingsFormFactory) compiles.
+        public SettingsForm(IMonitorController monitorController, IAudioController audioController, ISettingsStore settingsStore, IAutostartConfigurator autostartConfigurator, IThemeProvider themeProvider, Func<bool> tryRegisterConfiguredHotkey, Action applyTrayVisibility)
         {
             _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
             _audioController = audioController ?? throw new ArgumentNullException(nameof(audioController));
             _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
             _autostartConfigurator = autostartConfigurator ?? throw new ArgumentNullException(nameof(autostartConfigurator));
+            _themeProvider = themeProvider ?? throw new ArgumentNullException(nameof(themeProvider));
             _tryRegisterConfiguredHotkey = tryRegisterConfiguredHotkey ?? throw new ArgumentNullException(nameof(tryRegisterConfiguredHotkey));
             _applyTrayVisibility = applyTrayVisibility ?? throw new ArgumentNullException(nameof(applyTrayVisibility));
 
