@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Visual Polish & Documentation
 status: planning
-stopped_at: Phase 12 context gathered
-last_updated: "2026-08-02T19:29:29.103Z"
+stopped_at: Phase 12 UI-SPEC approved
+last_updated: "2026-08-02T20:29:43.353Z"
 last_activity: 2026-08-02 — v1.2 roadmap created (Phases 12-14), 13/13 requirements mapped
 progress:
   total_phases: 3
@@ -133,9 +133,9 @@ Resolved at v1.1 close (2026-08-01): Phase 11's `11-HUMAN-UAT.md` (2 pending hum
 
 ## Session Continuity
 
-Last session: 2026-08-02T19:29:29.066Z
-Stopped at: Phase 12 context gathered
-Resume file: .planning/phases/12-theme-infrastructure-live-theme-following/12-CONTEXT.md
+Last session: 2026-08-02T20:29:43.338Z
+Stopped at: Phase 12 UI-SPEC approved
+Resume file: .planning/phases/12-theme-infrastructure-live-theme-following/12-UI-SPEC.md
 
 ## Operator Next Steps
 
