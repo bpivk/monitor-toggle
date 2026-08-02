@@ -1,182 +1,148 @@
 # Project Research Summary
 
-**Project:** Rig Toggle
-**Domain:** Windows tray-resident automation utility — v1.1 milestone (tray residency/autostart, global hotkey, CLI trigger + IPC, toast notification, multi-monitor enable/disable) built on top of a shipped, rig-validated v1.0 single-monitor/single-audio-pair toggle app
-**Researched:** 2026-07-26 (v1.1 milestone research; supersedes/extends the 2026-07-24 v1.0 research, which remains valid foundation and is not repeated in full here)
-**Confidence:** MEDIUM-HIGH overall (HIGH for stack/architecture mechanics; MEDIUM for two items requiring rig hardware validation)
+**Project:** Rig Toggle — v1.2 milestone (Visual Polish & Documentation)
+**Domain:** Windows desktop GUI utility (WinForms) — system-theme-aware UI + tray icon redesign, layered on an existing shipped 4-project solution (Core/Windows/App/Tests)
+**Researched:** 2026-08-02
+**Confidence:** HIGH
 
 ## Executive Summary
 
-v1.1 adds five features to an already-shipped, rig-validated WinForms utility: tray residency + autostart, a global hotkey trigger, a CLI trigger with single-instance IPC signaling, toast/status notifications, and generalized multi-monitor enable/disable sets (replacing the single "primary monitor to disable" setting). All four research passes agree this milestone needs **zero new third-party NuGet packages** — every feature is achievable with WinForms built-ins (`NotifyIcon`), BCL types (`System.IO.Pipes`, `Microsoft.Win32.Registry`, `System.Threading.Mutex`), hand-rolled `user32.dll` P/Invoke, and the already-referenced `WindowsDisplayAPI` package used in a broader mode (querying/applying inactive as well as active display paths). This is consistent with the project's established preference for minimal dependencies over heavier SDKs.
+This milestone adds two visually-oriented capabilities to an already-shipped, working WinForms utility: (1) live system light/dark theme-following for `MainForm` and `SettingsForm` (title bar + control colors), and (2) a genuinely distinct, multi-resolution rig-mode/normal-mode tray icon pair. The single most important research finding, corroborated independently across all four research files, is that **PROJECT.md's own framing of this milestone is factually outdated**: as of .NET 10 (the project's pinned runtime), WinForms ships first-party, non-experimental dark-mode support (`Application.SetColorMode(SystemColorMode.System)`) that auto-recolors standard controls and manages the title bar's `DWMWA_USE_IMMERSIVE_DARK_MODE` attribute — this was previously assumed to require fully hand-rolled DWM P/Invoke plus manual per-control recoloring from scratch. The correct strategy is therefore "use the built-in feature as the base layer, then patch its two documented, verified gaps" rather than "hand-roll everything."
 
-The recommended approach layers cleanly onto the existing architecture (`RigToggle.Core` orchestration + models, `RigToggle.Windows` Win32/COM adapters, `RigToggle.App` UI shell/composition root): new tray/hotkey/IPC/notification code belongs in `RigToggle.App` (UI-shell concerns), the multi-monitor generalization changes `IMonitorController`'s signature and `AppSettings`/`MonitorState` models (Core + Windows), and no new Core interface is warranted for notifications (a plain method tied to the `NotifyIcon` instance is sufficient — introducing `INotificationService` would be ceremony with one real implementation). The single highest-leverage piece of shared prep work is extracting `MainForm.BtnToggle_Click`'s inline confirm-toggle-report logic into a reusable, owner-optional orchestration helper — every new trigger (tray menu, hotkey, CLI/IPC) needs to run that same pipeline, and building it three more times inline is exactly the kind of drift that produced this project's own prior H9 regression.
+The two gaps that must be closed with custom code are well-documented and consistent across sources: `SetColorMode` applies theming only once, at startup, and does **not** live-update if the user flips the Windows theme while the tray-resident app keeps running (a very real scenario for this app's hours-long rig sessions) — closed via `Microsoft.Win32.SystemEvents.UserPreferenceChanged` (or raw `WM_SETTINGCHANGE`/`ImmersiveColorSet`) plus a manual `DwmSetWindowAttribute` re-apply; and native `MessageBox`/`OpenFileDialog` remain permanently light-mode regardless of `SetColorMode`, requiring either an audit-and-accept decision or replacement with a themed custom dialog. No new NuGet packages are required for either the theming or icon work — everything is BCL/WinForms-native plus dev-time-only tooling (ImageMagick/Inkscape) for producing the `.ico` assets.
 
-Two categories of risk require rig hardware validation rather than being assumed safe from API-contract reasoning alone, and all three of Stack/Architecture/Pitfalls research independently flagged both: (1) **re-enabling a monitor that has been OS-disabled across a sleep/wake cycle or full reboot** — Microsoft's own docs confirm inactive CCD paths return with mode-index information marked invalid, so "does it come back, and at what resolution" is not guaranteed by the API contract alone; (2) **combined disable+enable topology construction** — composing what were two independently-reasoned single-target operations into one atomic `SetDisplayConfig` call is a materially harder topology-construction problem than the single-primary-removal case v1.0 actually validated. Both should get a dedicated go/no-go rig checkpoint mirroring v1.0 Phase 1's spike-first approach, not be folded into "the existing Disable/Restore already work" confidence. Separately — and this is the single most consequential cross-cutting implication of this research — **no reentrancy guard exists in `ToggleService` today**, which was safe when the GUI button was the only trigger but becomes a real correctness risk once tray menu, hotkey, and CLI can all invoke a toggle concurrently; this needs one explicit, up-front design decision (a guard in the shared orchestration helper), not a per-feature bolt-on.
+The primary risks are not "will this work" (the API contracts are HIGH confidence, verified against official .NET 10 docs and open dotnet/winforms GitHub issues) but "will it be verified correctly on this app's specific non-standard surfaces": the existing `--tray` hidden-start path (bare `ApplicationContext`, no `MainForm` reference) has already caused divergent-path bugs twice in this project's history (Phase 8, Phase 11), and theming code applied in `Form_Load`/`Shown` will silently no-op on that path unless moved to `OnHandleCreated`. Similarly, the tray icon redesign has a real, previously-reported failure mode (a 2026 GitHub issue against a comparable Windows app) where a custom icon reads fine in isolation but becomes invisible against one of the two taskbar theme backgrounds — mitigated by designing self-contained contrast into each icon rather than building a second theme-driven variant axis. Architecturally, both capabilities slot cleanly into the existing Core-interface/Windows-adapter/App-composition pattern with zero deviation from precedent (`IThemeProvider`/`WindowsThemeProvider` mirrors `IAutostartConfigurator`/`WindowsAutostartConfigurator` exactly), and the icon-redesign work is fully decoupled from the theme-infrastructure work — they can be built in either order or in parallel.
 
 ## Key Findings
 
 ### Recommended Stack
 
-No new packages. The five features are covered by: `System.Windows.Forms.NotifyIcon` (tray icon, context menu, minimize-to-tray, `ShowBalloonTip` notifications); `user32.dll` P/Invoke `RegisterHotKey`/`UnregisterHotKey` + `WM_HOTKEY` against a live window handle (`MainForm`'s, kept alive even while hidden); `Microsoft.Win32.Registry` (`HKCU\...\Run`) for autostart; `System.Threading.Mutex` (named, `Local\` scope) + `System.IO.Pipes` (`NamedPipeServerStream`/`ClientStream`, **must** set `PipeOptions.CurrentUserOnly` on both ends — a confirmed real gotcha, not theoretical) for single-instance detection and CLI-to-resident-instance signaling; and `WindowsDisplayAPI` 1.3.0.13's `PathInfo.GetAllPaths(onlyActivePaths: false)` (already confirmed via source read to wrap `QDC_ALL_PATHS`) for multi-monitor enable/disable, including enumerating currently-inactive targets.
+No new runtime dependencies. The theming work uses `Application.SetColorMode(SystemColorMode.System)` (built into WinForms as of .NET 10, GA/non-experimental) as the base layer, a hand-rolled `DwmSetWindowAttribute(DWMWA_USE_IMMERSIVE_DARK_MODE = 20)` P/Invoke as a live-update backstop (fired via `SystemEvents.UserPreferenceChanged`), and manual `FlatStyle`/`Panel`-based control substitutions (e.g. `GroupBox` → bordered `Panel`+`Label`, since `GroupBox` always renders a beveled 3D border regardless of color mode) for the "modern flat look" requirement. The icon redesign needs no runtime library at all — it's dev-time tooling (Inkscape or Figma for vector source art, ImageMagick's `magick` CLI for packing multi-resolution `.ico` files) producing static resources the existing embedded-icon mechanism already consumes unchanged.
 
-**Core technologies (v1.1 additions):**
-- `NotifyIcon` (WinForms built-in) — tray icon, context menu, minimize-to-tray, and `ShowBalloonTip` notifications, zero dependency
-- `RegisterHotKey`/`WM_HOTKEY` P/Invoke — global hotkey, must run on the UI thread that owns the registering window
-- `Microsoft.Win32.Registry` (`HKCU\...\Run`) — autostart, non-elevated, matches existing execution model
-- Named `Mutex` + `NamedPipeServerStream`/`ClientStream` (`CurrentUserOnly` required) — single-instance detection + CLI IPC
-- `WindowsDisplayAPI` (already referenced), used in broader mode — query/apply inactive display paths for multi-monitor enable/disable
-
-**Reconciled disagreement 1 — toast library:** FEATURES.md initially recommended `CommunityToolkit.WinUI.Notifications`; STACK.md found that package is now **archived** and recommends `NotifyIcon.ShowBalloonTip` instead (zero dependency); PITFALLS.md independently confirms unpackaged/non-shortcut-registered apps silently get **no toast at all** without AUMID + Start Menu shortcut registration — and that this failure mode specifically appears in the **published, self-contained single-file exe** while sometimes appearing to work under a VS debug session, which is exactly this project's distribution mode. **Resolved toward `NotifyIcon.ShowBalloonTip`** as the default — zero new dependency, zero AUMID/shortcut work, acceptable fidelity (transient banner; Windows 11 doesn't persist it to Action Center history, which is fine since this is a live confirmation, not a durable log — LOG-01 stays deferred anyway). Do not build the AUMID/shortcut path preemptively.
-
-**Reconciled disagreement 2 — autostart mechanism:** STACK.md recommends a plain `HKCU\...\Run` key (non-elevated, simplest, matches existing non-elevated execution model); PITFALLS.md's open questions lean toward Task Scheduler "At log on" with a startup delay, out of concern for driver-readiness timing, but explicitly flags this as untested/not rig-validated. **Resolved toward the Registry Run key as the default** — simplest, matches the app's existing non-elevated posture, and Task Scheduler's main advantage (silent elevation) is irrelevant here since the app deliberately never elevates. Only revisit Task Scheduler with a startup delay if plain autostart is found, on a real reboot, to race the Moza Companion driver/USB stack — do not build the more complex option preemptively without evidence it's needed.
-
-Packaging is unchanged from v1.0: `dotnet publish -r win-x64 --self-contained true -p:PublishSingleFile=true`, untrimmed.
+**Core technologies:**
+- `Application.SetColorMode(SystemColorMode.System)`: base-layer control/title-bar theming, called once in `Program.cs` before any control is constructed — GA in .NET 10, must precede `Application.Run`
+- `DwmSetWindowAttribute` (hand-rolled P/Invoke, `dwmapi.dll`): live title-bar re-theme on demand, best-effort/never-throw, mirrors the existing `GlobalHotkey.cs` public-façade pattern
+- `Microsoft.Win32.SystemEvents.UserPreferenceChanged`: zero-dependency live theme-change detection (already available via `UseWindowsForms=true`'s shared framework); filter to `UserPreferenceCategory.General` and diff old vs. new resolved value before re-theming
+- `Microsoft.Win32.Registry.CurrentUser` reads of `AppsUseLightTheme` (app/window theme) and `SystemUsesLightTheme` (taskbar/tray theme) — two distinct keys under the same `...\Personalize` path; conflating them is a documented pitfall (see below)
+- ImageMagick (`magick` CLI) + Inkscape/Figma: dev-time-only, produce the multi-resolution `.ico` files (minimum 16×16 + 32×32 per official Win32 guidance; recommended fuller set 16/20/24/32/40/48/256 for clean DPI-scaled rendering)
 
 ### Expected Features
 
-**Must have (table stakes for this milestone):**
-- Close (X) minimizes to tray, does not exit; explicit "Exit" always available in the tray menu
-- Tray icon reflects current mode; left-click vs. right-click behavior distinct
-- Autostart is an explicit Settings checkbox, off by default
-- Hotkey has a visible current binding, a way to rebind/clear it, and registration failures are surfaced (not silently swallowed — `RegisterHotKey` can fail if another app, e.g. Moza Companion or other rig software, already owns the combo)
-- CLI trigger works whether or not an instance is already running (launch-or-signal transparently)
-- Notification appears only for headless-trigger paths (hotkey/CLI/tray-while-hidden), not redundantly alongside the already-visible GUI click path
-- Multi-monitor Settings UI prevents "disable everything" configurations (Windows CCD refuses to disable every display)
-- Confirmation dialog names *all* monitors being disabled/enabled, not just one
+This is a visual-polish milestone on an already-feature-complete app, so "table stakes" here means "the bar a small utility must clear to not look like an unstyled WinForms app with a paint job bolted on," not net-new product features.
 
-**Should have (differentiators for this single-user tool):**
-- Left-click tray icon = instant toggle (matches Core Value even more tightly than the old GUI-button click)
-- Notification shows *what changed* (mode + affected devices), not just "Toggled" — reuses existing `ToggleResult`/checklist data
-- Partial-failure surfaced via notification when triggered headlessly (parity with the GUI's existing partial-failure MessageBox)
-- Enable-set and disable-set both independently restorable to whatever was true before, not a fixed on/off — architectural extension of the existing snapshot/restore mechanism, not a new UI feature
-- CLI `--status` query verb — cheap once the IPC channel exists, not required this milestone
+**Must have (table stakes):**
+- System theme detection (registry read) + live-update subscription — root dependency for everything else
+- Dark/light title bar via DWM attribute on both `MainForm` and `SettingsForm`
+- Live theme switching without app restart — treated as part of "done," not stretch polish, since a launch-time-only theme desyncs visibly during this app's long tray-resident sessions
+- Full, consistent control recoloring across both forms, including the multi-monitor settings grid (`DataGridView`) — the single largest effort item and the one most likely to look unfinished if rushed
+- Flat/borderless button and panel styling (no legacy 3D bevel chrome)
+- Two shape-distinct (not just color-distinct) mode icons authored specifically for 16×16, embedded as multi-resolution `.ico` files, with self-contained taskbar-background contrast
 
-**Defer / anti-features (do not build):**
-- Elevated/Task-Scheduler autostart — would silently reintroduce the UIPI cross-process-focus problem the H9 debug session already worked around
-- Hotkey chord/sequence engine — unused complexity for a single binding, single action
-- Full Windows App SDK / MSIX toast packaging — conflicts with the standalone-.exe distribution constraint
-- Per-monitor sets keyed by index/position instead of stable `DevicePath` — already burned once in v1.0, must not be reintroduced at N-monitor scale
-- CLI trigger that force-launches a brand-new process per invocation — defeats tray residency and risks concurrent file access on `settings.json`/`state.json`
-- Toggle history/log (LOG-01) — already deferred in PROJECT.md, unrelated to this milestone
+**Should have (competitive/stretch, if time remains):**
+- Rounded corners / Mica-style DWM backdrop on Windows 11 (graceful no-op elsewhere; low incremental cost given DWM plumbing already exists for the title bar)
+- Domain-specific icon metaphor refinement (wheel/monitor motif) over a generic status-dot pair
+- Coherent icon family reused at larger sizes across tray, exe/taskbar icon, and any About-box branding
+
+**Defer (explicitly out of scope for v1.2):**
+- Windows accent-color-aware highlight — a genuinely separate API surface (DWM colorization/`UISettings`) with its own live-update path; don't let it block shipping core theming
+- Custom-drawn toggle-switch control replacing the core action button — purely additive polish
+- Manual theme override (force light/dark regardless of system) — cheap once detection exists, but not requested
+- Full custom-owner-drawn control library, frameless custom-chrome window, theme-swapping 2×2 icon variant matrix, and any WPF/WinUI3 migration — all explicitly flagged as anti-features/disproportionate scope for a 2-form personal utility
 
 ### Architecture Approach
 
-The existing three-project split holds: `RigToggle.Core` (zero Windows API references, enforced) owns `ToggleService` and models; `RigToggle.Windows` implements Core's adapter interfaces via P/Invoke and COM/CCD; `RigToggle.App` is the UI shell and composition root. New tray/hotkey/IPC/notification code belongs in `RigToggle.App`, **not** `RigToggle.Windows`, even though `RigToggle.Windows.csproj` already has `UseWindowsForms=true` — that flag is there only because of the `WindowsDisplayAPI` dependency chain, not because that project owns any UI; it currently has zero WinForms controls and should stay that way. No new Core `INotificationService` interface — a toast is inseparable from the `NotifyIcon` instance that only exists in `RigToggle.App`, so it's a plain method there, not a Core abstraction with a single real implementation.
+This is not a new subsystem — it's two capabilities threaded through the existing four-project solution using the exact composition-root + interface-adapter pattern already established by `IAutostartConfigurator`/`WindowsAutostartConfigurator`. `IThemeProvider`/`AppTheme` live in `RigToggle.Core` with zero Windows-API references (enforced project invariant); `WindowsThemeProvider` (registry read + `SystemEvents` subscription) and `DwmTitleBar` (public static façade over the DWM P/Invoke) live in `RigToggle.Windows`; `ThemeApplier` (the recursive, per-control-type recolor pass encoding this app's specific Designer-generated control layout) lives in `RigToggle.App` only, since WinForms *composition* concerns have never lived in `RigToggle.Windows` in this codebase. All three top-level forms (`MainForm`, `SettingsForm`, `MonitorConfirmDialog`) get constructor-injected `IThemeProvider`, subscribe to `ThemeChanged` while open, and unsubscribe on close/dispose to avoid the classic disposed-form event-leak. The icon redesign is a pure binary-asset swap into the existing `EmbeddedResource`/`LogicalName` wiring with zero code changes, and is architecturally fully independent of the theme work — it can be built in parallel or in either order.
 
-**Major components (new/changed for v1.1):**
-1. **Shared toggle-orchestration helper** (new, `RigToggle.App`) — extracts `MainForm.BtnToggle_Click`'s inline confirm-toggle-report logic into a reusable, trigger-source-aware method (`Button`/`Hotkey`/`TrayMenu`/`Cli`) so all four entry points run identical logic and only differ in whether a modal confirmation is shown vs. skipped, and MessageBox vs. toast reporting.
-2. **`TrayIcon`** (new, `RigToggle.App`) — owns `NotifyIcon` + `ContextMenuStrip`, minimize-to-tray via `FormClosing` cancel+`Hide()`, and `ShowToggleNotification` built from existing `ToggleResult` data.
-3. **Hotkey P/Invoke + `MainForm.WndProc` override** (new, `RigToggle.App`) — `RegisterHotKey`/`WM_HOTKEY` against `MainForm.Handle`, alive independent of visibility.
-4. **Single-instance `Mutex` + named-pipe server/client, restructured `Program.Main`** (new, `RigToggle.App`) — CLI process-lifecycle handling, entirely new subsystem with no v1.0 precedent.
-5. **`IAutostartService` (Core interface) / `WindowsAutostartService` (Windows implementation)** — Registry `Run` key read/write, following the existing interface-in-Core/implementation-in-Windows pattern.
-6. **Generalized `IMonitorController`** — `Disable(IReadOnlyList<string>)` (breaking signature change) plus new `Enable(IReadOnlyList<string>)` and `GetAllMonitors()` (active+inactive) methods; recommend refactoring `WindowsMonitorController` around one shared internal primitive (e.g. `ApplyExactActiveSet`) that `Disable`/`Enable`/`Restore` all call, rather than three independently-evolving methods.
-
-**Build order (reconciled across Architecture and Features research):** multi-monitor's core data-model/interface changes (`AppSettings` fields, `IMonitorController` signature) should land early since they ripple into every other trigger's confirmation-dialog call sites — but this can proceed **in parallel** with extracting the shared toggle-orchestration helper, since these touch different layers (Core/Windows vs. App). Then tray residency + autostart (foundation for "headless" triggers) ships together with toast notification (which hard-depends on the `NotifyIcon` instance tray residency creates). Then global hotkey (depends on tray's keep-alive-on-close for real background usefulness). Then CLI trigger last (depends on tray's resident-instance model for "signal an already-running instance" to have any point, and benefits from the orchestration helper already being exercised by two other trigger paths before the highest-risk IPC path lands).
+**Major components:**
+1. `IThemeProvider` (Core, new) — pure contract: current theme + change event, no registry/DWM knowledge
+2. `WindowsThemeProvider` (Windows, new) — registry read + `SystemEvents.UserPreferenceChanged` subscription, deduped `ThemeChanged` event
+3. `DwmTitleBar` (Windows, new) — best-effort static façade over `DwmSetWindowAttribute`
+4. `ThemeApplier` (App, new) — recursive control-tree recolor pass keyed by concrete control type, applied on load and on every theme change
+5. Icon asset pipeline (App/Resources, binary-only) — replaces `normal.ico`/`rig.ico` in place, no change to `LoadTrayIconsIfNeeded`
 
 ### Critical Pitfalls
 
-1. **Toast notifications silently do nothing on the published exe without AUMID/shortcut registration** — a confirmed, documented failure mode for unpackaged apps that can appear to work in a VS debug session and then silently fail specifically in the shipped single-file exe. Avoid by defaulting to `NotifyIcon.ShowBalloonTip` (zero AUMID/shortcut requirement) and, if ever revisiting real toasts, always testing against the **published** exe from its real install location.
-2. **Re-enabling a monitor that's been OS-disabled across a sleep/wake cycle or reboot is an unvalidated, architecturally distinct scenario** from anything v1.0 tested — `GetAllPaths()` confirms inactive paths are enumerable, but Microsoft's own docs confirm their mode-index info is marked invalid (no stored resolution/position). Design `Enable()` as a new operation, not a `Restore()` variant, and require a dedicated rig checkpoint (disable, sleep/reboot, attempt enable, confirm resolution) before shipping.
-3. **Combined disable+enable topology construction multiplies CCD risk** beyond the single-primary-removal case v1.0 validated — `SetDisplayConfig` validates the entire proposed topology atomically, so composing two independently-reasoned operations risks overlapping positions or no GDI primary. Design as one deliberate, tested code path with a dedicated rig go/no-go checkpoint using the real configured sets, not synthetic single-monitor tests.
-4. **No reentrancy guard exists in `ToggleService` today** — safe only because the GUI button was the sole synchronous trigger; tray menu, hotkey, and CLI/IPC each add an independent entry point that can now invoke a toggle concurrently or in rapid double-fire succession, risking a second `CaptureState()` running mid-flight of a first call's mutation and corrupting the snapshot the whole app depends on for correct restore. This needs one explicit guard (lock/busy-flag) checked by every trigger path, decided up front — not discovered as a bug later.
-5. **`RegisterHotKey` conflicts silently with other rig software** — Moza Companion and other sim-racing peripheral tools are known to register their own global hotkeys; a silent `FALSE` return with no UI feedback makes the feature appear to "do nothing" specifically on the real, fully-loaded rig PC while working in isolated dev testing. Always check the return value, surface conflicts in Settings, and rig-test with Moza Companion actually running.
+1. **Double DWM attribute set (manual call fighting `SetColorMode`'s own internal call)** — causes a visible title-bar color flash/animation on form show. Avoid by deciding explicitly which mechanism owns the title bar (recommendation: `SetColorMode` as base + manual re-apply only as the live-update path, never both firing redundantly).
+2. **Assuming `SetColorMode` live-updates on its own** — it is applied once at startup only; `dotnet/winforms#13935` confirms this is not implemented framework behavior. Must explicitly wire `SystemEvents.UserPreferenceChanged`/`WM_SETTINGCHANGE` and test by flipping Windows theme *while the app is already running*, not just via restart.
+3. **Theming calls issued before the window handle exists** — silently no-ops on this app's proven-fragile `--tray` hidden-start path (`ApplicationContext` with no `MainForm`, already the source of two prior divergent-path bugs). Apply theming in `OnHandleCreated`, not `Form_Load`/`Shown`, and explicitly test the hidden-start-then-restore sequence.
+4. **Wrong registry key drives tray icon theme selection** — `AppsUseLightTheme` (app/window chrome) vs. `SystemUsesLightTheme` (taskbar/tray) are independent keys; using the former for icon-variant selection produces a mismatched icon against the actual taskbar. Read `SystemUsesLightTheme` specifically for any taskbar-facing decision.
+5. **Icon-swap GDI handle leak** — extending the existing 2-state (rig/normal) icon swap risks `new Icon(...)` per swap without disposal, which is a real risk specifically because this app stays tray-resident for multi-hour sessions with repeated toggles. Pre-load and cache all icon instances once at startup; never construct per-swap.
 
 ## Implications for Roadmap
 
-Based on combined research, suggested phase structure for v1.1 (five features plus one cross-cutting prerequisite):
+Based on research, suggested phase structure:
 
-### Phase 1: Multi-Monitor Data Model & Controller Generalization
-**Rationale:** Changes `AppSettings`, `MonitorState`, `MonitorInfo`, and `IMonitorController`'s signature — every other new trigger path (hotkey, tray menu, CLI) will call into `ToggleService`/the confirmation dialog, so it's cheaper to build those call sites once against the final multi-monitor-aware shape than to build against the old single-monitor shape and revisit later. Also the highest-CCD-risk change, benefiting from isolation from unrelated tray/hotkey/CLI work during debugging. Can proceed in parallel with Phase 2 (different layers: Core/Windows vs. App).
-**Delivers:** `MonitorsToDisable`/`MonitorsToEnable` (plural lists) replacing `MonitorDevicePath`, `IMonitorController.Disable(IReadOnlyList<string>)`/`Enable(IReadOnlyList<string>)`/`GetAllMonitors()`, a shared `ApplyExactActiveSet`-style internal primitive, plural `MonitorConfirmDialog`, and **the one-time settings migration in `JsonSettingsStore.Load()`** that seeds `MonitorsToDisable` from the legacy singular `MonitorDevicePath` field so existing v1.0 installs don't silently lose their configured monitor on upgrade.
-**Addresses:** Multi-monitor enable/disable configuration (PROJECT.md v1.1 scope)
-**Avoids:** Pitfalls 2, 3, 5 (architecture research) — anti-pattern of implementing multi-monitor disable as a loop of single-target calls
-**Requires a dedicated rig checkpoint** (mirroring v1.0 Phase 1's spike-first approach) before being considered production-ready: (a) disable-sleep/wake or reboot-enable round-trip, confirming the target is still enumerable and comes back at a sane resolution; (b) combined disable+enable topology applied together, confirming exactly one GDI primary results and no position overlap.
+### Phase 1: Theme Infrastructure
+**Rationale:** Higher-risk, more novel piece of this milestone (cross-thread event marshaling, per-control-type recolor correctness, DWM best-effort handling, and the app's own non-standard `--tray` startup path). Sequencing it first means rig-verification cycles for these specifics happen early, and any per-control recoloring bugs get discovered while the forms are already being actively touched.
+**Delivers:** `IThemeProvider`/`AppTheme` in Core; `WindowsThemeProvider`/`DwmTitleBar`/`NativeMethods` additions in Windows; `ThemeApplier` + wiring into `MainForm`/`SettingsForm`/`MonitorConfirmDialog` + `Program.cs` composition in App. Live theme-following (not just launch-time theming). Includes an audit-and-replace or audit-and-accept pass over existing `MessageBox.Show` call sites.
+**Addresses:** System theme detection, dark/light title bar, live theme switching, full control recoloring, flat control styling (FEATURES.md table stakes)
+**Avoids:** Pitfalls 1, 2, 3, 6, 7, 8 (double DWM set, no live-update, handle-timing no-op on `--tray` path, Win10 mismatch scoping, stale toolstrip cache, unthemed MessageBox)
 
-### Phase 2: Shared Toggle-Orchestration Helper Extraction
-**Rationale:** `MainForm.BtnToggle_Click` today inlines confirm-dialog, toggle invocation, and MessageBox reporting, coupled to a visible owning window. Every one of the next three features (tray menu, hotkey, CLI) needs to run the identical pipeline; building it three more times inline risks the exact kind of drift (GUI click behaves differently than hotkey) that produced this project's own prior H9 regression. Refactor against the now-final multi-monitor confirmation-dialog shape from Phase 1.
-**Delivers:** A trigger-source-aware orchestration method (e.g. `Execute(TriggerSource)`) deciding, in one place, whether to show the modal confirmation (interactive triggers only) and how to report outcomes (MessageBox vs. notification, once Phase 3 exists).
-**Uses:** No new stack elements — pure refactor of existing `ToggleService` call sites.
-**Cross-cutting requirement to resolve here, not later:** add the reentrancy guard (lock/busy-flag) in this helper (or in `ToggleService` directly) so every subsequent trigger path is safe by construction — this is the single most consequential design decision surfaced across all four research files and must not be a per-feature bolt-on.
+### Phase 2: Tray Icon Redesign
+**Rationale:** Fully independent of Phase 1 architecturally (no shared files, interfaces, or ordering dependency per ARCHITECTURE.md) — can run in parallel with or even before Phase 1 if design art is ready sooner. Grouped as its own phase because it has a distinct workflow (design tooling, asset iteration) rather than a code-architecture reason for separation.
+**Delivers:** Two shape-distinct (not just color-distinct) mode icons, authored as SVG and hand-simplified at 16×16, packed into multi-resolution `.ico` files (minimum 16/32, recommended 16/20/24/32/40/48/256), dropped into `RigToggle.App\Resources\` with unchanged filenames/LogicalNames.
+**Uses:** ImageMagick/Inkscape dev tooling (STACK.md); existing `EmbeddedResource`/`LoadTrayIconsIfNeeded` mechanism (ARCHITECTURE.md)
+**Implements:** Icon asset pipeline component (ARCHITECTURE.md Component 5)
 
-### Phase 3: Tray Residency, Autostart & Toast Notification
-**Rationale:** These ship together in practice — toast notification hard-depends on the `NotifyIcon` instance tray residency creates, and this phase establishes the "don't exit on close" behavior every remaining feature's headless/background usefulness depends on.
-**Delivers:** `TrayIcon` (icon + context menu: Switch mode/Settings/Exit), minimize-to-tray via `FormClosing` cancel+`Hide()`, `IAutostartService`/`WindowsAutostartService` (Registry `Run` key, re-written from current `Environment.ProcessPath` on every startup to self-heal if the exe moves), Settings checkboxes, and `ShowToggleNotification` via `NotifyIcon.ShowBalloonTip` gated on trigger source from Phase 2.
-**Implements:** `TrayIcon` component, `IAutostartService` (Core interface/Windows implementation pattern)
-**Avoids:** Pitfall 1 (toast/AUMID trap — resolved by using `ShowBalloonTip`), Pitfall 6 (window destroyed instead of hidden, silently killing hotkey registration later), Pitfall 10 (stale Run-key path), Pitfall 12/13 (ghost tray icon, duplicated menu handlers)
-
-### Phase 4: Global Hotkey Trigger
-**Rationale:** Depends on Phase 2's orchestration helper and benefits from Phase 3's keep-alive-on-close (so the hotkey remains useful once the window is hidden), though the `RegisterHotKey` call itself only needs a live window handle, which `MainForm` has regardless.
-**Delivers:** `RegisterHotKey`/`WM_HOTKEY` P/Invoke, `MainForm.WndProc` override forwarding to the Phase 2 helper, hotkey-capture Settings control, explicit surfacing of `RegisterHotKey` return-value failures.
-**Implements:** Hotkey P/Invoke component (App layer, not Windows layer — see Anti-Pattern 2 in ARCHITECTURE.md)
-**Avoids:** Pitfall 7 (silent conflict with Moza Companion/other rig software's own hotkeys — must rig-test with that software running) and Pitfall 6 (must survive a minimize-to-tray cycle)
-
-### Phase 5: CLI Trigger + Single-Instance IPC
-**Rationale:** Highest technical risk of the six features and the one subsystem with no v1.0 precedent at all (process lifecycle, Mutex, named pipes). Depends on Phase 3's resident-instance model (without it, "signal an already-running instance" has no point) and Phase 2's orchestration helper. Sequenced last so the pipe-server's command handler calls into a helper already exercised by two other real trigger paths, reducing the chance of an undiscovered edge case (e.g. confirmation-on-a-headless-trigger).
-**Delivers:** Named `Mutex` (`Local\` scope) + `NamedPipeServerStream`/`ClientStream` (`PipeOptions.CurrentUserOnly` on both ends), restructured `Program.Main` (parse args, try acquire mutex, signal-or-launch-and-execute), explicit decided behavior for all four combinations of (resident running/not) x (autostart on/off).
-**Avoids:** Pitfall 4 (reentrancy — relies on Phase 2's guard), Pitfall 8 (undefined no-resident-instance behavior), Pitfall 9 (IPC timeout mismatched against the toggle's real multi-second duration — size generously or acknowledge receipt immediately rather than blocking the CLI client)
+### Phase 3: Polish & Verification
+**Rationale:** Several pitfalls in this milestone are explicitly *not* catchable by code review — they require real-rig, real-Windows testing against scenarios (`--tray` hidden-start, live theme flip while running, both taskbar theme backgrounds, extended-session GDI monitoring, actual DPI scaling on rig vs. desk monitor) that a sandboxed/non-Windows build environment cannot surface. This must be a dedicated late phase, not folded into Phase 1/2's "looks done" moment.
+**Delivers:** Verified live theme-following (visible + tray-hidden), verified `--tray` startup-then-restore theming, verified tray icon contrast against both real taskbar themes and DPI sharpness on rig hardware, verified GDI handle stability over an extended session, documented decision on Windows 10 fallback scope (contingent on confirming actual rig PC Windows version), and README screenshot deliverable.
+**Addresses:** PITFALLS.md's full "Looks Done But Isn't" checklist
 
 ### Phase Ordering Rationale
 
-- Phase 1 (multi-monitor) is deliberately first among the five user-facing features because it changes shapes (`AppSettings`, `IMonitorController`) that every other trigger's confirmation/orchestration code will call into — cheaper to build once against the final shape.
-- Phase 2 (shared orchestration helper) is the load-bearing prerequisite for Phases 3-5; skipping straight to feature work risks three divergent copies of confirm/report logic.
-- Phases 3 through 5 follow a dependency chain each subsequent phase actually needs: tray residency's keep-alive enables the hotkey's background usefulness, which in turn is fully exercised before CLI (the highest-risk, most novel subsystem) lands.
-- Both multi-monitor's "enable a long-disabled monitor" and "combined disable+enable topology" capabilities need their own rig-validation checkpoint before being called done, mirroring the exact go/no-go discipline v1.0 Phase 1 used for the original single-monitor disable — don't treat this milestone's higher-risk CCD scenarios as safe by inference from v1.0's success.
-- The reentrancy guard is called out explicitly as a Phase 2 deliverable (not deferred to whichever feature phase "notices" the problem) because it's a cross-cutting invariant that all of Phases 3-5 depend on being correct.
+- Theme infrastructure precedes icon redesign only by convention/risk-priority, not by hard dependency — the two are provably decoupled (ARCHITECTURE.md Integration Points), so the roadmapper has real flexibility to reorder or parallelize if that suits available design-asset timing.
+- Verification is deliberately its own late phase rather than embedded in Phase 1/2 because this project's own history (Phase 8, Phase 11) shows that its most consequential bugs are startup-path-divergence and live-update bugs invisible to a normal launch/relaunch test cycle — grouping all "must verify on real rig, can't verify in sandbox" checks into one late phase matches how this project has actually been debugged before.
+- Documentation (README screenshots) is scoped last since it depends on the finished visual result, per ARCHITECTURE.md's explicit build-order note.
 
 ### Research Flags
 
-Needs research/rig-validation during planning:
-- **Phase 1 (Multi-Monitor):** The two flagged rig checkpoints (long-idle/reboot enable recovery, combined disable+enable topology) have no documentation-only answer — genuinely needs hands-on hardware validation before being considered shippable, exactly like v1.0 Phase 1's original monitor-disable spike.
-- **Phase 5 (CLI + IPC):** Standard, well-understood .NET pattern (Mutex + named pipe) per all four research files — the design decisions (reentrancy behavior, no-resident-instance behavior, IPC timeout sizing) are the risk, not the mechanism itself; a short design pass during planning should resolve these rather than requiring external research.
+Phases likely needing deeper research during planning:
+- None flagged as needing *additional* research-phase investment — all four research files for this milestone are HIGH confidence on the core API contracts (verified directly against official .NET 10 docs and primary-source dotnet/winforms GitHub issues), and the codebase-specific integration points were verified by direct source-tree reads, not inference.
 
-Phases with standard, well-documented patterns (skip research-phase):
-- **Phase 2 (Orchestration helper extraction):** Pure refactor of existing, already-read code; no new API surface.
-- **Phase 3 (Tray residency + autostart + toast):** `NotifyIcon`, `FormClosing` override, and Registry `Run` key are all long-stable, well-documented WinForms/Win32 patterns with no rig-hardware dependency.
-- **Phase 4 (Global hotkey):** `RegisterHotKey`/`WM_HOTKEY` is a decades-stable Win32 API; the only project-specific risk (conflict with Moza Companion's own hotkeys) is a rig-test item, not a research gap.
+Phases with standard patterns (skip research-phase):
+- **Phase 1 (Theme Infrastructure):** Standard, well-documented WinForms/.NET 10 API + established Core/Windows/App adapter pattern already used four times in this codebase (`IAutostartConfigurator`, `IMonitorController`, `IAudioController`, `GlobalHotkey`) — implementation guidance is already concrete enough (see ARCHITECTURE.md Patterns 1-4 with working code examples) to plan directly.
+- **Phase 2 (Tray Icon Redesign):** Standard `.ico` packing/DPI-sizing conventions, official Microsoft icon design guidance already cited directly (FEATURES.md, STACK.md).
+- **Phase 3 (Polish & Verification):** Not a research question — a checklist-driven rig-verification phase; the checklist itself is already fully enumerated in PITFALLS.md.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH for mechanisms (all verified against official Microsoft Learn docs and direct source reads of `WindowsDisplayAPI`); MEDIUM for the multi-monitor long-disabled-enable direction, which depends on graphics-driver behavior not verifiable from documentation alone |
-| Features | MEDIUM-HIGH | Patterns cross-checked against Win32/.NET official docs and multiple independent OSS/commercial reference implementations (EarTrumpet, DisplayFusion); several judgment calls (e.g. left-click-to-toggle) explicitly flagged as single-user-tool opinion, not externally validated |
-| Architecture | HIGH | All claims about current codebase architecture verified by direct source reads of this repo (not assumed from convention); the five feature-integration plans and three anti-patterns are grounded in that verified baseline |
-| Pitfalls | HIGH for the toast/AUMID trap and reentrancy gap (confirmed via official docs and direct code read, respectively); MEDIUM for the two CCD rig-validation items (API contract is HIGH confidence, but driver-level behavior at reboot/sleep-wake time scale is explicitly unverified) |
+| Stack | HIGH | Core API contract (`Application.SetColorMode`, DWM attribute value, registry keys) verified directly against official Microsoft Learn docs and .NET 10 release notes; a few runtime-behavior caveats (Windows 10 title-bar-only community reports, `UserPreferenceCategory.General` filtering) are MEDIUM |
+| Features | MEDIUM-HIGH | WinForms/DWM mechanics and Microsoft icon guidance are HIGH; "what well-regarded apps actually do" is thinner since comparable polished theme-following apps are mostly WPF/WinUI, used as aspirational reference only, not literal WinForms precedent |
+| Architecture | HIGH | Integration points verified directly against the real source tree (not inference), reusing an established, four-times-precedented pattern in this codebase; a couple of WinForms-runtime specifics (SystemEvents threading guarantees, UserPreferenceCategory filtering) are MEDIUM |
+| Pitfalls | HIGH for framework-API behavior (verified against official .NET 10 docs and primary-source dotnet/winforms open GitHub issues #13935, #12027, #12014); MEDIUM for icon-design/DPI specifics (WebSearch-aggregated, cross-checked but not project-verified) |
 
-**Overall confidence:** MEDIUM-HIGH — the tray/hotkey/CLI/autostart mechanisms are all HIGH confidence, well-trodden Win32/.NET patterns; the two multi-monitor CCD scenarios (long-idle enable, combined topology) are the only areas requiring empirical rig validation before being considered settled, consistent with how v1.0's original monitor-disable capability was also gated behind a hardware spike rather than accepted from documentation alone.
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Multi-monitor long-disabled-monitor enable recovery** (sleep/wake and full-reboot time scales) is unverified by documentation alone and needs a dedicated rig round-trip test before the feature ships — treat as a go/no-go checkpoint within Phase 1, not an assumption.
-- **Combined disable+enable topology construction** (multiple monitors changing state in one atomic `SetDisplayConfig` call) is a materially harder case than anything v1.0 validated — needs its own rig checkpoint with the real configured sets, not synthetic single-monitor tests, within Phase 1.
-- **Reentrancy guard design** (lock vs. busy-flag vs. queue-and-run) is not fully specified by research — a concrete decision (reject with "toggle already in progress" vs. queue) should be made explicitly during Phase 2 planning, not left implicit.
-- **`ToggleService.IsFullyConfigured` validation rule** for the new list-typed monitor settings (should an empty disable-set now be allowed, given the tool generalizes beyond "always disable exactly one monitor"?) is flagged by ARCHITECTURE.md as an open design question, not resolved by research — needs a decision during Phase 1 planning.
-- **Modal Settings dialog vs. hotkey/CLI/tray-menu delivery** — WinForms modal dialogs still pump `WM_HOTKEY` messages, so a hotkey press while Settings is open could fire a toggle mid-edit, something impossible in v1.0 (single trigger source blocked while Settings is modal). Needs an explicit decision (suppress vs. queue) during Phase 4 planning, not left as an untested edge case.
-- **Settings migration correctness** (seeding `MonitorsToDisable` from legacy `MonitorDevicePath` in `JsonSettingsStore.Load()`) is a concrete, testable task, not just new-feature scope — should have its own acceptance test loading a genuine v1.0-era `settings.json` file during Phase 1.
+- **Actual Windows version of the rig PC is unconfirmed** (Windows 10 vs. 11) — `Application.SetColorMode` dark mode and full control theming are Windows-11-only by documentation; this is a scoping question that must be resolved as a prerequisite check in the theme-infrastructure phase, not assumed. If Windows 11 (likely given project context), Pitfall 6 (Win10 dark-title/light-body mismatch) is moot and can be explicitly scoped out.
+- **Whether `SettingsForm` is instantiated fresh per open or reused/hidden** is not confirmed from research alone (flagged as an Integration Gotcha in PITFALLS.md) — verify against the actual codebase before writing theme-application/subscription code, since a reused-instance assumption vs. fresh-instance assumption changes where `ThemeChanged` subscribe/unsubscribe must live.
+- **`WM_SETTINGCHANGE`/`ImmersiveColorSet` category filtering** (`UserPreferenceCategory.General`) is MEDIUM confidence, community-pattern-sourced rather than pinned to one official doc — validate on the rig; fall back to unconditional re-read-and-compare (already the recommended safer default in ARCHITECTURE.md's `WindowsThemeProvider` example) if the category proves too narrow.
+- **Toolstrip stale-brush-cache bug (`dotnet/winforms#12027`)** has no clean first-party fix as of this research — must be explicitly accepted as a documented known limitation or worked around by rebuilding the `ContextMenuStrip` on live theme change; this is a product/scope decision for planning, not an open technical question.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-querydisplayconfig and .../nf-winuser-setdisplayconfig — official CCD reference confirming `QDC_ALL_PATHS` inactive-path enumeration and mode-index-invalid limitation, and `SDC_ALLOW_CHANGES`/best-mode-logic recovery behavior
-- https://github.com/falahati/WindowsDisplayAPI/blob/master/WindowsDisplayAPI/DisplayConfig/PathInfo.cs — source-verified `GetAllPaths(onlyActivePaths: false)` and `ApplyPathInfos` flag usage
-- https://learn.microsoft.com/en-us/dotnet/api/system.windows.forms.notifyicon.showballoontip — confirmed API surface and deprecated `timeout` parameter behavior
-- https://learn.microsoft.com/en-us/windows/win32/shell/enable-desktop-toast-with-appusermodelid — official confirmation of the AUMID/Start-Menu-shortcut requirement for desktop-app toast notifications (unpackaged apps)
-- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerhotkey — official `RegisterHotKey`/`WM_HOTKEY`/thread-ownership reference
-- Direct source reads of this repository (`src/RigToggle.Core/**`, `src/RigToggle.Windows/**`, `src/RigToggle.App/**`, all `.csproj` files) — ground truth for current architecture, confirmed absence of reentrancy guard, `FormClosing` handling, and single-instance detection
-- `.planning/PROJECT.md` and `.planning/milestones/v1.0-phases/01-monitor-disable-feasibility-spike/01-RESEARCH.md` + `01-VERIFICATION.md` — v1.1 scope and the project's own established go/no-go rig-spike methodology
-- `.planning/debug/resolved/moza-foreground-focus.md` — the 10-round debug session establishing "raw external state-mutation on a resource you don't fully control can desync unpredictably" as a transferable lesson
+- https://learn.microsoft.com/en-us/dotnet/desktop/winforms/whats-new/net100 — confirmed `Application.SetColorMode` non-experimental in .NET 10, Windows-11-only scope, MessageBox/Designer limitations
+- https://learn.microsoft.com/en-us/dotnet/api/system.windows.forms.application.setcolormode?view=windowsdesktop-10.0 — method signature, `SystemColorMode` values, live-update gap stated explicitly
+- https://learn.microsoft.com/en-us/windows/win32/shell/notification-area — official 16×16/32×32 minimum tray icon size guidance, `LoadIconMetric`
+- https://learn.microsoft.com/en-us/windows/apps/design/iconography/app-icon-design — silhouette/legibility/"color alone insufficient" guidance
+- https://github.com/dotnet/winforms/issues/13935, #12027, #12014 — primary-source, open/unresolved GitHub issues confirming no built-in live theme-following, stale toolstrip brush cache, title-bar regression
+- Direct source-tree reads of `Program.cs`, `MainForm.cs`, `SettingsForm.cs`, `MonitorConfirmDialog.cs`, `NativeMethods.cs`, `GlobalHotkey.cs`, `IAutostartConfigurator.cs`, and related `.csproj` files — ground truth for existing architecture and integration points
 
 ### Secondary (MEDIUM confidence)
-- https://medo64.com/posts/single-instance-application-for-net-6-or-7 and https://www.autoitconsulting.com/site/development/single-instance-winform-app-csharp-mutex-named-pipes/ — Mutex + named-pipe single-instance/IPC pattern, including the `PipeOptions.CurrentUserOnly` gotcha
-- https://github.com/Ivy-Interactive/Rustino/issues/11 and community csharpforums.net thread — corroborating reports of the "works in dev/IDE, silently fails in published exe" toast trap
-- CommunityToolkit.WinUI.Notifications NuGet listing / GitHub issue threads — confirmed the package is archived, informing the reconciled toast-library decision
-- howtoguides.org autostart-mechanism comparison, cross-checked against Microsoft's own Startup Apps documentation concepts — used for the Registry-Run-key-vs-Task-Scheduler comparison
-- https://www.displayfusion.com/Discussions/View/how-to-disable-all-monitors/ — community confirmation that Windows CCD refuses to disable every display
+- https://ironsoftware.com/academy/csharp-framework/dotnet10-dark-mode-winforms/ — practical caveats corroborating the official live-update gap and Windows-11-only scope
+- https://github.com/ShareX/ShareX/issues/4304, #4310 — real-world evidence of naive WinForms control-color reassignment producing suboptimal results in a comparable actively-maintained app
+- https://github.com/anthropics/claude-code/issues/72622 — concrete 2026 real-world instance of the taskbar-vs-app-theme icon contrast pitfall
+- https://github.com/Aldaviva/DarkNet — alternative library considered and deliberately not adopted (hand-rolling preferred, consistent with this project's established dependency-minimization bias)
+- WebSearch aggregation on `AppsUseLightTheme`/`SystemUsesLightTheme` registry key semantics and multi-resolution `.ico` DPI-sizing conventions — consistent across multiple independent sources
 
 ### Tertiary (LOW confidence)
-- Community examples (lostindetails.com, sudhirdotnet blog) for `NativeWindow`/hidden-window `WM_HOTKEY` pattern — corroborates an officially-documented requirement but is itself not an official source
-- Exact behavior of "best mode logic" reconstructing a long-idle monitor's true native resolution across a full reboot — explicitly flagged by STACK.md as not verifiable from documentation, driver-dependent, and the reason Phase 1's rig checkpoint is required
+- None flagged — all findings in this research pass were corroborated by at least one MEDIUM-or-higher source; no single-source/pure-inference claims were carried into this summary.
 
 ---
-*Research completed: 2026-07-26*
+*Research completed: 2026-08-02*
 *Ready for roadmap: yes*

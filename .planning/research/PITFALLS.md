@@ -1,112 +1,305 @@
-# Domain Pitfalls
+# Pitfalls Research
 
-**Domain:** Adding tray residency, autostart, global hotkey, CLI-to-running-instance IPC, toast notifications, and generalized multi-monitor CCD enable/disable to an already-shipped, non-elevated, single-file WinForms utility (Rig Toggle v1.1)
-**Researched:** 2026-07-26
-**Scope note:** This is a *subsequent-milestone* pitfalls pass. It supersedes the v1.0-era `PITFALLS.md` content (that research — CCD "no disconnect flag", elevation/UIPI cascading, cross-process window focus — is preserved in project history and in `.planning/milestones/v1.0-phases/01-monitor-disable-feasibility-spike/01-RESEARCH.md`; its conclusions were already validated and shipped, so it is not repeated here). This pass assumes the v1.0 codebase read directly for this research (`src/RigToggle.App/Program.cs`, `src/RigToggle.Core/ToggleService.cs`, `src/RigToggle.App/MainForm.cs`, `src/RigToggle.Windows/WindowsAppController.cs`, `src/RigToggle.Windows/WindowsMonitorController.cs`) and two pieces of hard-won project history: `.planning/milestones/v1.0-phases/01-monitor-disable-feasibility-spike/01-RESEARCH.md` + `01-VERIFICATION.md` (the CCD feasibility spike and its own Pitfalls A-D) and `.planning/debug/resolved/moza-foreground-focus.md` (a 10-round, evidence-driven debug session whose general lesson — raw external Win32/driver state-mutation on a resource you don't fully control can desync in ways only real-hardware testing surfaces — is treated here as a transferable methodology, not a one-off Moza bug).
+**Domain:** Adding Windows theme-following (dark/light mode) + custom tray/taskbar icons to an existing shipped WinForms tray-resident app
+**Researched:** 2026-08-02
+**Confidence:** HIGH for framework-API behavior (verified against official .NET 10 docs and dotnet/winforms GitHub issues), MEDIUM for icon-design/DPI specifics (WebSearch, cross-checked but not project-verified), LOW-flagged explicitly where noted
+
+**Scope note:** This is a *subsequent-milestone* pitfalls pass for v1.2 (Visual Polish & Documentation). It supersedes the v1.1-era `PITFALLS.md` content (tray residency, hotkey reentrancy, multi-monitor topology, CCD long-idle-monitor risk) — that research is preserved in project history (git log for this file, and in the milestone's own closed research trail) since its conclusions were already validated and shipped in v1.1. This pass focuses specifically on the two new v1.2 surfaces: theme-following (DWM/registry/live-update) and tray/taskbar icon redesign, layered on top of the *existing* tray-residency, close/minimize-to-tray preference, and `NotifyIcon` lifecycle architecture shipped in Phase 8/Phase 11.
+
+## Important Correction to Milestone Framing
+
+PROJECT.md's "Key context" for this milestone states: *"System-theme-following in WinForms has no built-in support — requires manual DWM API calls for the title bar plus re-coloring every control by hand."*
+
+**This is now factually outdated for this project's actual stack (.NET 10).** As of .NET 10 (GA November 2025, which is this project's pinned runtime per STACK.md), WinForms has **fully integrated, non-experimental dark mode support**: `Application.SetColorMode(SystemColorMode.System | .Dark | .Classic)`. This graduated out of the `WFO5001`-gated experimental state in .NET 9 and is a first-class API in .NET 10 — it recolors built-in controls automatically and manages the title bar's `DWMWA_USE_IMMERSIVE_DARK_MODE` attribute internally. (Source: [What's new in WinForms for .NET 10](https://learn.microsoft.com/en-us/dotnet/desktop/winforms/whats-new/net100) — HIGH confidence, official docs.)
+
+This doesn't eliminate the need for custom work (see Pitfalls 1 and 2 below — it has real gaps), but it changes the correct implementation strategy from "hand-roll everything" to "use `Application.SetColorMode` as the base layer, then patch its specific known gaps." Treat this as the single most important finding of this research: **verify this during the theme-infrastructure phase before writing any manual per-control recoloring code** — hand-rolling control-by-control recoloring that the framework already does is wasted effort and a source of conflicts (Pitfall 1).
 
 ## Critical Pitfalls
 
-### Pitfall 1: Toast notifications are silently swallowed for an unpackaged, non-shortcut-registered self-contained exe
-**What goes wrong:** Calling the modern `ToastNotificationManager`/`Windows.UI.Notifications` API (or the CommunityToolkit wrapper around it) from a non-MSIX, non-Store, self-contained single-file .exe throws no exception, returns no error — the toast simply never appears. Microsoft's own docs are explicit: **"Without a valid shortcut installed in the Start screen or in All Programs, you cannot raise a toast notification from a desktop app."** The AppUserModelID (AUMID) that toast delivery keys off of must come from a Start Menu `.lnk` shortcut whose `PKEY_AppUserModel_ID` property store value matches the AUMID string passed to `CreateToastNotifier(aumid)` — Rig Toggle ships with no installer, so nothing creates that shortcut today.
-**Why it happens:** The toast subsystem was designed around MSIX/Store app identity; unpackaged Win32 apps need to fake that identity via a manually-created shortcut + registered AUMID, a step every unpackaged-app toast guide treats as mandatory, not optional.
-**Consequences:** The whole "toast/status notification on toggle" feature silently does nothing on a fresh install — worse, it can appear to work while developing/debugging in Visual Studio (some dev-loop shortcuts get created incidentally) and then fail specifically in the **published, self-contained single-file exe** the user actually runs, matching a documented real-world report ("ToastNotificationManager ... only works within VS, not in published EXE").
-**Prevention:** Either (a) programmatically create/verify the Start Menu `.lnk` + AUMID registration on first run (before ever calling `Show()`), using the same `IShellLink`/`IPropertyStore` pattern Microsoft's own sample uses, and always test against the **published** exe, never an IDE debug session; or (b) sidestep the whole AUMID requirement by using classic `NotifyIcon.ShowBalloonTip(...)` instead of Action-Center toasts — it needs zero shortcut/AUMID registration and is a strictly lower-risk choice for a single-user personal tool. Recommend (b) as the default unless the milestone specifically wants the modern toast visual.
-**Detection/validation:** Rig-test the notification specifically from the **published, self-contained single-file exe** run from its real install location (not `dotnet run`, not F5 in VS) — this is the exact gap the documented failure reports describe. If choosing the AUMID/shortcut route, test it on a genuinely clean state (delete any existing shortcut first) so a leftover dev-time shortcut doesn't mask the real first-run behavior.
+### Pitfall 1: Manual DWM title-bar call fights the framework's own internal call
 
-### Pitfall 2: Re-enabling a monitor that has been CCD-disabled (or physically powered off) for an extended period is a different, unvalidated scenario from anything v1.0 tested
-**What goes wrong:** v1.0's `WindowsMonitorController.Restore()` has exactly two paths: an in-process cache replay (works only if the same process instance that called `Disable()` is still alive) and a crash-recovery fallback that reconstructs from a `MonitorState` snapshot **captured by this app moments before its own `Disable()` call**. Both paths assume a full position/resolution/pixel-format snapshot exists. The new v1.1 feature — a rig monitor that's *normally* kept OS-disabled to save power and gets enabled on toggle-to-rig — has **no such baseline**: there was never a RigToggle-captured "before" state for it, because it wasn't RigToggle that disabled it (or it was disabled so long ago no snapshot survives). This is architecturally a new "Enable(monitorDevicePath)" operation, not a variant of `Restore()`.
-**Why it happens:** The existing code's entire design (both the in-memory fast path and the `GetAllPaths()`-based crash-recovery fallback) is keyed on "this app just disabled it, now bring it back exactly." A monitor disabled for days/weeks by a different mechanism (Windows power management, the user manually, or a much earlier RigToggle session with no snapshot left) breaks that assumption in at least three concrete ways: (1) `GetAllPaths()` (the enumeration this app already relies on for inactive paths) may not even list a monitor Windows has aged out after long disconnection/idle — the OS's memory of an inactive path's identity is not proven durable at that time scale, only tested at the seconds-scale in Phase 1's spike; (2) the monitor's `DevicePath`/target identity can drift across driver updates, cable/port changes, or KVM switching that may have happened in the intervening time, silently invalidating a user-configured device-path setting; (3) even if the path is still found, there is no stored position/resolution to restore to — the code has to fall back to *some* default/preferred mode instead of "the exact prior state," a fundamentally different contract than what `Restore()` currently guarantees.
-**Consequences:** If unvalidated, "enable rig monitor" could silently no-op (target not found in `GetAllPaths()`), throw a confusing CCD validation error, or apply a degenerate mode (Microsoft's own docs already warn inactive-path mode/signal info reports "default values" — this is Pitfall 2 in the Phase 1 research carried forward, now hitting a longer time horizon).
-**Prevention:** Design this as an explicit new `Enable(monitorDevicePath)` operation (not a `Restore()` variant) that (a) re-queries `GetAllPaths()` fresh at enable-time, (b) fails loudly and distinguishably if the target isn't found rather than silently no-opping, and (c) applies either a user-configured target resolution/position or the driver's own preferred/default mode — explicitly documented as *not* a "restore exact prior state" guarantee, since none exists for this case.
-**Detection/validation — REQUIRED RIG CHECKPOINT (mirrors Phase 1's spike gate):** Before committing to a production implementation, run a dedicated rig round-trip: disable the target monitor (via RigToggle or Windows Display Settings), then leave it in that state across (i) at least one sleep/wake cycle and (ii) at least one full reboot — not just the seconds-scale delay Phase 1's Pitfall C already covers — then attempt the new Enable path and confirm: does `GetAllPaths()` still list it at all; does its `DevicePath` match what was configured; does the app successfully bring it to an active, sane-resolution state without a stored baseline. This is exactly the kind of "no amount of research substitutes for testing on the actual rig" situation that gated all of Phase 1 — treat it the same way (a go/no-go checkpoint before the feature ships), not as something safe to assume from the fact that same-session Disable/Restore already works.
+**What goes wrong:**
+If the theme-infrastructure phase (unaware of, or intentionally supplementing, `Application.SetColorMode`) also hand-rolls its own `DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ...)` P/Invoke call for the title bar, the two code paths can each set the attribute — once from WinForms' internal handling when `SetColorMode` is set, once from the app's own call. Confirmed community-reported symptom: *"Setting the DWMWA_USE_IMMERSIVE_DARK_MODE attribute twice can cause the title bar to start out as one color and then animate towards the correct color"* — a visible flash/flicker on every form show, most noticeable exactly on the app's existing hidden-tray-start path where a form's handle is created behind the scenes and later revealed.
 
-### Pitfall 3: Generalizing from "one primary monitor disabled + full-topology restore" to independently-configurable arbitrary disable-sets and enable-sets multiplies CCD topology-construction risk
-**What goes wrong:** v1.0's `Disable()` handles exactly one case well: remove one (usually primary) path, and if it was primary, uniformly reposition every survivor by a delta so exactly one lands at (0,0) (already a hard-won, repositioning-aware fix — see the file's own Pitfall-1 comment). v1.1 wants independently-configurable **sets** — some monitors to disable, others to enable, applied together in one toggle. A single `ApplyPathInfos` call now has to simultaneously remove N paths, add M previously-inactive paths, guarantee exactly one surviving/added path ends up GDI-primary at (0,0), and avoid any two paths overlapping in position — a materially harder topology-construction problem than the single-primary-removal case Phase 1/Phase 4 actually validated.
-**Why it happens:** It's tempting to treat "enable a monitor" and "disable a monitor" as symmetric, independent operations that can just be composed by calling existing single-target logic twice. CCD's `SetDisplayConfig` validates the **entire proposed topology atomically** — arbitrary composition of two separately-reasoned-about operations is exactly the class of thing `SDC_ALLOW_CHANGES`/primary-reassignment already surprised this project once (Phase 1 Pitfall B).
-**Consequences:** Silent validation failure (`ApplyPathInfos` throwing `PathChangeException` with a generic message, already seen in this codebase's `WR-03`/restore-path comments) or, worse, a topology that "succeeds" per the API but produces two monitors stacked at the same position, no GDI primary, or the wrong monitor treated as primary.
-**Prevention:** Design the combined disable+enable apply as one deliberate, tested code path (not two independent single-target calls run back to back) that explicitly computes final positions for every survivor + newly-enabled monitor before calling `ApplyPathInfos` once, reusing the existing verify-and-throw discipline (fresh `GetActivePaths()` re-query, `exactlyOnePrimary` check) already proven in `Disable()`.
-**Detection/validation — REQUIRED RIG CHECKPOINT:** Treat this the same way Phase 1 treated the original disable mechanism: a dedicated go/no-go round-trip on the actual rig with the **real configured disable+enable sets** (not a single monitor, not a synthetic test), checking (i) exactly one GDI primary results, (ii) no position overlap, (iii) the newly-enabled monitor lands at a sane, non-degenerate resolution. Do not infer this is safe merely because the existing single-primary-disable unit tests pass — this is a genuinely new topology shape those tests never exercised.
+**Why it happens:**
+Reasonable engineers assume WinForms dark mode is purely "you must do it all yourself" (reinforced by PROJECT.md's own framing above), so they write the full manual DWM call without first checking whether `Application.SetColorMode` already does it.
 
-### Pitfall 4: No reentrancy guard exists in ToggleService — multiple new trigger sources make concurrent/overlapping toggles newly possible
-**What goes wrong:** `ToggleService.ToggleToRigMode()`/`ToggleToNormalMode()` have zero locking or busy-state guard (confirmed by direct read of `src/RigToggle.Core/ToggleService.cs`) — this was safe in v1.0 only because the sole caller was a single synchronous UI-thread button click (`MainForm.BtnToggle_Click`), which cannot itself be re-entered while running. Adding a global hotkey handler, a named-pipe IPC command handler (potentially on a different thread), and a tray context-menu item creates three more independent entry points that can call into `ToggleService` concurrently with each other or with the GUI button, or in rapid double-fire succession (e.g. a double-tap of the hotkey, or a Stream Deck macro firing while a hotkey-triggered toggle is still mid-flight).
-**Why it happens:** The original design reasonably assumed one interactive user clicking one button. Nothing in the architecture enforces "only one toggle in flight at a time" as an invariant — it was true only because there used to be exactly one way to start a toggle.
-**Consequences:** Interleaved calls can corrupt the snapshot-then-mutate contract this whole app is built on: e.g. a second `ToggleToRigMode()` call's `CaptureState()` could run **after** a first, still-in-flight call's `Disable()` already changed the topology — persisting a snapshot of the *already-disabled* state as if it were the pre-toggle baseline, permanently corrupting the data toggle-back needs to restore correctly. Since current mode is derived purely from snapshot-file presence (D-14), an interleaved re-entrant call can also silently overwrite a correct snapshot mid-restore.
-**Prevention:** Add an explicit in-process guard (lock/semaphore or a simple "busy" flag) checked by **every** trigger path — hotkey handler, IPC command handler, tray menu item, and the existing GUI button — before calling into `ToggleService`. Rapid/overlapping requests should either no-op with a clear notification ("toggle already in progress") or queue, never silently interleave. This must be an explicit design decision made when hotkey/CLI/tray are added, not something assumed safe because it "worked before."
-**Detection/validation:** Warning sign on the rig — toggle-back restores the monitor to the *wrong* layout, or an audio restore appears to no-op, specifically after using two different trigger methods (e.g. hotkey then immediately the tray menu, or a macro-pad script firing twice quickly) rather than a single trigger. Test explicitly: fire two different trigger sources within the same few seconds and confirm the result is either serialized correctly or cleanly rejected, not silently corrupted.
+**How to avoid:**
+Decide once, explicitly, in the theme-infrastructure phase: use `Application.SetColorMode(SystemColorMode.System)` as the base mechanism for both control recoloring and the title bar. Only add a manual `DwmSetWindowAttribute` call as a Windows 10 fallback (see Pitfall 6) — gated so it never runs on Windows 11 where the framework already owns the attribute.
 
-### Pitfall 5: Applying the project's own "don't touch what you don't fully control" lesson from the Moza debug session to CCD monitor manipulation
-**What goes wrong:** The resolved `moza-foreground-focus.md` debug session's core, hard-won lesson was that raw external Win32 state-mutation calls (`SetForegroundWindow`/`ShowWindow`) against a resource RigToggle does not fully own (a third-party process's window) desynced something in that resource's own internal handling, in a way that was only discoverable through 10 rounds of real-hardware, evidence-driven debugging — never predictable from reasoning or docs alone. The same class of risk applies to CCD monitor enable/disable: the GPU driver "owns" the actual hardware/display state, and `ApplyPathInfos`/`ApplyTopology` calls are external mutations against a subsystem whose internal bookkeeping is just as opaque as a foreign app's window procedure. Phase 1's own research already flagged one instance of this (Pitfall C: hotplug re-detection silently reversing a disable after a delay) — the risk does not disappear for the *reverse* direction (enabling a long-idle monitor) or for the newly-combined disable+enable topology changes in v1.1.
-**Why it happens:** It's easy to treat "the CCD API call returned without throwing" as proof the hardware state is now correct and stable, the same trap the project already fell into once with `SetForegroundWindow`'s silent-failure semantics.
-**Consequences:** A monitor that appears to enable/disable correctly in an immediate check could still: silently revert a few seconds/minutes later (driver re-asserts a "remembered" topology — already-documented Pitfall C mechanism, now relevant in both directions), come back at the wrong resolution/rotation because of stale cached EDID data, or interact badly with the newly-added "enable a long-off monitor" feature in a way indistinguishable, from the outside, from a code bug — exactly the ambiguity that made the Moza debug session take 10 rounds to resolve.
-**Prevention:** Never trust a single immediate post-apply verification as proof of a stable end state for this feature category. Reuse (and extend) the project's own already-proven pattern: verify via a second, independent oracle (already done via `GetActivePaths()` re-query — consider also cross-checking `Screen.AllScreens`, per Phase 1's Pattern 2) **and** re-verify again after a real delay, not just immediately — Phase 1 used 10-30 seconds for the disable direction; this milestone's higher-risk scenario (a monitor idle for a long period, or a newly-combined multi-monitor topology) warrants a longer soak/re-check window, plus a genuine sleep/wake or reboot round-trip (see Pitfall 2's checkpoint) before declaring it production-ready.
-**Detection/validation:** Treat any new CCD enable/disable code path added in this milestone as needing its own explicit rig-validation checkpoint (mirroring Phase 1's spike-then-go/no-go structure) rather than being folded silently into "the existing Disable/Restore already work" confidence — that confidence was earned for a narrower, single-session, single-primary scenario, and does not automatically transfer.
+**Warning signs:**
+Title bar briefly flashes light-then-dark (or vice versa) when a form is first shown; happens more on the tray-hidden startup path than on a fresh normal launch (different handle-creation timing).
 
-## Moderate Pitfalls
+**Phase to address:**
+Theme-infrastructure phase — this is an architecture decision, not a bug to catch in review.
 
-### Pitfall 6: Minimize-to-tray implemented by letting the form's native window get destroyed, rather than canceling `FormClosing` + `Hide()`
-**What goes wrong:** v1.0's `Program.cs` has zero `FormClosing`/`Close` handling today (confirmed by direct read) — `Application.Run(mainForm)` is the only lifecycle wiring that exists. If the new tray-residency code doesn't explicitly intercept the "X" button (`e.Cancel = true` + `Hide()`) and instead lets a normal `Close()` proceed, the form's native `HWND` is destroyed. Windows auto-unregisters any `RegisterHotKey` binding tied to that HWND when it's destroyed, and the tray icon's own message-only callback window (or the form itself, if it's what receives `Shell_NotifyIcon` callbacks) can stop functioning too.
-**Why it happens:** "Minimize to tray" and "close normally" look identical from the user's perspective (window disappears) but are completely different at the Win32 level — a very common first-implementation mistake for exactly this feature.
-**Consequences:** After the very first "X" click, the global hotkey silently stops firing for the rest of that process's lifetime, even though the tray icon may still visually appear present — a confusing, hard-to-attribute symptom if not anticipated.
-**Prevention:** Override `FormClosing`, check the close reason, cancel it and `Hide()` for a user-initiated close (only the tray "Exit" menu item should allow a real close). Note this is meaningfully **safer** than the Moza situation in Pitfall 5/the debug session — this is RigToggle's *own* window, fully owned and controlled, so subclassing its own close behavior is a standard, well-understood pattern, not the "manipulating a resource you don't own" risk class.
-**Detection/validation:** One manual test suffices (not a multi-round rig investigation): minimize to tray via the X button, then immediately try the hotkey — it must still fire.
+---
 
-### Pitfall 7: RegisterHotKey conflicts silently with other rig software already using the same key combination
-**What goes wrong:** `RegisterHotKey` returns `FALSE` (with `GetLastError() == ERROR_HOTKEY_ALREADY_REGISTERED`) if another process already owns that exact key combination — a completely silent failure if the return value isn't checked. This rig specifically already runs other automation-heavy software (Moza Companion, and plausibly other sim-racing peripheral tools) that are known to register their own global hotkeys.
-**Why it happens:** Easy to overlook checking `RegisterHotKey`'s boolean return value, since the P/Invoke call "succeeds" from a compile/runtime-exception perspective either way.
-**Consequences:** The hotkey feature "does nothing" specifically on the real, fully-loaded rig PC (with Moza Companion and other tools running) while working fine in isolated development/testing — the same "only visible on the real rig" pattern this project has already hit multiple times (H7-H10 in the Moza debug session).
-**Prevention:** Always check `RegisterHotKey`'s return value; on failure, surface a clear error in the Settings UI (not silence) and let the user choose a different combination.
-**Detection/validation:** Rig-test the chosen hotkey with Moza Companion (and any other rig automation software) actually running, not just RigToggle alone on a clean dev machine.
+### Pitfall 2: Assuming built-in dark mode live-updates when the user flips Windows theme while the app is running
 
-### Pitfall 8: CLI trigger behavior when no resident instance is running is easy to leave undefined
-**What goes wrong:** v1.0 has no single-instance detection at all today — multiple GUI instances can currently be launched side by side with no complaint (confirmed: no Mutex/pipe code anywhere in `Program.cs`). Adding single-instance detection for v1.1 changes this existing (if accidental) tolerance. A CLI invocation (`RigToggle.exe --rig`) that finds no resident instance (autostart disabled, or the tray icon was manually exited) needs an explicit, decided behavior — auto-launch a full instance and then perform the toggle, or fail clearly — rather than an accidental fallthrough that, say, launches a full duplicate GUI process just to service one CLI call.
-**Prevention:** Make this an explicit design decision in the phase that implements CLI+IPC, and document/test both branches (resident running / not running) × (autostart on / off).
-**Detection/validation:** Test all four combinations explicitly on the rig, not just the happy path where a resident instance is already running.
+**What goes wrong:**
+`Application.SetColorMode(SystemColorMode.System)` is applied once — at the point in `Program.cs`/startup where it's called. It does **not** subscribe to live OS theme-change notifications on its own. As of this research, `dotnet/winforms#13935` ("Does WinForms react to Dark Mode settings changes... WM_SETTINGCHANGE... ImmersiveColorSet?") is open, unresolved, and explicitly confirms this is *not* implemented framework behavior. If the milestone's stated goal is "follows Windows system light/dark mode" (implying live-following, not just "correct at each launch"), relying on `SetColorMode` alone silently under-delivers: the app will only match the *theme active at process start* and will not react if the user (or a scheduled light/dark automation tool) flips the theme mid-session — which, for a tray-resident, hours-long rig session, is a realistic scenario, not an edge case.
 
-### Pitfall 9: Named-pipe IPC timeout mismatched against the toggle's real multi-second duration
-**What goes wrong:** A CLI client with a short connect/response timeout (a commonly-referenced pattern uses ~3 seconds) can time out and report failure to the calling macro pad/Stream Deck even though the resident instance's toggle (monitor CCD change + audio switch + app relaunch via `ShellExecute`, which is not instant) is still legitimately in progress and completes successfully moments later.
-**Prevention:** Either size the client's wait timeout generously above the realistic worst-case toggle duration, or design the protocol so the server acknowledges receipt of the command immediately (fire-and-forget) rather than blocking the CLI client until the entire toggle sequence finishes — more important the more this is driven by external tools (Stream Deck, macro pads) that may have their own execution timeouts.
-**Detection/validation:** Time an actual end-to-end toggle on the rig (all three steps) and confirm the chosen IPC timeout comfortably exceeds it.
+**Why it happens:**
+The API name and .NET 10 docs' "no longer experimental" framing invite an assumption of full dynamic theming; the docs don't call out the live-update gap explicitly, so it's easy to ship, test with an app restart, and never notice.
 
-### Pitfall 10: Autostart Registry Run-key entry goes stale if the user moves/re-publishes the exe
-**What goes wrong:** Rig Toggle ships as a single self-contained exe the user places and moves themselves (no installer, no fixed Program Files path) — a Registry Run key pointing at a fixed path is far more likely to go stale here than for an MSI-installed app. A stale Run-key entry fails completely silently — the process just never launches at boot, with no error surfaced anywhere.
-**Prevention:** Re-write the Run-key value using the current `Environment.ProcessPath`/`AppContext.BaseDirectory` on every app startup (not just once at first-enable), so re-publishing to a new folder self-heals autostart the next time the app is manually launched once.
-**Detection/validation:** Move/rename the published exe after enabling autostart, reboot, and confirm autostart either self-heals on the next manual launch or the Settings UI clearly surfaces autostart as broken — not silent, unexplained absence.
+**How to avoid:**
+Explicitly implement live-following via `WM_SETTINGCHANGE` in the main form's `WndProc` override: check `m.Msg == 0x001A` and `Marshal.PtrToStringUni(m.LParam) == "ImmersiveColorSet"`, then re-call `Application.SetColorMode(...)`/reapply theme and `Invalidate()`/re-theme the tray icon and any currently-hidden forms. Do this once, centrally (e.g. in a shared theme service that all forms and the tray-icon manager subscribe to), not duplicated per form.
 
-### Pitfall 11: Toast/notification content can drift from the GUI's own partial-failure reporting
-**What goes wrong:** v1.0's `MainForm` already has a per-step (`Monitor`/`Audio`/`App`) partial-failure checklist (`FormatChecklist`, CORE-04). A separately-implemented toast/notification path that just says "Toggled to Rig Mode" without reflecting the same per-step outcome could disagree with what the GUI shows if the user later opens it — e.g. toast says success while a partial failure actually occurred.
-**Prevention:** Reuse the existing `ToggleResult`/step-outcome data (and ideally the same formatting logic) to build the toast/notification text, rather than maintaining a second, independently-written success/failure message.
-**Detection/validation:** Trigger a toggle that deliberately fails one step (e.g. temporarily misconfigure the audio device) via a non-GUI trigger and confirm the toast reflects the same partial-failure detail the GUI checklist would show.
+**Warning signs:**
+Testing procedure only ever restarts the app to "test dark mode" rather than toggling Windows Settings > Personalization > Colors while the app is already running — this is exactly the kind of gap that source-level review won't catch but the real rig will, consistent with this project's established pattern (v1.0/v1.1 bugs only surfaced under real usage).
 
-## Minor Pitfalls
+**Phase to address:**
+Theme-infrastructure phase for the mechanism; polish/verification phase must include an explicit "flip Windows theme live, app already running, both visible and tray-hidden" rig test — this is not covered by a normal launch/relaunch test cycle.
 
-### Pitfall 12: NotifyIcon ghost/orphaned tray icon on ungraceful exit
-**What goes wrong:** If `NotifyIcon` isn't explicitly set invisible and disposed before the process truly exits, Windows can leave a "ghost" icon in the tray until the user mouses over it — confusing since it looks like the app is still running.
-**Prevention:** Wire the tray "Exit" command to explicitly `Visible = false` + `Dispose()` before `Application.Exit()`. Accept (don't over-engineer) that a hard process kill (Task Manager) can still leave a transient ghost icon — this is a well-known, generally-accepted OS-level limitation, not something fully fixable from app code.
+---
 
-### Pitfall 13: Tray context menu item handler leaks/duplicates across mode changes
-**What goes wrong:** Rebuilding the tray context menu's "Switch to Rig/Normal Mode" item (or its whole `ContextMenuStrip`) from scratch on every mode change, instead of just updating its `Text`, risks re-attaching a `Click` handler without removing the old one — causing the toggle action to fire multiple times per click after several mode changes.
-**Prevention:** Keep the same menu item/handler instance for the app's lifetime; only mutate its `Text` property when mode changes.
+### Pitfall 3: DWM/theme calls issued before the window handle exists — silently no-op on the app's existing hidden-tray startup path
 
-### Pitfall 14: Modal Settings dialog does not block hotkey/other trigger delivery the way it blocks the GUI button
-**What goes wrong:** WinForms modal dialogs (`ShowDialog`) still pump messages for other top-level windows on the same UI thread, including `WM_HOTKEY` delivered to the main form's handle — so a hotkey press while Settings is open modally could still fire a toggle mid-edit, something impossible today (single trigger source = the GUI button, itself blocked while Settings is modal).
-**Prevention:** Explicitly decide (and test) whether hotkey/CLI/tray-menu triggers should be suppressed or queued while the Settings dialog is open, rather than leaving it as an untested edge case introduced incidentally by adding new trigger sources.
+**What goes wrong:**
+Both `DwmSetWindowAttribute` and reliable control-recoloring require a created `HWND`. Calling either in a form's constructor (before `CreateHandle`/`OnHandleCreated`/`Load`) is a documented failure mode: *"The `DwmSetWindowAttribute` call should be done in the window's Load/Shown event... rather than before the form is displayed."* This project already has a *proven* history of exactly this class of bug: Phase 8's `--tray` hidden-start uses `Application.Run(new ApplicationContext())` with **no `MainForm` reference** specifically because the documented `ApplicationContext(mainForm)` pattern didn't actually suppress `Show()` on this runtime (per PROJECT.md Key Decisions). That non-standard startup path means the main form's handle-creation timing on the hidden-tray path is *not* the same as on a normal visible launch — a naive "apply theme in `Form_Load`" implementation may run at a different point relative to handle creation on this path than on the normal path, and only the hidden-tray path will fail silently (no exception, no visible symptom until the window is later shown from the tray icon and looks wrong).
 
-## Phase-Specific Warnings
+**Why it happens:**
+Standard WinForms theming guidance (and most blog tutorials) assumes the conventional `Application.Run(new MainForm())` startup shape. This app deliberately deviates from that shape for tray-hidden start, and that deviation is exactly where handle-lifecycle assumptions break.
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|--------------|-----------------|------------|
-| Tray residency + minimize-to-tray + autostart | Pitfalls 6, 10, 12, 13 | Cancel `FormClosing`/`Hide()` (own window, low risk); self-healing Run-key path; explicit NotifyIcon disposal; stable menu-item/handler instances |
-| Global hotkey | Pitfall 7 (Moza/rig-software conflict), Pitfall 6 (lost registration after tray-close if implemented wrong) | Check `RegisterHotKey` return value and surface conflicts; rig-test with Moza Companion running; verify hotkey survives a minimize-to-tray cycle |
-| CLI trigger + single-instance IPC | Pitfalls 4, 8, 9 | Explicit busy-guard shared across all trigger sources; explicit no-resident-instance behavior; generous/ack-based IPC timeout — **standard, well-understood .NET pattern (Mutex + named pipe), unlikely to need deep rig-hardware research beyond the reentrancy/timeout design decisions above** |
-| Toast/status notification | Pitfall 1 (AUMID/shortcut requirement), Pitfall 11 (content drift from GUI checklist) | Prefer `NotifyIcon.ShowBalloonTip` over full toast unless AUMID/shortcut registration is deliberately built and tested against the **published** exe; reuse existing `ToggleResult` formatting |
-| Multi-monitor generalized enable/disable sets | Pitfalls 2, 3, 5 — **flag as needing its own feasibility/go-no-go rig checkpoint, mirroring Phase 1** | Design `Enable()` as a new operation (not a `Restore()` variant); validate combined disable+enable topology on the actual rig with real configured sets; long-idle/sleep/reboot round-trip test before shipping; delayed re-verification, not just immediate |
+**How to avoid:**
+Apply theming logic in `OnHandleCreated` (fires reliably regardless of whether the form is ever `Show()`n) rather than `Form_Load`/`Shown` (which only fire when the form is actually displayed) — a hidden form still creates its handle even if never shown, so `OnHandleCreated` is the one lifecycle point common to both startup paths. Explicitly test theming on the `--tray` hidden-start path, not just normal launch.
+
+**Warning signs:**
+Title bar or controls appear correctly themed on normal launch but appear in default light-mode WinForms styling the first time the window is restored from the tray icon after a `--tray` hidden start.
+
+**Phase to address:**
+Theme-infrastructure phase for implementation; must be verified specifically against the existing `--tray` startup path (not just normal launch) before considered done — flag this as a required rig test given the project's history of exactly this startup-path class of bug (Phase 8, Phase 11 lockout bug were both divergent-path bugs).
+
+---
+
+### Pitfall 4: Icon-swap state space quietly doubles from 2 states to 4, with GDI-handle leak risk on long rig sessions
+
+**What goes wrong:**
+The app already swaps the tray `NotifyIcon.Icon` between two states (rig mode / normal mode). Adding theme-following icons turns this into four states (rig-light, rig-dark, normal-light, normal-dark) that must be selected correctly on: mode toggle, live theme change (Pitfall 2), and app startup. If the existing icon-swap code (or its extension) constructs a `new Icon(...)` on each swap without disposing the previous one, this is a real risk specifically *because* of this app's usage pattern: it stays tray-resident for entire multi-hour rig sessions with repeated toggles, which is exactly the workload that turns a per-swap GDI object leak (`Icon`/`Bitmap` handles count against the ~10,000-per-process GDI object ceiling) into an eventual failure, whereas a short manual smoke test (a few toggles) would never surface it.
+
+**Why it happens:**
+`Icon`/`Bitmap` are `IDisposable`; `NotifyIcon.Icon =` reassignment does not dispose the outgoing icon automatically, and it's easy to overlook when refactoring a 2-state swap into a 4-state one under time pressure, especially since nothing throws or visibly breaks until handles accumulate.
+
+**How to avoid:**
+Pre-load and cache all four `Icon` instances once at startup (they're static resources, not created per-swap), and only ever assign references to `NotifyIcon.Icon` from that cache — never `new Icon(...)` inside the toggle/theme-change handlers. Dispose the cached set once, on app exit.
+
+**Warning signs:**
+Task Manager's "GDI objects" column for the process climbing steadily across a long session with repeated toggles/theme flips rather than staying flat.
+
+**Phase to address:**
+Icon-redesign phase (where the 4-icon asset set and swap logic are built) — with an explicit code-review checklist item ("are all 4 icons loaded once and cached, never constructed per-swap?"). Verification (long-session GDI handle monitoring) belongs in the polish/verification phase, ideally during an actual extended rig session rather than a short smoke test.
+
+---
+
+### Pitfall 5: Wrong registry key drives icon-theme selection (`AppsUseLightTheme` vs `SystemUsesLightTheme`)
+
+**What goes wrong:**
+Windows exposes two independent theme keys under `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`: `AppsUseLightTheme` (governs app/window chrome — what `Application.SetColorMode(System)` effectively tracks) and `SystemUsesLightTheme` (governs system surfaces — the **taskbar and tray**, specifically). On Windows 11 a user can legitimately run light apps with a dark taskbar or vice versa. If the theme-infrastructure/icon-redesign code reads `AppsUseLightTheme` to decide which tray icon variant to show (a natural mistake, since it's the same key already being read/watched for window theming), the tray icon can end up light-on-light or dark-on-dark against the actual taskbar background even though the app window itself is themed correctly.
+
+**Why it happens:**
+Most WinForms dark-mode tutorials only ever mention `AppsUseLightTheme` because they're only theming the window, not the tray. It's the more commonly documented key, so it gets reused by default for the icon-selection logic without realizing the tray is a separate surface with its own key.
+
+**How to avoid:**
+Read `SystemUsesLightTheme` specifically to choose which tray icon variant (light-background-safe vs dark-background-safe) to display; keep `AppsUseLightTheme` reserved for window/control theming decisions. Watch both independently if both can change live (see Pitfall 2's `WM_SETTINGCHANGE` handling — the `lParam` string doesn't distinguish which key changed, so re-read both keys on every `ImmersiveColorSet` notification).
+
+**Warning signs:**
+Manually setting "dark taskbar, light apps" (or the reverse) in Windows Settings > Personalization > Colors and observing the tray icon doesn't match the taskbar even though the window does (or vice versa).
+
+**Phase to address:**
+Icon-redesign phase for the read-the-right-key logic; theme-infrastructure phase should expose a shared "current taskbar theme" signal (not just "current app theme") for the icon logic to consume, so this isn't duplicated ad hoc.
+
+---
+
+### Pitfall 6: Windows 10 fallback produces a mismatched dark-title/light-content window
+
+**What goes wrong:**
+Per official .NET 10 docs, *"Dark mode is only supported on Windows 11; older systems fall back to classic mode"* for `Application.SetColorMode`. If the theme-infrastructure phase separately adds a manual `DwmSetWindowAttribute` call as a "make sure the title bar goes dark on Windows 10 too" enhancement (the attribute itself does work on Windows 10 1809+, independent of WinForms' own support), the result on a real Windows 10 machine is a dark title bar sitting on top of an otherwise fully light-mode (unthemed) window body — a worse, more jarring visual state than doing nothing at all.
+
+**Why it happens:**
+It's tempting to "complete" Windows 10 support by adding the one API call that's known to work cross-version, without realizing the *controls* underneath won't follow because the framework's own dark-mode control recoloring is Windows-11-gated.
+
+**How to avoid:**
+Before adding any Windows-10-specific manual DWM call, confirm what Windows version the actual rig PC runs (not currently documented in PROJECT.md — verify this as a pre-requisite check in the theme-infrastructure phase). If it's Windows 11, this pitfall is moot and can be explicitly scoped out. If it could be Windows 10, either theme the title bar and skip full control recoloring consistently (accept a partial-but-consistent look), or don't attempt title-bar theming on pre-Win11 at all — don't do one without the other.
+
+**Warning signs:**
+Screenshots/testing only ever happen on one Windows version; this bug is invisible unless tested on the actual OS build the rig PC runs.
+
+**Phase to address:**
+Theme-infrastructure phase — resolve the actual target Windows version first (this is a scoping question, not just an implementation detail), then decide whether Windows-10-specific handling is even in scope for this milestone.
+
+---
+
+### Pitfall 7: Static system-brush/pen caches don't repaint on live color-mode switch (toolstrip separators, dropdown arrows)
+
+**What goes wrong:**
+A confirmed WinForms framework bug (`dotnet/winforms#12027`) affects exactly the control type this app already uses for its tray context menu (`ContextMenuStrip`/`ToolStrip`): *"colors only update correctly if the color mode is set at application startup"* when switching live, because `SystemBrushes`/`SystemPens` maintain a static cache indexed by `KnownColor` that isn't purged on a runtime color-mode switch. Concretely: `ToolStripSeparator` lines and `ToolStripSplitButton` dropdown arrows can remain the *old* theme's color after a live theme flip even though the rest of the tray context menu updates correctly — a subtle, easy-to-miss visual inconsistency that only appears after Pitfall 2's live-theme-change path is actually exercised, not on a fresh launch.
+
+**Why it happens:**
+This is a genuine, currently-unfixed framework limitation, not an app-level mistake — but it's specific to exactly the control (tray context menu) this project already has, so it will surface here if live theme-following is implemented at all.
+
+**How to avoid:**
+No clean first-party workaround exists as of this research (the fix requires the framework to purge the static caches, tracked upstream). Practical mitigations: (a) accept this as a known minor cosmetic gap and don't spend theme-infrastructure-phase time chasing it, or (b) force a full app restart-equivalent re-theme by disposing and rebuilding the `ContextMenuStrip` (not just its colors) on live theme change, which sidesteps the stale-cache issue at the cost of slightly more churn.
+
+**Warning signs:**
+Tray context menu separators/arrows look subtly wrong-themed only after flipping Windows theme live while the app is running with the menu previously shown at least once — won't reproduce on a fresh launch in the already-current theme.
+
+**Phase to address:**
+Polish/verification phase — flag as accepted known limitation if not worth fixing; document rather than silently ship as unnoticed.
+
+---
+
+### Pitfall 8: Modal dialogs and `MessageBox` remain permanently light-themed
+
+**What goes wrong:**
+Per official .NET 10 docs: *"some controls, like MessageBox, remain in light mode"* even with `Application.SetColorMode(SystemColorMode.System)` fully applied. If any part of this app's existing error/status surfacing uses `MessageBox.Show(...)` (a common pattern for e.g. hotkey-registration-failure or toggle-error surfacing per PROJECT.md's TRIG-01 "registration-failure surfacing"), that dialog will pop up stark white against an otherwise dark-themed app — a jarring, obviously-unfinished-looking regression that's easy to miss in code review (nothing is "broken," it just doesn't match) and easy to miss in a quick visual pass if the error path isn't deliberately triggered during testing.
+
+**Why it happens:**
+`MessageBox` is a thin wrapper over the native Win32 message-box API, which is a system-owned dialog outside WinForms' own rendering/theming control — the framework's dark-mode work doesn't (and can't easily) reach it.
+
+**How to avoid:**
+Audit every existing `MessageBox.Show` call site during the theme-infrastructure phase; replace user-facing ones with a themed custom `Form`-based dialog (a small owned form with OK/Cancel buttons that *does* pick up `Application.SetColorMode` styling) rather than leaving native `MessageBox` calls in place.
+
+**Warning signs:**
+A white flash-dialog appears when deliberately triggering an error path (e.g. hotkey conflict, launch-target missing) while the rest of the app is dark-themed.
+
+**Phase to address:**
+Theme-infrastructure phase should include an audit-and-replace pass over existing `MessageBox` call sites, since this app already has several error-surfacing code paths from prior milestones (hotkey conflict, autostart save-failure, etc. per PROJECT.md's bug history) that are exactly the kind of rarely-triggered path likely to be missed without a deliberate audit.
+
+---
+
+### Pitfall 9: Custom tray icon indistinguishable against one of the two taskbar theme backgrounds
+
+**What goes wrong:**
+A newly designed icon pair (rig-mode/normal-mode) validated only by eye in an image editor can look great against a white/light background and become nearly invisible (or vice versa) against Windows' actual dark taskbar background — Windows 11 does not automatically recolor arbitrary custom notification-area icons for contrast the way it does for some first-party monochrome system icons. This is purely a design-review gap, not a code bug, so it won't show up in any form of source review — only in a real screenshot against a real light taskbar and a real dark taskbar.
+
+**Why it happens:**
+Icon design is typically previewed against a neutral/white canvas in design tools, and the "does this read clearly on a genuinely dark taskbar" check requires an actual live comparison that's easy to skip when the icon "looks fine" in isolation.
+
+**How to avoid:**
+Design both icon variants with a visible outline/stroke or sufficient internal contrast that works on both a near-black and a near-white background (don't rely on background-color assumptions); explicitly screenshot the tray icon against both an actual light-taskbar and actual dark-taskbar Windows session before considering the icon-redesign phase done.
+
+**Warning signs:**
+Icon only ever verified in the image editor or against one taskbar theme during development.
+
+**Phase to address:**
+Icon-redesign phase for design; polish/verification phase must include the explicit real-rig, both-taskbar-themes screenshot check (this project's README milestone deliverable already requires real screenshots from the rig, which is a natural place to also capture this verification).
+
+---
+
+### Pitfall 10: Single-resolution icon renders blurry — and this app's own core action can trigger the exact DPI-change event that exposes it
+
+**What goes wrong:**
+A `NotifyIcon.Icon` backed by only a single embedded resolution (commonly just 32x32) gets stretched or shrunk by Windows to fit the actual DPI-scaled tray slot, producing a visibly blurry icon. This is a generically known WinForms/Win32 tray-icon gotcha, but it is *unusually relevant to this specific project*: this app's entire core function is disabling/enabling monitors, and if the rig monitor and the desk/primary monitor run at different DPI scaling percentages (common in mixed desktop+dedicated-rig-monitor setups), the monitor-disable/enable toggle itself is a plausible trigger for a DPI-scaling-context change around the same time the tray icon needs to re-render — making this pitfall more likely to actually manifest in this app's real usage than in a typical single-monitor utility.
+
+**Why it happens:**
+It's easy to embed just one or two icon sizes when producing a quick `.ico` in a hurry, and a single-DPI development/test machine won't surface the blurriness at all.
+
+**How to avoid:**
+Produce each `.ico` file with the full standard multi-resolution set (at minimum 16, 20, 24, 32, 48, 256 px — covering 100%/125%/150%/200% DPI scale steps) rather than a single embedded size; verify visually at whatever DPI scaling percentage the actual rig monitor and desk monitor each run at (check both, since they may differ).
+
+**Warning signs:**
+Icon looks fine on the primary development display but blurry specifically when the taskbar renders on a differently-DPI-scaled monitor, or immediately after a monitor topology change.
+
+**Phase to address:**
+Icon-redesign phase for producing the multi-resolution `.ico` asset; polish/verification phase should explicitly check icon sharpness on the actual rig hardware at its real DPI settings (both monitors, if they differ) — this cannot be meaningfully verified in a sandboxed/non-Windows build environment per PROJECT.md's own note that screenshots require the real rig.
+
+---
+
+## Technical Debt Patterns
+
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|--------------------|-----------------|------------------|
+| Skip live `WM_SETTINGCHANGE` theme-following, rely on `Application.SetColorMode` applied once at startup only | Much less code, ships faster | App silently goes stale-themed if user flips Windows theme mid-session; contradicts milestone's "follows Windows system light/dark mode" framing | Only acceptable if explicitly re-scoped as "themed at launch, not live" — must be a conscious decision, documented in PROJECT.md, not a silent gap |
+| Leave native `MessageBox.Show` calls unthemed rather than building custom dialog forms | Saves building/testing a themed dialog form | Visibly jarring white flash on every error path, undermines the whole point of the "modern, theme-aware UI" milestone goal | Acceptable only for truly rare/dev-only diagnostic dialogs, never for user-facing error paths like hotkey conflicts |
+| Ship without explicit Windows-10 fallback handling for dark mode | Less version-branching code | Inconsistent look if the rig PC (or any future machine) runs Windows 10 rather than 11 | Acceptable once the actual rig PC's Windows version is confirmed to be 11 — verify this first, don't guess |
+| Single-resolution tray icon | Faster asset production | Blurry rendering on DPI-scaled displays, more likely triggered by this app's own monitor-toggle core action than in a typical app | Never acceptable for the shipped icon-redesign deliverable — multi-resolution `.ico` production has effectively zero extra cost with any modern icon tool |
+
+## Integration Gotchas
+
+Common mistakes when adding theming/icons on top of the *existing* tray-residency system from prior milestones.
+
+| Integration Point | Common Mistake | Correct Approach |
+|--------------------|------------------|-------------------|
+| Existing `--tray` hidden-start path (`Application.Run(new ApplicationContext())`, no `MainForm`) | Theming applied in `Form_Load`/`Shown`, which never fires on this path until the user restores from tray — window then appears unthemed on first restore | Apply theming in `OnHandleCreated`, which fires for hidden forms too; explicitly test the hidden-start-then-restore sequence |
+| Existing derived tray-icon-existence logic (`CloseMinimizesToTray \|\| MinimizeToTray`, applied live on Settings-Save per Phase 11) | Icon-theme-variant selection logic bolted on separately from this existing live-recompute path, drifting out of sync (e.g. icon shows stale theme variant after a live Settings-Save toggles tray visibility) | Route icon-variant selection (mode × theme) through the same "recompute on Settings-Save" trigger point already established in Phase 11, not a separate ad hoc update path |
+| Existing rig/normal `NotifyIcon.Icon` swap on toggle | New theme-variant selection logic re-implemented separately from the existing mode-swap logic, doubling the number of places that decide "which icon right now" | Single icon-selection function taking `(mode, theme)` → cached `Icon`, called from every place that used to just take `mode` — one source of truth, not two parallel switches |
+| Existing Settings dialog lifecycle | Unclear whether SettingsForm is a fresh instance per open or reused/hidden — theming code that assumes "always constructed fresh" will silently skip re-theming a reused-and-shown instance after a live theme change while it was previously hidden | Confirm actual SettingsForm instantiation pattern in the existing codebase before writing theme-application code; if reused, ensure it's included in the same live-theme-change broadcast as MainForm |
+
+## Performance Traps
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|-----------------|
+| Constructing new `Icon`/`Bitmap` objects per toggle or per theme change instead of caching | GDI object count climbs over a session | Pre-load and cache all 4 icon variants once at startup; only assign cached references | Manifests specifically on long tray-resident rig sessions with many toggles — the app's actual real-world usage pattern, not a quick smoke test |
+| Re-theming the entire control tree (deep `Invalidate`/recursive recolor walk) on every `WM_SETTINGCHANGE`, without filtering to only the `ImmersiveColorSet` payload | Visible flicker or CPU spike on unrelated settings changes (many other Windows settings also broadcast `WM_SETTINGCHANGE`) | Filter strictly on `Marshal.PtrToStringUni(m.LParam) == "ImmersiveColorSet"` before doing any re-theme work | Noticeable if the user changes any other Windows setting while the app is open — easy to miss since normal dev testing rarely triggers unrelated `WM_SETTINGCHANGE` broadcasts |
+
+## Security Mistakes
+
+Not a significant concern for this milestone (no network/auth surface added), but one domain-relevant item:
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Assuming the theme registry keys (`AppsUseLightTheme`/`SystemUsesLightTheme`) always exist | Unhandled exception on read if a key is missing (uncommon but possible on some Windows configurations/server SKUs) or if the user manually deleted the value | Wrap registry reads with a safe-default fallback (assume light mode if unreadable) rather than letting a missing key throw and crash theme application |
+
+## UX Pitfalls
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-------------------|
+| Theme only applied at launch, not live | App looks visually "wrong"/stale for the rest of a long session after the user or a scheduled tool flips Windows theme | Implement live `WM_SETTINGCHANGE` following (Pitfall 2) if the milestone goal genuinely means "follows," not just "matches at launch" |
+| Native `MessageBox` dialogs breaking visual consistency on error paths | Jarring, unpolished-looking white flash exactly when something has already gone wrong (worst possible moment for a bad first impression) | Replace with themed custom dialog forms (Pitfall 8) |
+| Icon indistinguishable against one taskbar theme | User can't tell mode at a glance in the exact situation the icon exists to solve (quick visual status check) | Verify against both real taskbar themes before shipping (Pitfall 9) |
+
+## "Looks Done But Isn't" Checklist
+
+- [ ] **Dark mode on MainForm/SettingsForm:** Often verified only via IDE Designer preview (which doesn't render dark mode per .NET 10 docs' own caveat) or a single launch — verify on the real rig with an actual Windows 11 dark-mode session, both forms, including the `--tray` hidden-start-then-restore path
+- [ ] **Live theme-following:** Often tested only by restarting the app in each theme — verify by flipping Windows Settings > Personalization > Colors *while the app is already running*, both with the window visible and while tray-hidden
+- [ ] **Tray context menu theming:** Often verified only at initial theme, missing the stale-static-cache toolstrip-separator bug (Pitfall 7) — verify after at least one live theme flip with the menu previously opened
+- [ ] **Error/status dialogs:** Often forgotten entirely since they're rarely-triggered paths — deliberately trigger each known error surface (hotkey conflict, launch-target missing, autostart save failure) and check it's themed, not a native `MessageBox`
+- [ ] **Tray icon on both taskbar themes:** Often verified only in the image editor — screenshot against a real light taskbar and a real dark taskbar
+- [ ] **Tray icon DPI sharpness:** Often verified only on the primary dev monitor's DPI — check on the actual rig monitor and desk monitor if they run different scaling percentages
+- [ ] **GDI handle stability over a long session:** Often never checked at all since a short manual test won't leak visibly — monitor Task Manager's GDI-objects column across an extended real rig session with repeated toggles
+- [ ] **Windows 10 vs Windows 11 consistency:** Often assumed moot without checking — confirm the actual rig PC's Windows version before deciding whether Windows-10-specific fallback handling (Pitfall 6) is even in scope
+
+## Recovery Strategies
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|-----------------|------------------|
+| Double DWM attribute set causing title-bar flash (Pitfall 1) | LOW | Remove the redundant manual `DwmSetWindowAttribute` call; let `Application.SetColorMode` own the title bar exclusively (or vice versa, gated by OS version per Pitfall 6) |
+| Theme not live-following (Pitfall 2) | MEDIUM | Add the `WM_SETTINGCHANGE`/`ImmersiveColorSet` handler retroactively; requires touching every form/icon-manager that needs to react, plus a full live-flip rig retest |
+| Theming silently skipped on `--tray` hidden-start path (Pitfall 3) | LOW-MEDIUM | Move theming logic from `Load`/`Shown` to `OnHandleCreated`; retest both startup paths |
+| GDI handle leak from per-swap icon construction (Pitfall 4) | LOW | Refactor to a pre-cached 4-icon dictionary; no data/state migration needed since icons are static assets |
+| Wrong registry key for tray icon theme (Pitfall 5) | LOW | Swap the key read from `AppsUseLightTheme` to `SystemUsesLightTheme` in the icon-selection function; single-point fix given the "one source of truth" integration approach recommended above |
+| Native MessageBox left unthemed (Pitfall 8) | MEDIUM | Requires building a reusable themed dialog form and updating each call site — proportional to how many MessageBox call sites exist in the current codebase (audit first) |
+| Icon contrast/blurriness issues found late (Pitfalls 9, 10) | LOW | Asset-only fix — regenerate the `.ico` with proper multi-resolution content and adjusted contrast; no code changes needed if the icon-loading code already just points at the file/resource |
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|--------------------|----------------|
+| Manual DWM call conflicts with framework's own (1) | Theme-infrastructure | No title-bar color flash/animation on form show, checked on both startup paths |
+| No live theme-following without explicit work (2) | Theme-infrastructure | Flip Windows theme live while app running (visible and tray-hidden); UI updates without restart |
+| Theming skipped on hidden-tray startup handle timing (3) | Theme-infrastructure | `--tray` hidden start → restore from tray → window is correctly themed on first appearance |
+| Icon-swap state explosion / GDI leak (4) | Icon-redesign | Extended-session GDI-handle-count monitoring stays flat across many toggles |
+| Wrong theme registry key for tray icon (5) | Icon-redesign (consuming a shared signal from theme-infrastructure) | Set "dark taskbar + light apps" (or reverse) in Windows Settings; tray icon matches taskbar, window matches app theme |
+| Windows 10 dark-title/light-body mismatch (6) | Theme-infrastructure (scoping decision) | Confirm actual rig Windows version first; if Win11-only, mark this pitfall explicitly out of scope |
+| Toolstrip stale static-brush cache (7) | Polish/verification (documented as known limitation if unfixed) | Live theme flip with context menu previously opened; separators/arrows checked for stale color |
+| Native MessageBox unthemed (8) | Theme-infrastructure (audit) | Deliberately trigger each existing error path; confirm no native white dialog appears |
+| Icon low contrast on one taskbar theme (9) | Icon-redesign | Screenshot against both real light and dark taskbar |
+| Blurry icon at DPI scale steps (10) | Icon-redesign | Visual check on rig monitor and desk monitor's actual DPI scaling, especially around a monitor-toggle event |
 
 ## Sources
 
-- Direct code read: `src/RigToggle.App/Program.cs`, `src/RigToggle.Core/ToggleService.cs`, `src/RigToggle.App/MainForm.cs`, `src/RigToggle.Windows/WindowsAppController.cs`, `src/RigToggle.Windows/WindowsMonitorController.cs` — confirmed no existing single-instance detection, no `FormClosing` override, no reentrancy guard in `ToggleService`, and the exact shape of the existing CCD disable/restore code this milestone must generalize. HIGH confidence (primary source, this repo).
-- `.planning/milestones/v1.0-phases/01-monitor-disable-feasibility-spike/01-RESEARCH.md` and `01-VERIFICATION.md` — Pitfalls A-D (AMD-vs-NVIDIA unverified, primary-repositioning `SDC_ALLOW_CHANGES` requirement, hotplug re-detection reverting a disable, elevation-contamination risk) and the project's own established go/no-go rig-spike methodology. HIGH confidence (primary source, this project's own prior empirical work).
-- `.planning/debug/resolved/moza-foreground-focus.md` — the 10-round debug session establishing the "raw external state-mutation on a resource you don't fully control can desync unpredictably, discoverable only via real-hardware testing" lesson generalized here to CCD monitor manipulation. HIGH confidence (primary source, this project's own resolved incident).
-- https://learn.microsoft.com/en-us/windows/win32/shell/enable-desktop-toast-with-appusermodelid — official Microsoft guidance confirming the Start Menu shortcut + AUMID requirement for desktop-app toast notifications. HIGH confidence (official docs, fetched directly).
-- https://github.com/Ivy-Interactive/Rustino/issues/11 and https://csharpforums.net/threads/toastnotificationmanager-packaging-project-to-create-the-app-id-only-works-within-vs-not-in-published-exe.7210/ — community-reported confirmation of the "works in dev/IDE, silently fails in published exe" toast trap for unpackaged apps. MEDIUM confidence (community reports, corroborate the official docs' stated requirement).
-- https://www.autoitconsulting.com/site/development/single-instance-winform-app-csharp-mutex-named-pipes/ — Mutex + named-pipe single-instance/IPC pattern for WinForms, including timeout and pipe-security considerations referenced in Pitfalls 8/9. MEDIUM confidence (community reference implementation, pattern is well-established/widely mirrored).
-- General WebSearch corroboration on `RegisterHotKey` message-only-window/thread-ownership behavior and `WM_HOTKEY` delivery semantics (Microsoft Learn `RegisterHotKey` reference, cross-referenced community articles). MEDIUM-HIGH confidence (Win32 API behavior is stable and well-documented; specific rig-conflict risk in Pitfall 7 is project-specific reasoning, not independently sourced, and is exactly why it's flagged for rig validation rather than stated as certain).
+- [What's new in WinForms for .NET 10 — Microsoft Learn](https://learn.microsoft.com/en-us/dotnet/desktop/winforms/whats-new/net100) — HIGH confidence, official docs, confirms `Application.SetColorMode` is non-experimental in .NET 10, Windows-11-only scope, `MessageBox`/Designer limitations, `ControlStyles.ApplyThemingImplicitly` opt-in/opt-out mechanics
+- [dotnet/winforms#13935 — Does WinForms react to Dark Mode settings changes live?](https://github.com/dotnet/winforms/issues/13935) — HIGH confidence (primary source, open/unresolved issue), confirms no built-in live theme-following
+- [dotnet/winforms#12027 — Some toolstrip colors don't change when switching color mode](https://github.com/dotnet/winforms/issues/12027) — HIGH confidence (primary source), confirms static `SystemBrushes`/`SystemPens` cache bug affecting `ToolStripSeparator`/`ToolStripSplitButton`
+- [dotnet/winforms#12014 — Form title bars are the wrong color (regression)](https://github.com/dotnet/winforms/issues/12014) — MEDIUM confidence, corroborates double-attribute-set title-bar-flash symptom
+- WebSearch aggregation on `DWMWA_USE_IMMERSIVE_DARK_MODE` handle-creation timing (Microsoft Q&A, community sources) — MEDIUM confidence, consistent across multiple independent sources on the "must be set after handle creation, not in constructor" rule
+- WebSearch aggregation on `AppsUseLightTheme` vs `SystemUsesLightTheme` registry key scope — MEDIUM confidence, consistent across multiple sources; both keys live at `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`
+- WebSearch aggregation on `WM_SETTINGCHANGE`/`ImmersiveColorSet` detection pattern — MEDIUM confidence, standard community-verified technique, cross-checked against the confirmed-unimplemented framework gap in `#13935`
+- WebSearch aggregation on multi-resolution tray-icon `.ico` sizing (16/20/24/32/48/256px covering 100–200% DPI) and DPI-scale re-render via `WM_DPICHANGED` — MEDIUM confidence, consistent across multiple independent sources (KeePass forum bug report, Electron issue tracker, general Win32 guidance), no single authoritative Microsoft doc found specifically for `NotifyIcon` — flag as MEDIUM not HIGH
+- [SystemInformation.HighContrast Property — Microsoft Learn](https://learn.microsoft.com/en-us/dotnet/api/system.windows.forms.systeminformation.highcontrast) plus WebSearch on high-contrast/dark-mode interaction — MEDIUM confidence, confirms high-contrast and dark mode are mutually exclusive Windows states
+- PROJECT.md (this repository) — primary source for existing tray-lifecycle architecture (`--tray` hidden-start via bare `ApplicationContext`, `CloseMinimizesToTray`/`MinimizeToTray` live-derived tray existence, prior rig-only-discovered bug history) used to ground integration-gotcha analysis
+
+---
+*Pitfalls research for: WinForms system-theme-following (dark/light mode) + custom tray icon redesign, added to an existing shipped tray-resident app*
+*Researched: 2026-08-02*
