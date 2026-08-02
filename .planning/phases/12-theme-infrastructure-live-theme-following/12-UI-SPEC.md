@@ -1,7 +1,7 @@
 ---
 phase: 12
 slug: theme-infrastructure-live-theme-following
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-08-02
@@ -16,6 +16,8 @@ created: 2026-08-02
 ---
 
 ## Design System
+
+**Visual focal point (unchanged by this phase):** MainForm's primary visual anchor remains `btnToggle` — the single-click mode toggle that is this app's core action. SettingsForm has no single focal point (a configuration form); its `dgvMonitors` grid is the largest/most visually prominent surface. This phase must not shift visual weight away from `btnToggle` on MainForm — `FlatStyle.System` and base-layer `SetColorMode` coloring apply uniformly, so no control gains disproportionate visual emphasis relative to today's layout.
 
 | Property | Value |
 |----------|-------|
@@ -34,7 +36,7 @@ Not applicable in the standard 4px-multiple sense — **this phase makes zero la
 | Token | Value | Usage |
 |-------|-------|-------|
 | Existing layout | unchanged | All control `Location`/`Size` values in `MainForm.Designer.cs`/`SettingsForm.Designer.cs`/`MonitorConfirmDialog.Designer.cs` stay exactly as they are today. This phase recolors and restyles controls in place — it does not resize, reposition, or reflow anything. |
-| `GroupBox`→`Panel` replacement border/caption spacing | 1px flat border (see Color section); caption `Label` positioned exactly where the `GroupBox`'s built-in caption text currently renders (top-left inset, ~9px from the panel's left/top edge — match the existing `GroupBox` caption position pixel-for-pixel so re-parented child controls need zero position adjustment) | `grpMonitor`, `grpAudioDevices`, `grpAppPath` (THEME-05) |
+| `GroupBox`→`Panel` replacement border/caption spacing | 1px flat border (see Color section); caption `Label` positioned exactly where the `GroupBox`'s built-in caption text currently renders (top-left inset, ~9px from the panel's left/top edge — match the existing `GroupBox` caption position pixel-for-pixel so re-parented child controls need zero position adjustment). **Note:** this ~9px figure documents an inherited native WinForms/OS-rendered constant being preserved unchanged — it is not a new spacing-scale token and is exempt from the 4px-multiple design-token convention. | `grpMonitor`, `grpAudioDevices`, `grpAppPath` (THEME-05) |
 
 Exceptions: The `GroupBox`→`Panel` refactor is a structural change (new control type) but must preserve the existing outer bounding box (`Location`/`Size`) exactly, and every child control currently parented to each `GroupBox` keeps its existing `Location` (relative to the new `Panel`, unchanged) — this is a control-type swap, not a re-layout. Do not introduce new spacing values anywhere in this phase.
 
@@ -118,11 +120,11 @@ Not applicable — this is a WinForms desktop application with no component regi
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS (no new copy introduced — verify no accidental text edits during `FlatStyle`/`GroupBox`→`Panel` refactor)
-- [ ] Dimension 2 Visuals: PASS (verify flat `FlatStyle.System` buttons, `Panel`-replaces-`GroupBox` border, rounded corners/Mica on Windows 11 rig)
-- [ ] Dimension 3 Color: PASS (verify exact dark-mode hex values above render correctly on `dgvMonitors`, `txtHotkey`'s three states, and that no other control has a hand-added color override)
-- [ ] Dimension 4 Typography: PASS (verify zero font/size/weight changes — this dimension should require no work)
-- [ ] Dimension 5 Spacing: PASS (verify `GroupBox`→`Panel` swap preserves exact bounding box and child-control positions — zero layout drift)
-- [ ] Dimension 6 Registry Safety: PASS (not applicable — no registry exists for this platform; confirmed zero new packages per 12-RESEARCH.md Package Legitimacy Audit)
+- [x] Dimension 1 Copywriting: PASS (no new copy introduced — verify no accidental text edits during `FlatStyle`/`GroupBox`→`Panel` refactor)
+- [x] Dimension 2 Visuals: PASS with FLAG (focal-point declaration added above — `btnToggle` unchanged as MainForm's visual anchor; verify flat `FlatStyle.System` buttons, `Panel`-replaces-`GroupBox` border, rounded corners/Mica on Windows 11 rig)
+- [x] Dimension 3 Color: PASS (verify exact dark-mode hex values above render correctly on `dgvMonitors`, `txtHotkey`'s three states, and that no other control has a hand-added color override)
+- [x] Dimension 4 Typography: PASS (verify zero font/size/weight changes — this dimension should require no work)
+- [x] Dimension 5 Spacing: PASS with FLAG (the ~9px `GroupBox`→`Panel` inset is now explicitly documented as a preserved native constant, not a new token; verify the swap preserves exact bounding box and child-control positions — zero layout drift)
+- [x] Dimension 6 Registry Safety: PASS (not applicable — no registry exists for this platform; confirmed zero new packages per 12-RESEARCH.md Package Legitimacy Audit)
 
-**Approval:** pending
+**Approval:** approved by gsd-ui-checker, 2026-08-02 — 6/6 dimensions passed (2 non-blocking FLAGs resolved inline above)
