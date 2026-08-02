@@ -67,7 +67,7 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
   5. Buttons and panels render with flat, modern styling instead of legacy 3D bevel/gradient chrome (THEME-05)
   6. On Windows 11, window corners are rounded with a Mica-style backdrop; on Windows 10 or when the API is unavailable, the app runs with no visual glitches or crashes (THEME-06)
 **Plans**: 4 plans
-  - [ ] 12-01-PLAN.md — Theme provider infrastructure (Core IThemeProvider/AppTheme, Windows registry+SystemEvents provider, DWM P/Invoke façade)
+  - [x] 12-01-PLAN.md — Theme provider infrastructure (Core IThemeProvider/AppTheme, Windows registry+SystemEvents provider, DWM P/Invoke façade)
   - [ ] 12-02-PLAN.md — Composition wiring, base SetColorMode, live-follow + DWM chrome for MainForm & MonitorConfirmDialog
   - [ ] 12-03-PLAN.md — SettingsForm control gaps (DataGridView, GroupBox→Panel, txtHotkey) + ThemeApplier + live-follow
   - [ ] 12-04-PLAN.md — Rig human-verify checkpoint (THEME-01..06, Windows version, live-flip visible + --tray hidden)
@@ -111,7 +111,7 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 | 9. Global Hotkey Trigger | v1.1 | 4/4 | Complete | 2026-07-31 |
 | 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Removed — out of scope | - |
 | 11. Configurable Tray Close/Minimize Behavior | v1.1 | 4/4 | Complete | 2026-08-01 |
-| 12. Theme Infrastructure & Live Theme-Following | v1.2 | 0/4 | Planned | - |
+| 12. Theme Infrastructure & Live Theme-Following | v1.2 | 1/4 | In Progress|  |
 | 13. Tray & App Icon Redesign | v1.2 | 0/TBD | Not started | - |
 | 14. README & Release Documentation | v1.2 | 0/TBD | Not started | - |
 
