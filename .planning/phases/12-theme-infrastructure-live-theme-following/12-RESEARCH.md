@@ -468,21 +468,26 @@ private static void ThemeMonitorGrid(DataGridView grid, bool dark)
 
 **If this table is empty:** N/A — see entries above. All three are LOW-to-MODERATE risk with an already-documented safe fallback; none block planning.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does a freshly-constructed `SettingsForm`/`MonitorConfirmDialog` (built after a live Windows theme flip, without restarting the app) automatically render in the new theme via `Application.SetColorMode(System)` alone, or does it need the same live-update patch as `MainForm`?**
+All three questions below were resolved during planning; each carries an inline **(RESOLVED)** marker pointing to where it was closed. None remain open going into execution.
+
+1. **(RESOLVED — defensive unconditional-subscribe pattern, 12-02 Tasks 2/3 + 12-03)** **Does a freshly-constructed `SettingsForm`/`MonitorConfirmDialog` (built after a live Windows theme flip, without restarting the app) automatically render in the new theme via `Application.SetColorMode(System)` alone, or does it need the same live-update patch as `MainForm`?**
    - What we know: `SettingsForm` is confirmed instantiated fresh per open (verified: `Program.cs`'s `SettingsFormFactory` local function calls `new SettingsForm(...)`, and `MainForm.OpenSettingsDialog()` uses `using var settingsForm = _settingsFormFactory(); settingsForm.ShowDialog(this);` — never reused/cached across opens). Same for `MonitorConfirmDialog` (`using var confirmDialog = new MonitorConfirmDialog(...)` in `MainForm.BtnToggle_Click`).
    - What's unclear: whether `SystemColorMode.System`'s resolution happens once (cached) or per-control (live-queried at creation time) — the official docs' wording ("will not automatically adapt") is ambiguous on this specific point.
+   - Resolution: Made moot by design — all three forms unconditionally subscribe `IThemeProvider.ThemeChanged` on construct and unsubscribe on close (MainForm in 12-02 Task 2, MonitorConfirmDialog in 12-02 Task 3, SettingsForm in 12-03), which is correct whether resolution is cached or per-control. The ambiguity no longer gates any decision; the 12-04 rig checkpoint confirms behavior empirically but is not load-bearing.
    - Recommendation: Implement the subscribe-on-construct/unsubscribe-on-close pattern for all three forms regardless (per ARCHITECTURE.md's transient-dialog guidance, which remains valid) — this is correct either way. Treat the answer to this question as an optimization/verification note, not a blocking design decision: during rig verification, flip the Windows theme live, then open Settings fresh (without an app restart) and confirm it renders correctly — this tells you whether the subscription is strictly load-bearing for transient dialogs or a defensive no-op.
 
-2. **Is `MonitorConfirmDialog` in scope for this phase?**
+2. **(RESOLVED — 12-UI-SPEC.md Scope Notes: "IN SCOPE")** **Is `MonitorConfirmDialog` in scope for this phase?**
    - What we know: REQUIREMENTS.md's THEME-01 through THEME-06 text explicitly names only "MainForm and SettingsForm" for every criterion. `CONTEXT.md`'s own `<domain>` boundary section also only mentions MainForm/SettingsForm/the DataGridView — it does not mention `MonitorConfirmDialog`. `ARCHITECTURE.md` (research, not a locked decision) recommends including it "for visual consistency... shown on every first toggle."
    - What's unclear: whether extending scope to a third form is within this phase's literal requirement wording or a nice-to-have the planner should explicitly scope in or out.
+   - Resolution: Scoped IN. 12-UI-SPEC.md's Scope Notes declare MonitorConfirmDialog explicitly in scope, and 12-02 Task 3 themes it (ctor injection, live-follow, DWM chrome, FlatStyle.System buttons, no copy changes), flagging the first-of-its-kind injected-dependency precedent break.
    - Recommendation: Treat as planner discretion, but recommend including it — it is a small dialog (4 controls: `Label`, `CheckBox`, 2 `Button`s, all in the "themes automatically" bucket per Pattern 5's table) and the marginal cost of adding `IThemeProvider` injection to it is low, while leaving it unthemed would create a jarring light-mode popup in an otherwise dark-themed toggle flow (DISPLAY-07's dialog appears on literally every first toggle). If included, note the one real precedent break: this is the first time `MonitorConfirmDialog`'s constructor gains an injected dependency (currently "pure display data," no interfaces).
 
-3. **What Windows version does the actual rig PC run?**
+3. **(RESOLVED — deferred to the 12-04 human-verify checkpoint by design)** **What Windows version does the actual rig PC run?**
    - What we know: `Application.SetColorMode`'s dark mode and the `DWMWA_WINDOW_CORNER_PREFERENCE`/`DWMWA_SYSTEMBACKDROP_TYPE` attributes are all Windows-11-only by official documentation (Build 22000+ / 22621+ respectively). `STATE.md`'s Blockers/Concerns section already flags this as unconfirmed.
    - What's unclear: whether THEME-06's Windows-10 fallback path will ever be exercised for real vs. only defensively coded.
+   - Resolution: Deliberately deferred to the 12-04 `checkpoint:human-verify`. Per D-07 the defensive Windows-10 no-op code must exist regardless of the answer, so this question gates only depth-of-testing priority, not any code decision; the rig's actual build is observed at the checkpoint.
    - Recommendation: This is exactly the kind of "only catchable on real Windows" item this project has flagged before (Phase 8/9/11 precedent) — plan an explicit `checkpoint:human-verify` early in the phase to confirm the rig's Windows version before deciding how much defensive Windows-10-path code/testing effort to invest (per D-07, code must exist regardless, but its priority/depth of testing depends on this answer).
 
 ## Environment Availability
