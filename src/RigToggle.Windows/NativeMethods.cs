@@ -5,14 +5,15 @@ namespace RigToggle.Windows;
 
 /// <summary>
 /// Hand-rolled user32.dll P/Invoke signatures used by FindBestMainWindow/MinimizeIfRunning
-/// (APP-02/APP-03). No analog elsewhere in this repo — this is the project's only
-/// P/Invoke surface. Deliberately does NOT include FindWindow/FindWindowEx (title-based
+/// (APP-02/APP-03), plus a dwmapi.dll signature used by DwmTitleBar for Mica/rounded-corner
+/// theming (THEME-06). Deliberately does NOT include FindWindow/FindWindowEx (title-based
 /// lookup is forbidden — CLAUDE.md "What NOT to Use") and does NOT take a dependency on
 /// the PInvoke.User32 NuGet package (CLAUDE.md Alternatives Considered: hand-rolling is
 /// preferred for a surface this small). Stable, decades-unchanged Win32 API
 /// (learn.microsoft.com/windows/win32/api/winuser). LaunchOrFocus no longer touches any
-/// window at all (it unconditionally relaunches via ShellExecute instead) -- everything
-/// below exists solely to support MinimizeIfRunning's window lookup and minimize call.
+/// window at all (it unconditionally relaunches via ShellExecute instead) -- most of the
+/// user32.dll block below exists solely to support MinimizeIfRunning's window lookup and
+/// minimize call.
 /// </summary>
 internal static class NativeMethods
 {
@@ -119,4 +120,20 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    // THEME-06 DWM P/Invoke surface: requests title-bar Mica backdrop + rounded window
+    // corners on a caller-owned window handle. Kept internal like the rest of this class
+    // -- exposed to RigToggle.App only through the public DwmTitleBar façade
+    // (DwmTitleBar.cs in this same namespace), never through a new InternalsVisibleTo
+    // grant. DWMWA_USE_IMMERSIVE_DARK_MODE is owned by Application.SetColorMode and is
+    // declared here for reference only -- never call it manually (Pitfall 1: double-set
+    // causes a title-bar color flash). DwmSetWindowAttribute is declared to return int
+    // (HRESULT) rather than throwing on failure, so an unsupported OS/attribute is a
+    // silently-ignorable non-zero return (D-07) -- no try/catch needed at the call site.
+    internal const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    internal const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    internal const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
+
+    [DllImport("dwmapi.dll")]
+    internal static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
 }
