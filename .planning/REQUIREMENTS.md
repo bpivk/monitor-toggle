@@ -63,24 +63,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| THEME-01 | TBD | Pending |
-| THEME-02 | TBD | Pending |
-| THEME-03 | TBD | Pending |
-| THEME-04 | TBD | Pending |
-| THEME-05 | TBD | Pending |
-| THEME-06 | TBD | Pending |
-| ICON-01 | TBD | Pending |
-| ICON-02 | TBD | Pending |
-| ICON-03 | TBD | Pending |
-| ICON-04 | TBD | Pending |
-| DOCS-01 | TBD | Pending |
-| DOCS-02 | TBD | Pending |
-| DOCS-03 | TBD | Pending |
+| THEME-01 | Phase 12 | Pending |
+| THEME-02 | Phase 12 | Pending |
+| THEME-03 | Phase 12 | Pending |
+| THEME-04 | Phase 12 | Pending |
+| THEME-05 | Phase 12 | Pending |
+| THEME-06 | Phase 12 | Pending |
+| ICON-01 | Phase 13 | Pending |
+| ICON-02 | Phase 13 | Pending |
+| ICON-03 | Phase 13 | Pending |
+| ICON-04 | Phase 13 | Pending |
+| DOCS-01 | Phase 14 | Pending |
+| DOCS-02 | Phase 14 | Pending |
+| DOCS-03 | Phase 14 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 13 total
-- Mapped to phases: 0 (0%) — pending roadmap creation
-- Unmapped: 13
+- Mapped to phases: 13 (100%)
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-08-02*
