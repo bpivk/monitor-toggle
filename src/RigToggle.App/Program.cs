@@ -127,7 +127,7 @@ namespace RigToggle.App
             MainForm mainForm = null!;
             SettingsForm SettingsFormFactory() => new SettingsForm(monitorController, audioController, settingsStore, autostartConfigurator, themeProvider, mainForm.TryRegisterConfiguredHotkey, mainForm.ApplyTrayVisibility);
 
-            mainForm = new MainForm(toggleOrchestrator, settingsStore, monitorController, SettingsFormFactory);
+            mainForm = new MainForm(toggleOrchestrator, settingsStore, monitorController, SettingsFormFactory, themeProvider);
 
             // Pitfall 6: prime the tray icon/menu BEFORE either Run branch — under
             // --tray the form's own Load event never fires since the form is never

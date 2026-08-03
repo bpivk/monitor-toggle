@@ -26,6 +26,7 @@ namespace RigToggle.App
         private readonly ISettingsStore _settingsStore;
         private readonly IMonitorController _monitorController;
         private readonly Func<SettingsForm> _settingsFormFactory;
+        private readonly IThemeProvider _themeProvider;
 
         private System.Drawing.Icon? _normalIcon;
         private System.Drawing.Icon? _rigIcon;
@@ -43,14 +44,68 @@ namespace RigToggle.App
             ToggleOrchestrator orchestrator,
             ISettingsStore settingsStore,
             IMonitorController monitorController,
-            Func<SettingsForm> settingsFormFactory)
+            Func<SettingsForm> settingsFormFactory,
+            IThemeProvider themeProvider)
         {
             _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
             _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
             _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
             _settingsFormFactory = settingsFormFactory ?? throw new ArgumentNullException(nameof(settingsFormFactory));
+            _themeProvider = themeProvider ?? throw new ArgumentNullException(nameof(themeProvider));
 
             InitializeComponent();
+
+            // 12-02/D-05: live theme-follow -- WindowsThemeProvider raises this whenever
+            // the OS AppsUseLightTheme value genuinely flips while this form is alive.
+            _themeProvider.ThemeChanged += OnThemeChanged;
+        }
+
+        /// <summary>
+        /// 12-02/D-05: live theme-flip handler. WindowsThemeProvider's ThemeChanged
+        /// may fire off the UI thread (SystemEvents is not guaranteed to raise on the
+        /// subscriber's thread, per A3) -- marshal via InvokeRequired/BeginInvoke before
+        /// touching any control. The whole re-theme body is wrapped in try/catch:
+        /// theming is cosmetic-only and must never crash the toggle flow (T-12-02).
+        /// </summary>
+        private void OnThemeChanged(object? sender, EventArgs e)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => OnThemeChanged(sender, e)));
+                return;
+            }
+
+            try
+            {
+                System.Windows.Forms.Application.SetColorMode(System.Windows.Forms.SystemColorMode.System);
+                DwmTitleBar.ApplyRoundedCornersAndMica(Handle);
+                Refresh();
+            }
+            catch
+            {
+                // Cosmetic-only (T-12-02) -- a theming failure must never crash the toggle flow.
+            }
+        }
+
+        /// <summary>
+        /// 12-02/D-08/THEME-06: requests Windows-11 rounded corners + Mica for this
+        /// window (silent no-op on Windows 10, D-07). Called from InitializeTrayState()
+        /// below, NOT from OnLoad/OnShown -- under `--tray` startup, Form.Load/Shown
+        /// never fire since the window is never Show()'n, but InitializeTrayState()
+        /// runs unconditionally on both startup paths and Handle is already forced by
+        /// the time it runs (RegisterHotkeyAtStartup() forces it before either
+        /// Application.Run branch in Program.cs).
+        /// </summary>
+        private void ApplyDwmChrome()
+        {
+            try
+            {
+                DwmTitleBar.ApplyRoundedCornersAndMica(Handle);
+            }
+            catch
+            {
+                // Cosmetic-only (T-12-03) -- must never block startup.
+            }
         }
 
         protected override void OnLoad(EventArgs e)
@@ -93,6 +148,10 @@ namespace RigToggle.App
             LoadTrayIconsIfNeeded();
             RefreshUi();
             ApplyTrayVisibility();
+
+            // 12-02/D-08: DWM chrome is applied HERE, not from OnLoad/OnShown -- see
+            // ApplyDwmChrome's own doc comment for the full --tray-safe-timing rationale.
+            ApplyDwmChrome();
         }
 
         /// <summary>
