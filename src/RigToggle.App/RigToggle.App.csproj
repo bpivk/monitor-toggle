@@ -12,6 +12,10 @@
     <Nullable>enable</Nullable>
     <!-- Intentionally no elevation manifest element of any kind: this keeps the tool asInvoker
          (02-RESEARCH.md Pitfall 6) — do not add an elevated execution level or admin requirement. -->
+    <!-- Embeds app.ico as the compiled exe's native Win32 icon resource (RT_GROUP_ICON/RT_ICON),
+         read directly by Explorer/Alt-Tab/taskbar shell APIs — a separate mechanism from the
+         EmbeddedResource+LogicalName tray icons below (13-RESEARCH.md Pattern 4). -->
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
