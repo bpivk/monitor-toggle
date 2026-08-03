@@ -14,7 +14,7 @@ provides:
   - "WR-01: TraySizes expanded to 8 frames (16/20/24/28/32/36/40/48px) covering 100-300% DPI scale factors"
   - "WR-02: IconWriter.PngFrameThreshold promoted to internal, single shared source of truth (Program.cs's duplicate constant removed)"
   - "Regenerated normal.ico/rig.ico (8 frames each) and re-emitted app.ico, all passing both the round-trip and interior-artifact gates"
-affects: [13-tray-app-icon-redesign (this plan's own Task 3 rig checkpoint, pending), any future icon-geometry work referencing IconGeometry.cs's rig.ico constants]
+affects: [any future icon-geometry work referencing IconGeometry.cs's rig.ico constants]
 
 # Tech tracking
 tech-stack:
@@ -38,23 +38,23 @@ key-decisions:
   - "rig.ico geometry fractions nudged (InnerCutoutRadius 0.26->0.275, HubRadius 0.12->0.065, SpokeHalfWidth 0.07->0.05) per 13-UI-SPEC.md's own Scope Notes allowance to adjust proportions when a shape reads ambiguously/artifacts at 16px -- widens the hub-to-inner-rim band from ~2.2px to ~3.4px raw while keeping both ring thickness (~2.0px) and hub diameter (~2.08px) at/above the >=2px-at-16px minimum feature rule"
   - "DrawNormalIcon's outline pen stays at 2x doubling (unchanged from Task 1) -- its geometry (screen/neck/base) has far fewer nearby stroked boundaries and already passes the interior-artifact diagnostic with 0 enclosed components, no tuning needed"
 
-requirements-completed: [ICON-01, ICON-02]  # Artifact-delivery half only -- final human rig sign-off (Task 3) still pending, see below
+requirements-completed: [ICON-01, ICON-02]  # Rig-validated: Task 3 human verification confirmed both tray icons render cleanly on the real Windows 11 rig, both taskbar themes
 
 # Metrics
-duration: ~100min
+duration: ~105min
 completed: 2026-08-03
 ---
 
 # Phase 13 Plan 04: CR-01 Gap Closure (Tray Icon Seam Artifacts) Summary
 
-**Rewrote IconGeometry.cs's outline compositing to stroke-then-fill (eliminating interior seam lines by construction), added a pixel-level interior-artifact diagnostic to Program.cs that genuinely verifies clean silhouettes (not just ICO byte-container validity), and tuned rig.ico's outline-pen-width and radial geometry after the diagnostic caught a real defect the naive doubled-outline fix introduced. Tasks 1-2 complete and committed; Task 3 (blocking human rig re-check) requires real Windows 11 hardware unavailable in this Linux worktree sandbox -- plan execution is PAUSED at this checkpoint.**
+**Rewrote IconGeometry.cs's outline compositing to stroke-then-fill (eliminating interior seam lines by construction), added a pixel-level interior-artifact diagnostic to Program.cs that genuinely verifies clean silhouettes (not just ICO byte-container validity), and tuned rig.ico's outline-pen-width and radial geometry after the diagnostic caught a real defect the naive doubled-outline fix introduced. Rig-confirmed on real Windows 11 hardware: both tray icons render as clean single silhouettes on light and dark taskbars, no seam artifacts remain -- CR-01 is resolved.**
 
 ## Performance
 
-- **Duration:** ~100 min (includes substantial empirical iteration to root-cause and fix a rig.ico-specific pixel diagnostic failure not anticipated by the plan's exact proposed values)
+- **Duration:** ~105 min (includes substantial empirical iteration to root-cause and fix a rig.ico-specific pixel diagnostic failure not anticipated by the plan's exact proposed values)
 - **Started:** 2026-08-03T15:40:00Z (approx)
-- **Completed (Tasks 1-2):** 2026-08-03T16:12:04Z
-- **Tasks:** 2/3 complete (Task 3 is a blocking checkpoint, not executable from this environment)
+- **Completed:** 2026-08-03T16:20:00Z (approx, after rig approval)
+- **Tasks:** 3/3 complete
 - **Files modified:** 5 (3 source files, 2 regenerated .ico assets; app.ico re-emitted but byte-identical since DrawAppIcon is untouched)
 
 ## Accomplishments
@@ -63,7 +63,8 @@ completed: 2026-08-03
 - **Task 2 (diagnostic + WR-01/WR-02 + regeneration):** Added `VerifyNoInteriorArtifacts` to `Program.cs` -- decodes the 16px frame via `new Icon(path, new Size(16,16)).ToBitmap()` (BMP-in-ICO, not PNG, per the existing Pitfall 5 note), flood-fills transparent pixels from every border pixel to find exterior-reachable transparent regions, groups any remaining "enclosed" transparent pixels into 4-connected components, and fails the run if any component has area <=2px. Always prints an ASCII grid (`#`=opaque, `.`=transparent) plus the component count/areas for human inspection. Folded in WR-01 (TraySizes expanded to 8 frames covering 100-300% DPI) and WR-02 (`IconWriter.PngFrameThreshold` promoted to `internal`, Program.cs's duplicate constant removed).
 - **Diagnostic caught a real defect, not a false positive:** the first regeneration run (with rig.ico's outline doubled per Task 1's committed design) failed with a single <=2px enclosed transparent pixel near the wheel's hub. Root-caused via direct empirical testing (not hand-waving) that this was caused by rig.ico's six nearby stroked boundaries (hub circle, inner-cutout circle, both long edges of each of 3 spokes) compressed into a narrow 16px radial band -- doubling every one of those strokes compounds via sequential alpha-compositing and very nearly erases the intended transparent negative space entirely (the "between-spoke gaps" UI-SPEC governing rule 4 requires stay transparent), which manifested as both the specific dropout pixel and, more importantly, a near-total loss of the wheel's visible ring-hole/spoke-gap detail. Confirmed causation experimentally (isolated pen-width vs. geometry as separate variables across multiple Wine-rendered test runs) before landing on the fix: revert `DrawRigIcon`'s pen to 1x `OutlineWidth(size)` (interior seams stay fully hidden regardless of pen width since they are always filled on both sides; only true contour/gap-facing edges need the extra doubled margin) plus a modest widening of the hub-to-inner-rim band (`InnerCutoutRadius` 0.26->0.275, `HubRadius` 0.12->0.065, `SpokeHalfWidth` 0.07->0.05), both changes explicitly sanctioned by 13-UI-SPEC.md's Scope Notes ("adjust proportions ... if a shape reads ambiguously at 16px").
 - **Final verification (both gates, all three icons):** `dotnet run --project src/RigToggle.IconGen` (via the Wine self-contained-publish recipe) exits 0. `normal.ico`: 0 enclosed transparent components. `rig.ico`: exactly 3 enclosed transparent components (areas 6, 6, 7px -- the three intended between-spoke gaps, comfortably above the <=2px failure threshold, confirming the wheel's negative space is genuinely present again, not just alpha-technically-passing). `app.ico`: round-trip verified, byte-identical to before (untouched `DrawAppIcon`).
-- `dotnet build RigToggle.sln -c Release` and `dotnet publish src/RigToggle.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true` both succeed with the regenerated icons embedded, ready for the Task 3 rig checkpoint.
+- `dotnet build RigToggle.sln -c Release` and `dotnet publish src/RigToggle.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true` both succeed with the regenerated icons embedded.
+- **Task 3 (rig re-check, blocking checkpoint) - APPROVED.** The user launched the freshly republished single-file exe on the real Windows 11 rig and confirmed: normal-mode tray icon reads as a single clean monitor silhouette (no interior white gap in the neck/base, no stray specks); rig-mode tray icon reads as a single clean tri-spoke wheel silhouette (no interior transparent holes, no nested-circle clutter); both icons remain legible on both light and dark taskbars. CR-01 is confirmed resolved on real hardware, not just via the automated pixel diagnostic.
 
 ## Task Commits
 
@@ -71,8 +72,9 @@ Each completed task was committed atomically:
 
 1. **Task 1: Rewrite DrawNormalIcon/DrawRigIcon outline compositing so only the union contour is stroked (CR-01 core fix)** - `5979281` (fix)
 2. **Task 2: Add the interior-artifact pixel diagnostic, fold WR-01/WR-02, and regenerate + republish** - `f3c4162` (feat)
+3. **Task 3: Rig re-check (checkpoint:human-verify, gate="blocking")** - APPROVED by the user on real Windows 11 rig hardware (no code changes; verification-only checkpoint, no commit)
 
-**Task 3: Rig re-check (checkpoint:human-verify, gate="blocking")** - NOT executed. Requires launching the freshly republished single-file exe on real Windows 11 rig hardware to visually confirm both tray icons render as clean single silhouettes on both light and dark taskbars. This Linux worktree sandbox has no Windows GUI to perform this verification -- see "Next Phase Readiness" below.
+**Plan metadata:** `373b8fa` (docs: progress record at Task 3 checkpoint, superseded by this final update)
 
 ## Files Created/Modified
 
@@ -113,22 +115,18 @@ See `key-decisions` in frontmatter for full rationale. Summary:
 
 ## User Setup Required
 
-None for Tasks 1-2 (fully automated, verified in this session).
-
-**Task 3 (blocking checkpoint) requires the user's real Windows 11 rig hardware**, unavailable in this Linux worktree sandbox. See "Next Phase Readiness" below for exact verification steps.
+None. The user performed the Task 3 rig verification directly (launching the republished exe on their real Windows 11 rig) and reported "approved" -- no further manual step required.
 
 ## Next Phase Readiness
 
-- **Tasks 1-2 are complete, committed, and verified** (`dotnet build RigToggle.sln -c Release` and the self-contained win-x64 publish both succeed with the regenerated icons embedded).
-- **Task 3 (rig re-check) is BLOCKED, pending human verification on real Windows 11 hardware.** The freshly republished single-file exe (built in this session at `src/RigToggle.App/bin/Release/net10.0-windows/win-x64/publish/`) needs to be run on the rig to confirm:
-  1. Normal-mode tray icon reads as a single clean monitor silhouette (no interior white gap in the neck/base, no stray specks)
-  2. Rig-mode tray icon reads as a single clean tri-spoke wheel silhouette (no interior transparent holes, no nested-circle clutter)
-  3. Both icons remain legible on both light and dark taskbars
-- This plan execution is PAUSED at the Task 3 checkpoint per the standard checkpoint protocol -- a continuation agent (or the user directly) must perform the rig verification and report back "approved" (or describe remaining artifacts) before this plan can be marked complete and the icon regression (CR-01) formally closed.
+- **All 3 tasks complete, committed, and rig-verified.** `dotnet build RigToggle.sln -c Release` and the self-contained win-x64 publish both succeed with the regenerated icons embedded, and the user confirmed on real Windows 11 hardware that both tray icons render as clean single silhouettes (no seam artifacts, no interior holes) on both light and dark taskbars.
+- CR-01 (13-REVIEW.md) is resolved. ICON-01 (shape distinguishability) and ICON-02 (16px legibility) are restored and rig-validated.
+- WR-01 (28/36/40/48px tray DPI frames) and WR-02 (single shared PNG-frame threshold constant) are folded in.
+- No outstanding gaps from this plan's scope. Phase 13 (tray-app-icon-redesign) is ready for the orchestrator to finalize STATE.md/ROADMAP.md/REQUIREMENTS.md updates across the wave.
 
 ---
 *Phase: 13-tray-app-icon-redesign*
-*Paused at: Task 3 checkpoint (2026-08-03)*
+*Completed: 2026-08-03*
 
 ## Self-Check: PASSED
 
@@ -141,4 +139,4 @@ None for Tasks 1-2 (fully automated, verified in this session).
 - FOUND: commit f3c4162 (Task 2)
 - `dotnet build RigToggle.sln -c Release` verified passing (0 errors) after both commits
 - `wine RigToggle.IconGen.exe` (self-contained win-x64 publish) verified exit 0: round-trip verified for all 3 files, interior-artifact gate passing (normal.ico 0 components, rig.ico 3 legitimate components of 6/6/7px, 0 components <=2px)
-- Task 3 (checkpoint:human-verify, gate="blocking") NOT executed -- requires real Windows 11 rig hardware unavailable in this Linux worktree sandbox. Plan execution is PAUSED, not complete.
+- Task 3 (checkpoint:human-verify, gate="blocking") APPROVED by the user on real Windows 11 rig hardware. Plan execution is COMPLETE.
