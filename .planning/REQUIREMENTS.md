@@ -9,12 +9,12 @@ Requirements for the v1.2 milestone (Visual Polish & Documentation). Introduces 
 
 ### Theming
 
-- [ ] **THEME-01**: App detects the current Windows light/dark theme setting on startup and applies it to MainForm and SettingsForm
-- [ ] **THEME-02**: Theme changes made in Windows Settings while the app is running are picked up live, without requiring an app restart
-- [ ] **THEME-03**: The title bar of MainForm and SettingsForm reflects the active theme (dark title bar in dark mode)
-- [ ] **THEME-04**: All controls on MainForm and SettingsForm, including the multi-monitor settings grid, are legibly recolored to match the active theme — no stock white/gray controls left over in dark mode
-- [ ] **THEME-05**: Buttons and panels use flat, modern styling instead of legacy 3D bevel/gradient chrome
-- [ ] **THEME-06**: On Windows 11, window corners are rounded and a Mica-style backdrop is applied; on Windows 10 or earlier (or if the API is unavailable), the app falls back gracefully with no visual glitches or crashes
+- [x] **THEME-01**: App detects the current Windows light/dark theme setting on startup and applies it to MainForm and SettingsForm
+- [x] **THEME-02**: Theme changes made in Windows Settings while the app is running are picked up live, without requiring an app restart
+- [x] **THEME-03**: The title bar of MainForm and SettingsForm reflects the active theme (dark title bar in dark mode)
+- [x] **THEME-04**: All controls on MainForm and SettingsForm, including the multi-monitor settings grid, are legibly recolored to match the active theme — no stock white/gray controls left over in dark mode
+- [x] **THEME-05**: Buttons and panels use flat, modern styling instead of legacy 3D bevel/gradient chrome
+- [x] **THEME-06**: On Windows 11, window corners are rounded and a Mica-style backdrop is applied; on Windows 10 or earlier (or if the API is unavailable), the app falls back gracefully with no visual glitches or crashes
 
 ### Icon
 
@@ -63,12 +63,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| THEME-01 | Phase 12 | Pending |
-| THEME-02 | Phase 12 | Pending |
-| THEME-03 | Phase 12 | Pending |
-| THEME-04 | Phase 12 | Pending |
-| THEME-05 | Phase 12 | Pending |
-| THEME-06 | Phase 12 | Pending |
+| THEME-01 | Phase 12 | Complete |
+| THEME-02 | Phase 12 | Complete |
+| THEME-03 | Phase 12 | Complete |
+| THEME-04 | Phase 12 | Complete |
+| THEME-05 | Phase 12 | Complete |
+| THEME-06 | Phase 12 | Complete |
 | ICON-01 | Phase 13 | Pending |
 | ICON-02 | Phase 13 | Pending |
 | ICON-03 | Phase 13 | Pending |
