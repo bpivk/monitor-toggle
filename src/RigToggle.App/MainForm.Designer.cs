@@ -25,6 +25,11 @@ namespace RigToggle.App
             {
                 _normalIcon?.Dispose();
                 _rigIcon?.Dispose();
+
+                // 12-02/T-12-05: unsubscribe from the app-lifetime theme provider so this
+                // form (which the provider otherwise long outlives) does not leak a
+                // handler reference.
+                _themeProvider.ThemeChanged -= OnThemeChanged;
             }
             base.Dispose(disposing);
         }
@@ -73,6 +78,10 @@ namespace RigToggle.App
             this.btnToggle.Location = new System.Drawing.Point(16, 60);
             this.btnToggle.Size = new System.Drawing.Size(288, 40);
             this.btnToggle.Name = "btnToggle";
+            // 12-02/THEME-05: FlatStyle.System (never .Flat, dotnet/winforms#13897) --
+            // renders a flat, theme-aware button using the OS's own visual-styles
+            // renderer instead of WinForms' 3D-bevel default.
+            this.btnToggle.FlatStyle = System.Windows.Forms.FlatStyle.System;
             this.btnToggle.Click += new System.EventHandler(this.BtnToggle_Click);
 
             //
@@ -82,6 +91,7 @@ namespace RigToggle.App
             this.btnSettings.Location = new System.Drawing.Point(16, 108);
             this.btnSettings.Size = new System.Drawing.Size(288, 32);
             this.btnSettings.Name = "btnSettings";
+            this.btnSettings.FlatStyle = System.Windows.Forms.FlatStyle.System;
             this.btnSettings.Click += new System.EventHandler(this.BtnSettings_Click);
 
             //
@@ -104,6 +114,14 @@ namespace RigToggle.App
             // traySeparator
             //
             this.traySeparator.Name = "traySeparator";
+
+            // 12-02/D-03 rationale (trayContextMenu/traySeparator, THEME-03 scope note):
+            // the ToolStrip separator and dropdown-arrow glyph keep their pre-flip color
+            // after a live theme change (dotnet/winforms#12027, no clean first-party
+            // fix) -- this is an ACCEPTED, known WinForms limitation for this milestone,
+            // not a bug to fix. Do NOT expand scope into rebuilding/re-creating
+            // trayContextMenu on every ThemeChanged just to chase this cosmetic,
+            // rarely-visible stale-color glitch.
 
             //
             // trayExitMenuItem

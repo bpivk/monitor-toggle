@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using RigToggle.Core;
+using RigToggle.Core.Abstractions;
 using RigToggle.Core.Models;
 using RigToggle.Core.Persistence;
 using RigToggle.Windows;
@@ -33,6 +34,13 @@ namespace RigToggle.App
         [STAThread]
         static void Main(string[] args)
         {
+            // 12-02/D-04: must be the very first executable statement of Main(), before
+            // ApplicationConfiguration.Initialize() and before any Form/control is
+            // constructed (Pitfall 1) -- constructing UI before this call risks a
+            // visible title-bar flash as SetColorMode's own internal DWM call fires
+            // after the window has already painted once in the default light chrome.
+            System.Windows.Forms.Application.SetColorMode(System.Windows.Forms.SystemColorMode.System);
+
             // To customize application configuration such as set high DPI settings or default font,
             // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
@@ -89,6 +97,12 @@ namespace RigToggle.App
             var appController = new WindowsAppController();
             var autostartConfigurator = new WindowsAutostartConfigurator();
 
+            // 12-02/THEME-01/02/03: composition-root-only construction (Anti-Pattern 2)
+            // -- this is the ONE and only place the theme provider adapter is
+            // constructed anywhere in the solution. App-lifetime object; intentionally
+            // never disposed before Application.Run.
+            var themeProvider = new WindowsThemeProvider();
+
             var toggleService = new ToggleService(
                 settingsStore,
                 snapshotStore,
@@ -111,9 +125,9 @@ namespace RigToggle.App
             // mainForm by reference, and by the time it's actually invoked (Settings is
             // opened), mainForm already holds the real instance.
             MainForm mainForm = null!;
-            SettingsForm SettingsFormFactory() => new SettingsForm(monitorController, audioController, settingsStore, autostartConfigurator, mainForm.TryRegisterConfiguredHotkey, mainForm.ApplyTrayVisibility);
+            SettingsForm SettingsFormFactory() => new SettingsForm(monitorController, audioController, settingsStore, autostartConfigurator, themeProvider, mainForm.TryRegisterConfiguredHotkey, mainForm.ApplyTrayVisibility);
 
-            mainForm = new MainForm(toggleOrchestrator, settingsStore, monitorController, SettingsFormFactory);
+            mainForm = new MainForm(toggleOrchestrator, settingsStore, monitorController, SettingsFormFactory, themeProvider);
 
             // Pitfall 6: prime the tray icon/menu BEFORE either Run branch — under
             // --tray the form's own Load event never fires since the form is never
