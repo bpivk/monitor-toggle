@@ -37,9 +37,25 @@ internal static class IconGeometry
 
     // rig.ico wheel geometry (fractions of W, centered at 0.5W,0.5H).
     private const float OuterRimRadius = 0.40f;
-    private const float InnerCutoutRadius = 0.26f;
-    private const float HubRadius = 0.12f;
-    private const float SpokeHalfWidth = 0.07f; // spoke width 0.14W, half on each side of the spoke's centerline
+    // InnerCutoutRadius/HubRadius/SpokeHalfWidth are nudged from the original
+    // UI-SPEC starting values (0.26/0.12/0.07) per the Scope Notes' explicit
+    // "adjust proportions ... if a shape reads ambiguously at 16px" allowance.
+    // Empirically confirmed via the actual Wine-rendered pixel diagnostic (not
+    // guessed): at the original values, the hub-to-inner-rim band (where the
+    // between-spoke negative space lives) was only ~2.2px wide at 16px --
+    // too narrow for DrawRigIcon's outline stroke (see its own doc comment for
+    // why that stroke's width also had to be tuned) to leave any clean
+    // transparent margin, producing anti-aliasing dropout artifacts and nearly
+    // erasing the intended negative space entirely (UI-SPEC governing rule 4).
+    // Widened the band to ~3.4px raw (InnerCutoutRadius 0.26 -> 0.275, HubRadius
+    // 0.12 -> 0.065) while keeping the ring thickness (0.40-0.275=0.125W, 2.0px)
+    // and hub diameter (2*0.065=0.13W, 2.08px) at/above the >=2px-at-16px
+    // minimum feature rule; SpokeHalfWidth narrowed correspondingly
+    // (0.07 -> 0.05, spoke width 0.14W -> 0.10W) to keep the 3 between-spoke
+    // gaps open rather than crowded shut by wider spokes.
+    private const float InnerCutoutRadius = 0.275f;
+    private const float HubRadius = 0.065f;
+    private const float SpokeHalfWidth = 0.05f;
 
     // app.ico color treatment (13-UI-SPEC.md Color table).
     private static readonly Color AppBodyColor = Color.FromArgb(45, 45, 48);   // #2D2D30
@@ -48,9 +64,16 @@ internal static class IconGeometry
 
     /// <summary>
     /// normal.ico: monitor-on-a-stand silhouette. Screen ∪ neck ∪ base as one
-    /// contiguous GraphicsPath (13-RESEARCH.md Pattern 2) so a single DrawPath
-    /// call traces the outer contour only, not internal seams between the
-    /// touching/overlapping sub-shapes. White fill, black outline (D-04/D-05).
+    /// combined GraphicsPath (13-RESEARCH.md Pattern 2). CR-01 fix: a Pen stroke
+    /// on the combined path strokes every sub-figure's own boundary independently
+    /// -- it does NOT compute a merged union contour -- so stroking after filling leaves
+    /// visible seam lines wherever two sub-shapes touch or overlap (screen↔neck,
+    /// neck↔base). Instead this draws the outline FIRST, at DOUBLE width, then
+    /// fills white ON TOP: the anti-aliased white fill exactly covers the union
+    /// region, overpainting the inner half of every stroke -- including every
+    /// interior seam stroke, since those seams are by definition interior to the
+    /// union -- and leaving only the true outer contour visible, at the intended
+    /// ~OutlineWidth(size) thickness. White fill, black outline (D-04/D-05).
     /// </summary>
     public static Bitmap DrawNormalIcon(int size)
     {
@@ -62,11 +85,11 @@ internal static class IconGeometry
 
         using var path = BuildMonitorPath(size);
 
+        using var outline = new Pen(Color.Black, 2f * OutlineWidth(size));
+        g.DrawPath(outline, path);
+
         using var fill = new SolidBrush(Color.White);
         g.FillPath(fill, path);
-
-        using var outline = new Pen(Color.Black, OutlineWidth(size));
-        g.DrawPath(outline, path);
 
         return bmp;
     }
@@ -74,8 +97,27 @@ internal static class IconGeometry
     /// <summary>
     /// rig.ico: tri-spoke steering-wheel silhouette. Outer rim minus inner
     /// cutout (ring), plus hub disc and three spokes, all combined into one
-    /// GraphicsPath so the union outlines as a single contiguous silhouette
-    /// (13-RESEARCH.md Pattern 2). White fill, black outline (D-04/D-05).
+    /// GraphicsPath (13-RESEARCH.md Pattern 2). CR-01 fix: same stroke-then-fill
+    /// compositing direction as DrawNormalIcon -- outline drawn first, then
+    /// overpainted by the white fill -- so every interior seam (hub↔spoke,
+    /// spoke↔inner-rim, outer-rim↔inner-rim) is covered, leaving only the true
+    /// outer rim contour and the genuine inner-ring-hole/gap edges visible.
+    ///
+    /// Unlike DrawNormalIcon, the outline pen here is 1x OutlineWidth(size), NOT
+    /// doubled. Doubling is only necessary to preserve a full-thickness visible
+    /// trace on TRUE CONTOUR edges (one side filled, one side transparent
+    /// background) -- interior seams are always filled on BOTH sides (by the two
+    /// touching/overlapping sub-shapes), so the fill overpaints an interior seam
+    /// stroke completely regardless of pen width. Empirically confirmed (via the
+    /// actual Wine-rendered pixel diagnostic, not assumed): at 16px, rig.ico
+    /// packs six nearby stroked boundaries into the narrow hub-to-inner-rim band
+    /// (the hub circle, the inner-cutout circle, and both long edges of each of
+    /// the 3 spokes) -- doubling every one of those strokes compounds via
+    /// sequential alpha-compositing and swallows the intended transparent
+    /// between-spoke gaps almost entirely (violating UI-SPEC governing rule 4),
+    /// producing sub-pixel anti-aliasing dropout artifacts rather than clean
+    /// negative space. Reverting to 1x for this icon only resolves that while
+    /// still fully hiding every interior seam per the reasoning above.
     /// </summary>
     public static Bitmap DrawRigIcon(int size)
     {
@@ -87,11 +129,11 @@ internal static class IconGeometry
 
         using var path = BuildWheelPath(size);
 
-        using var fill = new SolidBrush(Color.White);
-        g.FillPath(fill, path);
-
         using var outline = new Pen(Color.Black, OutlineWidth(size));
         g.DrawPath(outline, path);
+
+        using var fill = new SolidBrush(Color.White);
+        g.FillPath(fill, path);
 
         return bmp;
     }
@@ -188,7 +230,8 @@ internal static class IconGeometry
         // edge (hubR) to the inner rim edge (innerR).
         foreach (var angleDegrees in new[] { 180.0, 60.0, 300.0 })
         {
-            path.AddPath(BuildSpokePath(cx, cy, hubR, innerR, spokeHalf, angleDegrees), false);
+            using var spoke = BuildSpokePath(cx, cy, hubR, innerR, spokeHalf, angleDegrees);
+            path.AddPath(spoke, false);
         }
 
         return path;
