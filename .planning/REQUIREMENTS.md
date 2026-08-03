@@ -20,8 +20,8 @@ Requirements for the v1.2 milestone (Visual Polish & Documentation). Introduces 
 
 - [x] **ICON-01**: The tray icon pair (rig mode / normal mode) uses genuinely distinct silhouettes, not just a color swap, so the two modes are distinguishable even to colorblind users
 - [x] **ICON-02**: Tray icons are legible at the actual 16x16 tray size and remain visible against both light and dark taskbar backgrounds
-- [ ] **ICON-03**: Icons are embedded as multi-resolution .ico files (at minimum 16/20/24/32px) so they render sharply at every DPI-scaled size Windows requests
-- [ ] **ICON-04**: The same icon artwork/motif is reused at larger sizes for the .exe/taskbar icon, not just the tray glyph
+- [x] **ICON-03**: Icons are embedded as multi-resolution .ico files (at minimum 16/20/24/32px) so they render sharply at every DPI-scaled size Windows requests
+- [x] **ICON-04**: The same icon artwork/motif is reused at larger sizes for the .exe/taskbar icon, not just the tray glyph
 
 ### Documentation
 
@@ -71,8 +71,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | THEME-06 | Phase 12 | Complete |
 | ICON-01 | Phase 13 | Complete |
 | ICON-02 | Phase 13 | Complete |
-| ICON-03 | Phase 13 | Pending |
-| ICON-04 | Phase 13 | Pending |
+| ICON-03 | Phase 13 | Complete |
+| ICON-04 | Phase 13 | Complete |
 | DOCS-01 | Phase 14 | Pending |
 | DOCS-02 | Phase 14 | Pending |
 | DOCS-03 | Phase 14 | Pending |
