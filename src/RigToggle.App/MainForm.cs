@@ -243,9 +243,9 @@ namespace RigToggle.App
             // resource should fail with a clear diagnostic, not an opaque exception
             // from the Icon constructor at startup, before any window exists.
             _normalIcon = new System.Drawing.Icon(normalStream
-                ?? throw new InvalidOperationException("Embedded resource 'normal.ico' not found."));
+                ?? throw new InvalidOperationException("Embedded resource 'normal.ico' not found."), SystemInformation.SmallIconSize);
             _rigIcon = new System.Drawing.Icon(rigStream
-                ?? throw new InvalidOperationException("Embedded resource 'rig.ico' not found."));
+                ?? throw new InvalidOperationException("Embedded resource 'rig.ico' not found."), SystemInformation.SmallIconSize);
         }
 
         /// <summary>
