@@ -65,9 +65,14 @@ v1.1 removed the daily-use friction that remained after v1.0: the app no longer 
 - [x] Toast/status notification on toggle (NOTIF-01) — Validated in Phase 8 (`NotifyIcon.ShowBalloonTip`, shared `ToggleResultFormatter`)
 - [x] Global hotkey trigger, with registration-failure surfacing (TRIG-01) — Validated in Phase 9: Global Hotkey Trigger. Rig-confirmed toggle-from-anywhere including tray-hidden, conflict surfacing with Moza Companion running, and a non-corrupting Settings-dialog race.
 
+### Validated (v1.2, in progress)
+
+- [x] GUI restyle: theme-aware, modern flat controls following Windows system light/dark mode — title bar (DWM `DWMWA_USE_IMMERSIVE_DARK_MODE`), every control (grid, hotkey box, buttons, panels), Windows-11 Mica/rounded corners, live theme-follow while running (THEME-01 through THEME-06) — Validated in Phase 12: Theme Infrastructure & Live Theme-Following. Rig-validated on real Windows 11 hardware after one gap-closure round: the first rig pass failed the title bar and buttons (an unproven bet that .NET's `Application.SetColorMode` alone would recolor them) plus an unenumerated audio-ComboBox gap; a code review root-caused all three, a gap-closure plan fixed them with an explicit per-control theming pattern (including a deliberate `dotnet/winforms#13897` hover/pressed workaround), and a second rig pass confirmed all three fixed on real hardware.
+
 ### Active
 
-None currently — fresh milestone requirements to be defined via `/gsd:new-milestone`.
+- [ ] Redesigned tray icon pair (visually distinct rig-mode vs. normal-mode icons) — next up for v1.2
+- [ ] New README.md (feature overview, screenshots, install/build instructions, badges) — next up for v1.2
 
 ### Out of Scope
 
@@ -118,6 +123,8 @@ None currently — fresh milestone requirements to be defined via `/gsd:new-mile
 | `--tray` hidden-startup uses `Application.Run(new ApplicationContext())` with no `MainForm` reference | The Microsoft-doc-cited `ApplicationContext(mainForm)` pattern did not actually suppress `Show()` on this runtime | Validated Phase 8, rig-confirmed |
 | Tray icon existence derived as `CloseMinimizesToTray \|\| MinimizeToTray`, applied live on Settings-Save | Lets close-to-tray and minimize-to-tray be configured as two independent preferences instead of one combined flag | Validated Phase 11, rig-confirmed after fixing a lockout bug found by code review |
 | Phase 10 (CLI trigger + single-instance IPC, TRIG-02/TRIG-03) permanently out of scope, not delivered | Phase 8/9's tray and hotkey triggers already deliver the "toggle without opening the GUI" core value this milestone targeted; a CLI/IPC path for external tools was judged not needed | Decided at v1.1 close 2026-08-01 |
+| Explicit-color `FlatStyle.Flat` button theming (with explicit `BorderSize=0` + hover/pressed color overrides), not `FlatStyle.System` | `Application.SetColorMode` doesn't recolor `FlatStyle.System`'s native visual-styles rendering pipeline at all — rig-proven false on real Windows 11; explicit-color `Flat` is deterministic but reintroduces `dotnet/winforms#13897` unless hover/pressed colors are also set explicitly, which this fix does | Validated Phase 12 gap closure (12-05/12-06), rig-confirmed including interaction states |
+| Manual `DWMWA_USE_IMMERSIVE_DARK_MODE` call, not relying on `Application.SetColorMode` to own the title bar | Original bet that `SetColorMode` alone would flip the DWM title-bar attribute was rig-disproven | Validated Phase 12 gap closure |
 
 ## Evolution
 
@@ -137,4 +144,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-01 — milestone v1.2 (Visual Polish & Documentation) started after v1.1 close.*
+*Last updated: 2026-08-03 — Phase 12 (Theme Infrastructure & Live Theme-Following) complete, rig-validated on Windows 11 after one gap-closure round.*
