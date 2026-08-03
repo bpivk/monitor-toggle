@@ -66,11 +66,13 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
   4. Every control on both forms — including the multi-monitor settings grid — is legibly recolored in dark mode, with no stock white/gray controls left over (THEME-04)
   5. Buttons and panels render with flat, modern styling instead of legacy 3D bevel/gradient chrome (THEME-05)
   6. On Windows 11, window corners are rounded with a Mica-style backdrop; on Windows 10 or when the API is unavailable, the app runs with no visual glitches or crashes (THEME-06)
-**Plans**: 4 plans
+**Plans**: 6 plans (4 original + 2 gap closure from the 12-04 rig failures)
   - [x] 12-01-PLAN.md — Theme provider infrastructure (Core IThemeProvider/AppTheme, Windows registry+SystemEvents provider, DWM P/Invoke façade)
   - [x] 12-02-PLAN.md — Composition wiring, base SetColorMode, live-follow + DWM chrome for MainForm & MonitorConfirmDialog
   - [x] 12-03-PLAN.md — SettingsForm control gaps (DataGridView, GroupBox→Panel, txtHotkey) + ThemeApplier + live-follow
-  - [ ] 12-04-PLAN.md — Rig human-verify checkpoint (THEME-01..06, Windows version, live-flip visible + --tray hidden)
+  - [x] 12-04-PLAN.md — Rig human-verify checkpoint (FAILED: title bar, buttons, audio combos stayed light in dark mode)
+  - [ ] 12-05-PLAN.md — Gap closure: immersive dark title bar (THEME-03), explicit-color flat buttons (THEME-05), audio ComboBox theming (THEME-04) + Dispose/lock hardening
+  - [ ] 12-06-PLAN.md — Gap closure rig re-verify: confirm the 3 previously-failing checks on Windows 11
 
 ### Phase 13: Tray & App Icon Redesign
 
