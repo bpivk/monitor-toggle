@@ -125,9 +125,10 @@ internal static class NativeMethods
     // corners on a caller-owned window handle. Kept internal like the rest of this class
     // -- exposed to RigToggle.App only through the public DwmTitleBar façade
     // (DwmTitleBar.cs in this same namespace), never through a new InternalsVisibleTo
-    // grant. DWMWA_USE_IMMERSIVE_DARK_MODE is owned by Application.SetColorMode and is
-    // declared here for reference only -- never call it manually (Pitfall 1: double-set
-    // causes a title-bar color flash). DwmSetWindowAttribute is declared to return int
+    // grant. DWMWA_USE_IMMERSIVE_DARK_MODE is now called explicitly by DwmTitleBar
+    // (12-REVIEW.md CR-01) -- the Windows 11 rig test in 12-04 proved the app's white/light
+    // title bar in dark mode, falsifying the earlier assumption that Application.SetColorMode
+    // alone would flip this attribute. DwmSetWindowAttribute is declared to return int
     // (HRESULT) rather than throwing on failure, so an unsupported OS/attribute is a
     // silently-ignorable non-zero return (D-07) -- no try/catch needed at the call site.
     internal const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
