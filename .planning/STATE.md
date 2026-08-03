@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: Visual Polish & Documentation
 status: executing
 stopped_at: Phase 14 context gathered
-last_updated: "2026-08-03T20:39:18.688Z"
-last_activity: 2026-08-03 -- Phase 14 planning complete
+last_updated: "2026-08-03T20:42:33.199Z"
+last_activity: 2026-08-03 -- Phase 14 execution started
 progress:
   total_phases: 3
   completed_phases: 2
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-01)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
-**Current focus:** Phase 14 — readme & release documentation
+**Current focus:** Phase 14 — readme-release-documentation
 
 ## Current Position
 
-Phase: 14
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-08-03 -- Phase 14 planning complete
+Phase: 14 (readme-release-documentation) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 14
+Last activity: 2026-08-03 -- Phase 14 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
