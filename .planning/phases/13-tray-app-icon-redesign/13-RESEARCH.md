@@ -421,17 +421,17 @@ Verified/cross-referenced patterns — see Architecture Patterns section above f
 | A3 | `GraphicsPath` union-stroke behavior (Pattern 2) eliminates internal seams between overlapping sub-shapes (screen/neck/base, rim/hub/spokes) without extra `FillMode`/winding-rule tuning | Pattern 2 | Medium — if wrong, the silhouette could show visible internal seam lines instead of one clean outline; would need a `FillMode.Winding` adjustment or explicit path simplification, catchable at the same human-verification step |
 | A4 | The hand-rolled `EncodeBmpInIco` byte layout (Pattern 3, Pitfall 4) is correct end-to-end (bottom-up rows, 32-bit-padded AND mask, doubled `biHeight`) | Pattern 3, Pitfall 4 | High if wrong — a malformed ICO file could fail to load at all (`InvalidOperationException` at startup, per the existing null-check pattern in `LoadTrayIconsIfNeeded`) or render garbled; **strongly recommend the plan include a task that round-trips each generated `.ico` through `new Icon(path, size)` and asserts it loads and reports the expected `.Size` for every frame**, not just a visual check, before the human-verification step |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does `SystemInformation.SmallIconSize` update live if display scaling changes while the app is tray-resident, or only at process start?**
+1. **Does `SystemInformation.SmallIconSize` update live if display scaling changes while the app is tray-resident, or only at process start?** — RESOLVED: out of scope, documented as a known limitation.
    - What we know: `LoadTrayIconsIfNeeded()` is called once and its result cached for the app's lifetime (existing 08-RESEARCH.md Pitfall 3 constraint, cited in the code comments, explicitly to avoid a GDI handle leak over multi-hour sessions).
    - What's unclear: If a user changes Windows display scaling mid-session (rare but possible on this rig-and-desk dual-context machine), whether the cached `Icon` objects would need to be re-derived to stay DPI-correct, and whether `SystemInformation.SmallIconSize` itself reflects the *new* scaling without an app restart.
-   - Recommendation: Out of scope for this phase's success criteria (ICON-01 through ICON-04 don't mention live-DPI-change handling) — note as a known limitation if raised during human verification, don't build new re-load logic speculatively.
+   - Resolution: Out of scope for this phase's success criteria (ICON-01 through ICON-04 don't mention live-DPI-change handling) — recorded as a known limitation in 13-03-PLAN.md's threat register (T-13-08), not built. No re-load logic added speculatively.
 
-2. **Exact outline stroke width and corner-radius-implied thin-feature interaction at 16px are not independently pinned by UI-SPEC beyond "thin"/existing fraction values.**
+2. **Exact outline stroke width and corner-radius-implied thin-feature interaction at 16px are not independently pinned by UI-SPEC beyond "thin"/existing fraction values.** — RESOLVED: operationalized as a tunable, validated at the rig checkpoint.
    - What we know: UI-SPEC pins shape fractions precisely but leaves outline stroke width to "Claude's Discretion" (still open per CONTEXT.md, not resolved by UI-SPEC's Color table which only pins the outline *color*, not its *width*).
    - What's unclear: Whether a 1px-at-16px outline (Pattern 1's `Math.Max(1f, size/16f)` starting value) reads correctly against both extremes (pure white and pure black taskbars) or needs to be thicker.
-   - Recommendation: Treat as a tunable parameter validated by the UI-SPEC's own mandated human-verification step, not something to over-specify in the plan before seeing a real render.
+   - Resolution: Treated as a tunable parameter — 13-01-PLAN.md Task 2 implements the `Math.Max(1f, size/16f)` starting value, and 13-03-PLAN.md's human-verify checkpoint validates actual legibility against both taskbar extremes on real hardware before the phase is considered complete.
 
 ## Environment Availability
 
