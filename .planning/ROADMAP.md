@@ -100,7 +100,10 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
   1. README's feature overview includes screenshots of the toggle in both modes, or clearly marked placeholders for user-supplied screenshots where a real screenshot isn't available (DOCS-01)
   2. README documents both downloading the released .exe and building the app from source (DOCS-02)
   3. README displays GitHub badges for build status, license, and latest release version (DOCS-03)
-**Plans**: TBD
+**Plans**: 3 plans (2 waves — CI/license infra + GitHub state changes in wave 1, README rewrite + human-verify checkpoint in wave 2)
+  - [ ] 14-01-PLAN.md — MIT LICENSE, build.yml (push/PR CI), release.yml (tag-triggered publish + attach exe to GitHub Release)
+  - [ ] 14-02-PLAN.md — Flip repo to public, backfill v1.0/v1.1 as notes-only GitHub Releases
+  - [ ] 14-03-PLAN.md — Rewrite README.md (badges, feature overview, screenshots, install/build, requirements) + rig-verify live badges/build/releases
 
 ## Progress
 
@@ -119,7 +122,7 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 | 11. Configurable Tray Close/Minimize Behavior | v1.1 | 4/4 | Complete | 2026-08-01 |
 | 12. Theme Infrastructure & Live Theme-Following | v1.2 | 6/6 | Complete    | 2026-08-03 |
 | 13. Tray & App Icon Redesign | v1.2 | 4/4 | Complete    | 2026-08-03 |
-| 14. README & Release Documentation | v1.2 | 0/TBD | Not started | - |
+| 14. README & Release Documentation | v1.2 | 0/3 | Planned    |  |
 
 ## Backlog
 

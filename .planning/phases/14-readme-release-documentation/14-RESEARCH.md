@@ -335,17 +335,19 @@ Source: composed from `[VERIFIED: actions/checkout GitHub page, actions/setup-do
 
 **If this table is empty:** N/A — two low/medium-risk assumptions logged above; everything else in this document (package/action versions, CLI flag syntax, publish paths, tag types, repo visibility state, `gh` auth state) was verified directly against either official current sources or this repo's live state.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the v1.2 release badge/DOCS-02 download link be tested end-to-end before this phase is marked complete?**
    - What we know: The workflow YAML pattern is verified against current official docs and this repo's exact publish path/command. `gh` CLI commands for visibility flip and v1.0/v1.1 backfill were verified against the CLI manual and can be run directly (auth already confirmed present in this environment).
    - What's unclear: Whether the plan should include an actual `git tag v1.2 && git push --tags` step to trigger the new release workflow live (producing a real, verifiable v1.2 release + asset) as part of this phase's completion criteria, or whether that's deferred to whenever v1.2 actually ships as a milestone (per CONTEXT.md's phrasing, "v1.2: a real, current release once this milestone ships" — implying it may happen at milestone close, not mid-phase).
    - Recommendation: Planner should treat "workflow files exist and are syntactically/logically correct, verified by the build workflow triggering successfully on the phase's own commits (push trigger)" as the phase's own completion bar, and leave the actual `v1.2` tag push as a milestone-close action (outside this phase) — consistent with how CONTEXT.md scopes D-04/D-05 (backfill v1.0/v1.1 *now*, but v1.2 "once this milestone ships"). Flag this explicitly in the plan so it isn't silently dropped.
+   - **RESOLVED:** Adopted as recommended. 14-03's human-verify checkpoint (Task 3) sets the completion bar as "build workflow ran green on this phase's own commits" and explicitly excludes a v1.2 tag push, which is deferred to milestone close per D-04.
 
 2. **Exact wording/section ordering of the README's generic feature overview (D-10 through D-13)**
    - What we know: Content requirements are fully specified in CONTEXT.md (D-10 feature list, D-11 generic naming constraint, D-12 problem statement, D-13 system requirements note) — this is explicitly left to Claude's Discretion for ordering/headings.
    - What's unclear: Nothing blocking — this is discretionary by design, not a research gap.
    - Recommendation: Planner can proceed directly; no further research needed for README prose content.
+   - **RESOLVED:** 14-03 Task 2 specifies concrete section ordering (badges → problem statement → feature overview → screenshots → download/build → system requirements) and exact content per D-10 through D-13, with no ambiguity left for the executor.
 
 ## Environment Availability
 
