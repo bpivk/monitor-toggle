@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Visual Polish & Documentation
-status: executing
-stopped_at: Phase 13 UI-SPEC approved
-last_updated: "2026-08-03T11:37:00.374Z"
+status: ready_to_plan
+stopped_at: Phase 13 complete (4/4) — ready to discuss Phase 14
+last_updated: 2026-08-03T16:29:50.307Z
 last_activity: 2026-08-03 -- Phase 13 execution started
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 10
   percent: 33
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-01)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
-**Current focus:** Phase 13 — tray-app-icon-redesign
+**Current focus:** Phase 14 — readme & release documentation
 
 ## Current Position
 
-Phase: 13 (tray-app-icon-redesign) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 13
-Last activity: 2026-08-03 -- Phase 13 execution started
+Phase: 14
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-08-03
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -36,7 +36,7 @@ Progress: [░░░░░░░░░░] 0%
 
 **Velocity:**
 
-- Total plans completed: 43
+- Total plans completed: 47
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0%
 | 09 | 4 | - | - |
 | 11 | 4 | - | - |
 | 12 | 6 | - | - |
+| 13 | 4 | - | - |
 
 **Recent Trend:**
 
