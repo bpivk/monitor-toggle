@@ -31,24 +31,24 @@ key-decisions:
 patterns-established:
   - "Badge row at top of README uses only live-endpoint URLs (GitHub Actions badge.svg, shields.io license/release) — never hardcoded static badges"
 
-requirements-completed: []  # DOCS-01/02/03 not yet complete — plan paused at Task 3 human-verify checkpoint
+requirements-completed: [DOCS-01, DOCS-02, DOCS-03]
 
 # Metrics
-duration: 20min
+duration: 25min
 completed: 2026-08-03
 ---
 
-# Phase 14 Plan 03: README Rewrite Summary (Tasks 1-2 of 3; Task 3 checkpoint pending)
+# Phase 14 Plan 03: README Rewrite Summary
 
-**Rewrote root README.md with three live shields.io/GitHub-Actions badges, a generic feature overview and problem statement, download+build instructions, and four screenshot placeholders under a new docs/screenshots/ directory — Task 3's live-repo human verification is still pending.**
+**Rewrote root README.md with three live shields.io/GitHub-Actions badges, a generic feature overview and problem statement, download+build instructions, and four screenshot placeholders under a new docs/screenshots/ directory. Task 3's live-repo human verification passed after the orchestrator caught and fixed a real bug: build.yml was scoped to `branches: [main]` but this repo's actual default branch is `master`.**
 
 ## Performance
 
-- **Duration:** ~20 min (Tasks 1-2 only)
+- **Duration:** ~25 min
 - **Started:** 2026-08-03T20:41:00Z (approx)
-- **Completed (this pass):** 2026-08-03T21:01:21Z
-- **Tasks:** 2 of 3 completed (Task 3 is a blocking human-verify checkpoint, not yet reached/answered)
-- **Files modified:** 2 (README.md rewritten, docs/screenshots/.gitkeep created)
+- **Completed:** 2026-08-03T21:10:00Z (approx)
+- **Tasks:** 3 of 3 completed
+- **Files modified:** 3 (README.md rewritten, docs/screenshots/.gitkeep created, .github/workflows/build.yml branch-trigger fix)
 
 ## Accomplishments
 - Created `docs/screenshots/` as a git-persistable placeholder directory via `.gitkeep`
@@ -62,9 +62,9 @@ Each task was committed atomically:
 1. **Task 1: Create docs/screenshots/ placeholder directory** - `8099525` (chore)
 2. **Task 2: Rewrite README.md — badges, feature overview, install/build, screenshots, requirements** - `2f0014d` (feat)
 
-Task 3 is `type="checkpoint:human-verify" gate="blocking"` — requires the orchestrator's human user to visually confirm the live public GitHub repo (badge rendering, green build workflow, Releases tab). Not attempted by this agent per plan instructions; execution paused here awaiting human verification/resume.
+3. **Task 3: Confirm honest-badge end state on the live public repo** - checkpoint, resolved by orchestrator + user
 
-**Plan metadata:** not yet committed (final metadata commit deferred until Task 3 resolves)
+Task 3 required the orchestrator's human user to visually confirm the live public GitHub repo. Before presenting the checkpoint, the orchestrator pushed master to origin (first-ever push, 88 commits, user-confirmed) and independently verified all 5 acceptance criteria via `gh`/`curl` (repo public, Build workflow green, all 3 badges rendering correct labels, v1.0/v1.1 releases notes-only, README generic with 4 placeholders). The user reviewed this evidence and replied "approved".
 
 ## Files Created/Modified
 - `docs/screenshots/.gitkeep` - empty-directory placeholder so git persists `docs/screenshots/` as the target for user-supplied screenshots
@@ -77,29 +77,33 @@ Task 3 is `type="checkpoint:human-verify" gate="blocking"` — requires the orch
 
 ## Deviations from Plan
 
-None - Tasks 1 and 2 executed exactly as written. Task 3 (checkpoint) intentionally not attempted, per this plan's explicit instruction that it requires a human to view the live public GitHub repo.
+- **Real bug found and fixed during checkpoint verification (not in original plan):** `.github/workflows/build.yml` (created in 14-01) triggered on `branches: [main]`, but this repo's actual default branch is `master` — the Build workflow would never have fired on a real push, leaving the build-status badge permanently unpopulated. Fixed to `branches: [master]` in commit `10f401f`, pushed, and confirmed the workflow triggered and passed (run `30853093473`). This is a correctness fix to 14-01's deliverable, caught only because Task 3's live verification forced an actual push+check that 14-01's own local acceptance criteria (grep-based, no live trigger) couldn't catch.
+- Tasks 1 and 2 otherwise executed exactly as written.
 
 ## Issues Encountered
 
-None.
+None beyond the branch-name bug above, which was caught and fixed before the checkpoint was presented.
 
 ## User Setup Required
 
-None - no external service configuration required for Tasks 1-2. Task 3 itself is the pending human-verification checkpoint (see below).
+None — the orchestrator pushed to origin and ran all verification directly; no external service configuration was required of the user beyond confirming the checkpoint.
 
 ## Next Phase Readiness
 
-- README.md and docs/screenshots/ are complete and committed; ready for the human-verify checkpoint (Task 3) once this phase's commits are pushed to GitHub `main`
-- Task 3 requires: repo loads publicly, "Build" workflow ran green, all three badges render (build=passing, license=MIT, release=v1.1), v1.0/v1.1 releases show notes-only, README reads generically with broken-image screenshot placeholders
-- Blocked on: human visually confirming the live public repo state (cannot be automated/verified by this agent)
+- README.md, docs/screenshots/, and both CI workflows are complete, correct, and pushed to GitHub `main` (branch `master`)
+- All three DOCS-01/02/03 requirements are satisfied and live-verified: repo public, Build workflow green, all three badges rendering correct values (build=passing, license=MIT, release=v1.1), v1.0/v1.1 releases notes-only, README generic with 4 screenshot placeholders
+- v1.2 release (with an attached .exe, automated via release.yml on tag push) is deferred to milestone close, per D-04 and RESEARCH Open Question #1 — not part of this phase's completion bar
 
 ## Self-Check: PASSED
 
 - FOUND: docs/screenshots/.gitkeep
 - FOUND: README.md (modified)
+- FOUND: .github/workflows/build.yml (branch-trigger fix)
 - FOUND commit 8099525 (Task 1)
 - FOUND commit 2f0014d (Task 2)
+- FOUND commit 10f401f (Task 3 — branch-trigger fix discovered during checkpoint verification)
+- VERIFIED live: https://github.com/bpivk/monitor-toggle/actions/runs/30853093473 (Build workflow, conclusion=success)
 
 ---
 *Phase: 14-readme-release-documentation*
-*Completed (partial — Tasks 1-2 only, Task 3 checkpoint pending): 2026-08-03*
+*Completed: 2026-08-03*
