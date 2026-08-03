@@ -59,6 +59,8 @@ namespace RigToggle.App
             this.btnContinue.Size = new System.Drawing.Size(90, 32);
             this.btnContinue.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnContinue.Name = "btnContinue";
+            // 12-02/THEME-05: FlatStyle.System (never .Flat, dotnet/winforms#13897).
+            this.btnContinue.FlatStyle = System.Windows.Forms.FlatStyle.System;
 
             //
             // btnCancel
@@ -68,6 +70,7 @@ namespace RigToggle.App
             this.btnCancel.Size = new System.Drawing.Size(90, 32);
             this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.btnCancel.Name = "btnCancel";
+            this.btnCancel.FlatStyle = System.Windows.Forms.FlatStyle.System;
 
             //
             // MonitorConfirmDialog

@@ -319,7 +319,7 @@ namespace RigToggle.App
                         var disableNames = disablePaths.Select(ResolveName).ToList();
                         var enableNames = enablePaths.Select(ResolveName).ToList();
 
-                        using var confirmDialog = new MonitorConfirmDialog(disableNames, enableNames);
+                        using var confirmDialog = new MonitorConfirmDialog(disableNames, enableNames, _themeProvider);
                         if (confirmDialog.ShowDialog(this) != DialogResult.OK)
                         {
                             return; // user cancelled — nothing mutated
