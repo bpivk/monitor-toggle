@@ -122,7 +122,7 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 | 11. Configurable Tray Close/Minimize Behavior | v1.1 | 4/4 | Complete | 2026-08-01 |
 | 12. Theme Infrastructure & Live Theme-Following | v1.2 | 6/6 | Complete    | 2026-08-03 |
 | 13. Tray & App Icon Redesign | v1.2 | 4/4 | Complete    | 2026-08-03 |
-| 14. README & Release Documentation | v1.2 | 3/3 | Complete   | 2026-08-03 |
+| 14. README & Release Documentation | v1.2 | 3/3 | Complete    | 2026-08-03 |
 
 ## Backlog
 

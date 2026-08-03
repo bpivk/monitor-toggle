@@ -25,9 +25,9 @@ Requirements for the v1.2 milestone (Visual Polish & Documentation). Introduces 
 
 ### Documentation
 
-- [ ] **DOCS-01**: README.md includes a feature overview with screenshots (or clearly marked placeholders for user-supplied screenshots) of the toggle in both modes
-- [ ] **DOCS-02**: README.md includes instructions for downloading/installing the released .exe and for building from source
-- [ ] **DOCS-03**: README.md includes GitHub badges (build status, license, latest release version)
+- [x] **DOCS-01**: README.md includes a feature overview with screenshots (or clearly marked placeholders for user-supplied screenshots) of the toggle in both modes
+- [x] **DOCS-02**: README.md includes instructions for downloading/installing the released .exe and for building from source
+- [x] **DOCS-03**: README.md includes GitHub badges (build status, license, latest release version)
 
 ## v2 Requirements
 
@@ -73,9 +73,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ICON-02 | Phase 13 | Complete |
 | ICON-03 | Phase 13 | Complete |
 | ICON-04 | Phase 13 | Complete |
-| DOCS-01 | Phase 14 | Pending |
-| DOCS-02 | Phase 14 | Pending |
-| DOCS-03 | Phase 14 | Pending |
+| DOCS-01 | Phase 14 | Complete |
+| DOCS-02 | Phase 14 | Complete |
+| DOCS-03 | Phase 14 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 13 total
