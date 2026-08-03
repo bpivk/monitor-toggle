@@ -15,9 +15,20 @@ namespace RigToggle.IconGen;
 /// technique. See 13-RESEARCH.md Pitfall 3 (256px byte=0) and Pitfall 4 (bottom-up
 /// BGRA rows, 32-bit-padded 1bpp AND mask, doubled biHeight) for the specific
 /// failure modes this implementation guards against.
+///
+/// Pitfall 5 (discovered during Task 3 execution, not in 13-RESEARCH.md's original
+/// Pitfall 3/4): frames at 256x256 must be encoded as an embedded PNG blob, not raw
+/// BMP-in-ICO. Pitfall 3's "0 byte means 256" ICONDIRENTRY encoding is necessary but
+/// not sufficient — readers (confirmed via System.Drawing.Icon's own sized
+/// constructor) do not reliably recognize a raw-BMP 256px frame and silently fall
+/// back to a smaller embedded frame instead. Since Vista, 256px ICO frames are
+/// conventionally PNG-compressed; every other size keeps using the proven BMP-in-ICO
+/// path unchanged.
 /// </summary>
 internal static class IconWriter
 {
+    private const int PngFrameThreshold = 256;
+
     /// <summary>
     /// Packs the given frames into a standards-compliant multi-frame .ico byte stream.
     /// Frames may be supplied in any order — offsets are computed from each frame's
@@ -37,11 +48,15 @@ internal static class IconWriter
         var entryDataSizes = new int[count];
         var frameBytes = new byte[count][];
 
-        // Pre-encode every frame's BMP-in-ICO bytes so we know sizes before writing
-        // the directory (offsets must be known up front).
+        // Pre-encode every frame's bytes so we know sizes before writing the
+        // directory (offsets must be known up front). Pitfall 5: 256px frames use
+        // PNG encoding; every smaller frame keeps the proven BMP-in-ICO path.
         for (int i = 0; i < count; i++)
         {
-            frameBytes[i] = EncodeBmpInIco(frames[i]);
+            var bmp = frames[i];
+            frameBytes[i] = bmp.Width >= PngFrameThreshold || bmp.Height >= PngFrameThreshold
+                ? EncodePngInIco(bmp)
+                : EncodeBmpInIco(bmp);
         }
 
         int headerSize = 6 + 16 * count;
@@ -132,5 +147,24 @@ internal static class IconWriter
         {
             bmp.UnlockBits(locked);
         }
+    }
+
+    /// <summary>
+    /// Encodes a single bitmap as a standard PNG blob for embedding directly as an
+    /// ICO frame's data (Pitfall 5). Used only for frames at 256x256 -- the
+    /// well-established convention for large ICO frames since Windows Vista, and the
+    /// encoding System.Drawing.Icon's own reader actually recognizes at that size
+    /// (confirmed by round-trip testing: a raw BMP-in-ICO 256px frame silently fails
+    /// to load as 256x256, while a PNG-in-ICO frame at the same size loads correctly).
+    /// PNG's own header carries width/height/alpha, so no BITMAPINFOHEADER or AND
+    /// mask is written here -- the ICONDIRENTRY's data-size field alone tells readers
+    /// how many bytes to treat as one opaque blob (PNG signature is how they detect
+    /// it isn't a BMP).
+    /// </summary>
+    private static byte[] EncodePngInIco(Bitmap bmp)
+    {
+        using var ms = new MemoryStream();
+        bmp.Save(ms, ImageFormat.Png);
+        return ms.ToArray();
     }
 }
