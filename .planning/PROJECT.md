@@ -16,18 +16,20 @@ v1.1 removed the daily-use friction that remained after v1.0: the app no longer 
 
 **Scope decision, not a gap:** CLI trigger + single-instance IPC (TRIG-02/TRIG-03) was scoped for v1.1 but never built, and after review was decided permanently out of scope rather than deferred — tray and hotkey triggers already cover every trigger path this project needs. Full detail: `.planning/milestones/v1.1-REQUIREMENTS.md`.
 
-## Current Milestone: v1.2 Visual Polish & Documentation
+## Current Milestone: v1.2 Visual Polish & Documentation — all phases complete, ready to close
 
 **Goal:** Replace the default-WinForms look with a theme-aware, modern UI and give the tray icons real visual distinction, plus a GitHub-ready README.
 
-**Target features:**
-- GUI restyle: modern flat controls following Windows system light/dark mode (title bar via DWM API + re-themed controls), applied to MainForm and SettingsForm
-- Redesigned tray icon pair: visually distinct, well-designed icons for rig mode vs. normal mode (replaces the current functional-but-plain pair)
-- New README.md: feature overview + screenshots, install/build instructions, badges (build status, license, latest release)
+**Target features (all shipped):**
+- GUI restyle: modern flat controls following Windows system light/dark mode (title bar via DWM API + re-themed controls), applied to MainForm and SettingsForm — Phase 12
+- Redesigned tray icon pair: visually distinct, well-designed icons for rig mode vs. normal mode (replaces the current functional-but-plain pair) — Phase 13
+- New README.md: feature overview + screenshots, install/build instructions, badges (build status, license, latest release) — Phase 14
 
-**Key context:** System-theme-following in WinForms has no built-in support — requires manual DWM API calls for the title bar plus re-coloring every control by hand; accepted as worthwhile complexity per explicit user call. Screenshots must be supplied by the user from the real rig (no Windows GUI available in this build environment) — placeholders will be marked in the README for the user to fill in.
+**Key context:** System-theme-following in WinForms has no built-in support — requires manual DWM API calls for the title bar plus re-coloring every control by hand; accepted as worthwhile complexity per explicit user call. Screenshots are still placeholders in the README — user must supply real screenshots from the rig (no Windows GUI available in this build environment). The GitHub repo (`bpivk/monitor-toggle`) was flipped from private to public as part of Phase 14, with v1.0/v1.1 backfilled as GitHub Releases and new CI/release automation added — none of this existed before v1.2.
 
 **Deferred from this milestone:** LOG-01 (toggle history/log) — still a nice-to-have, lower priority than visual polish.
+
+**Next step:** Run `/gsd:complete-milestone` to close out v1.2 and scope v2 work.
 
 <details>
 <summary>Archived: v1.0 and v1.1 milestone framing (superseded)</summary>
@@ -65,14 +67,15 @@ v1.1 removed the daily-use friction that remained after v1.0: the app no longer 
 - [x] Toast/status notification on toggle (NOTIF-01) — Validated in Phase 8 (`NotifyIcon.ShowBalloonTip`, shared `ToggleResultFormatter`)
 - [x] Global hotkey trigger, with registration-failure surfacing (TRIG-01) — Validated in Phase 9: Global Hotkey Trigger. Rig-confirmed toggle-from-anywhere including tray-hidden, conflict surfacing with Moza Companion running, and a non-corrupting Settings-dialog race.
 
-### Validated (v1.2, in progress)
+### Validated (v1.2)
 
 - [x] GUI restyle: theme-aware, modern flat controls following Windows system light/dark mode — title bar (DWM `DWMWA_USE_IMMERSIVE_DARK_MODE`), every control (grid, hotkey box, buttons, panels), Windows-11 Mica/rounded corners, live theme-follow while running (THEME-01 through THEME-06) — Validated in Phase 12: Theme Infrastructure & Live Theme-Following. Rig-validated on real Windows 11 hardware after one gap-closure round: the first rig pass failed the title bar and buttons (an unproven bet that .NET's `Application.SetColorMode` alone would recolor them) plus an unenumerated audio-ComboBox gap; a code review root-caused all three, a gap-closure plan fixed them with an explicit per-control theming pattern (including a deliberate `dotnet/winforms#13897` hover/pressed workaround), and a second rig pass confirmed all three fixed on real hardware.
 - [x] Redesigned tray icon pair + exe/taskbar icon: silhouette-distinct (monitor vs. steering wheel, no color-only differentiation), monochrome self-contained-contrast tray icons, color-treated exe icon, multi-resolution `.ico` (8 frames, 16-48px tray; 6 frames, 16-256px exe) via a new dev-time `RigToggle.IconGen` GDI+ generator (ICON-01 through ICON-04) — Validated in Phase 13: Tray & App Icon Redesign. Rig-validated on real Windows 11 hardware after one gap-closure round: the first rig pass approved shape/legibility/DPI/exe-icon, but a code review afterward found the outline-drawing approach (`GraphicsPath.DrawPath` on a combined multi-shape path) produced real seam artifacts the human hadn't caught at a glance; fixed via stroke-then-fill compositing plus a new automated pixel-level diagnostic, re-confirmed clean on a second rig pass.
+- [x] GitHub-ready README.md: three live-endpoint badges (build status, license, latest release), generic feature overview + problem statement, download+build instructions, four screenshot placeholders (DOCS-01 through DOCS-03) — Validated in Phase 14: README & Release Documentation. Delivering this required real backing infrastructure beyond docs: a new MIT LICENSE, two GitHub Actions workflows (build + tag-triggered release with exe attachment), the repo flipped from private to public, and v1.0/v1.1 backfilled as notes-only GitHub Releases. Live-verified end to end (repo public, Build workflow green, all three badges rendering correct values, releases present) after fixing a real bug caught only by that live verification: `build.yml` was scoped to `branches: [main]` but this repo's actual default branch is `master`.
 
 ### Active
 
-- [ ] New README.md (feature overview, screenshots, install/build instructions, badges) — next up for v1.2
+None — all v1.2 requirements validated. Ready for `/gsd:complete-milestone`.
 
 ### Out of Scope
 
@@ -127,6 +130,9 @@ v1.1 removed the daily-use friction that remained after v1.0: the app no longer 
 | Manual `DWMWA_USE_IMMERSIVE_DARK_MODE` call, not relying on `Application.SetColorMode` to own the title bar | Original bet that `SetColorMode` alone would flip the DWM title-bar attribute was rig-disproven | Validated Phase 12 gap closure |
 | Steering-wheel vs. desktop-monitor motif for rig/normal tray icons, procedurally drawn via GDI+ (not sourced artwork) | Strong shape contrast readable at 16px without color, maps directly onto the user's actual sim-racing setup; zero new asset-pipeline dependency | Validated Phase 13 |
 | Stroke-then-fill outline compositing for icon geometry, not `FillPath`+`DrawPath` on a combined multi-shape `GraphicsPath` | `DrawPath` strokes every touching/overlapping sub-shape's boundary independently rather than a merged contour, producing seam artifacts a human rig glance didn't catch but code review + pixel-level diagnostic did | Validated Phase 13 gap closure (13-04), rig-confirmed |
+| GitHub repo flipped private → public, badges wired to live GitHub Actions/shields.io endpoints (never static/decorative) | A "GitHub-ready README" with badges only makes sense on a public repo; CONTEXT.md explicitly rejected decorative badges not backed by real CI/license/release state | Validated Phase 14, live-verified |
+| README kept deliberately generic (no "Moza"/"BeamNG" naming) despite internal docs (CLAUDE.md/PROJECT.md) using those names | User's explicit choice during Phase 14 discuss — a public-facing doc reads more general-purpose than the internal project framing; downstream agents must not "correct" this back | Validated Phase 14 |
+| `build.yml` triggers on `branches: [master]`, not the more common `[main]` default | This repo's actual default branch is `master` — a bug where the workflow was originally scoped to `main` (never firing) was caught only by Phase 14's live human-verify checkpoint, not by local acceptance-criteria grep checks | Validated Phase 14, fixed and re-verified live |
 
 ## Evolution
 
@@ -146,4 +152,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-03 — Phase 13 (Tray & App Icon Redesign) complete, rig-validated on Windows 11 after one gap-closure round.*
+*Last updated: 2026-08-03 — Phase 14 (README & Release Documentation) complete; v1.2 Visual Polish & Documentation milestone fully shipped, ready for `/gsd:complete-milestone`.*
