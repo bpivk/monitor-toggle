@@ -48,9 +48,16 @@ internal static class IconGeometry
 
     /// <summary>
     /// normal.ico: monitor-on-a-stand silhouette. Screen ∪ neck ∪ base as one
-    /// contiguous GraphicsPath (13-RESEARCH.md Pattern 2) so a single DrawPath
-    /// call traces the outer contour only, not internal seams between the
-    /// touching/overlapping sub-shapes. White fill, black outline (D-04/D-05).
+    /// combined GraphicsPath (13-RESEARCH.md Pattern 2). CR-01 fix: a Pen stroke
+    /// on the combined path strokes every sub-figure's own boundary independently
+    /// -- it does NOT compute a merged union contour -- so stroking after filling leaves
+    /// visible seam lines wherever two sub-shapes touch or overlap (screen↔neck,
+    /// neck↔base). Instead this draws the outline FIRST, at DOUBLE width, then
+    /// fills white ON TOP: the anti-aliased white fill exactly covers the union
+    /// region, overpainting the inner half of every stroke -- including every
+    /// interior seam stroke, since those seams are by definition interior to the
+    /// union -- and leaving only the true outer contour visible, at the intended
+    /// ~OutlineWidth(size) thickness. White fill, black outline (D-04/D-05).
     /// </summary>
     public static Bitmap DrawNormalIcon(int size)
     {
@@ -62,11 +69,11 @@ internal static class IconGeometry
 
         using var path = BuildMonitorPath(size);
 
+        using var outline = new Pen(Color.Black, 2f * OutlineWidth(size));
+        g.DrawPath(outline, path);
+
         using var fill = new SolidBrush(Color.White);
         g.FillPath(fill, path);
-
-        using var outline = new Pen(Color.Black, OutlineWidth(size));
-        g.DrawPath(outline, path);
 
         return bmp;
     }
@@ -74,8 +81,12 @@ internal static class IconGeometry
     /// <summary>
     /// rig.ico: tri-spoke steering-wheel silhouette. Outer rim minus inner
     /// cutout (ring), plus hub disc and three spokes, all combined into one
-    /// GraphicsPath so the union outlines as a single contiguous silhouette
-    /// (13-RESEARCH.md Pattern 2). White fill, black outline (D-04/D-05).
+    /// GraphicsPath (13-RESEARCH.md Pattern 2). CR-01 fix: same stroke-then-fill
+    /// compositing as DrawNormalIcon -- outline drawn first at double width,
+    /// then overpainted by the white fill -- so every interior seam (hub↔spoke,
+    /// spoke↔inner-rim, outer-rim↔inner-rim) is covered, leaving only the true
+    /// outer rim contour and the genuine inner-ring-hole edge visible. White
+    /// fill, black outline (D-04/D-05).
     /// </summary>
     public static Bitmap DrawRigIcon(int size)
     {
@@ -87,11 +98,11 @@ internal static class IconGeometry
 
         using var path = BuildWheelPath(size);
 
+        using var outline = new Pen(Color.Black, 2f * OutlineWidth(size));
+        g.DrawPath(outline, path);
+
         using var fill = new SolidBrush(Color.White);
         g.FillPath(fill, path);
-
-        using var outline = new Pen(Color.Black, OutlineWidth(size));
-        g.DrawPath(outline, path);
 
         return bmp;
     }
@@ -188,7 +199,8 @@ internal static class IconGeometry
         // edge (hubR) to the inner rim edge (innerR).
         foreach (var angleDegrees in new[] { 180.0, 60.0, 300.0 })
         {
-            path.AddPath(BuildSpokePath(cx, cy, hubR, innerR, spokeHalf, angleDegrees), false);
+            using var spoke = BuildSpokePath(cx, cy, hubR, innerR, spokeHalf, angleDegrees);
+            path.AddPath(spoke, false);
         }
 
         return path;
