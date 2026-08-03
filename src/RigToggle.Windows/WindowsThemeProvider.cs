@@ -23,7 +23,17 @@ public sealed class WindowsThemeProvider : IThemeProvider, IDisposable
     private const string KeyPath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
     private const string ValueName = "AppsUseLightTheme";
 
-    public AppTheme CurrentTheme { get; private set; }
+    // WR-02: guards the read-compare-write below and the CurrentTheme getter, per this
+    // class's own documented "ThemeChanged may fire off the UI thread" contract -- two
+    // rapid UserPreferenceChanged events could otherwise race the diff-and-assign.
+    private readonly object _themeLock = new();
+    private AppTheme _currentTheme;
+
+    public AppTheme CurrentTheme
+    {
+        get { lock (_themeLock) { return _currentTheme; } }
+        private set { _currentTheme = value; }
+    }
 
     public event EventHandler? ThemeChanged;
 
@@ -41,10 +51,20 @@ public sealed class WindowsThemeProvider : IThemeProvider, IDisposable
     private void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e)
     {
         var resolved = ReadThemeFromRegistry();
-        if (resolved != CurrentTheme)
+        AppTheme previous;
+        bool changed;
+        lock (_themeLock)
         {
-            var previous = CurrentTheme;
-            CurrentTheme = resolved;
+            changed = resolved != _currentTheme;
+            previous = _currentTheme;
+            if (changed)
+            {
+                _currentTheme = resolved;
+            }
+        }
+
+        if (changed)
+        {
             Log($"Theme flip detected: {previous} -> {resolved}");
             ThemeChanged?.Invoke(this, EventArgs.Empty);
         }

@@ -78,7 +78,9 @@ namespace RigToggle.App
             try
             {
                 System.Windows.Forms.Application.SetColorMode(System.Windows.Forms.SystemColorMode.System);
-                DwmTitleBar.ApplyRoundedCornersAndMica(Handle);
+                DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDark);
+                ThemeApplier.ThemeButton(btnToggle, IsDark);
+                ThemeApplier.ThemeButton(btnSettings, IsDark);
                 Refresh();
             }
             catch
@@ -86,6 +88,11 @@ namespace RigToggle.App
                 // Cosmetic-only (T-12-02) -- a theming failure must never crash the toggle flow.
             }
         }
+
+        // 12-05/CR-01: single source of truth for "is dark mode active right now,"
+        // read fresh every call (never cached) so DWM chrome + button theming stay
+        // correct across live flips -- mirrors SettingsForm.IsDarkTheme.
+        private bool IsDark => _themeProvider.CurrentTheme == AppTheme.Dark;
 
         /// <summary>
         /// 12-02/D-08/THEME-06: requests Windows-11 rounded corners + Mica for this
@@ -100,7 +107,7 @@ namespace RigToggle.App
         {
             try
             {
-                DwmTitleBar.ApplyRoundedCornersAndMica(Handle);
+                DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDark);
             }
             catch
             {
@@ -152,6 +159,12 @@ namespace RigToggle.App
             // 12-02/D-08: DWM chrome is applied HERE, not from OnLoad/OnShown -- see
             // ApplyDwmChrome's own doc comment for the full --tray-safe-timing rationale.
             ApplyDwmChrome();
+
+            // 12-05/CR-02: theme both buttons at load time too, same --tray-safe timing
+            // rationale as ApplyDwmChrome above -- InitializeTrayState() runs unconditionally
+            // on both startup paths, unlike OnLoad/OnShown.
+            ThemeApplier.ThemeButton(btnToggle, IsDark);
+            ThemeApplier.ThemeButton(btnSettings, IsDark);
         }
 
         /// <summary>

@@ -17,6 +17,19 @@ namespace RigToggle.App
             {
                 components.Dispose();
             }
+
+            // WR-01 (12-REVIEW.md): deterministic backstop unsubscribe, mirroring
+            // MainForm's Dispose(bool) pattern. The constructor's FormClosed-based
+            // unsubscribe (MonitorConfirmDialog.cs) covers the normal ShowDialog-then-
+            // close path; this covers an abnormal dispose that never fires FormClosed
+            // (e.g. an exception between construction and ShowDialog returning) so a
+            // disposed instance can never leak a handler onto the app-lifetime
+            // WindowsThemeProvider (T-12-05). "-=" on an already-removed handler is a
+            // safe no-op, so double-unsubscribe on the normal close path is harmless.
+            if (disposing)
+            {
+                _themeProvider.ThemeChanged -= OnThemeChanged;
+            }
             base.Dispose(disposing);
         }
 
@@ -59,8 +72,12 @@ namespace RigToggle.App
             this.btnContinue.Size = new System.Drawing.Size(90, 32);
             this.btnContinue.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnContinue.Name = "btnContinue";
-            // 12-02/THEME-05: FlatStyle.System (never .Flat, dotnet/winforms#13897).
-            this.btnContinue.FlatStyle = System.Windows.Forms.FlatStyle.System;
+            // 12-05/THEME-05 (12-REVIEW.md CR-02): FlatStyle.Flat, not .System -- see
+            // MainForm.Designer.cs's btnToggle comment for the full rig-finding + #13897
+            // rationale. ThemeApplier.ThemeButton (called from the ctor and OnThemeChanged)
+            // re-asserts this at runtime; this Designer assignment is the declarative
+            // default.
+            this.btnContinue.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
 
             //
             // btnCancel
@@ -70,7 +87,7 @@ namespace RigToggle.App
             this.btnCancel.Size = new System.Drawing.Size(90, 32);
             this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.btnCancel.Name = "btnCancel";
-            this.btnCancel.FlatStyle = System.Windows.Forms.FlatStyle.System;
+            this.btnCancel.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
 
             //
             // MonitorConfirmDialog

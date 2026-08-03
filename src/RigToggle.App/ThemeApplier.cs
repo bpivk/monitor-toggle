@@ -4,18 +4,21 @@ using System.Windows.Forms;
 namespace RigToggle.App
 {
     /// <summary>
-    /// Targeted per-control recolor helpers for the two confirmed SettingsForm gaps
-    /// Application.SetColorMode does not reach: the dgvMonitors DataGridView
-    /// (dotnet/winforms#11893) and txtHotkey's hand-rolled SystemColors.* state
-    /// machine (12-RESEARCH.md Pitfall 8 — those literal SystemColors.* assignments do
-    /// NOT follow SetColorMode and were silently resetting the control to light-mode on
-    /// every user interaction). Every method here is idempotent (safe to call once at
-    /// startup and again on every live theme flip) and never throws — this is
-    /// cosmetic-only code and a theming failure must never crash Settings save/load
-    /// (T-12-02). Deliberately NOT a recursive Controls-tree walk: base controls
-    /// (Label/TextBox/ComboBox/CheckBox/Button fill+text) are already owned by
-    /// SetColorMode, and adding overrides there would fight it (12-RESEARCH.md
-    /// Pitfall 1/8).
+    /// Targeted per-control recolor helpers for the confirmed gaps Application.SetColorMode
+    /// does not reach: the dgvMonitors DataGridView (dotnet/winforms#11893), txtHotkey's
+    /// hand-rolled SystemColors.* state machine (12-RESEARCH.md Pitfall 8 — those literal
+    /// SystemColors.* assignments do NOT follow SetColorMode and were silently resetting
+    /// the control to light-mode on every user interaction), and -- as of 12-REVIEW.md
+    /// CR-02/CR-03 -- Button and ComboBox. The Windows 11 rig test in 12-04 proved Button
+    /// (FlatStyle.System) and ComboBox (DropDownList) fill+text are NOT actually recolored
+    /// by SetColorMode on this runtime, so they now get the same explicit-override
+    /// treatment as the grid and hotkey box, for the same reason. Every method here is
+    /// idempotent (safe to call once at startup and again on every live theme flip) and
+    /// never throws — this is cosmetic-only code and a theming failure must never crash
+    /// Settings save/load (T-12-02). Deliberately NOT a recursive Controls-tree walk: every
+    /// override here targets a specific control instance passed by the caller, never a
+    /// blanket Controls-tree walk over base controls SetColorMode otherwise handles
+    /// correctly (12-RESEARCH.md Pitfall 1/8).
     /// </summary>
     internal static class ThemeApplier
     {
@@ -93,6 +96,62 @@ namespace RigToggle.App
             {
                 textBox.BackColor = dark ? Color.FromArgb(0, 90, 158) : SystemColors.Info;
                 textBox.ForeColor = dark ? Color.White : SystemColors.WindowText;
+            }
+            catch
+            {
+                // Cosmetic-only — leave the control unchanged on failure.
+            }
+        }
+
+        /// <summary>
+        /// Button theming (12-REVIEW.md CR-02). The Windows 11 rig proved FlatStyle.System
+        /// buttons do NOT pick up dark-mode coloring from Application.SetColorMode on this
+        /// runtime, so this replaces the native FlatStyle.System rendering pipeline with
+        /// explicit FlatStyle.Flat + palette colors -- the same explicit-override approach
+        /// already working for the grid and hotkey box.
+        ///
+        /// Why BorderSize=0 + explicit MouseOverBackColor/MouseDownBackColor rather than
+        /// relying on FlatStyle.Flat's normal auto-apply pipeline: dotnet/winforms#13897
+        /// (open) documents that FlatAppearance border/hover/pressed colors don't reliably
+        /// apply once dark mode is active when FlatStyle.Flat is used, producing visually
+        /// broken buttons (a stock light-colored flash on hover/press even though the rest
+        /// of the button is themed dark). Setting BorderSize=0 (NOT 1) sidesteps the
+        /// unreliable border-color application entirely, and pinning MouseOverBackColor/
+        /// MouseDownBackColor explicitly (rather than leaving them to auto-derive from
+        /// BackColor) keeps hover/pressed states dark-themed instead of hitting the #13897
+        /// bug -- this is 12-REVIEW.md CR-02 "Fix Option 2".
+        /// </summary>
+        public static void ThemeButton(Button button, bool dark)
+        {
+            try
+            {
+                button.FlatStyle = FlatStyle.Flat;
+                button.FlatAppearance.BorderSize = 0;
+                button.BackColor = dark ? Color.FromArgb(45, 45, 48) : SystemColors.Control;
+                button.ForeColor = dark ? Color.FromArgb(240, 240, 240) : SystemColors.ControlText;
+                button.FlatAppearance.MouseOverBackColor = dark ? Color.FromArgb(62, 62, 66) : SystemColors.ControlLight;
+                button.FlatAppearance.MouseDownBackColor = dark ? Color.FromArgb(28, 28, 30) : SystemColors.ControlDark;
+            }
+            catch
+            {
+                // Cosmetic-only — leave the control unchanged on failure.
+            }
+        }
+
+        /// <summary>
+        /// Audio-device ComboBox theming (12-REVIEW.md CR-03). cboAudioNormal/cboAudioRig
+        /// are DropDownList-style combos that the Windows 11 rig proved are never recolored
+        /// by SetColorMode -- a documented WinForms gap even where SetColorMode is
+        /// otherwise effective (edit/list portions often need explicit BackColor/ForeColor/
+        /// FlatStyle overrides to follow dark mode).
+        /// </summary>
+        public static void ThemeComboBox(ComboBox combo, bool dark)
+        {
+            try
+            {
+                combo.FlatStyle = FlatStyle.Flat;
+                combo.BackColor = dark ? Color.FromArgb(45, 45, 48) : SystemColors.Window;
+                combo.ForeColor = dark ? Color.FromArgb(240, 240, 240) : SystemColors.WindowText;
             }
             catch
             {

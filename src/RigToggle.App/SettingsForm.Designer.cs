@@ -17,6 +17,19 @@ namespace RigToggle.App
             {
                 components.Dispose();
             }
+
+            // WR-01 (12-REVIEW.md): deterministic backstop unsubscribe, mirroring
+            // MainForm's Dispose(bool) pattern. The constructor's FormClosed-based
+            // unsubscribe (SettingsForm.cs) covers the normal ShowDialog-then-close
+            // path; this covers an abnormal dispose that never fires FormClosed (e.g.
+            // an exception between construction and ShowDialog returning) so a disposed
+            // instance can never leak a handler onto the app-lifetime
+            // WindowsThemeProvider (T-12-05). "-=" on an already-removed handler is a
+            // safe no-op, so double-unsubscribe on the normal close path is harmless.
+            if (disposing)
+            {
+                _themeProvider.ThemeChanged -= OnThemeChanged;
+            }
             base.Dispose(disposing);
         }
 
@@ -295,10 +308,13 @@ namespace RigToggle.App
             this.btnBrowse.Location = new System.Drawing.Point(306, 21);
             this.btnBrowse.Size = new System.Drawing.Size(78, 25);
             this.btnBrowse.Name = "btnBrowse";
-            // THEME-05: FlatStyle.System routes around a live dark-mode color bug in
-            // WinForms' other flat-button rendering mode (dotnet/winforms#13897) while
-            // still giving a modern flat look.
-            this.btnBrowse.FlatStyle = System.Windows.Forms.FlatStyle.System;
+            // 12-05/THEME-05 (12-REVIEW.md CR-02): FlatStyle.Flat, not .System -- the
+            // Windows 11 rig proved FlatStyle.System buttons do NOT pick up dark-mode
+            // coloring on this runtime. ThemeApplier.ThemeButton (called from
+            // SettingsForm_Load and OnThemeChanged) re-asserts Flat + explicit palette
+            // colors, working around dotnet/winforms#13897's unreliable FlatAppearance
+            // auto-apply pipeline via BorderSize=0 + explicit hover/pressed overrides.
+            this.btnBrowse.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnBrowse.Click += new System.EventHandler(this.BtnBrowse_Click);
 
             //
@@ -398,7 +414,9 @@ namespace RigToggle.App
             this.btnSaveSettings.Size = new System.Drawing.Size(110, 32);
             this.btnSaveSettings.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnSaveSettings.Name = "btnSaveSettings";
-            this.btnSaveSettings.FlatStyle = System.Windows.Forms.FlatStyle.System;
+            // 12-05/THEME-05 (12-REVIEW.md CR-02): see btnBrowse's comment above for the
+            // full rig-finding + #13897 rationale.
+            this.btnSaveSettings.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnSaveSettings.Click += new System.EventHandler(this.BtnSaveSettings_Click);
 
             //
@@ -409,7 +427,9 @@ namespace RigToggle.App
             this.btnDiscardChanges.Size = new System.Drawing.Size(110, 32);
             this.btnDiscardChanges.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.btnDiscardChanges.Name = "btnDiscardChanges";
-            this.btnDiscardChanges.FlatStyle = System.Windows.Forms.FlatStyle.System;
+            // 12-05/THEME-05 (12-REVIEW.md CR-02): see btnBrowse's comment above for the
+            // full rig-finding + #13897 rationale.
+            this.btnDiscardChanges.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
 
             //
             // dlgOpenExe
