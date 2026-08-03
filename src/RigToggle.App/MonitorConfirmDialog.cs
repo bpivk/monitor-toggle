@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using RigToggle.Core.Abstractions;
+using RigToggle.Core.Models;
 using RigToggle.Windows;
 
 namespace RigToggle.App
@@ -48,8 +49,13 @@ namespace RigToggle.App
             // (never hidden-tray-started like MainForm), so no --tray-safe timing
             // concern applies -- applying DWM chrome right here, post-InitializeComponent
             // (Handle already exists by this point), is sufficient.
-            DwmTitleBar.ApplyRoundedCornersAndMica(Handle);
+            DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDark);
         }
+
+        // 12-05/CR-01: single source of truth for "is dark mode active right now,"
+        // read fresh every call (never cached) -- mirrors SettingsForm.IsDarkTheme /
+        // MainForm.IsDark.
+        private bool IsDark => _themeProvider.CurrentTheme == AppTheme.Dark;
 
         /// <summary>
         /// 12-02/D-05: live theme-flip handler, same marshal-then-try/catch pattern as
@@ -66,7 +72,7 @@ namespace RigToggle.App
             try
             {
                 System.Windows.Forms.Application.SetColorMode(System.Windows.Forms.SystemColorMode.System);
-                DwmTitleBar.ApplyRoundedCornersAndMica(Handle);
+                DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDark);
                 Refresh();
             }
             catch

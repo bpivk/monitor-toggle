@@ -78,10 +78,14 @@ namespace RigToggle.App
             this.btnToggle.Location = new System.Drawing.Point(16, 60);
             this.btnToggle.Size = new System.Drawing.Size(288, 40);
             this.btnToggle.Name = "btnToggle";
-            // 12-02/THEME-05: FlatStyle.System (never .Flat, dotnet/winforms#13897) --
-            // renders a flat, theme-aware button using the OS's own visual-styles
-            // renderer instead of WinForms' 3D-bevel default.
-            this.btnToggle.FlatStyle = System.Windows.Forms.FlatStyle.System;
+            // 12-05/THEME-05 (12-REVIEW.md CR-02): FlatStyle.Flat, not .System -- the
+            // Windows 11 rig proved FlatStyle.System buttons do NOT pick up dark-mode
+            // coloring on this runtime. ThemeApplier.ThemeButton (called at load and on
+            // every live flip) re-asserts Flat + explicit palette colors, working around
+            // dotnet/winforms#13897's unreliable FlatAppearance auto-apply pipeline via
+            // BorderSize=0 + explicit hover/pressed overrides. This Designer assignment
+            // is the declarative default; the runtime call is belt-and-suspenders.
+            this.btnToggle.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnToggle.Click += new System.EventHandler(this.BtnToggle_Click);
 
             //
@@ -91,7 +95,7 @@ namespace RigToggle.App
             this.btnSettings.Location = new System.Drawing.Point(16, 108);
             this.btnSettings.Size = new System.Drawing.Size(288, 32);
             this.btnSettings.Name = "btnSettings";
-            this.btnSettings.FlatStyle = System.Windows.Forms.FlatStyle.System;
+            this.btnSettings.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnSettings.Click += new System.EventHandler(this.BtnSettings_Click);
 
             //

@@ -78,7 +78,7 @@ namespace RigToggle.App
             try
             {
                 System.Windows.Forms.Application.SetColorMode(System.Windows.Forms.SystemColorMode.System);
-                DwmTitleBar.ApplyRoundedCornersAndMica(Handle);
+                DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDark);
                 Refresh();
             }
             catch
@@ -86,6 +86,11 @@ namespace RigToggle.App
                 // Cosmetic-only (T-12-02) -- a theming failure must never crash the toggle flow.
             }
         }
+
+        // 12-05/CR-01: single source of truth for "is dark mode active right now,"
+        // read fresh every call (never cached) so DWM chrome + button theming stay
+        // correct across live flips -- mirrors SettingsForm.IsDarkTheme.
+        private bool IsDark => _themeProvider.CurrentTheme == AppTheme.Dark;
 
         /// <summary>
         /// 12-02/D-08/THEME-06: requests Windows-11 rounded corners + Mica for this
@@ -100,7 +105,7 @@ namespace RigToggle.App
         {
             try
             {
-                DwmTitleBar.ApplyRoundedCornersAndMica(Handle);
+                DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDark);
             }
             catch
             {

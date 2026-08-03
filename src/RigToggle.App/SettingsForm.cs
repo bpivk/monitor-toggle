@@ -80,7 +80,7 @@ namespace RigToggle.App
             // (Handle already exists by this point), is sufficient. DwmSetWindowAttribute
             // is declared to return an HRESULT and never throws (D-07) -- no try/catch
             // needed around this specific call, matching MonitorConfirmDialog's precedent.
-            DwmTitleBar.ApplyRoundedCornersAndMica(Handle);
+            DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDarkTheme);
 
             // Esc / system close box (X) both produce DialogResult.Cancel via the
             // declarative Discard button — no extra FormClosing handler needed
@@ -128,7 +128,7 @@ namespace RigToggle.App
             try
             {
                 System.Windows.Forms.Application.SetColorMode(System.Windows.Forms.SystemColorMode.System);
-                DwmTitleBar.ApplyRoundedCornersAndMica(Handle);
+                DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDarkTheme);
                 ThemeApplier.ThemeMonitorGrid(dgvMonitors, IsDarkTheme);
 
                 // Re-render whatever txtHotkey state is currently active -- Recording
