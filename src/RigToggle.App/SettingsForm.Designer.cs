@@ -30,7 +30,8 @@ namespace RigToggle.App
         {
             this.components = new System.ComponentModel.Container();
 
-            this.grpMonitor = new System.Windows.Forms.GroupBox();
+            this.pnlMonitor = new System.Windows.Forms.Panel();
+            this.lblMonitorCaption = new System.Windows.Forms.Label();
             this.dgvMonitors = new System.Windows.Forms.DataGridView();
             this.colMonitorName = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.colDisable = new System.Windows.Forms.DataGridViewCheckBoxColumn();
@@ -38,7 +39,8 @@ namespace RigToggle.App
             this.lblMonitorWarning = new System.Windows.Forms.Label();
             this.lblMonitorExplain = new System.Windows.Forms.Label();
 
-            this.grpAudioDevices = new System.Windows.Forms.GroupBox();
+            this.pnlAudioDevices = new System.Windows.Forms.Panel();
+            this.lblAudioDevicesCaption = new System.Windows.Forms.Label();
             this.lblAudioNormalCaption = new System.Windows.Forms.Label();
             this.cboAudioNormal = new System.Windows.Forms.ComboBox();
             this.lblAudioNormalWarning = new System.Windows.Forms.Label();
@@ -46,7 +48,8 @@ namespace RigToggle.App
             this.cboAudioRig = new System.Windows.Forms.ComboBox();
             this.lblAudioRigWarning = new System.Windows.Forms.Label();
 
-            this.grpAppPath = new System.Windows.Forms.GroupBox();
+            this.pnlAppPath = new System.Windows.Forms.Panel();
+            this.lblAppPathCaption = new System.Windows.Forms.Label();
             this.txtAppPath = new System.Windows.Forms.TextBox();
             this.btnBrowse = new System.Windows.Forms.Button();
             this.lblAppWarning = new System.Windows.Forms.Label();
@@ -81,21 +84,35 @@ namespace RigToggle.App
             ((System.ComponentModel.ISupportInitialize)(this.errAutostart)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.errHotkey)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dgvMonitors)).BeginInit();
-            this.grpMonitor.SuspendLayout();
-            this.grpAudioDevices.SuspendLayout();
-            this.grpAppPath.SuspendLayout();
+            this.pnlMonitor.SuspendLayout();
+            this.pnlAudioDevices.SuspendLayout();
+            this.pnlAppPath.SuspendLayout();
             this.SuspendLayout();
 
             //
-            // grpMonitor
+            // pnlMonitor (THEME-05: flat bordered Panel replacing the grpMonitor GroupBox
+            // bevel -- GroupBox has no flat variant, SetColorMode cannot recolor its 3D
+            // border. Same Location/Size as the original GroupBox, zero layout drift.)
             //
-            this.grpMonitor.Location = new System.Drawing.Point(12, 12);
-            this.grpMonitor.Size = new System.Drawing.Size(396, 234);
-            this.grpMonitor.TabStop = false;
-            this.grpMonitor.Text = "Monitor";
-            this.grpMonitor.Controls.Add(this.lblMonitorExplain);
-            this.grpMonitor.Controls.Add(this.dgvMonitors);
-            this.grpMonitor.Controls.Add(this.lblMonitorWarning);
+            this.pnlMonitor.Location = new System.Drawing.Point(12, 12);
+            this.pnlMonitor.Size = new System.Drawing.Size(396, 234);
+            this.pnlMonitor.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.pnlMonitor.Name = "pnlMonitor";
+            this.pnlMonitor.Controls.Add(this.lblMonitorCaption);
+            this.pnlMonitor.Controls.Add(this.lblMonitorExplain);
+            this.pnlMonitor.Controls.Add(this.dgvMonitors);
+            this.pnlMonitor.Controls.Add(this.lblMonitorWarning);
+
+            //
+            // lblMonitorCaption
+            //
+            // Positioned at the GroupBox's native caption inset (~9px from the panel's
+            // top-left) so every re-parented child below keeps its existing Location
+            // unchanged (UI-SPEC Spacing contract -- pixel-parity, not a new token).
+            this.lblMonitorCaption.Text = "Monitor";
+            this.lblMonitorCaption.Location = new System.Drawing.Point(9, 9);
+            this.lblMonitorCaption.AutoSize = true;
+            this.lblMonitorCaption.Name = "lblMonitorCaption";
 
             //
             // dgvMonitors
@@ -160,18 +177,28 @@ namespace RigToggle.App
             this.lblMonitorWarning.Name = "lblMonitorWarning";
 
             //
-            // grpAudioDevices
+            // pnlAudioDevices (THEME-05: flat bordered Panel replacing the grpAudioDevices
+            // GroupBox bevel. Same Location/Size as the original GroupBox.)
             //
-            this.grpAudioDevices.Location = new System.Drawing.Point(12, 258);
-            this.grpAudioDevices.Size = new System.Drawing.Size(396, 132);
-            this.grpAudioDevices.TabStop = false;
-            this.grpAudioDevices.Text = "Audio Devices";
-            this.grpAudioDevices.Controls.Add(this.lblAudioNormalCaption);
-            this.grpAudioDevices.Controls.Add(this.cboAudioNormal);
-            this.grpAudioDevices.Controls.Add(this.lblAudioNormalWarning);
-            this.grpAudioDevices.Controls.Add(this.lblAudioRigCaption);
-            this.grpAudioDevices.Controls.Add(this.cboAudioRig);
-            this.grpAudioDevices.Controls.Add(this.lblAudioRigWarning);
+            this.pnlAudioDevices.Location = new System.Drawing.Point(12, 258);
+            this.pnlAudioDevices.Size = new System.Drawing.Size(396, 132);
+            this.pnlAudioDevices.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.pnlAudioDevices.Name = "pnlAudioDevices";
+            this.pnlAudioDevices.Controls.Add(this.lblAudioDevicesCaption);
+            this.pnlAudioDevices.Controls.Add(this.lblAudioNormalCaption);
+            this.pnlAudioDevices.Controls.Add(this.cboAudioNormal);
+            this.pnlAudioDevices.Controls.Add(this.lblAudioNormalWarning);
+            this.pnlAudioDevices.Controls.Add(this.lblAudioRigCaption);
+            this.pnlAudioDevices.Controls.Add(this.cboAudioRig);
+            this.pnlAudioDevices.Controls.Add(this.lblAudioRigWarning);
+
+            //
+            // lblAudioDevicesCaption
+            //
+            this.lblAudioDevicesCaption.Text = "Audio Devices";
+            this.lblAudioDevicesCaption.Location = new System.Drawing.Point(9, 9);
+            this.lblAudioDevicesCaption.AutoSize = true;
+            this.lblAudioDevicesCaption.Name = "lblAudioDevicesCaption";
 
             //
             // lblAudioNormalCaption
@@ -224,18 +251,30 @@ namespace RigToggle.App
             this.lblAudioRigWarning.Name = "lblAudioRigWarning";
 
             //
-            // grpAppPath
+            // pnlAppPath (THEME-05: flat bordered Panel replacing the grpAppPath GroupBox
+            // bevel. Same Location/Size as the original GroupBox. CRITICAL: AllowDrop and
+            // the AppPath_DragEnter/AppPath_DragDrop wiring move here from the old
+            // GroupBox verbatim -- must not be dropped (T-12-07).)
             //
-            this.grpAppPath.Location = new System.Drawing.Point(12, 402);
-            this.grpAppPath.Size = new System.Drawing.Size(396, 76);
-            this.grpAppPath.TabStop = false;
-            this.grpAppPath.Text = "Target App";
-            this.grpAppPath.AllowDrop = true;
-            this.grpAppPath.Controls.Add(this.txtAppPath);
-            this.grpAppPath.Controls.Add(this.btnBrowse);
-            this.grpAppPath.Controls.Add(this.lblAppWarning);
-            this.grpAppPath.DragEnter += new System.Windows.Forms.DragEventHandler(this.AppPath_DragEnter);
-            this.grpAppPath.DragDrop += new System.Windows.Forms.DragEventHandler(this.AppPath_DragDrop);
+            this.pnlAppPath.Location = new System.Drawing.Point(12, 402);
+            this.pnlAppPath.Size = new System.Drawing.Size(396, 76);
+            this.pnlAppPath.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.pnlAppPath.Name = "pnlAppPath";
+            this.pnlAppPath.AllowDrop = true;
+            this.pnlAppPath.Controls.Add(this.lblAppPathCaption);
+            this.pnlAppPath.Controls.Add(this.txtAppPath);
+            this.pnlAppPath.Controls.Add(this.btnBrowse);
+            this.pnlAppPath.Controls.Add(this.lblAppWarning);
+            this.pnlAppPath.DragEnter += new System.Windows.Forms.DragEventHandler(this.AppPath_DragEnter);
+            this.pnlAppPath.DragDrop += new System.Windows.Forms.DragEventHandler(this.AppPath_DragDrop);
+
+            //
+            // lblAppPathCaption
+            //
+            this.lblAppPathCaption.Text = "Target App";
+            this.lblAppPathCaption.Location = new System.Drawing.Point(9, 9);
+            this.lblAppPathCaption.AutoSize = true;
+            this.lblAppPathCaption.Name = "lblAppPathCaption";
 
             //
             // txtAppPath
@@ -256,6 +295,10 @@ namespace RigToggle.App
             this.btnBrowse.Location = new System.Drawing.Point(306, 21);
             this.btnBrowse.Size = new System.Drawing.Size(78, 25);
             this.btnBrowse.Name = "btnBrowse";
+            // THEME-05: FlatStyle.System routes around a live dark-mode color bug in
+            // WinForms' other flat-button rendering mode (dotnet/winforms#13897) while
+            // still giving a modern flat look.
+            this.btnBrowse.FlatStyle = System.Windows.Forms.FlatStyle.System;
             this.btnBrowse.Click += new System.EventHandler(this.BtnBrowse_Click);
 
             //
@@ -355,6 +398,7 @@ namespace RigToggle.App
             this.btnSaveSettings.Size = new System.Drawing.Size(110, 32);
             this.btnSaveSettings.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnSaveSettings.Name = "btnSaveSettings";
+            this.btnSaveSettings.FlatStyle = System.Windows.Forms.FlatStyle.System;
             this.btnSaveSettings.Click += new System.EventHandler(this.BtnSaveSettings_Click);
 
             //
@@ -365,6 +409,7 @@ namespace RigToggle.App
             this.btnDiscardChanges.Size = new System.Drawing.Size(110, 32);
             this.btnDiscardChanges.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.btnDiscardChanges.Name = "btnDiscardChanges";
+            this.btnDiscardChanges.FlatStyle = System.Windows.Forms.FlatStyle.System;
 
             //
             // dlgOpenExe
@@ -397,9 +442,9 @@ namespace RigToggle.App
             this.Text = "Rig Toggle — Settings";
             this.Name = "SettingsForm";
 
-            this.Controls.Add(this.grpMonitor);
-            this.Controls.Add(this.grpAudioDevices);
-            this.Controls.Add(this.grpAppPath);
+            this.Controls.Add(this.pnlMonitor);
+            this.Controls.Add(this.pnlAudioDevices);
+            this.Controls.Add(this.pnlAppPath);
             this.Controls.Add(this.chkEnableDebugLogging);
             this.Controls.Add(this.lblHotkeyCaption);
             this.Controls.Add(this.txtHotkey);
@@ -418,15 +463,16 @@ namespace RigToggle.App
             ((System.ComponentModel.ISupportInitialize)(this.errAutostart)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.errHotkey)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dgvMonitors)).EndInit();
-            this.grpMonitor.ResumeLayout(false);
-            this.grpAudioDevices.ResumeLayout(false);
-            this.grpAppPath.ResumeLayout(false);
+            this.pnlMonitor.ResumeLayout(false);
+            this.pnlAudioDevices.ResumeLayout(false);
+            this.pnlAppPath.ResumeLayout(false);
             this.ResumeLayout(false);
         }
 
         #endregion
 
-        private System.Windows.Forms.GroupBox grpMonitor;
+        private System.Windows.Forms.Panel pnlMonitor;
+        private System.Windows.Forms.Label lblMonitorCaption;
         private System.Windows.Forms.DataGridView dgvMonitors;
         private System.Windows.Forms.DataGridViewTextBoxColumn colMonitorName;
         private System.Windows.Forms.DataGridViewCheckBoxColumn colDisable;
@@ -434,7 +480,8 @@ namespace RigToggle.App
         private System.Windows.Forms.Label lblMonitorWarning;
         private System.Windows.Forms.Label lblMonitorExplain;
 
-        private System.Windows.Forms.GroupBox grpAudioDevices;
+        private System.Windows.Forms.Panel pnlAudioDevices;
+        private System.Windows.Forms.Label lblAudioDevicesCaption;
         private System.Windows.Forms.Label lblAudioNormalCaption;
         private System.Windows.Forms.ComboBox cboAudioNormal;
         private System.Windows.Forms.Label lblAudioNormalWarning;
@@ -442,7 +489,8 @@ namespace RigToggle.App
         private System.Windows.Forms.ComboBox cboAudioRig;
         private System.Windows.Forms.Label lblAudioRigWarning;
 
-        private System.Windows.Forms.GroupBox grpAppPath;
+        private System.Windows.Forms.Panel pnlAppPath;
+        private System.Windows.Forms.Label lblAppPathCaption;
         private System.Windows.Forms.TextBox txtAppPath;
         private System.Windows.Forms.Button btnBrowse;
         private System.Windows.Forms.Label lblAppWarning;

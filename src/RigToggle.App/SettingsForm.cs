@@ -1,6 +1,7 @@
 using RigToggle.Core;
 using RigToggle.Core.Abstractions;
 using RigToggle.Core.Models;
+using RigToggle.Windows;
 
 namespace RigToggle.App
 {
@@ -64,6 +65,23 @@ namespace RigToggle.App
 
             InitializeComponent();
 
+            // 12-03/D-05: live theme-follow, mirroring MonitorConfirmDialog's (12-02)
+            // marshal-then-try/catch pattern. SettingsForm is transient (fresh-per-open
+            // via `using var settingsForm = ...ShowDialog()`, see OpenSettingsDialog in
+            // MainForm.cs) while WindowsThemeProvider is an app-lifetime singleton --
+            // FormClosed unsubscribe (not Dispose) is REQUIRED here or every dialog open
+            // leaks a handler onto the outliving provider (T-12-05).
+            _themeProvider.ThemeChanged += OnThemeChanged;
+            this.FormClosed += (_, _) => _themeProvider.ThemeChanged -= OnThemeChanged;
+
+            // 12-03/THEME-06: this dialog is always shown immediately via ShowDialog
+            // (never hidden-tray-started like MainForm), so no --tray-safe timing
+            // concern applies -- applying DWM chrome right here, post-InitializeComponent
+            // (Handle already exists by this point), is sufficient. DwmSetWindowAttribute
+            // is declared to return an HRESULT and never throws (D-07) -- no try/catch
+            // needed around this specific call, matching MonitorConfirmDialog's precedent.
+            DwmTitleBar.ApplyRoundedCornersAndMica(Handle);
+
             // Esc / system close box (X) both produce DialogResult.Cancel via the
             // declarative Discard button — no extra FormClosing handler needed
             // (02-RESEARCH.md Pattern 5).
@@ -85,11 +103,61 @@ namespace RigToggle.App
             txtHotkey.LostFocus += TxtHotkey_LostFocus;
         }
 
+        // 12-03/THEME-04: single source of truth for "is dark mode active right now,"
+        // read fresh every call (never cached) so it's always correct across live flips
+        // -- consumed by ThemeApplier calls at Load and inside OnThemeChanged.
+        private bool IsDarkTheme => _themeProvider.CurrentTheme == AppTheme.Dark;
+
+        /// <summary>
+        /// 12-03/D-05: live theme-flip handler for SettingsForm's own per-control
+        /// theming (dgvMonitors grid + txtHotkey state colors), mirroring
+        /// MonitorConfirmDialog/MainForm's marshaled OnThemeChanged pattern (12-02).
+        /// WindowsThemeProvider's ThemeChanged may fire off the UI thread -- marshal via
+        /// InvokeRequired/BeginInvoke before touching any control. The whole re-theme
+        /// body is wrapped in try/catch: theming is cosmetic-only and must never crash
+        /// Settings save/load (T-12-02).
+        /// </summary>
+        private void OnThemeChanged(object? sender, EventArgs e)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => OnThemeChanged(sender, e)));
+                return;
+            }
+
+            try
+            {
+                System.Windows.Forms.Application.SetColorMode(System.Windows.Forms.SystemColorMode.System);
+                DwmTitleBar.ApplyRoundedCornersAndMica(Handle);
+                ThemeApplier.ThemeMonitorGrid(dgvMonitors, IsDarkTheme);
+
+                // Re-render whatever txtHotkey state is currently active -- Recording
+                // needs its own re-apply (it's not driven by RenderHotkeyIdleDisplay),
+                // every other state re-derives correctly from RenderHotkeyIdleDisplay's
+                // existing _pendingHotkeyModifiers/_pendingHotkeyKey read.
+                if (_recordingHotkey)
+                {
+                    ThemeApplier.ApplyHotkeyRecording(txtHotkey, IsDarkTheme);
+                }
+                else
+                {
+                    RenderHotkeyIdleDisplay();
+                }
+
+                Refresh();
+            }
+            catch
+            {
+                // Cosmetic-only (T-12-02) -- a theming failure must never crash Settings.
+            }
+        }
+
         private void SettingsForm_Load(object? sender, EventArgs e)
         {
             // Re-enumerate on every open — no manual Refresh control exists (D-11).
             _settings = _settingsStore.Load();
             PopulateMonitorGrid();
+            ThemeApplier.ThemeMonitorGrid(dgvMonitors, IsDarkTheme);
             PopulateAudioPickers();
             PopulateAppPathField();
             chkEnableDebugLogging.Checked = _settings.EnableDebugLogging;
@@ -132,19 +200,23 @@ namespace RigToggle.App
         // pair — Configured (both set) or Unconfigured (either null). Called on Load and
         // whenever a Recording attempt ends without producing a Configured state that
         // needs its own explicit render (capture/Escape branches set their own text).
+        // 12-03/Pitfall 8: this method's two branches used to hardcode
+        // SystemColors.Window/WindowText/GrayText directly. SystemColors.* does NOT
+        // follow Application.SetColorMode, so those literal assignments silently reset
+        // this control back to light-mode colors on every idle re-render even after the
+        // rest of the form had already themed correctly -- replaced with ThemeApplier
+        // calls sourced from the live IThemeProvider.CurrentTheme instead.
         private void RenderHotkeyIdleDisplay()
         {
             if (_pendingHotkeyModifiers is int modifiers && _pendingHotkeyKey is int key)
             {
                 txtHotkey.Text = HotkeyFormatter.ToDisplayString(modifiers, key);
-                txtHotkey.BackColor = SystemColors.Window;
-                txtHotkey.ForeColor = SystemColors.WindowText;
+                ThemeApplier.ApplyHotkeyIdleConfigured(txtHotkey, IsDarkTheme);
             }
             else
             {
                 txtHotkey.Text = "(No hotkey set — click to configure)";
-                txtHotkey.BackColor = SystemColors.Window;
-                txtHotkey.ForeColor = SystemColors.GrayText;
+                ThemeApplier.ApplyHotkeyIdleUnconfigured(txtHotkey, IsDarkTheme);
             }
         }
 
@@ -156,8 +228,7 @@ namespace RigToggle.App
         {
             _recordingHotkey = true;
             txtHotkey.Text = "Press a key combination… (Esc to clear)";
-            txtHotkey.BackColor = SystemColors.Info;
-            txtHotkey.ForeColor = SystemColors.WindowText;
+            ThemeApplier.ApplyHotkeyRecording(txtHotkey, IsDarkTheme);
         }
 
         // Rig checkpoint 09-04 fix: Escape was clearing the field AND closing the dialog
@@ -234,8 +305,7 @@ namespace RigToggle.App
             _pendingHotkeyKey = (int)e.KeyCode;
             _recordingHotkey = false;
 
-            txtHotkey.BackColor = SystemColors.Window;
-            txtHotkey.ForeColor = SystemColors.WindowText;
+            ThemeApplier.ApplyHotkeyIdleConfigured(txtHotkey, IsDarkTheme);
             txtHotkey.Text = HotkeyFormatter.ToDisplayString(capturedModifiers, (int)e.KeyCode);
         }
 
