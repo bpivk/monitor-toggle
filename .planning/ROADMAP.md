@@ -49,7 +49,7 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 **Milestone Goal:** Replace the default-WinForms look with a theme-aware, modern UI, give the tray icons real visual distinction, and ship a GitHub-ready README.
 
 - [x] **Phase 12: Theme Infrastructure & Live Theme-Following** - MainForm and SettingsForm follow the Windows light/dark theme, including title bar and every control, live and without restart (completed 2026-08-03)
-- [x] **Phase 13: Tray & App Icon Redesign** - Shape-distinct, DPI-sharp rig/normal mode icon pair replaces the current plain pair (completed 2026-08-03)
+- [~] **Phase 13: Tray & App Icon Redesign** - Shape-distinct, DPI-sharp rig/normal mode icon pair replaces the current plain pair (rig-passed 2026-08-03; reopened for CR-01 outline-seam gap closure, plan 13-04)
 - [ ] **Phase 14: README & Release Documentation** - GitHub-ready README with screenshots, install/build instructions, and badges
 
 ## Phase Details
@@ -84,10 +84,11 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
   2. Both tray icons stay legible at the actual 16x16 tray size and remain visible against both light and dark taskbar backgrounds (ICON-02)
   3. Icons are embedded as multi-resolution `.ico` files (at minimum 16/20/24/32px) so they render sharply at every DPI-scaled size Windows requests (ICON-03)
   4. The .exe/taskbar icon reuses the same artwork/motif as the tray icons at a larger size, not a different, unrelated glyph (ICON-04)
-**Plans**: 3 plans (2 waves of implementation + 1 rig verification checkpoint)
+**Plans**: 4 plans (2 waves of implementation + 1 rig verification checkpoint + 1 gap-closure fix)
   - [x] 13-01-PLAN.md — RigToggle.IconGen dev-time generator (GDI+ geometry + hand-rolled multi-frame .ico writer) → regenerated normal.ico/rig.ico + new color app.ico
   - [x] 13-02-PLAN.md — App integration: MainForm SystemInformation.SmallIconSize DPI fix (Pitfall 1) + <ApplicationIcon> exe-icon wiring
   - [x] 13-03-PLAN.md — Rig human-verify checkpoint: shape/legibility/DPI-sharpness/exe-icon on real Windows 11
+  - [ ] 13-04-PLAN.md — Gap closure (CR-01): fix GraphicsPath.DrawPath interior-seam artifacts in IconGeometry.cs via stroke-then-fill compositing + raw-pixel interior-artifact diagnostic (folds in WR-01/WR-02)
 **UI hint**: yes
 
 ### Phase 14: README & Release Documentation
