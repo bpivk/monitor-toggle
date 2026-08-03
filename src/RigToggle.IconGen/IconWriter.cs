@@ -27,7 +27,7 @@ namespace RigToggle.IconGen;
 /// </summary>
 internal static class IconWriter
 {
-    private const int PngFrameThreshold = 256;
+    internal const int PngFrameThreshold = 256;
 
     /// <summary>
     /// Packs the given frames into a standards-compliant multi-frame .ico byte stream.
