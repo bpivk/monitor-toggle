@@ -79,6 +79,8 @@ namespace RigToggle.App
             {
                 System.Windows.Forms.Application.SetColorMode(System.Windows.Forms.SystemColorMode.System);
                 DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDark);
+                ThemeApplier.ThemeButton(btnToggle, IsDark);
+                ThemeApplier.ThemeButton(btnSettings, IsDark);
                 Refresh();
             }
             catch
@@ -157,6 +159,12 @@ namespace RigToggle.App
             // 12-02/D-08: DWM chrome is applied HERE, not from OnLoad/OnShown -- see
             // ApplyDwmChrome's own doc comment for the full --tray-safe-timing rationale.
             ApplyDwmChrome();
+
+            // 12-05/CR-02: theme both buttons at load time too, same --tray-safe timing
+            // rationale as ApplyDwmChrome above -- InitializeTrayState() runs unconditionally
+            // on both startup paths, unlike OnLoad/OnShown.
+            ThemeApplier.ThemeButton(btnToggle, IsDark);
+            ThemeApplier.ThemeButton(btnSettings, IsDark);
         }
 
         /// <summary>

@@ -50,6 +50,11 @@ namespace RigToggle.App
             // concern applies -- applying DWM chrome right here, post-InitializeComponent
             // (Handle already exists by this point), is sufficient.
             DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDark);
+
+            // 12-05/CR-02: theme both buttons at load time too, mirroring the DWM call
+            // immediately above.
+            ThemeApplier.ThemeButton(btnContinue, IsDark);
+            ThemeApplier.ThemeButton(btnCancel, IsDark);
         }
 
         // 12-05/CR-01: single source of truth for "is dark mode active right now,"
@@ -73,6 +78,8 @@ namespace RigToggle.App
             {
                 System.Windows.Forms.Application.SetColorMode(System.Windows.Forms.SystemColorMode.System);
                 DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDark);
+                ThemeApplier.ThemeButton(btnContinue, IsDark);
+                ThemeApplier.ThemeButton(btnCancel, IsDark);
                 Refresh();
             }
             catch

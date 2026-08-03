@@ -144,6 +144,15 @@ namespace RigToggle.App
                     RenderHotkeyIdleDisplay();
                 }
 
+                // 12-05/CR-02: re-theme all three buttons on every live flip.
+                ThemeApplier.ThemeButton(btnBrowse, IsDarkTheme);
+                ThemeApplier.ThemeButton(btnSaveSettings, IsDarkTheme);
+                ThemeApplier.ThemeButton(btnDiscardChanges, IsDarkTheme);
+
+                // 12-05/CR-03: re-theme both audio combos on every live flip.
+                ThemeApplier.ThemeComboBox(cboAudioNormal, IsDarkTheme);
+                ThemeApplier.ThemeComboBox(cboAudioRig, IsDarkTheme);
+
                 Refresh();
             }
             catch
@@ -158,6 +167,12 @@ namespace RigToggle.App
             _settings = _settingsStore.Load();
             PopulateMonitorGrid();
             ThemeApplier.ThemeMonitorGrid(dgvMonitors, IsDarkTheme);
+
+            // 12-05/CR-02: theme all three buttons at load time too.
+            ThemeApplier.ThemeButton(btnBrowse, IsDarkTheme);
+            ThemeApplier.ThemeButton(btnSaveSettings, IsDarkTheme);
+            ThemeApplier.ThemeButton(btnDiscardChanges, IsDarkTheme);
+
             PopulateAudioPickers();
             PopulateAppPathField();
             chkEnableDebugLogging.Checked = _settings.EnableDebugLogging;
@@ -556,6 +571,12 @@ namespace RigToggle.App
             }
 
             combo.SelectedIndexChanged += OnPickerChanged;
+
+            // 12-05/CR-03: re-applied every time this combo is (re)populated, after the
+            // DataSource rebind above -- covers both the initial SettingsForm_Load call
+            // and any future re-population, so the combo never regresses to its stock
+            // un-themed appearance.
+            ThemeApplier.ThemeComboBox(combo, IsDarkTheme);
         }
 
         private void PopulateAppPathField()
