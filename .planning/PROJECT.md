@@ -68,10 +68,10 @@ v1.1 removed the daily-use friction that remained after v1.0: the app no longer 
 ### Validated (v1.2, in progress)
 
 - [x] GUI restyle: theme-aware, modern flat controls following Windows system light/dark mode — title bar (DWM `DWMWA_USE_IMMERSIVE_DARK_MODE`), every control (grid, hotkey box, buttons, panels), Windows-11 Mica/rounded corners, live theme-follow while running (THEME-01 through THEME-06) — Validated in Phase 12: Theme Infrastructure & Live Theme-Following. Rig-validated on real Windows 11 hardware after one gap-closure round: the first rig pass failed the title bar and buttons (an unproven bet that .NET's `Application.SetColorMode` alone would recolor them) plus an unenumerated audio-ComboBox gap; a code review root-caused all three, a gap-closure plan fixed them with an explicit per-control theming pattern (including a deliberate `dotnet/winforms#13897` hover/pressed workaround), and a second rig pass confirmed all three fixed on real hardware.
+- [x] Redesigned tray icon pair + exe/taskbar icon: silhouette-distinct (monitor vs. steering wheel, no color-only differentiation), monochrome self-contained-contrast tray icons, color-treated exe icon, multi-resolution `.ico` (8 frames, 16-48px tray; 6 frames, 16-256px exe) via a new dev-time `RigToggle.IconGen` GDI+ generator (ICON-01 through ICON-04) — Validated in Phase 13: Tray & App Icon Redesign. Rig-validated on real Windows 11 hardware after one gap-closure round: the first rig pass approved shape/legibility/DPI/exe-icon, but a code review afterward found the outline-drawing approach (`GraphicsPath.DrawPath` on a combined multi-shape path) produced real seam artifacts the human hadn't caught at a glance; fixed via stroke-then-fill compositing plus a new automated pixel-level diagnostic, re-confirmed clean on a second rig pass.
 
 ### Active
 
-- [ ] Redesigned tray icon pair (visually distinct rig-mode vs. normal-mode icons) — next up for v1.2
 - [ ] New README.md (feature overview, screenshots, install/build instructions, badges) — next up for v1.2
 
 ### Out of Scope
@@ -125,6 +125,8 @@ v1.1 removed the daily-use friction that remained after v1.0: the app no longer 
 | Phase 10 (CLI trigger + single-instance IPC, TRIG-02/TRIG-03) permanently out of scope, not delivered | Phase 8/9's tray and hotkey triggers already deliver the "toggle without opening the GUI" core value this milestone targeted; a CLI/IPC path for external tools was judged not needed | Decided at v1.1 close 2026-08-01 |
 | Explicit-color `FlatStyle.Flat` button theming (with explicit `BorderSize=0` + hover/pressed color overrides), not `FlatStyle.System` | `Application.SetColorMode` doesn't recolor `FlatStyle.System`'s native visual-styles rendering pipeline at all — rig-proven false on real Windows 11; explicit-color `Flat` is deterministic but reintroduces `dotnet/winforms#13897` unless hover/pressed colors are also set explicitly, which this fix does | Validated Phase 12 gap closure (12-05/12-06), rig-confirmed including interaction states |
 | Manual `DWMWA_USE_IMMERSIVE_DARK_MODE` call, not relying on `Application.SetColorMode` to own the title bar | Original bet that `SetColorMode` alone would flip the DWM title-bar attribute was rig-disproven | Validated Phase 12 gap closure |
+| Steering-wheel vs. desktop-monitor motif for rig/normal tray icons, procedurally drawn via GDI+ (not sourced artwork) | Strong shape contrast readable at 16px without color, maps directly onto the user's actual sim-racing setup; zero new asset-pipeline dependency | Validated Phase 13 |
+| Stroke-then-fill outline compositing for icon geometry, not `FillPath`+`DrawPath` on a combined multi-shape `GraphicsPath` | `DrawPath` strokes every touching/overlapping sub-shape's boundary independently rather than a merged contour, producing seam artifacts a human rig glance didn't catch but code review + pixel-level diagnostic did | Validated Phase 13 gap closure (13-04), rig-confirmed |
 
 ## Evolution
 
@@ -144,4 +146,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-03 — Phase 12 (Theme Infrastructure & Live Theme-Following) complete, rig-validated on Windows 11 after one gap-closure round.*
+*Last updated: 2026-08-03 — Phase 13 (Tray & App Icon Redesign) complete, rig-validated on Windows 11 after one gap-closure round.*
