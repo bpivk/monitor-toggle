@@ -49,7 +49,7 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 **Milestone Goal:** Replace the default-WinForms look with a theme-aware, modern UI, give the tray icons real visual distinction, and ship a GitHub-ready README.
 
 - [x] **Phase 12: Theme Infrastructure & Live Theme-Following** - MainForm and SettingsForm follow the Windows light/dark theme, including title bar and every control, live and without restart (completed 2026-08-03)
-- [ ] **Phase 13: Tray & App Icon Redesign** - Shape-distinct, DPI-sharp rig/normal mode icon pair replaces the current plain pair
+- [x] **Phase 13: Tray & App Icon Redesign** - Shape-distinct, DPI-sharp rig/normal mode icon pair replaces the current plain pair (completed 2026-08-03)
 - [ ] **Phase 14: README & Release Documentation** - GitHub-ready README with screenshots, install/build instructions, and badges
 
 ## Phase Details
@@ -87,7 +87,7 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 **Plans**: 3 plans (2 waves of implementation + 1 rig verification checkpoint)
   - [x] 13-01-PLAN.md — RigToggle.IconGen dev-time generator (GDI+ geometry + hand-rolled multi-frame .ico writer) → regenerated normal.ico/rig.ico + new color app.ico
   - [x] 13-02-PLAN.md — App integration: MainForm SystemInformation.SmallIconSize DPI fix (Pitfall 1) + <ApplicationIcon> exe-icon wiring
-  - [ ] 13-03-PLAN.md — Rig human-verify checkpoint: shape/legibility/DPI-sharpness/exe-icon on real Windows 11
+  - [x] 13-03-PLAN.md — Rig human-verify checkpoint: shape/legibility/DPI-sharpness/exe-icon on real Windows 11
 **UI hint**: yes
 
 ### Phase 14: README & Release Documentation
@@ -117,7 +117,7 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 | 10. CLI Trigger + Single-Instance IPC | v1.1 | 0/TBD | Removed — out of scope | - |
 | 11. Configurable Tray Close/Minimize Behavior | v1.1 | 4/4 | Complete | 2026-08-01 |
 | 12. Theme Infrastructure & Live Theme-Following | v1.2 | 6/6 | Complete    | 2026-08-03 |
-| 13. Tray & App Icon Redesign | v1.2 | 2/3 | In Progress|  |
+| 13. Tray & App Icon Redesign | v1.2 | 3/3 | Complete   | 2026-08-03 |
 | 14. README & Release Documentation | v1.2 | 0/TBD | Not started | - |
 
 ## Backlog
