@@ -50,7 +50,7 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 
 - [x] **Phase 12: Theme Infrastructure & Live Theme-Following** - MainForm and SettingsForm follow the Windows light/dark theme, including title bar and every control, live and without restart (completed 2026-08-03)
 - [~] **Phase 13: Tray & App Icon Redesign** - Shape-distinct, DPI-sharp rig/normal mode icon pair replaces the current plain pair (rig-passed 2026-08-03; reopened for CR-01 outline-seam gap closure, plan 13-04)
-- [ ] **Phase 14: README & Release Documentation** - GitHub-ready README with screenshots, install/build instructions, and badges
+- [x] **Phase 14: README & Release Documentation** - GitHub-ready README with screenshots, install/build instructions, and badges (completed 2026-08-03)
 
 ## Phase Details
 
@@ -103,7 +103,7 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 **Plans**: 3 plans (2 waves — CI/license infra + GitHub state changes in wave 1, README rewrite + human-verify checkpoint in wave 2)
   - [x] 14-01-PLAN.md — MIT LICENSE, build.yml (push/PR CI), release.yml (tag-triggered publish + attach exe to GitHub Release)
   - [x] 14-02-PLAN.md — Flip repo to public, backfill v1.0/v1.1 as notes-only GitHub Releases
-  - [ ] 14-03-PLAN.md — Rewrite README.md (badges, feature overview, screenshots, install/build, requirements) + rig-verify live badges/build/releases
+  - [x] 14-03-PLAN.md — Rewrite README.md (badges, feature overview, screenshots, install/build, requirements) + rig-verify live badges/build/releases
 
 ## Progress
 
@@ -122,7 +122,7 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 | 11. Configurable Tray Close/Minimize Behavior | v1.1 | 4/4 | Complete | 2026-08-01 |
 | 12. Theme Infrastructure & Live Theme-Following | v1.2 | 6/6 | Complete    | 2026-08-03 |
 | 13. Tray & App Icon Redesign | v1.2 | 4/4 | Complete    | 2026-08-03 |
-| 14. README & Release Documentation | v1.2 | 2/3 | In Progress|  |
+| 14. README & Release Documentation | v1.2 | 3/3 | Complete   | 2026-08-03 |
 
 ## Backlog
 
