@@ -11,14 +11,14 @@ Requirements for the v2.0 milestone (Configurable Monitors, Optional Targets & C
 
 ### App
 
-- [ ] **APP-04**: User can leave the companion app launch target unset; toggling skips launch/focus (Rig direction) and minimize (Normal direction) entirely, with no error
-- [ ] **APP-05**: A configured-but-missing app path (file no longer exists at toggle time) still surfaces as a real failure, not silently treated as unset
+- [x] **APP-04**: User can leave the companion app launch target unset; toggling skips launch/focus (Rig direction) and minimize (Normal direction) entirely, with no error
+- [x] **APP-05**: A configured-but-missing app path (file no longer exists at toggle time) still surfaces as a real failure, not silently treated as unset
 
 ### Audio
 
-- [ ] **AUDIO-03**: User can leave the Rig-mode audio device unset; toggling to Rig mode skips Rig-direction audio switching entirely
-- [ ] **AUDIO-04**: User can configure a Normal-mode audio device that actually applies on toggle to Normal mode (replacing today's snapshot-based restore); leaving it unset skips Normal-direction audio switching
-- [ ] **AUDIO-05**: A configured-but-invalid audio device (no longer exists on the system) still surfaces as a real failure, not silently skipped
+- [x] **AUDIO-03**: User can leave the Rig-mode audio device unset; toggling to Rig mode skips Rig-direction audio switching entirely
+- [x] **AUDIO-04**: User can configure a Normal-mode audio device that actually applies on toggle to Normal mode (replacing today's snapshot-based restore); leaving it unset skips Normal-direction audio switching
+- [x] **AUDIO-05**: A configured-but-invalid audio device (no longer exists on the system) still surfaces as a real failure, not silently skipped
 
 ### Display
 
@@ -77,11 +77,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| APP-04 | Phase 15 | Pending |
-| APP-05 | Phase 15 | Pending |
-| AUDIO-03 | Phase 15 | Pending |
-| AUDIO-04 | Phase 15 | Pending |
-| AUDIO-05 | Phase 15 | Pending |
+| APP-04 | Phase 15 | Complete |
+| APP-05 | Phase 15 | Complete |
+| AUDIO-03 | Phase 15 | Complete |
+| AUDIO-04 | Phase 15 | Complete |
+| AUDIO-05 | Phase 15 | Complete |
 | DISPLAY-09 | Phase 16 | Pending |
 | DISPLAY-10 | Phase 16 | Pending |
 | DISPLAY-11 | Phase 16 | Pending |
