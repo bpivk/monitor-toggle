@@ -1,131 +1,206 @@
 # Feature Research
 
-**Domain:** Visual polish for an existing WinForms Windows tray utility (theme-following UI + tray-mode-indicator icon pair) — v1.2 milestone
-**Researched:** 2026-08-02
-**Confidence:** MEDIUM-HIGH (WinForms/DWM mechanics and Microsoft icon guidance are HIGH confidence, sourced directly; "what well-regarded apps actually do" is thinner because most polished theme-following Windows apps are WPF/WinUI, not WinForms, so those are used as aspirational reference points, not literal implementation precedent — flagged per item below)
+**Domain:** Windows display/audio/app-launch toggle utility — configurable monitor profiles, optional automation targets, live manual display control panel
+**Researched:** 2026-08-04
+**Confidence:** MEDIUM-HIGH (patterns verified against DisplayFusion, NirSoft MultiMonitorTool, Windows' own Settings > Display UI, and EarTrumpet/SoundVolumeView via WebSearch; codebase dependency claims verified by direct inspection of the current `RigToggle.Core`/`RigToggle.App`/`RigToggle.Windows` source, not just training data)
 
-This supersedes the v1.1 `FEATURES.md` (dated 2026-07-26, which covered tray residency/hotkey/CLI/multi-monitor). This file covers the **v1.2 milestone only**: system light/dark theme-following for MainForm + SettingsForm, and a genuinely distinct rig-mode/normal-mode tray icon pair. It assumes all existing mechanisms (NotifyIcon tray residency, tray context menu, mode-toggle logic, Settings persistence) are already built and working per `.planning/PROJECT.md` — this document only covers what's new to make those existing surfaces *look* modern/native.
+This supersedes the v1.2 `FEATURES.md` (dated 2026-08-02, which covered theme-following UI + tray icon redesign — that milestone is shipped, its research is no longer active). This file covers the **v2.0 milestone only**: optional app/audio toggle targets, explicit per-mode monitor configuration replacing snapshot-restore, and a new live manual monitor-toggle panel. It assumes everything currently shipped (v1.0-v1.2: GUI settings, tray residency, hotkey, multi-monitor sets for Rig mode, theming, icons) is already built and working per `.planning/PROJECT.md`.
 
-## Feature Landscape
+## Comparable Tools Surveyed
 
-### Table Stakes (Users Expect These)
+- **DisplayFusion** (Monitor Profiles + hotkeys) — closest analog to features #3/#4: named profiles are explicit "these monitors on, these off" sets (not snapshots), switchable by hotkey, with a **confirmation-prompt toggle** ("disable confirmation prompt when changing monitor settings") that is *on by default*.
+- **NirSoft MultiMonitorTool** — GUI checkboxes per monitor + `Ctrl+F6`/`F7`/`F8` (disable/enable/disable-enable-switch) + tray-icon quick access + CLI (`/disable`, `/enable`) for external triggers. Confirms the "per-monitor live toggle with a persistent status affordance" pattern is standard, not novel.
+- **Windows Settings > System > Display** (built-in) — the canonical reference for #4's status-icon UX: numbered rectangle tiles per monitor, an **Identify** button that overlays a number on the physical screen, a **Detect** action for reconnecting displays, and (separately, in the classic resolution-change dialog) a **"Keep these display settings?" 15-second auto-revert** — the standard Windows pattern for any display mutation that risks locking the user out of a usable screen.
+- **EarTrumpet / SoundVolumeView** (default audio device switching) — confirms "no target device configured → no-op, never an error" is the universal convention for audio-switch automation; neither tool treats an unset target as an error state.
+- **NVIDIA/AMD driver display profiles** — same explicit-profile-not-snapshot pattern as DisplayFusion, applied per-game/per-app rather than per-hotkey; reinforces that "named target configuration, not runtime snapshot" is the dominant pattern once a tool moves beyond a single ad-hoc toggle.
 
-Features that, if missing or half-done, make the "modern/native" claim ring false — the bar a small Windows utility must clear to not look like an unstyled WinForms app with a paint job bolted on.
+## Feature Landscape (by target feature)
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| System theme detection (read `HKCU\...\Personalize\AppsUseLightTheme`) | Root dependency for every other theming feature — nothing else can happen without knowing which mode is active | LOW | Registry read is the documented, standard technique (no public typed API exists for this in .NET/WinForms). Read once at startup as the baseline. |
-| Dark/light title bar via `DwmSetWindowAttribute(DWMWA_USE_IMMERSIVE_DARK_MODE)` | This is the single most visible "does this app respect my theme" signal — a white title bar on an otherwise-dark app reads as broken, not stylish | LOW-MEDIUM | Attribute value 20 (post-20H1 builds); works on Windows 10 20H1+ and Windows 11 despite docs listing Windows 11 only. Apply to both MainForm and SettingsForm. |
-| Live theme switching without app restart | Windows itself, VS Code, Windows Terminal, and every actively-maintained utility apply a theme change live; requiring a relaunch to pick up a Settings > Personalization toggle reads as an unfinished feature, not a design choice | MEDIUM | Subscribe to `Microsoft.Win32.SystemEvents.UserPreferenceChanged`, re-read the registry value, and re-apply DWM attribute + re-color controls when it actually flips (event fires on many unrelated preference changes too — must diff old vs new value, not react to every firing). |
-| Full, consistent control recoloring — not just the title bar | A themed title bar sitting above a stock white/gray WinForms client area looks *more* broken than doing nothing (half-themed is worse than unthemed) — this is the actual majority of the implementation effort | HIGH | WinForms has no supported theming API; every `BackColor`/`ForeColor` on every `Panel`/`Label`/`Button`/`GroupBox`/`ComboBox`/`CheckBox`/`ListView`/`DataGridView` (the multi-monitor settings grid) must be set by hand per theme. `ComboBox`/`ListView` in particular need owner-draw or `FlatStyle=Flat` + explicit color overrides to avoid a native-white dropdown/list surface breaking dark mode. Confirmed pitfall from ShareX's own "Experimental dark theme" changelog notes: naive color-property reassignment leaves several stock controls looking "suboptimal" — budget for per-control verification, not a single blanket pass. |
-| Flat, borderless/subtle-border styling (no legacy 3D bevel/gradient button chrome) | Default WinForms `FlatStyle=Standard` buttons and classic sunken group boxes read as Windows-XP/7 era, undermining "modern" regardless of correct dark/light colors | LOW-MEDIUM | Set `FlatStyle=Flat` (or `System` where native look is acceptable) with a 1px border color that itself flips per theme; avoid `FlatStyle=Popup`'s hover-bevel look, which still reads dated. |
-| Taskbar-background-agnostic tray icon contrast | A tray glyph designed only against one taskbar background (e.g. pure white icon assuming a dark taskbar) becomes invisible the moment the user's taskbar is the opposite shade — this is a real, currently-open class of bug (see anti-feature #4 for the "fix via variant-swapping" trap) | MEDIUM | Confirmed real-world failure mode: a 2026 GitHub issue against Claude Desktop for Windows describes exactly this — "system-tray icon invisible when app theme differs from the Windows taskbar mode." Cheapest robust fix: design each mode icon with self-contained contrast (saturated fill color + a dark or neutral outline) rather than a pure monochrome glyph that only works on one background. |
-| Multi-resolution `.ico` embedding (16, 20, 24, 32px at minimum) | `NotifyIcon` and the taskbar/Alt-Tab surfaces render at different DPI-scaled sizes; a single 32x32 source stretched down looks soft/blurry at the actual 16x16 (100% DPI) tray size, which is the size that matters most for "genuinely distinct" legibility | LOW | Ship one `.ico` containing 16/20/24/32 (and ideally 40/48/64/256 for taskbar/Alt-Tab/shortcut icon reuse) frames, each hand-tuned rather than one auto-scaled master — auto-downscaling loses exactly the fine silhouette control the mode-distinction goal needs at 16px. |
-| Two genuinely distinct-at-16x16 mode icons (shape difference, not just a color swap) | This is the explicit ask, and Microsoft's own icon guidance is blunt about the failure mode: "avoid relying on color alone to convey meaning; use shape and metaphor with color to communicate" — a same-silhouette red/green pair fails colorblind users and reads as a generic status dot, not "rig mode" vs "normal mode" | MEDIUM | Needs an actual distinguishable silhouette per state (different shape/motif), reinforced by (optionally) different color families too — color alone is not sufficient per official guidance. |
+### 1. Optional App Launch Target
 
-### Differentiators (Competitive Advantage)
+**Table stakes (expected baseline behavior):**
 
-Features that push past "acceptable modern WinForms app" into "feels like it was designed on purpose" — valuable, not required, and worth doing only after table stakes are solid.
+| Behavior | Why Expected | Complexity |
+|----------|--------------|------------|
+| Unset app path → toggle silently skips launch/focus (Rig direction) and minimize (Normal direction); no dialog, no error | Universal automation-tool convention (AutoHotkey optional macro step, Stream Deck "no action" slot, DisplayFusion's "Run this program" being an optional per-profile action) | LOW |
+| Settings UI shows the app-path field as genuinely optional (no red/required styling) once unset | Matches the project's own existing convention for the hotkey fields (`HotkeyModifiers`/`HotkeyKey` are already nullable, "no default hotkey" per D-02) — this feature is bringing App into line with a pattern the codebase already established, not inventing a new one | LOW |
+| Toggle result reporting distinguishes "skipped because not configured" from "not attempted because an earlier step failed" | `ToggleStepResult` currently only has `Succeeded`/`Failed`/`NotAttempted` — conflating "user chose not to configure this" with "upstream failure blocked this" is a real UX regression risk once App becomes optional, since both would otherwise render identically | LOW-MEDIUM (may need a 4th outcome or a distinct message string) |
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Windows accent-color-aware highlight on the core toggle control/status indicator | Ties the app's single most-used control into the user's actual system personalization rather than a hardcoded blue/accent, which is what separates "themed" from "feels native" in apps like Windows Terminal/PowerToys (WinUI-based — cited here only as the visual bar these set, not as literal WinForms precedent) | MEDIUM-HIGH | Read via DWM colorization API or `UISettings.GetColorValue`; needs the same live-update handling as theme (`WM_DWMCOLORIZATIONCOLORCHANGED`). Real but bounded scope — one accent color, applied to one or two controls, not a full palette-generation system. |
-| Domain-specific icon metaphor (e.g., a wheel/monitor motif) instead of a generic on/off or power-symbol pair | A metaphor tied to the actual product concept (rig vs desk) reads immediately and memorably vs. a generic colored-dot pair that any utility could use | LOW-MEDIUM | Almost entirely a design-time cost (icon authoring), not engineering — reuses the same multi-resolution `.ico`/NotifyIcon mechanism already required as table stakes. Directly satisfies Microsoft's "single clear metaphor, no more than two elements" guidance. |
-| Rounded window corners / Mica-style DWM backdrop (Windows 11 only) | Matches the native Windows 11 app shell aesthetic more closely than a theme-colored-but-still-square window | MEDIUM | `DWMWA_WINDOW_CORNER_PREFERENCE` / `DWMWA_SYSTEMBACKDROP_TYPE` — additional DWM attribute calls, same mechanism family as the required dark-title-bar call, so incremental cost given that's already being built. No-ops gracefully pre-Win11 (attribute simply ignored), so safe to attempt unconditionally. |
-| Custom-drawn "big toggle" control for MainForm's single core action, replacing the default `Button` | The core value of this app is one click; a purpose-built toggle-switch-style control (rather than a generic themed button) visually elevates the app's single most important interaction | MEDIUM | Owner-draw (`OnPaint` override) on top of the already-established theme-color palette — bounded to one control, not a full control-library rewrite (see anti-feature #1 for why a full rewrite is out of scope). |
-| Manual theme override (force light/dark regardless of system setting) | Small, cheap addition once "follow system theme" exists; some users want to pin a mode | LOW | Settings persistence layer (`System.Text.Json` to `%APPDATA%`) already exists per current stack — this is one more enum field, no new infrastructure. |
-| Coherent icon family across tray, `.exe`/taskbar icon, and any About-box branding, sharing one motif in both mode variants | Reinforces "this was designed as a product" rather than "the tray icon got attention but the rest didn't" | LOW-MEDIUM | Reuses the same authored artwork at larger sizes (the `.exe` icon already needs 256x256+ frames per the multi-resolution `.ico` table-stakes item) — largely a "don't stop at 16x16" scoping decision, not new mechanism. |
+**Differentiators:** None really — this is closing a scope gap, not a competitive feature. Do not over-invest here.
 
-### Anti-Features (Commonly Requested, Often Problematic)
+**Anti-features (avoid):**
+- Do **not** add independent per-direction opt-in (e.g., "launch on Rig only, never minimize on Normal") — keep a single optional `CompanionAppPath`, symmetric across both directions, matching the existing single-field model. Splitting it is unrequested scope creep.
+- Do **not** conflate "never configured" (`null`/empty — skip silently) with "configured but the file is now missing" (a real, user-facing failure state — see Edge Cases below). Collapsing these removes a useful signal.
 
-Things that look like the "obviously more polished" choice but create disproportionate risk or scope for this specific app.
+**Dependencies on existing model:**
+- `ToggleService.IsFullyConfigured` (ToggleService.cs:201-205) currently `&&`s `!string.IsNullOrEmpty(settings.CompanionAppPath)` into the required set — must drop this term.
+- `ToggleService.ToggleToRigMode`'s preflight `File.Exists(settings.CompanionAppPath)` check (ToggleService.cs:70-78) currently throws unconditionally before any step runs — must be reworked to skip entirely when the path is null/empty, but still surface a real problem when a path *is* configured but the file is now missing (do not silently downgrade that to "skipped").
+- `SettingsForm.ValidateSettingsForm`/the Save-button gating must drop the app-path field from its required-fields check.
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|------------------|-------------|
-| Full custom-owner-drawn control library (rounded buttons, ripple/hover animations, restyled scrollbars, etc. across every control) | "If we're already recoloring everything, why not make it look pixel-perfect Fluent" | WinForms has no supported theming hook for this; hand-building a mini design system for a 2-window personal utility is open-ended effort with high risk of an inconsistent, half-finished patchwork (exactly what ShareX's own maintainers flagged as the outcome of naive control restyling) | Do the table-stakes work (DWM title bar + per-control color properties + `FlatStyle=Flat`) and stop there; accept native control silhouettes with correct theme colors rather than reshaping them |
-| Frameless custom-chrome window with hand-built minimize/close buttons | Mimics native Windows 11 app chrome more closely than a themed-but-still-native title bar | Reintroduces Aero Snap, drag-resize, and multi-monitor/DPI edge cases that the native title bar + DWM dark-mode call sidesteps entirely for free; disproportionate risk for a 2-window utility whose core value has nothing to do with window chrome | Keep the native title bar, theme it via `DWMWA_USE_IMMERSIVE_DARK_MODE` (already table stakes) |
-| Color-only mode differentiation on the tray icon (identical glyph, red vs. green tint only) | Fast to produce, "traffic light" mental model feels intuitive | Fails Microsoft's own icon guidance (color alone is explicitly called out as insufficient), fails at 16x16 where fine color differences compress, and fails colorblind users; reads as a generic status dot rather than communicating "rig mode" specifically | Distinct silhouette per mode (different shape/motif), color as reinforcement not the sole signal |
-| Theme-swapping tray icon variants — a separate icon asset per taskbar light/dark state, multiplying the required set to 2 (mode) × 2 (taskbar theme) = 4 icons plus swap-detection logic | Seems like the "correct" fix for the taskbar-contrast pitfall (table stakes item above) | Microsoft's own guidance explicitly frames light/dark theme-sensitive icon assets as *optional*, not required — building the 2×2 variant matrix plus a second theme-detection/swap system doubles the asset and logic surface for a problem that a single self-contained-contrast design solves more cheaply | Design each of the 2 mode icons with built-in contrast (saturated fill + outline) that reads on both taskbar backgrounds; keep the icon set at exactly 2 |
-| Detailed/gradient/photographic icon artwork carried straight into the 16x16 tray asset | The larger app-icon artwork (256x256, About box) looks good, so reusing it everywhere seems efficient | Fine detail and gradients that read well at 256x256 collapse into a shapeless blur at 16x16 — this directly undermines the "reads clearly in the tray" goal that is the actual point of this feature | Author a deliberately simplified silhouette specifically for the 16x16 tray frame (and its DPI siblings), separate from the more detailed larger-size artwork within the same `.ico` |
-| Migrating the app (or just these two windows) to WPF/WinUI3 to get theming "for free" | Both frameworks have far better native theming support than WinForms, which makes this the technically easiest path to the same visual result | A framework migration is a rewrite of a ~6,900 LOC, 4-project solution to solve a styling problem — wildly disproportionate scope for a visual-polish milestone, and explicitly not what `.planning/PROJECT.md` scoped ("System-theme-following in WinForms has no built-in support... accepted as worthwhile complexity per explicit user call") | DWM API calls + manual per-control color properties within the existing WinForms app, as already decided |
+---
+
+### 2. Optional Audio Devices Per Direction
+
+**Table stakes:**
+
+| Behavior | Why Expected | Complexity |
+|----------|--------------|------------|
+| Unset `RigAudioDeviceId` → Rig-direction toggle skips the audio switch entirely, no error | Matches EarTrumpet/SoundVolumeView convention: unset target = no-op, never a failure | LOW |
+| Unset `NormalAudioDeviceId` → Normal-direction toggle skips audio entirely | Symmetric with the Rig-direction behavior above | **MEDIUM — see architectural finding below** |
+| Settings UI treats both audio-device pickers as optional, same visual treatment as the app path | Consistency across all three "optional target" settings | LOW |
+
+**Differentiators:** None — parity feature, not a competitive one.
+
+**Anti-features (avoid):**
+- Do **not** make "RigAudioDeviceId set but NormalAudioDeviceId unset" fall back to "restore whatever was playing before" — that reintroduces exactly the snapshot-based hybrid behavior the milestone is deliberately moving away from for monitors. For consistency, an unset audio target should mean "touch nothing," full stop, not "fall back to snapshot."
+
+**Complexity — architectural finding (important for roadmap):**
+Direct inspection of `ToggleService.cs` shows `NormalAudioDeviceId` is currently used for **exactly two things**: the `IsFullyConfigured` required-field check, and pre-selecting the combo box in `SettingsForm`. It is **never read by `ToggleToNormalMode`** — that method restores audio via `_audioController.Restore(snapshot.Audio)`, i.e. the pre-toggle **snapshot**, completely independent of whatever `NormalAudioDeviceId` is set to. So "make `NormalAudioDeviceId` optional, skip audio switching when unset" isn't a validation-only change here — today, setting/unsetting it has **zero runtime effect on Normal-direction audio** at all. Delivering feature #2 as scoped requires *first* giving `NormalAudioDeviceId` a real runtime effect (switch `ToggleToNormalMode` from `Restore(snapshot.Audio)` to `SetDefault(settings.NormalAudioDeviceId)` when set, mirroring how Rig mode already works via `SetDefault(settings.RigAudioDeviceId)`), which is the *same* "snapshot-restore → explicit-config" architectural shift explicitly scoped for monitors (feature #3) — just not explicitly called out for audio in the milestone framing. Flag this for requirements/roadmap clarification: is Normal-mode audio meant to move to explicit-config symmetry with Rig mode (recommended, for consistency with feature #3's rationale), or does it stay snapshot-based with the optional flag only gating *whether* the (now-unused-for-Normal) restore call runs?
+
+**Dependencies on existing model:**
+- `ToggleService.IsFullyConfigured` — same relaxation as #1, drop both audio-ID required-field checks.
+- `WindowsAudioController.SetDefault`/`ApplyAndVerify` already applies one device ID to all three Windows audio roles (eConsole/eMultimedia/eCommunications) in a single call — "optional per role" in the milestone framing means "optional per toggle **direction**" (Normal vs. Rig), not per individual Windows audio role; the existing per-role capture/restore machinery (`AudioState`/`AudioRoleState`) already operates correctly underneath a single `SetDefault(deviceId)` call and needs no change on that axis.
+- If Normal-direction audio moves to explicit config (see above), `StateSnapshot.Audio`/`ISnapshotStore`'s audio half either becomes dead code or is repurposed purely as crash-recovery data (see Feature #3's dependency section — same question applies to audio as to monitors).
+
+---
+
+### 3. Normal Mode Explicit Monitor Target Set (replaces snapshot-restore)
+
+**Table stakes:**
+
+| Behavior | Why Expected | Complexity |
+|----------|--------------|------------|
+| Normal mode has its own `NormalMonitorsToDisable`/`NormalMonitorsToEnable`-shaped config, symmetric to Rig mode's existing `MonitorsToDisable`/`MonitorsToEnable` | This is literally how DisplayFusion Monitor Profiles and NVIDIA/AMD display profiles work — every named "mode" is an explicit target set, never a runtime snapshot | MEDIUM |
+| Toggling to Normal mode disables/enables monitors to match the explicit Normal target set, not "whatever was active before the last toggle to Rig" | Direct scope statement in PROJECT.md; matches the profile-based pattern in every comparable tool surveyed | MEDIUM |
+| Settings UI for Normal-mode monitors reuses the same picker UI already built for Rig-mode monitors (symmetric layout) | Users expect a "second copy" of a control they've already learned, not a differently-shaped one | LOW (UI reuse) |
+
+**Differentiators:** None on their own — but this change is a *precondition* for feature #4 (live panel) sharing the safety-guard and apply logic cleanly, since both features now revolve around "the same monitor-set-apply operation, driven by three different sources" (Rig config, Normal config, or ad-hoc manual selection).
+
+**Anti-features (avoid):**
+- Do **not** keep snapshot-restore as a silent fallback "in case the explicit Normal set doesn't cover a monitor" — that reintroduces exactly the ambiguity (which state wins?) this milestone is meant to eliminate. If a monitor isn't mentioned in either the Normal disable-set or enable-set, its resulting state must be a clearly documented default (e.g., "left untouched" or "explicitly enabled") — not "whatever the snapshot says."
+- Do **not** attempt "smart" migration that tries to synthesize a Normal-mode config by replaying the last captured snapshot at upgrade time as if it were a permanent setting — a one-time migration hint (e.g., pre-populate the Normal enable-set from `GetActiveMonitors()` at first-run-after-upgrade) is reasonable and expected; treating stale runtime snapshot data as durable configuration going forward is not.
+
+**Critical architectural dependency — mode detection itself (must be called out explicitly for roadmap):**
+`ToggleService.IsInRigMode()` currently derives the app's *entire* current-mode concept from snapshot-file presence: `_snapshotStore.Exists()` (documented inline as "D-14" — snapshot presence **is** the mode flag, there is no separate persisted mode field). Every consumer of "are we in Rig or Normal mode" — `MainForm`'s label/tray icon/tray text, the reentrancy-safe toggle routing, crash-recovery messaging — reads through this single signal. Once Normal mode stops depending on `ISnapshotStore` for monitor restore, **the snapshot file is no longer guaranteed to exist or be meaningful in Rig mode**, and mode detection needs a new, independently-persisted `CurrentMode` (or equivalent explicit flag) that is *not* coupled to whether a monitor/audio snapshot happens to be on disk. This is not optional plumbing — without it, the app has no way to know which mode it's in after this change ships. Recommend this be an explicit early requirement/phase in the roadmap, not an implementation detail folded silently into the monitor-config work.
+
+A second, related consequence: the snapshot file currently doubles as **crash-recovery data** — if the app dies mid-toggle, the snapshot on disk is both "proof we were mid-transition" and "the exact state to recover to." Moving Normal-mode monitor restore off snapshots weakens or removes that free crash-recovery story for monitors (audio may retain it, per feature #2's open question above, or may not, if it's also moved to explicit config for consistency). Decide explicitly whether v2.0 needs a *replacement* crash-recovery mechanism (e.g., persist "toggle in progress, started at T, target mode X" as a small marker file) or whether losing automatic crash-recovery for monitors is an accepted tradeoff — this should be a stated decision, not a silent regression.
+
+**Dependencies on existing model:**
+- `AppSettings` needs new fields (or a nested `MonitorTarget`-shaped structure used twice) for the Normal-mode monitor set, mirroring `MonitorsToDisable`/`MonitorsToEnable`.
+- `ToggleService.ToggleToNormalMode`'s current body (ToggleService.cs:243-374) is built entirely around `_snapshotStore.Load()`/`.Exists()`/`.Clear()` plus `_monitorController.Restore(snapshot.Monitor)` — this is a genuine rewrite of the method, not a small patch, since the snapshot-or-nothing branching (`if (snapshot is null) { ... }`) is the method's entire control-flow spine today.
+- `StateSnapshot`/`MonitorState`/`MonitorPathSnapshot`/`ISnapshotStore`/`JsonSnapshotStore` either become dead code (if audio also drops snapshot-restore) or shrink to audio-only (if audio keeps it) — either way, this model needs an explicit "keep, shrink, or delete" decision, not silent abandonment. `WindowsMonitorController.Restore(MonitorState)` likely becomes unused and should be removed rather than left as dead code, per the milestone's own "code quality/cleanup pass" goal.
+- The existing safety-guard error text ("Cannot disable all configured monitors — at least one active display must...", `WindowsMonitorController.cs:307`) is currently only reachable from the Rig-mode disable path; it must also guard whatever new "apply the Normal-mode target set" code path is added (see Feature #5).
+
+---
+
+### 4. Live Manual Monitor Toggle Panel (status icons)
+
+**Table stakes:**
+
+| Behavior | Why Expected | Complexity |
+|----------|--------------|------------|
+| One row/tile per detected monitor, independent of Rig/Normal mode, each with an on/off toggle control | Direct match to MultiMonitorTool's checkbox-per-monitor GUI and DisplayFusion's per-monitor enable state list | MEDIUM |
+| Per-monitor status shown via **icon**, not just a text label ("Enabled"/"Disabled") | Explicit scope requirement; also matches Windows' own Settings > Display numbered-tile pattern, which is icon/graphic-first, text-second | MEDIUM (new icon assets — but the project already has a working procedural-icon pipeline: `RigToggle.IconGen`, used for the Phase 13 tray/exe icons, shape-distinct and colorblind-safe by explicit prior decision — reuse that generator/convention rather than sourcing new bitmap art) |
+| Panel reflects **live** state — reacts to a monitor being connected/disconnected/hot-plugged while the panel is open, not just a snapshot taken when the panel opened | "Live" is explicit in the scope; matches Windows Settings' "Detect" affordance for newly connected displays | MEDIUM (requires either a refresh-on-focus/poll, or a `WM_DISPLAYCHANGE` message hook — the latter is idiomatic WinForms/Win32 and low-cost since the app already pumps Win32 messages for the global hotkey, Phase 9) |
+| Acting on a monitor here has an immediate, real effect (not "stage a change, apply on Save" like the Settings picker) | This is the defining difference from the existing Settings-form monitor pickers — "on-demand" in the scope explicitly means immediate application, not deferred | LOW once the underlying "apply a target set" logic is unified with #3 |
+
+**Differentiators (worth doing well, not just minimally):**
+- An **Identify** action (briefly overlay a number/label on the physical screen) — standard in Windows' own Display settings and genuinely useful once a user has 3+ monitors and needs to map "row 2 in this panel" to "the physical screen on my left." Not explicitly scoped, but cheap relative to value and directly informed by the dominant pattern in every comparable tool surveyed; worth flagging as a candidate differentiator for the roadmap to accept or explicitly defer.
+- A brief **revert-if-unconfirmed** safety window (Windows' own "Keep these display settings?" 15-second auto-revert pattern) for the live panel specifically, since unlike the Rig/Normal toggle (which is driven by pre-vetted config the user set up in advance), the live panel invites impulsive single-click changes that could disable the monitor the user is currently looking at. The project already has a related, lighter-weight pattern for this class of risk — `SkipMonitorConfirmation`, an existing Settings flag that gates a confirmation dialog before the Rig/Normal toggle's monitor changes apply (`MainForm.cs:307`) — extending that convention (or the stronger auto-revert variant) to the new live panel is a natural fit, not a new pattern being introduced.
+
+**Anti-features (avoid):**
+- Do **not** let the live panel silently persist its changes into `AppSettings`/Rig-mode/Normal-mode config — a manual on-demand toggle is explicitly independent of the Rig/Normal target sets per scope; conflating "I just want this one screen off right now" with "redefine what Normal mode means" would be a serious, confusing scope violation.
+- Do **not** build a full drag-and-drop position/arrangement editor (Windows' own Display settings already owns that job well) — the scope is enable/disable status only, not display topology/arrangement editing. Scope creep to avoid.
+- Do **not** attempt resolution/refresh-rate/orientation controls in this panel — same reasoning; stay narrowly scoped to on/off, matching the rest of this app's existing "disable/enable," not "configure," monitor model.
+
+**Dependencies on existing model:**
+- Needs read access to the full monitor inventory (`WindowsMonitorController`'s existing `GetAllMonitors()`), independent of whichever `AppSettings` target sets exist — this data path already exists (used by the Settings pickers) and can be reused directly.
+- The actual apply-one-monitor-on/off operation should reuse `WindowsMonitorController.ActivateMonitors`/`DeactivateMonitors` (already generalized to sets in Phase 6) rather than introducing a third code path — pass a single-element set.
+- New icon assets: reuse the `RigToggle.IconGen` GDI+ generator pattern (dev-time icon generation, not runtime-drawn) established in Phase 13, for consistency with the existing tray/exe icon pipeline and the project's stated colorblind-safe, shape-distinct visual convention.
+- Must call through the same safety-guard codepath as #5 below — do not duplicate the "at least one monitor must stay enabled" check as a second implementation.
+
+---
+
+### 5. Safety Constraint: At Least One Monitor Always Enabled (carried over, no regression)
+
+**Table stakes:**
+
+| Behavior | Why Expected | Complexity |
+|----------|--------------|------------|
+| Enforced identically across all three now-independent ways to change monitor state: Rig-mode toggle, Normal-mode toggle, and the new live manual panel | Already true today for the toggle path (`WindowsMonitorController.cs:307`); scope explicitly requires it extend to the manual panel without regressing the toggle path | LOW-MEDIUM if the guard lives in one shared place; HIGH risk of drift/bugs if duplicated per call site |
+| A blocked action fails clearly and immediately (before mutating anything), not after a partial mutation | Matches the existing guard's behavior (`WindowsMonitorController.cs` pre-mutation validation, confirmed in `ToggleService.cs` CR-01 comments as throwing "before any real CCD mutation is attempted") | Already established convention — extend, don't redesign |
+
+**Differentiators:** None — this is a hard safety floor, not a feature to differentiate on.
+
+**Anti-features (avoid):**
+- Do **not** relax the guard to "at least one monitor enabled across the whole system" while allowing e.g. Normal-mode config to define zero enabled monitors "because Rig mode will re-enable something" — the guard must be evaluated against the **actual resulting state of the specific action being taken**, not a cross-mode assumption about what happens next. See Edge Cases below for the "both modes configured to zero enabled monitors" case this implies.
+
+**Dependencies on existing model:**
+- The current guard is implemented inside `WindowsMonitorController`'s disable path and is therefore already reasonably positioned to protect all three call sites (Rig toggle, Normal toggle once rewritten, and the manual panel) **if** all three route through the same controller methods (`ActivateMonitors`/`DeactivateMonitors`) rather than each growing bespoke apply logic — reinforces the "unify the apply-a-monitor-set operation" dependency called out under #3 and #4.
+
+---
+
+## Cross-Cutting Edge Cases (optional-target semantics)
+
+These are the specific "what if" scenarios the scope's optionality introduces; each needs an explicit, intentional answer (not an accidental one) before roadmap phases are cut:
+
+| Edge case | Recommended handling | Rationale |
+|---|---|---|
+| Both Rig-mode and Normal-mode monitor sets end up configured to zero enabled monitors (e.g., user empties both independently, or a migration bug does it) | The safety guard (#5) must block *applying* such a config at toggle-time / panel-time — reject the specific mutating action, don't merely warn in Settings — since Settings already allows saving an empty set today (only the apply-time guard in `WindowsMonitorController` currently prevents harm) | Confirmed existing pattern: Settings-side validation and apply-time guard are already two separate, intentionally redundant layers in the current code; keep both layers for the new Normal-mode set too |
+| Configured `CompanionAppPath` is non-null but the file/shortcut no longer exists at toggle time (moved, uninstalled, external drive unplugged) | This is **not** the same as "unset" — must still surface a clear, real failure (as today), not be silently downgraded to "skipped" once App becomes optional | Conflating "never configured" with "configured but broken" removes a real, currently-working failure signal (ToggleService.cs:70-78 already does this correctly for the required case; must not regress when the field becomes optional) |
+| Configured `RigAudioDeviceId`/`NormalAudioDeviceId` references a device ID that no longer exists (headset unplugged, USB DAC removed) | Same principle as above — a configured-but-now-invalid device ID is a real failure to surface, distinct from "not configured, skip silently." The existing `SettingsForm` already has device-availability warning UI (`lblAudioNormalWarning`/`lblAudioRigWarning`) for this at config time; the toggle-time behavior should be consistent with that, not silently no-op | Same "don't collapse two different states into one" principle as the app-path case |
+| User empties the app path *after* it was previously configured (was required, now goes to null) | Treat purely as "now optional/unset," no migration ceremony needed — this is the field's designed new steady state, not an error condition | Matches how `MonitorsToEnable`/`MonitorsToDisable` already tolerate being emptied post-configuration (guarded against re-injection bugs per the existing "migration guard keys off null only, never null-or-empty" decision in PROJECT.md) — same discipline should apply to the newly-optional fields |
+| Manual live-panel action targets a monitor that gets physically unplugged between the panel refreshing its list and the user clicking the toggle | Fail the specific action cleanly (existing "still-present" guard pattern already used in `WindowsMonitorController.Restore`, per the `"Still-present guard first"` comment at `WindowsMonitorController.cs:539`) rather than crashing or silently no-op-ing | This is a pre-existing, already-solved pattern in the codebase for a structurally identical race — reuse it rather than inventing a new one |
+| Toggle-to-Rig with App optional-and-unset succeeds on Monitor+Audio — what does the result checklist show for the App row? | A distinct, positive "Skipped (not configured)" state, not blank and not styled like a failure | Prevents the 3-row toggle-result checklist (Monitor/Audio/App) from looking incomplete or broken once rows can legitimately be intentionally absent — directly relevant to the existing `ToggleResultFormatter` shared by GUI MessageBox and tray balloon-tip surfaces |
 
 ## Feature Dependencies
 
 ```
-System theme detection (registry read)
-    ├──requires (root dependency for)──> Dark/light title bar (DWM call)
-    ├──requires (root dependency for)──> Full control recoloring
-    └──requires (root dependency for)──> Live theme switching (SystemEvents subscription)
+[3: Normal-mode explicit monitor set]
+    └──requires──> [new persisted CurrentMode flag, replacing snapshot-presence-as-mode-signal (D-14)]
+    └──requires──> [decision: keep/shrink/delete ISnapshotStore + StateSnapshot/MonitorState model]
+    └──enables───> [4: Live manual monitor panel] (shares the same "apply a target set" controller calls)
 
-Live theme switching ──enhances──> Dark/light title bar
-Live theme switching ──enhances──> Full control recoloring
-    (without live switching, both are launch-time-only — reads as an
-    unfinished feature per current expectations, see table stakes notes)
+[4: Live manual monitor panel]
+    └──requires──> [5: safety guard, called from a single shared codepath, not duplicated]
+    └──requires──> [3's controller-call unification, to avoid a third bespoke apply path]
 
-Multi-resolution .ico embedding ──requires──> Two distinct mode icons
-    (the existing NotifyIcon swap mechanism from Phase 8 already
-    selects an icon per mode; this only replaces/expands the icon
-    assets it points at — no new tray infrastructure needed)
+[1: Optional app target] ──parallel, independent──> [2: Optional audio targets]
+    (both are validation-gate relaxations + guard clauses; neither blocks the other or
+     features 3/4/5, but 2 has its own internal dependency — see below)
 
-Taskbar-background-agnostic icon contrast ──conflicts──> Theme-swapping icon
-    variant anti-feature (both solve the same problem; pick the
-    self-contained-contrast design, not the 2x2 variant matrix)
-
-Domain-specific icon metaphor ──enhances──> Two distinct mode icons
-    (a well-chosen metaphor makes the shape-differentiation
-    requirement easier to satisfy well)
-
-Windows accent-color-aware highlight ──requires──> a separate small
-    API surface (DWM colorization / UISettings), not the same
-    registry read as light/dark detection — can be built independently
-    of the light/dark theming work, just shares the "live update" pattern
-
-Manual theme override ──requires──> System theme detection
-    (override is just "ignore the registry read, use a stored
-    preference instead" — trivial once detection exists)
+[2: Optional audio targets]
+    └──requires (if Normal-direction symmetry is adopted, recommended)──>
+           [Normal-mode audio switches from Restore(snapshot.Audio) to
+            SetDefault(settings.NormalAudioDeviceId), mirroring Rig mode]
 ```
 
 ### Dependency Notes
 
-- **Everything theme-related requires system theme detection first.** This is the one piece of new plumbing (a registry read + a `SystemEvents.UserPreferenceChanged` subscription) that every other theming feature sits on top of — build and verify it in isolation before touching title bars or control colors.
-- **Live theme switching is not optional polish on top of the other two — treat it as part of "done."** A title bar and control set that only reflect the theme active at process launch will visibly desync the moment the user flips Windows' light/dark toggle while the app is open, which is a worse look than not attempting theming at all.
-- **The tray icon swap mechanism itself already exists** (Phase 8 shipped mode-reflecting tray icons, "functional but plain" per PROJECT.md) — this milestone's icon work is scoped to replacing/expanding the *assets*, not building new selection logic, except for the optional taskbar-contrast decision noted above.
-- **Taskbar-contrast handling and mode-distinction are two different axes** — don't conflate them. Mode distinction (rig vs. normal) is the explicit ask; taskbar-background contrast is a robustness concern that applies regardless of which mode icon is showing. Solving both with one well-designed, self-contained-contrast icon pair (rather than a 2×2 variant matrix) keeps scope bounded.
+- **Feature 3 requires a new mode-detection mechanism:** this is the single highest-risk hidden dependency in the whole milestone. `IsInRigMode()` today *is* `_snapshotStore.Exists()` — there is no other mode flag anywhere in the codebase. Any phase that touches Normal-mode monitor behavior must also land explicit mode persistence, or the app will have no reliable way to know which mode it's in.
+- **Feature 4 depends on Feature 3's unification work, not its data model:** the live panel doesn't need the new `NormalMonitorsToDisable`/`Enable` settings fields themselves, but it does need the same underlying `ActivateMonitors`/`DeactivateMonitors` + safety-guard codepath that Feature 3's rewritten `ToggleToNormalMode` will also route through — sequencing these in the same phase, or Feature 3 clearly before Feature 4, reduces the risk of two divergent "toggle a monitor" implementations.
+- **Feature 2's audio-symmetry question should be resolved before implementation, not during it:** unlike the other four features, #2 has a genuine open architectural question (does `NormalAudioDeviceId` gain real runtime effect, matching Rig mode's `SetDefault` call, or does the optionality only gate a still-snapshot-based restore that the field itself doesn't otherwise influence). Recommend the roadmap surface this explicitly as a requirements-clarification item rather than letting an implementer decide it silently.
+- **Features 1 and 2 have no hard dependency on 3/4/5** and could ship in an earlier phase independently — they are self-contained validation/guard-clause changes against the existing `AppSettings`/`ToggleService` shape.
 
-## MVP Definition
+## MVP-equivalent Scoping (this is a defined milestone, not a fresh MVP)
 
-Framed for this milestone specifically (not a from-scratch product MVP).
+Since all 5 features are already scoped as "must ship this milestone" per PROJECT.md, there is no MVP-trim decision to make here — but ordering by dependency risk for phase sequencing:
 
-### Launch With (v1.2 core)
-
-- [ ] System theme detection + live-update subscription — nothing else works without this
-- [ ] Dark/light title bar (DWM) on MainForm and SettingsForm
-- [ ] Full control recoloring across both forms, including the multi-monitor settings `DataGridView`/`ListView` — the single largest effort item, and the one most likely to look unfinished if rushed
-- [ ] Flat button/panel styling (no legacy 3D bevel)
-- [ ] Two shape-distinct mode icons authored specifically for 16x16, embedded as multi-resolution `.ico` files, with self-contained taskbar-background contrast
-
-### Add After Validation (stretch within v1.2, if time remains)
-
-- [ ] Rounded corners / Mica backdrop on Windows 11 (graceful no-op elsewhere, low incremental cost given DWM plumbing already exists)
-- [ ] Domain-specific icon metaphor refinement (if first-pass icon design reads as generic, invest further design time here before adding new mechanism elsewhere)
-- [ ] Coherent icon family (exe/taskbar icon, About box) reusing the same authored motif at larger sizes
-
-### Future Consideration (defer past v1.2)
-
-- [ ] Accent-color-aware highlight — real value, but a genuinely separate API surface and live-update path from the light/dark work; don't let it block shipping the core theming
-- [ ] Custom-drawn toggle-switch control replacing the core action button — valuable but purely additive polish on a feature that will already work correctly once table stakes ship
-- [ ] Manual theme override (force light/dark) — cheap but not requested; only worth adding if "follow system" alone proves insufficient in practice
+1. **Features 1 & 2 (optional targets)** — lowest risk, no architectural prerequisites, good early-phase candidates to build confidence before touching the mode-detection redesign.
+2. **Feature 3 (Normal-mode explicit config)** — do this before Feature 4; it forces the mode-detection and controller-unification decisions that Feature 4 then benefits from for free.
+3. **Feature 4 (live panel)** — sequenced after 3 so it can reuse the unified apply/safety-guard path rather than introducing a third one.
+4. **Feature 5 (safety guard)** — not a standalone phase; verify-and-extend as a cross-cutting concern threaded through 3 and 4's implementation and their test/verification passes, not a separate deliverable.
 
 ## Sources
 
-- [Support Dark and Light themes in Win32 apps — Microsoft Learn](https://learn.microsoft.com/en-us/windows/apps/desktop/modernize/ui/apply-windows-themes) — DWM dark-mode mechanism — HIGH confidence, official docs
-- [Design guidelines for Windows app icons — Microsoft Learn](https://learn.microsoft.com/en-us/windows/apps/design/iconography/app-icon-design) — silhouette/legibility/color guidance, "color alone insufficient," optional light/dark theme-sensitive assets — HIGH confidence, official docs, fetched directly
-- [dotnet/winforms#12014 — title bar color regression discussion](https://github.com/dotnet/winforms/issues/12014) — confirms WinForms-specific `DwmSetWindowAttribute` behavior nuances — MEDIUM confidence, GitHub issue
-- [ShareX#4304 — Dark theme poor visibility](https://github.com/ShareX/ShareX/issues/4304) and [ShareX#4310 — follow system theme setting](https://github.com/ShareX/ShareX/issues/4310) — real-world evidence that naive WinForms control-color reassignment produces suboptimal results in a comparable actively-maintained WinForms utility — MEDIUM confidence, corroborated by ShareX's own release notes language ("most WinForms controls look suboptimal when their color properties are modified")
-- [anthropics/claude-code#72622 — tray icon invisible on taskbar/app theme mismatch](https://github.com/anthropics/claude-code/issues/72622) — concrete, recent (2026) real-world instance of the taskbar-vs-app-theme contrast pitfall — MEDIUM-HIGH confidence, first-party GitHub issue
-- [SystemEvents.UserPreferenceChanged — Microsoft Learn](https://learn.microsoft.com/en-us/dotnet/api/microsoft.win32.systemevents.userpreferencechanged) — live theme-change detection mechanism — HIGH confidence, official API docs
-- WebSearch aggregation on `AppsUseLightTheme` registry key and DPI-scaled icon sizing (16/20/24/32/40/48/64/256) conventions — MEDIUM confidence, community-sourced but internally consistent and matches documented Windows icon/DPI scale steps
+- https://www.displayfusion.com/HelpGuide/WorkingWithDisplayFusionMonitorProfiles/ — Monitor Profiles as explicit named target sets, hotkey-switchable — MEDIUM confidence (vendor help guide, not independently corroborated elsewhere, but internally consistent and matches training-data knowledge of the product)
+- https://www.displayfusion.com/Discussions/View/enable-disable-monitors-with-hotkey-or-rotate-profiles-with-single-hot-key/ — confirms confirmation-prompt-suppression setting exists and is opt-out (implying prompt-by-default) — MEDIUM confidence (community forum, single source)
+- https://www.nirsoft.net/articles/turn-off-monitor.html and MultiMonitorTool product page — GUI checkbox + `Ctrl+F6/F7/F8` shortcuts, tray icon, CLI `/disable`/`/enable` — MEDIUM-HIGH confidence (NirSoft's own docs, cross-checked against multiple independent write-ups in search results)
+- https://support.microsoft.com/en-us/windows/how-to-use-multiple-monitors-in-windows-329c6962-5a4d-b481-7baa-bec9671f728a — Windows Settings > Display's numbered-tile + Identify + Detect pattern — HIGH confidence (official Microsoft support doc)
+- Windows' classic display-resolution-change "Keep these display settings?" 15-second auto-revert behavior — MEDIUM confidence (well-established, long-standing Windows UX pattern from training data; not independently re-verified via a fresh fetch this session, but extremely well-documented historically and low-risk to state as fact)
+- https://github.com/File-New-Project/EarTrumpet (issues/discussions surveyed) — confirms unset/default-device audio switching is treated as a no-op convention, not an error path — MEDIUM confidence (GitHub issue discussions, not official docs, but consistent across multiple threads)
+- Direct source inspection (this session): `/home/bpivk/moza/src/RigToggle.Core/ToggleService.cs`, `Models/AppSettings.cs`, `Models/StateSnapshot.cs`, `Models/MonitorState.cs`, `Models/AudioState.cs`, `Models/AudioRoleState.cs`, `/home/bpivk/moza/src/RigToggle.Windows/WindowsAudioController.cs`, `/home/bpivk/moza/src/RigToggle.Windows/WindowsMonitorController.cs`, `/home/bpivk/moza/src/RigToggle.App/SettingsForm.cs`, `/home/bpivk/moza/src/RigToggle.App/MainForm.cs` — HIGH confidence (primary source, current repo state as of this research)
 
 ---
-*Feature research for: Windows desktop utility visual-polish milestone (theme-following WinForms UI + tray icon pair)*
-*Researched: 2026-08-02*
+*Feature research for: Rig Toggle v2.0 (Configurable Monitors, Optional Targets & Cleanup)*
+*Researched: 2026-08-04*

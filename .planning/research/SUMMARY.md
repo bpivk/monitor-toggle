@@ -1,148 +1,152 @@
 # Project Research Summary
 
-**Project:** Rig Toggle — v1.2 milestone (Visual Polish & Documentation)
-**Domain:** Windows desktop GUI utility (WinForms) — system-theme-aware UI + tray icon redesign, layered on an existing shipped 4-project solution (Core/Windows/App/Tests)
-**Researched:** 2026-08-02
+**Project:** Rig Toggle — v2.0 Milestone (Configurable Monitors, Optional Targets & Cleanup)
+**Domain:** Windows desktop GUI utility (display/audio/process control automation) — subsequent-milestone redesign of an existing four-project .NET 10 WinForms solution
+**Researched:** 2026-08-04
 **Confidence:** HIGH
 
 ## Executive Summary
 
-This milestone adds two visually-oriented capabilities to an already-shipped, working WinForms utility: (1) live system light/dark theme-following for `MainForm` and `SettingsForm` (title bar + control colors), and (2) a genuinely distinct, multi-resolution rig-mode/normal-mode tray icon pair. The single most important research finding, corroborated independently across all four research files, is that **PROJECT.md's own framing of this milestone is factually outdated**: as of .NET 10 (the project's pinned runtime), WinForms ships first-party, non-experimental dark-mode support (`Application.SetColorMode(SystemColorMode.System)`) that auto-recolors standard controls and manages the title bar's `DWMWA_USE_IMMERSIVE_DARK_MODE` attribute — this was previously assumed to require fully hand-rolled DWM P/Invoke plus manual per-control recoloring from scratch. The correct strategy is therefore "use the built-in feature as the base layer, then patch its two documented, verified gaps" rather than "hand-roll everything."
+v2.0 is not a new product — it's a scoped redesign threaded through an already-shipped, rig-validated four-project solution (`RigToggle.Core`/`.Windows`/`.App`/`.Tests`). All four research passes converge on the same conclusion: **no new NuGet dependencies are required anywhere in this milestone.** Every target capability — optional/nullable App and Audio targets, an explicit per-mode monitor target set replacing snapshot-restore, a live manual monitor panel, exe-size reduction, and a cleanup pass — is achievable with existing packages (`WindowsDisplayAPI`, `NAudio`), existing BCL/WinForms primitives, and the project's own already-proven architectural patterns (Core-interface / Windows-adapter / App-composition-root, nullable-by-design settings, hand-rolled WinForms controls over third-party suites). The `IMonitorController`/`IAudioController` interfaces need **zero signature changes** — the entire redesign happens above the Windows-adapter layer, which meaningfully de-risks the milestone since the highest-uncertainty code (real CCD/COM interop) is untouched.
 
-The two gaps that must be closed with custom code are well-documented and consistent across sources: `SetColorMode` applies theming only once, at startup, and does **not** live-update if the user flips the Windows theme while the tray-resident app keeps running (a very real scenario for this app's hours-long rig sessions) — closed via `Microsoft.Win32.SystemEvents.UserPreferenceChanged` (or raw `WM_SETTINGCHANGE`/`ImmersiveColorSet`) plus a manual `DwmSetWindowAttribute` re-apply; and native `MessageBox`/`OpenFileDialog` remain permanently light-mode regardless of `SetColorMode`, requiring either an audit-and-accept decision or replacement with a themed custom dialog. No new NuGet packages are required for either the theming or icon work — everything is BCL/WinForms-native plus dev-time-only tooling (ImageMagick/Inkscape) for producing the `.ico` assets.
+The recommended approach: (1) ship the low-risk optional-target validation relaxations (App path, Audio device IDs) first, since they require no data-model or mode-tracking changes and deliver real user value immediately; (2) tackle the core, highest-risk piece next — replacing Normal-mode's snapshot-restore with an explicit, symmetric-with-Rig-mode monitor target set, which forces a load-bearing but under-specified architectural dependency: mode detection (`IsInRigMode()`) currently *is* "does a snapshot file exist on disk" (D-14), and that proxy breaks silently the moment Normal mode stops depending on the snapshot for restore — this must become an explicit, independently-persisted mode flag (`IModeStore`), landed in the same phase as the monitor-set rewrite, not deferred; (3) build the manual monitor panel and its shared concurrency guard after the mode-store work, so it reuses the unified apply/safety-guard codepath rather than introducing a third bespoke one; (4) finish with a cleanup pass (deleting the now-dead ~260-LOC `Restore()`/`RestoreViaReconstruction()` subsystem) and exe-size reduction (MSBuild-property-only, no trimming), both schedulable independently of the rest.
 
-The primary risks are not "will this work" (the API contracts are HIGH confidence, verified against official .NET 10 docs and open dotnet/winforms GitHub issues) but "will it be verified correctly on this app's specific non-standard surfaces": the existing `--tray` hidden-start path (bare `ApplicationContext`, no `MainForm` reference) has already caused divergent-path bugs twice in this project's history (Phase 8, Phase 11), and theming code applied in `Form_Load`/`Shown` will silently no-op on that path unless moved to `OnHandleCreated`. Similarly, the tray icon redesign has a real, previously-reported failure mode (a 2026 GitHub issue against a comparable Windows app) where a custom icon reads fine in isolation but becomes invisible against one of the two taskbar theme backgrounds — mitigated by designing self-contained contrast into each icon rather than building a second theme-driven variant axis. Architecturally, both capabilities slot cleanly into the existing Core-interface/Windows-adapter/App-composition pattern with zero deviation from precedent (`IThemeProvider`/`WindowsThemeProvider` mirrors `IAutostartConfigurator`/`WindowsAutostartConfigurator` exactly), and the icon-redesign work is fully decoupled from the theme-infrastructure work — they can be built in either order or in parallel.
+The dominant risk theme across all four research files is **silent regression through flattening distinct states into one** — treating "unconfigured" and "configured but broken" as the same skip-path (masks real failures), treating "mode flag" timing as interchangeable with old "snapshot" timing (loses a hard-won CR-01 safety net), and treating two independently-edited monitor-set grids as safe without re-verifying the shared apply-time "at least one monitor enabled" guard actually covers all three mutating entry points. None of these require new technology to avoid — they require discipline in *how* existing, well-understood patterns are extended, which is exactly what the Pitfalls research maps to specific phases below.
 
 ## Key Findings
 
 ### Recommended Stack
 
-No new runtime dependencies. The theming work uses `Application.SetColorMode(SystemColorMode.System)` (built into WinForms as of .NET 10, GA/non-experimental) as the base layer, a hand-rolled `DwmSetWindowAttribute(DWMWA_USE_IMMERSIVE_DARK_MODE = 20)` P/Invoke as a live-update backstop (fired via `SystemEvents.UserPreferenceChanged`), and manual `FlatStyle`/`Panel`-based control substitutions (e.g. `GroupBox` → bordered `Panel`+`Label`, since `GroupBox` always renders a beveled 3D border regardless of color mode) for the "modern flat look" requirement. The icon redesign needs no runtime library at all — it's dev-time tooling (Inkscape or Figma for vector source art, ImageMagick's `magick` CLI for packing multi-resolution `.ico` files) producing static resources the existing embedded-icon mechanism already consumes unchanged.
+No new packages. Exe-size reduction is pure MSBuild configuration (`EnableCompressionInSingleFile`, `SatelliteResourceLanguages=en`, `InvariantGlobalization=true`, splitting the `NAudio` meta-package into `NAudio.Core`+`NAudio.Wasapi`) — explicitly **not** IL trimming, which remains a hard, unchanged project constraint because trimming's reachability analysis misidentifies the app's COM-interop (`IPolicyConfig`) and P/Invoke (`WindowsDisplayAPI`) code paths as dead and strips them. The live manual monitor panel is a hand-rolled tile `UserControl` in a `FlowLayoutPanel`, reusing the project's own already-validated `RigToggle.IconGen` GDI+ icon pipeline — explicitly not `ListView.Tile` (native-control theming risk under WinForms dark mode) or a third-party component suite (Krypton/Infragistics — same "extra dependency, second theming API" rejection already applied to prior milestones). Optional/nullable settings need zero stack change: `AppSettings` is already 100% nullable-by-design, `System.Text.Json` already round-trips missing/null fields, and this exact migration pattern (detect legacy/absent field, migrate once, never re-trigger — the CR-01-hardened `is null`-only check) has already shipped once for v1.0→v1.1.
 
-**Core technologies:**
-- `Application.SetColorMode(SystemColorMode.System)`: base-layer control/title-bar theming, called once in `Program.cs` before any control is constructed — GA in .NET 10, must precede `Application.Run`
-- `DwmSetWindowAttribute` (hand-rolled P/Invoke, `dwmapi.dll`): live title-bar re-theme on demand, best-effort/never-throw, mirrors the existing `GlobalHotkey.cs` public-façade pattern
-- `Microsoft.Win32.SystemEvents.UserPreferenceChanged`: zero-dependency live theme-change detection (already available via `UseWindowsForms=true`'s shared framework); filter to `UserPreferenceCategory.General` and diff old vs. new resolved value before re-theming
-- `Microsoft.Win32.Registry.CurrentUser` reads of `AppsUseLightTheme` (app/window theme) and `SystemUsesLightTheme` (taskbar/tray theme) — two distinct keys under the same `...\Personalize` path; conflating them is a documented pitfall (see below)
-- ImageMagick (`magick` CLI) + Inkscape/Figma: dev-time-only, produce the multi-resolution `.ico` files (minimum 16×16 + 32×32 per official Win32 guidance; recommended fuller set 16/20/24/32/40/48/256 for clean DPI-scaled rendering)
+**Core technologies (unchanged from prior milestones, reused as-is):**
+- `WindowsDisplayAPI` 1.3.0.13 (CCD display topology) — no interface changes needed; `ActivateMonitors`/`DeactivateMonitors` already take arbitrary sets.
+- `NAudio.CoreAudioApi` (via split `NAudio.Core`+`NAudio.Wasapi`) — same types/version, dependency-hygiene-only swap.
+- Hand-rolled `IPolicyConfig` COM interop — unchanged, still the only way to set the default audio device.
+- `System.Text.Json` + nullable-by-design `AppSettings` — extend with more `string?`/`List<string>?` fields, no serializer change.
 
 ### Expected Features
 
-This is a visual-polish milestone on an already-feature-complete app, so "table stakes" here means "the bar a small utility must clear to not look like an unstyled WinForms app with a paint job bolted on," not net-new product features.
+Five target features (per PROJECT.md scope), all closing scope gaps or matching patterns already standard in comparable tools (DisplayFusion Monitor Profiles, NirSoft MultiMonitorTool, Windows' own Settings > Display, EarTrumpet/SoundVolumeView) — none are competitive differentiators requiring extra polish beyond matching the established convention.
 
 **Must have (table stakes):**
-- System theme detection (registry read) + live-update subscription — root dependency for everything else
-- Dark/light title bar via DWM attribute on both `MainForm` and `SettingsForm`
-- Live theme switching without app restart — treated as part of "done," not stretch polish, since a launch-time-only theme desyncs visibly during this app's long tray-resident sessions
-- Full, consistent control recoloring across both forms, including the multi-monitor settings grid (`DataGridView`) — the single largest effort item and the one most likely to look unfinished if rushed
-- Flat/borderless button and panel styling (no legacy 3D bevel chrome)
-- Two shape-distinct (not just color-distinct) mode icons authored specifically for 16×16, embedded as multi-resolution `.ico` files, with self-contained taskbar-background contrast
+- Optional App launch target — unset path silently skips launch/minimize, no dialog; "configured but now missing" must still surface as a real failure (not silently downgraded).
+- Optional Audio devices per direction — unset device skips the audio switch, no error; **architectural finding:** `NormalAudioDeviceId` is already collected in Settings but never read by `ToggleToNormalMode` today — giving it real runtime effect (mirroring Rig mode's `SetDefault` call) is a genuine open decision, not just a validation change, and should be resolved explicitly during roadmap/requirements, not left to an implementer.
+- Normal-mode explicit monitor target set, symmetric with Rig mode's existing `MonitorsToDisable`/`MonitorsToEnable` — replaces `Restore(snapshot.Monitor)` entirely; no snapshot-fallback for monitors not mentioned in either set.
+- Live manual monitor panel with per-monitor status icons, immediate-effect (not deferred like Settings), independent of Rig/Normal mode.
+- Safety constraint ("at least one monitor always enabled") enforced identically across all three now-independent mutation paths (Rig toggle, Normal toggle, manual panel) from one shared codepath.
 
-**Should have (competitive/stretch, if time remains):**
-- Rounded corners / Mica-style DWM backdrop on Windows 11 (graceful no-op elsewhere; low incremental cost given DWM plumbing already exists for the title bar)
-- Domain-specific icon metaphor refinement (wheel/monitor motif) over a generic status-dot pair
-- Coherent icon family reused at larger sizes across tray, exe/taskbar icon, and any About-box branding
+**Should have (worth doing well, cheap relative to value):**
+- Identify action (briefly overlay a number on the physical screen) for the manual panel — standard in Windows' own Display settings, not explicitly scoped but flagged as a candidate for the roadmap to accept or defer.
+- Extending the existing `SkipMonitorConfirmation` confirmation-gate pattern to the new manual panel, since impulsive single-click toggles there carry more risk than pre-vetted Rig/Normal config.
 
-**Defer (explicitly out of scope for v1.2):**
-- Windows accent-color-aware highlight — a genuinely separate API surface (DWM colorization/`UISettings`) with its own live-update path; don't let it block shipping core theming
-- Custom-drawn toggle-switch control replacing the core action button — purely additive polish
-- Manual theme override (force light/dark regardless of system) — cheap once detection exists, but not requested
-- Full custom-owner-drawn control library, frameless custom-chrome window, theme-swapping 2×2 icon variant matrix, and any WPF/WinUI3 migration — all explicitly flagged as anti-features/disproportionate scope for a 2-form personal utility
+**Defer / explicitly out of scope:**
+- Independent per-direction app-launch opt-in (splitting the single `CompanionAppPath` field) — unrequested scope creep.
+- Drag-and-drop monitor arrangement/resolution/orientation editing in the manual panel — Windows' own Display settings already owns that; stay narrowly on/off.
+- "Smart" migration that synthesizes a Normal-mode config from the retired snapshot at upgrade time — leave new fields null, require one explicit Settings visit post-upgrade.
 
 ### Architecture Approach
 
-This is not a new subsystem — it's two capabilities threaded through the existing four-project solution using the exact composition-root + interface-adapter pattern already established by `IAutostartConfigurator`/`WindowsAutostartConfigurator`. `IThemeProvider`/`AppTheme` live in `RigToggle.Core` with zero Windows-API references (enforced project invariant); `WindowsThemeProvider` (registry read + `SystemEvents` subscription) and `DwmTitleBar` (public static façade over the DWM P/Invoke) live in `RigToggle.Windows`; `ThemeApplier` (the recursive, per-control-type recolor pass encoding this app's specific Designer-generated control layout) lives in `RigToggle.App` only, since WinForms *composition* concerns have never lived in `RigToggle.Windows` in this codebase. All three top-level forms (`MainForm`, `SettingsForm`, `MonitorConfirmDialog`) get constructor-injected `IThemeProvider`, subscribe to `ThemeChanged` while open, and unsubscribe on close/dispose to avoid the classic disposed-form event-leak. The icon redesign is a pure binary-asset swap into the existing `EmbeddedResource`/`LogicalName` wiring with zero code changes, and is architecturally fully independent of the theme work — it can be built in parallel or in either order.
+The v2.0 redesign fits entirely inside the existing four-project shape with **zero `IMonitorController`/`IAudioController`/`IAppController` signature changes**. The single most load-bearing architectural change is repurposing `ISnapshotStore`/`JsonSnapshotStore` into a minimal `IModeStore` — keeping the same atomic-write, crash-safe file-presence idiom, but flipping an explicit Rig/Normal marker instead of keying mode off "does a snapshot happen to exist." A new `SingleFlightGuard` is extracted from `ToggleOrchestrator`'s existing `Interlocked.CompareExchange` busy-flag into its own class, constructed once in `Program.cs`, and injected into **both** `ToggleOrchestrator` and the new `ManualMonitorService` — this is the only genuinely new cross-component coordination boundary the milestone introduces, and it's what prevents a toggle and a manual panel action from racing the same CCD topology concurrently.
 
 **Major components:**
-1. `IThemeProvider` (Core, new) — pure contract: current theme + change event, no registry/DWM knowledge
-2. `WindowsThemeProvider` (Windows, new) — registry read + `SystemEvents.UserPreferenceChanged` subscription, deduped `ThemeChanged` event
-3. `DwmTitleBar` (Windows, new) — best-effort static façade over `DwmSetWindowAttribute`
-4. `ThemeApplier` (App, new) — recursive control-tree recolor pass keyed by concrete control type, applied on load and on every theme change
-5. Icon asset pipeline (App/Resources, binary-only) — replaces `normal.ico`/`rig.ico` in place, no change to `LoadTrayIconsIfNeeded`
+1. `AppSettings` — gains `NormalMonitorsToDisable`/`NormalMonitorsToEnable` (new sibling fields, not a rename of the existing Rig-mode pair, to avoid touching the CR-01 migration guard and every existing test for zero behavioral benefit).
+2. `IModeStore` (repurposed `ISnapshotStore`) — independently-persisted mode marker, replacing file-presence-as-mode-proxy.
+3. `SingleFlightGuard` (new, extracted) — shared concurrency guard for both `ToggleOrchestrator` and `ManualMonitorService`.
+4. `ManualMonitorService` (new) — thin guarded wrapper over `IMonitorController.ActivateMonitors`/`DeactivateMonitors`, single-element sets.
+5. `MonitorPanelForm` (new, `RigToggle.App`) — non-modal `Form`, depends only on `IMonitorController`+`ManualMonitorService`, never a concrete adapter directly (established codebase invariant).
+6. `ToggleService.ToggleToNormalMode` — rewritten Monitor step (and, if the audio-symmetry recommendation is adopted, Audio step) to use the same `ActivateMonitors(enableSet); DeactivateMonitors(disableSet);` shape Rig mode already uses, instead of `Restore(snapshot)`.
+
+**Suggested build order (from ARCHITECTURE.md, matches FEATURES.md's independent dependency analysis):** optional targets first (lowest risk, no prerequisites) → monitor-set + mode-store redesign (highest risk, forces the mode-tracking decision) → shared concurrency guard + manual panel (reuses the prior phase's unification) → cleanup pass + exe-size reduction last (only safe once the snapshot/restore subsystem is confirmed genuinely dead; exe-size work has no ordering dependency and can be batched here for scheduling convenience only).
 
 ### Critical Pitfalls
 
-1. **Double DWM attribute set (manual call fighting `SetColorMode`'s own internal call)** — causes a visible title-bar color flash/animation on form show. Avoid by deciding explicitly which mechanism owns the title bar (recommendation: `SetColorMode` as base + manual re-apply only as the live-update path, never both firing redundantly).
-2. **Assuming `SetColorMode` live-updates on its own** — it is applied once at startup only; `dotnet/winforms#13935` confirms this is not implemented framework behavior. Must explicitly wire `SystemEvents.UserPreferenceChanged`/`WM_SETTINGCHANGE` and test by flipping Windows theme *while the app is already running*, not just via restart.
-3. **Theming calls issued before the window handle exists** — silently no-ops on this app's proven-fragile `--tray` hidden-start path (`ApplicationContext` with no `MainForm`, already the source of two prior divergent-path bugs). Apply theming in `OnHandleCreated`, not `Form_Load`/`Shown`, and explicitly test the hidden-start-then-restore sequence.
-4. **Wrong registry key drives tray icon theme selection** — `AppsUseLightTheme` (app/window chrome) vs. `SystemUsesLightTheme` (taskbar/tray) are independent keys; using the former for icon-variant selection produces a mismatched icon against the actual taskbar. Read `SystemUsesLightTheme` specifically for any taskbar-facing decision.
-5. **Icon-swap GDI handle leak** — extending the existing 2-state (rig/normal) icon swap risks `new Icon(...)` per swap without disposal, which is a real risk specifically because this app stays tray-resident for multi-hour sessions with repeated toggles. Pre-load and cache all icon instances once at startup; never construct per-swap.
+1. **Two independent concurrency guards instead of one shared one** — building `ManualMonitorService` with its own busy-flag "because it's a separate feature" cannot prevent a genuine cross-path race against the same CCD topology. Extract `ToggleOrchestrator`'s existing guard into a standalone `SingleFlightGuard`, construct it once, inject the same instance into both callers.
+2. **Mode detection breaks silently when the snapshot dependency is removed, without anyone touching `IsInRigMode()` itself** — the bug only surfaces on the *next* toggle or app restart, not the toggle that introduced it, making it a classic "looks done, isn't" gap a single manual test pass will miss. Land the `IModeStore` repurposing in the *same* phase as the monitor-step rewrite, and explicitly test mode indication across an app restart.
+3. **Silently skipping a step when a target is unconfigured masks a genuinely different failure state ("configured but broken")** — a moved companion-app exe or unplugged audio device must still surface as a real `Failed` result, not be flattened into the same `NotAttempted` outcome as "never configured." Write one test per state per newly-optional field.
+4. **Losing the CR-01 recapture-and-compare safety net** during the mode-tracking rewrite — the reasoning ("never let the mode flag misrepresent whether the display was really touched") is timeless even though its current code is snapshot-specific; deleting the literal `_snapshotStore` calls risks deleting the reasoning alongside the mechanism.
+5. **Reintroducing the already-fixed null-vs-empty migration-guard bug** for the new `NormalMonitorsToDisable`/`NormalMonitorsToEnable` fields — any new migration logic must copy the existing `is null`-only check verbatim (not `Count > 0`-style checks), or better, add no auto-population logic at all.
 
 ## Implications for Roadmap
 
-Based on research, suggested phase structure:
+Based on combined research (FEATURES.md's dependency graph + ARCHITECTURE.md's build order + PITFALLS.md's phase mapping, all three converge on the same sequencing), suggested phase structure:
 
-### Phase 1: Theme Infrastructure
-**Rationale:** Higher-risk, more novel piece of this milestone (cross-thread event marshaling, per-control-type recolor correctness, DWM best-effort handling, and the app's own non-standard `--tray` startup path). Sequencing it first means rig-verification cycles for these specifics happen early, and any per-control recoloring bugs get discovered while the forms are already being actively touched.
-**Delivers:** `IThemeProvider`/`AppTheme` in Core; `WindowsThemeProvider`/`DwmTitleBar`/`NativeMethods` additions in Windows; `ThemeApplier` + wiring into `MainForm`/`SettingsForm`/`MonitorConfirmDialog` + `Program.cs` composition in App. Live theme-following (not just launch-time theming). Includes an audit-and-replace or audit-and-accept pass over existing `MessageBox.Show` call sites.
-**Addresses:** System theme detection, dark/light title bar, live theme switching, full control recoloring, flat control styling (FEATURES.md table stakes)
-**Avoids:** Pitfalls 1, 2, 3, 6, 7, 8 (double DWM set, no live-update, handle-timing no-op on `--tray` path, Win10 mismatch scoping, stale toolstrip cache, unthemed MessageBox)
+### Phase 1: Optional App & Audio Targets
+**Rationale:** Lowest risk, no data-model or mode-tracking prerequisites — pure validation-gate relaxation against the existing `AppSettings`/`ToggleService` shape. Delivers real user value independently and builds confidence before the higher-risk mode-tracking redesign.
+**Delivers:** `CompanionAppPath`, `RigAudioDeviceId` become skippable in `ToggleToRigMode` without breaking the "configured but broken" failure path; `SettingsForm.ValidateSettingsForm` relaxed in lockstep with `ToggleService.IsFullyConfigured` (must not drift — Pitfall 8).
+**Addresses:** Features 1 & 2 (Rig-mode half) from FEATURES.md.
+**Avoids:** Pitfall 3 (silent-skip masking real failures), Pitfall 8 (two validation gates drifting out of sync).
+**Open question to resolve before/during this phase:** does `NormalAudioDeviceId` gain real runtime effect (recommended, for symmetry) or stay an inert, collected-but-unused field? Flagged in FEATURES.md as a requirements-clarification item, not an implementer's call.
 
-### Phase 2: Tray Icon Redesign
-**Rationale:** Fully independent of Phase 1 architecturally (no shared files, interfaces, or ordering dependency per ARCHITECTURE.md) — can run in parallel with or even before Phase 1 if design art is ready sooner. Grouped as its own phase because it has a distinct workflow (design tooling, asset iteration) rather than a code-architecture reason for separation.
-**Delivers:** Two shape-distinct (not just color-distinct) mode icons, authored as SVG and hand-simplified at 16×16, packed into multi-resolution `.ico` files (minimum 16/32, recommended 16/20/24/32/40/48/256), dropped into `RigToggle.App\Resources\` with unchanged filenames/LogicalNames.
-**Uses:** ImageMagick/Inkscape dev tooling (STACK.md); existing `EmbeddedResource`/`LoadTrayIconsIfNeeded` mechanism (ARCHITECTURE.md)
-**Implements:** Icon asset pipeline component (ARCHITECTURE.md Component 5)
+### Phase 2: Normal-Mode Explicit Monitor Config + Mode-Store Redesign
+**Rationale:** The core, highest-risk, most novel piece of the milestone — forces the mode-detection redesign that Phase 3 then benefits from for free. Sequencing this before the manual panel avoids two divergent "toggle a monitor" implementations.
+**Delivers:** `AppSettings` gains `NormalMonitorsToDisable`/`NormalMonitorsToEnable`; `ToggleToNormalMode`'s Monitor step (and Audio step, if the symmetry question above resolves "yes") rewritten to the same configured-target shape Rig mode already uses; `ISnapshotStore` repurposed into `IModeStore`; `StateSnapshot`/`MonitorState`-as-restore-payload marked for deletion in Phase 4.
+**Uses:** `WindowsDisplayAPI`'s already-proven `ActivateMonitors`/`DeactivateMonitors` (zero interface changes needed); `System.Text.Json`'s existing nullable-field round-tripping.
+**Implements:** `IModeStore`, the `NormalMonitorsToDisable`/`ToEnable` data model.
+**Avoids:** Pitfall 2 (zero-monitors edge case across two independently-configured sets — verify no second implementation of the survivor-check exists), Pitfall 4 (mode detection breaking silently), Pitfall 5 (losing CR-01's safety net), Pitfall 6 (null-vs-empty migration bug reintroduced), Pitfall 7 (stale "before switching to Rig Mode" error text once `DeactivateMonitors` gets a second caller — fix the message here, before Phase 3 adds a third).
 
-### Phase 3: Polish & Verification
-**Rationale:** Several pitfalls in this milestone are explicitly *not* catchable by code review — they require real-rig, real-Windows testing against scenarios (`--tray` hidden-start, live theme flip while running, both taskbar theme backgrounds, extended-session GDI monitoring, actual DPI scaling on rig vs. desk monitor) that a sandboxed/non-Windows build environment cannot surface. This must be a dedicated late phase, not folded into Phase 1/2's "looks done" moment.
-**Delivers:** Verified live theme-following (visible + tray-hidden), verified `--tray` startup-then-restore theming, verified tray icon contrast against both real taskbar themes and DPI sharpness on rig hardware, verified GDI handle stability over an extended session, documented decision on Windows 10 fallback scope (contingent on confirming actual rig PC Windows version), and README screenshot deliverable.
-**Addresses:** PITFALLS.md's full "Looks Done But Isn't" checklist
+### Phase 3: Shared Concurrency Guard + Manual Monitor Panel
+**Rationale:** Depends on Phase 2's controller-call unification (not its data model) — building this after Phase 2 means the panel's status icons reflect the final, redesigned notion of monitor state without a second UI pass, and the `SingleFlightGuard` extraction is more natural as a companion refactor to `ToggleOrchestrator` while it's already being touched.
+**Delivers:** `SingleFlightGuard` (extracted, single shared instance), `ManualMonitorService`, non-modal `MonitorPanelForm` with per-monitor status-icon tiles (reusing `RigToggle.IconGen`).
+**Addresses:** Features 4 & 5 from FEATURES.md.
+**Avoids:** Pitfall 1 (two independent concurrency guards — verify with an automated test that deliberately races a toggle against a panel action), Pitfall 7 (verify the generalized error text reaches the panel's third call site too).
+
+### Phase 4: Cleanup Pass + Exe-Size Reduction
+**Rationale:** Only safe to run once Phase 2 has retired the snapshot/restore subsystem — removing dead code in one pass rather than incrementally. Exe-size reduction has no ordering dependency on anything else and is batched here for scheduling convenience, not because it's architecturally coupled.
+**Delivers:** `WindowsMonitorController.Restore()`/`RestoreViaReconstruction()` (~260 LOC) deleted along with `StateSnapshot` and (if the audio-symmetry decision from Phase 1 was "yes") `AudioState`/`AudioRoleState`-as-restore-payload and `WindowsAudioController.Restore()`/`CaptureState()`; MSBuild-only exe-size levers (`EnableCompressionInSingleFile`, `SatelliteResourceLanguages=en`, `InvariantGlobalization=true`, `NAudio` package split) applied and verified.
+**Avoids:** Pitfall 9 (deleting dead code without preserving the rig-specific knowledge it encodes — read `Restore()` fully before deleting, extract any lessons worth preserving elsewhere), Pitfall 10 (exe-size levers assumed safe for this app's COM/P-Invoke surface without rig verification — this phase's definition of done must include a full rig round-trip toggle plus a cold auto-started-boot timing check, not just a file-size diff, echoing the v1.2 "false assumption" pattern this project has already been burned by once).
 
 ### Phase Ordering Rationale
 
-- Theme infrastructure precedes icon redesign only by convention/risk-priority, not by hard dependency — the two are provably decoupled (ARCHITECTURE.md Integration Points), so the roadmapper has real flexibility to reorder or parallelize if that suits available design-asset timing.
-- Verification is deliberately its own late phase rather than embedded in Phase 1/2 because this project's own history (Phase 8, Phase 11) shows that its most consequential bugs are startup-path-divergence and live-update bugs invisible to a normal launch/relaunch test cycle — grouping all "must verify on real rig, can't verify in sandbox" checks into one late phase matches how this project has actually been debugged before.
-- Documentation (README screenshots) is scoped last since it depends on the finished visual result, per ARCHITECTURE.md's explicit build-order note.
+- **Dependency-driven, not feature-list-order:** FEATURES.md's own dependency graph confirms Features 1 & 2 have no hard dependency on 3/4/5 and can ship first; Feature 4 explicitly requires Feature 3's controller-unification work; Feature 5 (safety guard) is a cross-cutting verification concern threaded through 3 and 4, not a standalone phase — this shapes the 4-phase structure above rather than a 1-phase-per-numbered-feature structure.
+- **The mode-tracking redesign is the load-bearing risk, so it's isolated in its own phase** with dedicated pitfall coverage (4 of PITFALLS.md's 10 critical pitfalls map to this one phase) rather than being folded silently into "the monitor config feature" as an implementation detail.
+- **Cleanup and exe-size work are sequenced last** specifically because their prerequisite (dead code confirmed genuinely dead) doesn't exist until Phase 2 ships — attempting them earlier would require re-doing the dead-code analysis.
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- None flagged as needing *additional* research-phase investment — all four research files for this milestone are HIGH confidence on the core API contracts (verified directly against official .NET 10 docs and primary-source dotnet/winforms GitHub issues), and the codebase-specific integration points were verified by direct source-tree reads, not inference.
+- **Phase 2 (Normal-mode + mode-store redesign):** The audio-symmetry question (does `NormalAudioDeviceId` gain real runtime effect?) is explicitly flagged as unresolved by both FEATURES.md and ARCHITECTURE.md — resolve this as a requirements decision before or at the start of planning this phase, not mid-implementation. The exact `IModeStore` flag-flip timing (mirroring old snapshot save/clear points vs. re-deriving from first principles) also needs explicit design attention per Pitfall 5/Technical Debt table.
+- **Phase 4 (cleanup):** Needs a deliberate read-before-delete pass on `Restore()`/`RestoreViaReconstruction()` and the two flagged-fallback helpers (`CopyOutputTechnology`, `AssignSource`) — not pure mechanical dead-code removal.
 
-Phases with standard patterns (skip research-phase):
-- **Phase 1 (Theme Infrastructure):** Standard, well-documented WinForms/.NET 10 API + established Core/Windows/App adapter pattern already used four times in this codebase (`IAutostartConfigurator`, `IMonitorController`, `IAudioController`, `GlobalHotkey`) — implementation guidance is already concrete enough (see ARCHITECTURE.md Patterns 1-4 with working code examples) to plan directly.
-- **Phase 2 (Tray Icon Redesign):** Standard `.ico` packing/DPI-sizing conventions, official Microsoft icon design guidance already cited directly (FEATURES.md, STACK.md).
-- **Phase 3 (Polish & Verification):** Not a research question — a checklist-driven rig-verification phase; the checklist itself is already fully enumerated in PITFALLS.md.
+Phases with standard, well-documented patterns (skip deep research-phase):
+- **Phase 1 (optional targets):** Pure validation-gate relaxation against an already-nullable-by-design model; the project has already shipped this exact class of change once.
+- **Phase 3 (manual panel + guard):** Hand-rolled `UserControl`/`FlowLayoutPanel` and `Interlocked`-based guard extraction are both established, low-ambiguity WinForms/threading patterns already used elsewhere in this codebase.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Core API contract (`Application.SetColorMode`, DWM attribute value, registry keys) verified directly against official Microsoft Learn docs and .NET 10 release notes; a few runtime-behavior caveats (Windows 10 title-bar-only community reports, `UserPreferenceCategory.General` filtering) are MEDIUM |
-| Features | MEDIUM-HIGH | WinForms/DWM mechanics and Microsoft icon guidance are HIGH; "what well-regarded apps actually do" is thinner since comparable polished theme-following apps are mostly WPF/WinUI, used as aspirational reference only, not literal WinForms precedent |
-| Architecture | HIGH | Integration points verified directly against the real source tree (not inference), reusing an established, four-times-precedented pattern in this codebase; a couple of WinForms-runtime specifics (SystemEvents threading guarantees, UserPreferenceCategory filtering) are MEDIUM |
-| Pitfalls | HIGH for framework-API behavior (verified against official .NET 10 docs and primary-source dotnet/winforms open GitHub issues #13935, #12027, #12014); MEDIUM for icon-design/DPI specifics (WebSearch-aggregated, cross-checked but not project-verified) |
+| Stack | HIGH | MSBuild-property and dependency-hygiene claims verified directly against official Microsoft docs, package contents, and this repo's own source (grep-confirmed API usage). MEDIUM only on exact compression/satellite-language MB-savings figures, which are workload-dependent and not yet empirically measured against this specific exe. |
+| Features | MEDIUM-HIGH | Patterns verified against DisplayFusion, NirSoft MultiMonitorTool, Windows' own Settings > Display UI, and EarTrumpet/SoundVolumeView via web search; codebase dependency claims (e.g., the `NormalAudioDeviceId` dead-field finding) verified by direct inspection of current source, not training data. |
+| Architecture | HIGH on integration points and component placement (verified directly against the real source tree). MEDIUM on one specific recommendation: whether audio also drops snapshot-restore in Normal mode — this is the research's own inference from evidence (an already-scaffolded-but-unwired field), not a directly-stated requirement, and should be confirmed during roadmap/planning. |
+| Pitfalls | HIGH for pitfalls grounded in direct reads of this project's own source and documented bug history (`PROJECT.md`); MEDIUM for exe-size-lever interaction risks (no first-party report of this exact combination breaking COM/P-Invoke, reasoned from documented trimming risk plus this project's own track record). |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Actual Windows version of the rig PC is unconfirmed** (Windows 10 vs. 11) — `Application.SetColorMode` dark mode and full control theming are Windows-11-only by documentation; this is a scoping question that must be resolved as a prerequisite check in the theme-infrastructure phase, not assumed. If Windows 11 (likely given project context), Pitfall 6 (Win10 dark-title/light-body mismatch) is moot and can be explicitly scoped out.
-- **Whether `SettingsForm` is instantiated fresh per open or reused/hidden** is not confirmed from research alone (flagged as an Integration Gotcha in PITFALLS.md) — verify against the actual codebase before writing theme-application/subscription code, since a reused-instance assumption vs. fresh-instance assumption changes where `ThemeChanged` subscribe/unsubscribe must live.
-- **`WM_SETTINGCHANGE`/`ImmersiveColorSet` category filtering** (`UserPreferenceCategory.General`) is MEDIUM confidence, community-pattern-sourced rather than pinned to one official doc — validate on the rig; fall back to unconditional re-read-and-compare (already the recommended safer default in ARCHITECTURE.md's `WindowsThemeProvider` example) if the category proves too narrow.
-- **Toolstrip stale-brush-cache bug (`dotnet/winforms#12027`)** has no clean first-party fix as of this research — must be explicitly accepted as a documented known limitation or worked around by rebuilding the `ContextMenuStrip` on live theme change; this is a product/scope decision for planning, not an open technical question.
+- **Audio-symmetry decision (Normal-mode `SetDefault` vs. stay `Restore`-based):** Flagged independently by FEATURES.md, ARCHITECTURE.md, and PITFALLS.md as the one genuinely open architectural question in this milestone. Resolve explicitly as a requirements/roadmap decision before Phase 2 planning, not left implicit.
+- **Mode-flag timing re-derivation:** The old snapshot save/clear timing existed for restore-safety reasons that no longer apply to a pure mode marker — don't copy the old timing without re-justifying it for the new marker's actual purpose (a UI-truth signal, not restore payload). Address explicitly during Phase 2 planning.
+- **Long-disabled-monitor re-enable behavior across a full reboot (carried over from v1.1, still relevant to the manual panel's "enable a monitor" action):** best-mode-logic reconstruction of resolution/position for a monitor inactive since before the current session is API-contract-verified but not empirically proven on this specific rig hardware across a real reboot — if not already validated in a prior milestone, budget a small hardware-verification step rather than assuming.
+- **Exe-size lever interaction with COM/P-Invoke + autostart cold-boot:** No first-party report of this exact combination breaking anything, but this project has already been burned once (v1.2) by "the framework will surely handle this" assumptions that were rig-disproven. Treat Phase 4's exe-size work with the same rig-verification discipline as any CCD/COM-interop-touching change, not as a low-risk mechanical task.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- https://learn.microsoft.com/en-us/dotnet/desktop/winforms/whats-new/net100 — confirmed `Application.SetColorMode` non-experimental in .NET 10, Windows-11-only scope, MessageBox/Designer limitations
-- https://learn.microsoft.com/en-us/dotnet/api/system.windows.forms.application.setcolormode?view=windowsdesktop-10.0 — method signature, `SystemColorMode` values, live-update gap stated explicitly
-- https://learn.microsoft.com/en-us/windows/win32/shell/notification-area — official 16×16/32×32 minimum tray icon size guidance, `LoadIconMetric`
-- https://learn.microsoft.com/en-us/windows/apps/design/iconography/app-icon-design — silhouette/legibility/"color alone insufficient" guidance
-- https://github.com/dotnet/winforms/issues/13935, #12027, #12014 — primary-source, open/unresolved GitHub issues confirming no built-in live theme-following, stale toolstrip brush cache, title-bar regression
-- Direct source-tree reads of `Program.cs`, `MainForm.cs`, `SettingsForm.cs`, `MonitorConfirmDialog.cs`, `NativeMethods.cs`, `GlobalHotkey.cs`, `IAutostartConfigurator.cs`, and related `.csproj` files — ground truth for existing architecture and integration points
+- Direct source-tree reads this session: `src/RigToggle.Core/ToggleService.cs`, `ToggleOrchestrator.cs`, `Models/AppSettings.cs`, `Models/StateSnapshot.cs`, `Persistence/JsonSettingsStore.cs`, `Persistence/JsonSnapshotStore.cs`; `src/RigToggle.Windows/WindowsMonitorController.cs`, `WindowsAudioController.cs`; `src/RigToggle.App/MainForm.cs`, `Program.cs`, `SettingsForm.cs`; `src/RigToggle.Tests/Doubles/*` — used across all four research passes as primary evidence, not inference.
+- https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview — `EnableCompressionInSingleFile` semantics and documented startup-cost tradeoff.
+- https://learn.microsoft.com/en-us/windows/win32/shell/notification-area — official tray icon size guidance (carried over context).
+- `.planning/PROJECT.md` and `.planning/MILESTONES.md` — v2.0 milestone framing, target features list, documented bug history (CR-01/CR-02, D-02/D-04/D-05/D-08/D-14) used as ground truth for scope and as the evidence base for which bug classes are genuine recurrence risks.
 
 ### Secondary (MEDIUM confidence)
-- https://ironsoftware.com/academy/csharp-framework/dotnet10-dark-mode-winforms/ — practical caveats corroborating the official live-update gap and Windows-11-only scope
-- https://github.com/ShareX/ShareX/issues/4304, #4310 — real-world evidence of naive WinForms control-color reassignment producing suboptimal results in a comparable actively-maintained app
-- https://github.com/anthropics/claude-code/issues/72622 — concrete 2026 real-world instance of the taskbar-vs-app-theme icon contrast pitfall
-- https://github.com/Aldaviva/DarkNet — alternative library considered and deliberately not adopted (hand-rolling preferred, consistent with this project's established dependency-minimization bias)
-- WebSearch aggregation on `AppsUseLightTheme`/`SystemUsesLightTheme` registry key semantics and multi-resolution `.ico` DPI-sizing conventions — consistent across multiple independent sources
+- https://www.displayfusion.com/HelpGuide/WorkingWithDisplayFusionMonitorProfiles/ and companion forum thread — Monitor Profiles as explicit named target sets, confirmation-prompt-suppression pattern.
+- https://www.nirsoft.net/articles/turn-off-monitor.html / MultiMonitorTool product page — per-monitor checkbox + hotkey + CLI pattern.
+- https://github.com/File-New-Project/EarTrumpet (issues/discussions) — unset-target-is-a-no-op convention for audio switching.
+- https://andrewlock.net/disabling-localized-satellite-assemblies-during-dotnet-publish/ — `SatelliteResourceLanguages` mechanism and a cited MB-savings figure (single blog source for the exact figure).
 
 ### Tertiary (LOW confidence)
-- None flagged — all findings in this research pass were corroborated by at least one MEDIUM-or-higher source; no single-source/pure-inference claims were carried into this summary.
+- Windows' classic "Keep these display settings?" 15-second auto-revert behavior — well-established from training data, not independently re-verified via a fresh fetch this session; used only as UX-pattern precedent for the manual panel's optional revert-safety-window idea, not as a hard requirement.
 
 ---
-*Research completed: 2026-08-02*
+*Research completed: 2026-08-04*
 *Ready for roadmap: yes*
