@@ -49,7 +49,7 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 **Milestone Goal:** Replace the default-WinForms look with a theme-aware, modern UI, give the tray icons real visual distinction, and ship a GitHub-ready README.
 
 - [x] **Phase 12: Theme Infrastructure & Live Theme-Following** - MainForm and SettingsForm follow the Windows light/dark theme, including title bar and every control, live and without restart (completed 2026-08-03)
-- [~] **Phase 13: Tray & App Icon Redesign** - Shape-distinct, DPI-sharp rig/normal mode icon pair replaces the current plain pair (rig-passed 2026-08-03; reopened for CR-01 outline-seam gap closure, plan 13-04)
+- [x] **Phase 13: Tray & App Icon Redesign** - Shape-distinct, DPI-sharp rig/normal mode icon pair replaces the current plain pair (rig-passed 2026-08-03 after CR-01 outline-seam gap closure, plan 13-04; completed 2026-08-03)
 - [x] **Phase 14: README & Release Documentation** - GitHub-ready README with screenshots, install/build instructions, and badges (completed 2026-08-03)
 
 ## Phase Details
