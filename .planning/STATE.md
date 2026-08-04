@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Visual Polish & Documentation
-status: Awaiting next milestone
-stopped_at: Milestone v1.2 complete and archived
-last_updated: "2026-08-04T06:30:00.000Z"
-last_activity: 2026-08-04 — Milestone v1.2 completed and archived
+milestone: v2.0
+milestone_name: Configurable Monitors, Optional Targets & Cleanup
+status: planning
+last_updated: "2026-08-04T07:25:42.130Z"
+last_activity: 2026-08-04
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 13
-  completed_plans: 13
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-08-04)
 
 ## Current Position
 
-Phase: Milestone v1.2 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-08-04 - Completed quick task 260804-9rt: Fix UF-14-01 and UF-14-02 from Phase 14 security audit
+Status: Defining requirements
+Last activity: 2026-08-04 — Milestone v2.0 started
 
 ## Performance Metrics
 

@@ -16,7 +16,21 @@ v1.2 replaced the default-WinForms look with a theme-aware, modern UI (live ligh
 
 **Not yet done:** the four README screenshot placeholders (`docs/screenshots/*.png`) are intentionally still broken-image links — real screenshots must be supplied by the user from the rig (no Windows GUI in this build environment).
 
-**Next milestone:** Not yet scoped. Run `/gsd:new-milestone` to start.
+## Current Milestone: v2.0 Configurable Monitors, Optional Targets & Cleanup
+
+**Goal:** Replace snapshot-restore with explicit per-mode monitor configuration, make app/audio targets optional, add a live manual monitor toggle panel, and reduce exe size + clean up code.
+
+**Target features:**
+- App path becomes optional — when unset, toggle skips launch/focus/minimize entirely
+- Audio devices become optional per role — when unset, toggle skips audio switching entirely
+- Normal mode gets an explicit configured monitor set (which monitors on/off), replacing snapshot-restore
+- Rig mode's existing monitor set config stays, now symmetric with Normal mode's
+- New GUI panel: live, on-demand enable/disable of any monitor, independent of the Rig/Normal toggle, with per-monitor status shown via monitor icons (not just text)
+- Safety constraint carried over: at least one monitor must always remain enabled, enforced across both the toggle action and the manual panel
+- Reduce self-contained exe size (without enabling IL trimming — COM/P-Invoke code gets falsely stripped, per existing project guidance)
+- Code quality/cleanup pass across the 3-milestone-old codebase
+
+**Key context:** This milestone revises the project's stated Core Value ("restores everything to exactly how it was before") — Normal mode moves from snapshot-restore to an explicitly configured target state, matching how Rig mode already works. The "at least one monitor enabled" safety guard is explicitly preserved across this redesign. Exe size reduction must find savings other than trimming, since `PublishTrimmed=true` is documented as unsafe for this codebase's COM/P-Invoke-heavy surface.
 
 <details>
 <summary>Archived: v1.0, v1.1, and v1.2 milestone framing (superseded)</summary>
@@ -69,7 +83,7 @@ v1.2 replaced the default-WinForms look with a theme-aware, modern UI (live ligh
 
 ### Active
 
-None — v1.2 shipped and closed. Next milestone not yet scoped; see `.planning/milestones/v1.2-REQUIREMENTS.md`'s v2 backlog (LOG-01, THEME-07/08/09) as candidates for `/gsd:new-milestone`.
+Defining requirements for v2.0 Configurable Monitors, Optional Targets & Cleanup — see `.planning/REQUIREMENTS.md` once written.
 
 ### Out of Scope
 
@@ -147,4 +161,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-04 — v1.2 Visual Polish & Documentation milestone closed and archived.*
+*Last updated: 2026-08-04 — milestone v2.0 (Configurable Monitors, Optional Targets & Cleanup) started after v1.2 close.*
