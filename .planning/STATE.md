@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Configurable Monitors, Optional Targets & Cleanup
 status: planning
-stopped_at: Phase 16 context gathered
-last_updated: "2026-08-04T20:21:58.318Z"
+stopped_at: Phase 16 UI-SPEC approved
+last_updated: "2026-08-04T21:30:58.084Z"
 last_activity: 2026-08-04
 progress:
   total_phases: 4
@@ -131,9 +131,9 @@ Resolved at v1.2 close (2026-08-04): Phase 13's `13-VERIFICATION.md` had the sam
 
 ## Session Continuity
 
-Last session: 2026-08-04T20:21:58.302Z
-Stopped at: Phase 16 context gathered
-Resume file: .planning/phases/16-normal-mode-explicit-monitor-config-mode-store-redesign/16-CONTEXT.md
+Last session: 2026-08-04T21:30:58.067Z
+Stopped at: Phase 16 UI-SPEC approved
+Resume file: .planning/phases/16-normal-mode-explicit-monitor-config-mode-store-redesign/16-UI-SPEC.md
 
 ## Operator Next Steps
 
