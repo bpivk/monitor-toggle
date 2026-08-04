@@ -289,7 +289,7 @@ namespace RigToggle.App
                         // snapshot and flipping the mode indicator to "Rig".
                         MessageBox.Show(
                             this,
-                            "Please finish configuring Settings (at least one monitor to disable or enable, both audio devices, and the companion app) before switching to Rig Mode.",
+                            "Please choose at least one monitor to disable or enable in Settings before switching to Rig Mode.",
                             "Rig Toggle",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
