@@ -81,9 +81,17 @@ v1.2 replaced the default-WinForms look with a theme-aware, modern UI (live ligh
 - [x] Redesigned tray icon pair + exe/taskbar icon: silhouette-distinct (monitor vs. steering wheel, no color-only differentiation), monochrome self-contained-contrast tray icons, color-treated exe icon, multi-resolution `.ico` (8 frames, 16-48px tray; 6 frames, 16-256px exe) via a new dev-time `RigToggle.IconGen` GDI+ generator (ICON-01 through ICON-04) — Validated in Phase 13: Tray & App Icon Redesign. Rig-validated on real Windows 11 hardware after one gap-closure round: the first rig pass approved shape/legibility/DPI/exe-icon, but a code review afterward found the outline-drawing approach (`GraphicsPath.DrawPath` on a combined multi-shape path) produced real seam artifacts the human hadn't caught at a glance; fixed via stroke-then-fill compositing plus a new automated pixel-level diagnostic, re-confirmed clean on a second rig pass.
 - [x] GitHub-ready README.md: three live-endpoint badges (build status, license, latest release), generic feature overview + problem statement, download+build instructions, four screenshot placeholders (DOCS-01 through DOCS-03) — Validated in Phase 14: README & Release Documentation. Delivering this required real backing infrastructure beyond docs: a new MIT LICENSE, two GitHub Actions workflows (build + tag-triggered release with exe attachment), the repo flipped from private to public, and v1.0/v1.1 backfilled as notes-only GitHub Releases. Live-verified end to end (repo public, Build workflow green, all three badges rendering correct values, releases present) after fixing a real bug caught only by that live verification: `build.yml` was scoped to `branches: [main]` but this repo's actual default branch is `master`.
 
+### Validated (v2.0)
+
+- [x] User can leave the companion app launch target unset; toggling skips launch/focus (Rig direction) and minimize (Normal direction) entirely, with no error (APP-04) — Validated in Phase 15: Optional App & Audio Targets
+- [x] A configured-but-missing app path still surfaces as a real failure, not silently treated as unset (APP-05) — Validated in Phase 15
+- [x] User can leave the Rig-mode audio device unset; toggling to Rig mode skips Rig-direction audio switching entirely (AUDIO-03) — Validated in Phase 15
+- [x] User can configure a Normal-mode audio device that actually applies on toggle to Normal mode, replacing snapshot-based restore; leaving it unset skips Normal-direction audio switching (AUDIO-04) — Validated in Phase 15, rig-confirmed the Windows default device actually switches
+- [x] A configured-but-invalid audio device still surfaces as a real failure, not silently skipped (AUDIO-05) — Validated in Phase 15, rig-confirmed with a removed USB device
+
 ### Active
 
-Defining requirements for v2.0 Configurable Monitors, Optional Targets & Cleanup — see `.planning/REQUIREMENTS.md` once written.
+Defining/executing remaining v2.0 requirements (DISPLAY-09 through DISPLAY-13 and beyond) — see `.planning/REQUIREMENTS.md`.
 
 ### Out of Scope
 
@@ -105,6 +113,7 @@ Defining requirements for v2.0 Configurable Monitors, Optional Targets & Cleanup
 - v1.1 rig-discovered/code-review-found bugs, all fixed and verified: `GetAllMonitors()` duplicate-row/dual-primary dedup; `Restore()` Source-ID staleness for enable-set monitors; migration guard re-corrupting an emptied disable set; non-exception-safe companion-app minimize step; `--tray` hidden-start not actually suppressing the window; autostart save-failure recovery itself throwing unhandled; hotkey owner-window-destroyed timing bug; Escape-closes-Settings-during-hotkey-capture; Phase 11's tray-preference lockout bug (two fix commits, rig-reverified at milestone close).
 - Known limitation carried forward unpatched: `LaunchOrFocus`/`MinimizeIfRunning` derive the running-process name from the configured launch-target path via `Path.GetFileNameWithoutExtension` — if the user configures a `.lnk` (not the target `.exe` itself), toggle-back's minimize may silently no-op. Documented, out of scope.
 - v1.2 CI hardening gaps flagged by code review, advisory/non-blocking, not yet addressed: `build.yml` has no explicit `permissions:` block despite running on `pull_request`; all three GitHub Actions are pinned to floating major-version tags rather than commit SHAs; `release.yml` publishes on tag push with no build/test gate beforehand; neither workflow sets `timeout-minutes`. Full detail: `.planning/phases/14-readme-release-documentation/14-REVIEW.md`.
+- Phase 15 code-review debt flagged for Phase 18 cleanup, advisory/non-blocking: `IAudioController.Restore` is now dead in production (Normal-mode audio uses `SetDefault` instead) but the interface/implementations still carry it; `SettingsForm.cs` treats "unset" as `is null`/`is not null` while `ToggleService.cs` uses `string.IsNullOrEmpty` — a latent semantic mismatch if `""` were ever persisted instead of `null`. Full detail: `.planning/phases/15-optional-app-audio-targets/15-REVIEW.md`.
 
 ## Constraints
 
@@ -142,6 +151,9 @@ Defining requirements for v2.0 Configurable Monitors, Optional Targets & Cleanup
 | GitHub repo flipped private → public, badges wired to live GitHub Actions/shields.io endpoints (never static/decorative) | A "GitHub-ready README" with badges only makes sense on a public repo; CONTEXT.md explicitly rejected decorative badges not backed by real CI/license/release state | Validated Phase 14, live-verified |
 | README kept deliberately generic (no "Moza"/"BeamNG" naming) despite internal docs (CLAUDE.md/PROJECT.md) using those names | User's explicit choice during Phase 14 discuss — a public-facing doc reads more general-purpose than the internal project framing; downstream agents must not "correct" this back | Validated Phase 14 |
 | `build.yml` triggers on `branches: [master]`, not the more common `[main]` default | This repo's actual default branch is `master` — a bug where the workflow was originally scoped to `main` (never firing) was caught only by Phase 14's live human-verify checkpoint, not by local acceptance-criteria grep checks | Validated Phase 14, fixed and re-verified live |
+| Distinct `Skipped` toggle-step outcome, never conflated with `NotAttempted` or `Failed` | An unset target must never trigger a "did not fully complete" warning, but a configured-but-broken target must still fail loudly — a two-state boolean couldn't represent both | Validated Phase 15, rig-confirmed both toggle directions |
+| Normal-mode audio device applies via `SetDefault`, not `Restore(snapshot.Audio)` | AUDIO-04 requires the configured Normal-mode device to genuinely become the Windows default on toggle-to-Normal, not whatever was previously snapshotted | Validated Phase 15, rig-confirmed in the Windows sound flyout |
+| `IsFullyConfigured`/Save gate relaxed to the monitor-set check only; a broken (not merely unset) app/audio target still blocks Save | Now-optional targets shouldn't block Save just for being unset, but "broken" (moved .exe, removed device) must remain distinguishable from "unset" everywhere, including at Save time | Validated Phase 15, rig-confirmed |
 
 ## Evolution
 
@@ -161,4 +173,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-04 — milestone v2.0 (Configurable Monitors, Optional Targets & Cleanup) started after v1.2 close.*
+*Last updated: 2026-08-04 — Phase 15 (Optional App & Audio Targets) complete, rig-verified.*
