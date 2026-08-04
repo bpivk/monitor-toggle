@@ -58,7 +58,7 @@ Full phase details: `.planning/milestones/v1.2-ROADMAP.md`
 
 **Milestone Goal:** Replace snapshot-restore with explicit per-mode monitor configuration, make app/audio targets optional, add a live manual monitor toggle panel, and reduce exe size + clean up code.
 
-- [ ] **Phase 15: Optional App & Audio Targets** - Companion app and per-role audio devices become optional; toggle skips cleanly when unset but a configured-but-broken target still surfaces as a real failure
+- [x] **Phase 15: Optional App & Audio Targets** - Companion app and per-role audio devices become optional; toggle skips cleanly when unset but a configured-but-broken target still surfaces as a real failure (completed 2026-08-04)
 - [ ] **Phase 16: Normal-Mode Explicit Monitor Config & Mode-Store Redesign** - Normal mode applies an explicitly configured monitor set instead of snapshot-restore, with mode tracked via a persisted flag and crash-mid-toggle detection
 - [ ] **Phase 17: Manual Monitor Panel & Shared Safety Guard** - A live panel lets the user enable/disable any monitor on demand, with the "at least one monitor enabled" guard enforced identically everywhere monitors can be mutated
 - [ ] **Phase 18: Cleanup Pass & Exe-Size Reduction** - Dead snapshot-restore code removed, general code-quality pass, and exe size reduced via MSBuild config, rig-verified
@@ -91,7 +91,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 15-04-PLAN.md — Full-solution regression gate + rig verification of all five success criteria
+- [x] 15-04-PLAN.md — Full-solution regression gate + rig verification of all five success criteria
 
 ### Phase 16: Normal-Mode Explicit Monitor Config & Mode-Store Redesign
 
@@ -156,7 +156,7 @@ Plans:
 | 12. Theme Infrastructure & Live Theme-Following | v1.2 | 6/6 | Complete | 2026-08-03 |
 | 13. Tray & App Icon Redesign | v1.2 | 4/4 | Complete | 2026-08-03 |
 | 14. README & Release Documentation | v1.2 | 3/3 | Complete | 2026-08-03 |
-| 15. Optional App & Audio Targets | v2.0 | 3/4 | In Progress|  |
+| 15. Optional App & Audio Targets | v2.0 | 4/4 | Complete   | 2026-08-04 |
 | 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 0/TBD | Not started | - |
 | 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 0/TBD | Not started | - |
 | 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 0/TBD | Not started | - |
