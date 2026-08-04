@@ -45,13 +45,16 @@ public sealed class ToggleService
     }
 
     /// <summary>
-    /// Loads settings, verifies the companion app path still exists (D-05 preflight —
-    /// fails fast with nothing yet captured, persisted, or mutated), captures the
-    /// current monitor + audio state, saves that snapshot (BEFORE any mutation —
-    /// CORE-03), then disables the configured monitor, switches the default audio
-    /// device, and launches/focuses the companion app — stop-on-first-failure (D-04):
-    /// the first mutation step to throw is recorded as Failed and every step after it
-    /// is recorded as NotAttempted, with no rollback and no further steps attempted.
+    /// Loads settings, captures the current monitor + audio state, saves that snapshot
+    /// (BEFORE any mutation — CORE-03), then disables the configured monitor, switches
+    /// the default audio device (if configured), and launches/focuses the companion app
+    /// (if configured) — stop-on-first-failure (D-04): the first mutation step to throw
+    /// is recorded as Failed and every step after it is recorded as NotAttempted, with no
+    /// rollback and no further steps attempted. Phase 15/AUDIO-03/APP-04: Audio and App
+    /// are optional — a null/empty RigAudioDeviceId or CompanionAppPath records a Skipped
+    /// step instead of running (and does not block the next step); the companion-app
+    /// existence check now runs inside the App step body rather than as a top-level
+    /// preflight, so D-04's "always 3 steps" holds even for a configured-but-missing path.
     /// </summary>
     public ToggleResult ToggleToRigMode()
     {
@@ -64,18 +67,14 @@ public sealed class ToggleService
             // durably persisting a garbage snapshot and flipping IsInRigMode() to true
             // (D-14) even though nothing was actually captured or changed.
             throw new InvalidOperationException(
-                "Rig Toggle settings are not fully configured. Open Settings and choose at least one monitor to disable or enable, both audio devices, and the companion app path before switching to Rig Mode.");
+                "Rig Toggle settings are not fully configured. Open Settings and choose at least one monitor to disable or enable before switching to Rig Mode.");
         }
 
-        if (!File.Exists(settings.CompanionAppPath))
-        {
-            // D-05: a missing/moved companion-app path must fail before any state is
-            // captured, persisted, or mutated — this is a fail-fast UX guard, not a
-            // security control (T-03-09 accepts the TOCTOU window between this check
-            // and the later Process.Start in WindowsAppController.LaunchOrFocus).
-            throw new InvalidOperationException(
-                $"The companion app could not be found at '{settings.CompanionAppPath}'. Open Settings and reselect the companion app path before switching to Rig Mode.");
-        }
+        // Phase 15/D-04: the companion-app-path existence check used to be a top-level
+        // preflight throw here — that made a broken app path block the entire toggle
+        // (including monitor disable) and produced zero ToggleResult steps, contradicting
+        // D-04's "the result always has all 3 steps." The check now lives inside the App
+        // step body below (TryExecuteOptionalStep), running only when a path is configured.
 
         var monitorState = _monitorController.CaptureState();
         var audioState = _audioController.CaptureState();
@@ -137,13 +136,41 @@ public sealed class ToggleService
             return new ToggleResult(steps);
         }
 
-        if (!TryExecuteStep("Audio", () => _audioController.SetDefault(settings.RigAudioDeviceId!), steps))
+        // Phase 15/AUDIO-03/APP-04: Audio and App are now optional in both directions.
+        // TryExecuteOptionalStep records a Skipped step (not blocking) when the field is
+        // unset, otherwise delegates to TryExecuteStep — preserving the exact same
+        // stop-on-first-failure short-circuit shape as before: a Failed Audio step still
+        // blocks App (NotAttempted), a Skipped Audio step does not.
+        if (!TryExecuteOptionalStep("Audio", settings.RigAudioDeviceId, deviceId =>
+            {
+                if (_audioController.TryResolveDevice(deviceId) is null)
+                {
+                    throw new InvalidOperationException(
+                        "The configured Rig-mode audio device could not be found. Open Settings and reselect it.");
+                }
+
+                _audioController.SetDefault(deviceId);
+            }, steps))
         {
             steps.Add(new ToggleStepResult("App", ToggleStepOutcome.NotAttempted, null));
             return new ToggleResult(steps);
         }
 
-        TryExecuteStep("App", () => _appController.LaunchOrFocus(settings.CompanionAppPath!), steps);
+        TryExecuteOptionalStep("App", settings.CompanionAppPath, path =>
+            {
+                if (!File.Exists(path))
+                {
+                    // D-05 (relocated from the old top-level preflight, Phase 15/D-04):
+                    // a missing/moved companion-app path fails as a real step, not before
+                    // any state is captured — this is a fail-fast UX guard, not a security
+                    // control (T-03-09 accepts the TOCTOU window between this check and
+                    // the later Process.Start in WindowsAppController.LaunchOrFocus).
+                    throw new InvalidOperationException(
+                        $"The companion app could not be found at '{path}'. Open Settings and reselect the companion app path before switching to Rig Mode.");
+                }
+
+                _appController.LaunchOrFocus(path);
+            }, steps);
 
         return new ToggleResult(steps);
     }
@@ -175,6 +202,30 @@ public sealed class ToggleService
     }
 
     /// <summary>
+    /// Phase 15/D-03: extends TryExecuteStep with a "configured at all?" guard, rather
+    /// than duplicating its try/catch/trace logic. When <paramref name="configuredValue"/>
+    /// is null/empty, records a distinct Skipped step (the user deliberately left this
+    /// target unconfigured — never NotAttempted, which means "blocked by an earlier
+    /// failure") and returns true, since Skipped does not block the chain, the same as
+    /// Succeeded. Otherwise delegates to TryExecuteStep so a configured-but-broken target
+    /// still surfaces as a real Failed step (AUDIO-05/APP-05).
+    /// </summary>
+    private static bool TryExecuteOptionalStep(
+        string stepName,
+        string? configuredValue,
+        Action<string> action,
+        List<ToggleStepResult> steps)
+    {
+        if (string.IsNullOrEmpty(configuredValue))
+        {
+            steps.Add(new ToggleStepResult(stepName, ToggleStepOutcome.Skipped, null));
+            return true;
+        }
+
+        return TryExecuteStep(stepName, () => action(configuredValue), steps);
+    }
+
+    /// <summary>
     /// Structural equality for MonitorState, used only by the CR-01 fix above. MonitorState
     /// is a record, but its Paths member is typed IReadOnlyList&lt;T&gt; — record-generated
     /// equality falls back to reference equality for that member (interfaces/List&lt;T&gt;
@@ -186,33 +237,38 @@ public sealed class ToggleService
         before.TargetDevicePath == after.TargetDevicePath && before.Paths.SequenceEqual(after.Paths);
 
     /// <summary>
-    /// True when every field ToggleToRigMode/ToggleToNormalMode depend on has been saved
-    /// at least once via Settings (mirrors the four fields SettingsForm.ValidateSettingsForm
-    /// already requires before enabling Save). Exposed publicly so MainForm can pre-check
-    /// before offering "Switch to Rig Mode" at all, rather than relying solely on the
-    /// exception thrown by ToggleToRigMode above.
+    /// True when the monitor set is configured (at least one monitor in either
+    /// MonitorsToDisable or MonitorsToEnable). Phase 15/D-05: Audio and App targets are
+    /// now genuinely optional (AUDIO-03/AUDIO-04/APP-04) — leaving them unset never blocks
+    /// a toggle in either direction, so this gate no longer checks them. Only the
+    /// monitor-disable step is safety-relevant and non-optional. Exposed publicly so
+    /// MainForm can pre-check before offering "Switch to Rig Mode" at all, rather than
+    /// relying solely on the exception thrown by ToggleToRigMode above.
     /// </summary>
     public bool IsSettingsConfigured() => IsFullyConfigured(_settingsStore.Load());
 
     // D-07: an enable-only or disable-only configuration is fully configured — a
     // single required MonitorDevicePath no longer exists (v1.1 generalizes to
     // arbitrary disable/enable sets), so this checks that at least one of the two
-    // sets is non-empty rather than requiring a specific monitor.
+    // sets is non-empty rather than requiring a specific monitor. Phase 15/D-05: the
+    // audio/app field requirements have been dropped entirely — see IsSettingsConfigured
+    // doc comment above.
     private static bool IsFullyConfigured(Models.AppSettings settings) =>
-        (settings.MonitorsToDisable?.Count > 0 || settings.MonitorsToEnable?.Count > 0)
-        && !string.IsNullOrEmpty(settings.NormalAudioDeviceId)
-        && !string.IsNullOrEmpty(settings.RigAudioDeviceId)
-        && !string.IsNullOrEmpty(settings.CompanionAppPath);
+        settings.MonitorsToDisable?.Count > 0 || settings.MonitorsToEnable?.Count > 0;
 
     /// <summary>
-    /// Loads the snapshot and restores the monitor and audio state it captured — the
-    /// audio restore path always uses IAudioController.Restore, never the forward-mode
-    /// device-switch call, which is reserved for the rig-mode path only. Minimizes the
-    /// companion app if running, then clears the snapshot last so IsInRigMode() flips
-    /// back to false. Isolate-and-continue (D-05): unlike ToggleToRigMode's stop-on-
-    /// first-failure, every restore step here is attempted regardless of whether an
-    /// earlier one failed, and no step throws — each outcome is recorded as a
-    /// ToggleStepResult instead (D-02).
+    /// Loads the snapshot and restores the monitor state it captured via
+    /// IMonitorController.Restore. Phase 15/AUDIO-04: the Audio step no longer reads the
+    /// snapshot at all — it applies settings.NormalAudioDeviceId via the same
+    /// forward-mode SetDefault call the rig-mode path uses, skipped when unset
+    /// (AUDIO-03's optional-target pattern mirrored for the Normal direction).
+    /// snapshot.Audio becomes unread dead data as a result (still captured/persisted,
+    /// just never consumed here — Phase 18 cleanup scope). Minimizes the companion app
+    /// if running (or Skipped if unset, Phase 15/APP-04), then clears the snapshot last
+    /// so IsInRigMode() flips back to false. Isolate-and-continue (D-05): unlike
+    /// ToggleToRigMode's stop-on-first-failure, every restore step here is attempted
+    /// regardless of whether an earlier one failed, and no step throws — each outcome
+    /// is recorded as a ToggleStepResult instead (D-02).
     ///
     /// Monitor restore failure is NOT swallowed (04-CONTEXT.md D-05): a failed monitor
     /// restore leaves the user's screen disabled, so it is recorded as a Failed step so
@@ -300,30 +356,51 @@ public sealed class ToggleService
                 monitorFailure = ex;
             }
 
+            // Phase 15/AUDIO-04: Normal-mode audio no longer restores from the pre-toggle
+            // snapshot — it now applies settings.NormalAudioDeviceId via SetDefault, the
+            // same optional-target pattern Rig mode already uses for RigAudioDeviceId,
+            // skipped when unset. snapshot.Audio becomes unread dead data (still captured
+            // and persisted, just never consumed here) — cleanup is Phase 18 scope.
+            // Isolate-and-continue is preserved: this stays inside the same try/catch
+            // shape as the old Restore call so a monitor failure above does not block
+            // this, and this failing does not block MinimizeIfRunning/Clear below.
             Exception? audioFailure = null;
-            try
+            ToggleStepOutcome audioOutcome;
+            if (string.IsNullOrEmpty(settings.NormalAudioDeviceId))
             {
-                _audioController.Restore(snapshot.Audio);
+                audioOutcome = ToggleStepOutcome.Skipped;
             }
-            catch (Exception ex)
+            else
             {
-                // Gap-closure 03-04: audio restore is intentionally swallowed (continues
-                // rather than short-circuiting) — see class-level remarks. Traced for
-                // the same reason as every other step failure now (IN-02 code review):
-                // this codebase has no other logging, and a Trace breadcrumb outlives
-                // the single ToggleStepResult/MessageBox prompt.
-                System.Diagnostics.Trace.WriteLine($"Audio restore failed, continuing: {ex}");
-                audioFailure = ex;
+                try
+                {
+                    if (_audioController.TryResolveDevice(settings.NormalAudioDeviceId) is null)
+                    {
+                        throw new InvalidOperationException(
+                            "The configured Normal-mode audio device could not be found. Open Settings and reselect it.");
+                    }
+
+                    _audioController.SetDefault(settings.NormalAudioDeviceId);
+                    audioOutcome = ToggleStepOutcome.Succeeded;
+                }
+                catch (Exception ex)
+                {
+                    // Gap-closure 03-04: audio failure is intentionally swallowed
+                    // (continues rather than short-circuiting) — see class-level remarks.
+                    // Traced for the same reason as every other step failure now (IN-02
+                    // code review): this codebase has no other logging, and a Trace
+                    // breadcrumb outlives the single ToggleStepResult/MessageBox prompt.
+                    System.Diagnostics.Trace.WriteLine($"Audio switch failed, continuing: {ex}");
+                    audioFailure = ex;
+                    audioOutcome = ToggleStepOutcome.Failed;
+                }
             }
 
             steps.Add(new ToggleStepResult(
                 "Monitor",
                 monitorFailure is null ? ToggleStepOutcome.Succeeded : ToggleStepOutcome.Failed,
                 monitorFailure?.Message));
-            steps.Add(new ToggleStepResult(
-                "Audio",
-                audioFailure is null ? ToggleStepOutcome.Succeeded : ToggleStepOutcome.Failed,
-                audioFailure?.Message));
+            steps.Add(new ToggleStepResult("Audio", audioOutcome, audioFailure?.Message));
 
             if (monitorFailure is not null)
             {
@@ -360,10 +437,9 @@ public sealed class ToggleService
         }
         else
         {
-            // No companion app path configured/available — minimize was never
-            // attempted (not that it failed); represented as NotAttempted so the
-            // checklist keeps a consistent up-to-3-entry shape.
-            steps.Add(new ToggleStepResult("App", ToggleStepOutcome.NotAttempted, null));
+            // Phase 15/D-03/D-04: an unset companion app path is a deliberate choice
+            // (APP-04), not blocked-by-an-earlier-failure — Skipped, never NotAttempted.
+            steps.Add(new ToggleStepResult("App", ToggleStepOutcome.Skipped, null));
         }
 
         // CR-02: Clear() must run regardless of the App step's outcome above — Monitor

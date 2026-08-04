@@ -49,7 +49,8 @@ public class ToggleServiceTests : IDisposable
         bool audioThrowsOnRestore = false,
         bool monitorThrowsOnDisable = false,
         bool monitorMutatesBeforeThrowingOnDisable = false,
-        bool appThrowsOnMinimize = false)
+        bool appThrowsOnMinimize = false,
+        bool audioDeviceMissing = false)
     {
         var callLog = new List<string>();
         var settingsStore = new InMemorySettingsStore(settings ?? ConfiguredSettings);
@@ -58,7 +59,7 @@ public class ToggleServiceTests : IDisposable
             callLog,
             throwOnDisable: monitorThrowsOnDisable,
             mutatesBeforeThrowingOnDisable: monitorMutatesBeforeThrowingOnDisable);
-        var audioController = new FakeAudioController(callLog, throwOnRestore: audioThrowsOnRestore);
+        var audioController = new FakeAudioController(callLog, throwOnRestore: audioThrowsOnRestore, deviceExists: !audioDeviceMissing);
         var appController = new FakeAppController(callLog, throwOnMinimize: appThrowsOnMinimize);
 
         var service = new ToggleService(settingsStore, snapshotStore, monitorController, audioController, appController);
@@ -121,34 +122,20 @@ public class ToggleServiceTests : IDisposable
     }
 
     [Fact]
-    public void ToggleToNormalMode_RestoresAudioViaRestore_NeverSetDefault()
+    public void ToggleToNormalMode_AppliesNormalAudioDeviceViaSetDefault_NeverRestore()
     {
+        // AUDIO-04: Normal-mode audio now applies via SetDefault(NormalAudioDeviceId),
+        // replacing the old snapshot-based Restore call. Monitor's own restore path
+        // (Phase 16 territory) is unaffected and still uses monitor.Restore.
         var (service, callLog, _) = CreateService();
         service.ToggleToRigMode();
         callLog.Clear();
 
         service.ToggleToNormalMode();
 
-        Assert.Contains(callLog, entry => entry.StartsWith("audio.Restore:"));
-        Assert.DoesNotContain(callLog, entry => entry.StartsWith("audio.SetDefault"));
-    }
-
-    [Fact]
-    public void ToggleToNormalMode_StillMinimizesAndClears_WhenAudioRestoreThrows()
-    {
-        // Gap-closure 03-04 (T-03-04-02): a throwing audio Restore must not abort the
-        // rest of ToggleToNormalMode — MinimizeIfRunning (APP-03) and snapshot Clear must
-        // still run, and IsInRigMode() must still flip back to false, so the app never
-        // gets permanently stuck reporting Rig mode.
-        var (service, callLog, _) = CreateService(audioThrowsOnRestore: true);
-        service.ToggleToRigMode();
-        callLog.Clear();
-
-        service.ToggleToNormalMode();
-
-        Assert.Contains(callLog, entry => entry.StartsWith("app.MinimizeIfRunning:"));
-        Assert.Contains("snapshot.Clear", callLog);
-        Assert.False(service.IsInRigMode());
+        Assert.Contains(callLog, entry => entry == $"audio.SetDefault:{ConfiguredSettings.NormalAudioDeviceId}");
+        Assert.DoesNotContain(callLog, entry => entry.StartsWith("audio.Restore"));
+        Assert.Contains(callLog, entry => entry.StartsWith("monitor.Restore"));
     }
 
     [Fact]
@@ -201,12 +188,14 @@ public class ToggleServiceTests : IDisposable
     }
 
     [Fact]
-    public void ToggleToNormalMode_ReturnsFailedAudioStep_ButStillClears_WhenAudioRestoreThrows()
+    public void ToggleToNormalMode_ReturnsFailedAudioStep_ButStillMinimizesAndClears_WhenAudioDeviceGone()
     {
-        // Gap-closure 03-04 (T-03-04-02), now asserted via the ToggleResult contract:
-        // a throwing audio Restore must still be reported (not thrown) as a Failed
-        // Audio step, and MinimizeIfRunning + Clear must still run afterward.
-        var (service, callLog, _) = CreateService(audioThrowsOnRestore: true);
+        // AUDIO-04/AUDIO-05, replaces the old "audio restore throws" coverage now that
+        // Normal-mode audio no longer calls Restore: a configured-but-since-removed
+        // NormalAudioDeviceId must be reported (not thrown) as a Failed Audio step, and
+        // isolate-and-continue still runs MinimizeIfRunning + Clear afterward, still
+        // flipping IsInRigMode() back to false.
+        var (service, callLog, _) = CreateService(audioDeviceMissing: true);
         service.ToggleToRigMode();
         callLog.Clear();
 
@@ -214,6 +203,7 @@ public class ToggleServiceTests : IDisposable
 
         var audioStep = result.Steps.Single(s => s.StepName == "Audio");
         Assert.Equal(ToggleStepOutcome.Failed, audioStep.Outcome);
+        Assert.Contains("audio device", audioStep.Reason);
         Assert.False(service.IsInRigMode());
         Assert.Contains(callLog, entry => entry.StartsWith("app.MinimizeIfRunning"));
         Assert.Contains("snapshot.Clear", callLog);
@@ -241,8 +231,12 @@ public class ToggleServiceTests : IDisposable
     }
 
     [Fact]
-    public void ToggleToRigMode_Throws_WhenCompanionAppPathDoesNotExist()
+    public void ToggleToRigMode_RecordsAppFailed_WhenCompanionAppPathMissing()
     {
+        // APP-05/D-04: a configured-but-missing app path is no longer a top-level
+        // preflight throw — it surfaces as a Failed App step in a full 3-step result,
+        // with Monitor and Audio having already run (D-04 requires the checklist to
+        // always have all 3 entries).
         // AppSettings is a class, not a record — `with { ... }` does not compile here,
         // so build a fresh object-initializer copy instead (D-05 regression, 03-PATTERNS.md).
         var settings = new AppSettings
@@ -258,8 +252,15 @@ public class ToggleServiceTests : IDisposable
         };
         var (service, callLog, _) = CreateService(settings);
 
-        Assert.Throws<InvalidOperationException>(() => service.ToggleToRigMode());
-        Assert.DoesNotContain(callLog, entry => entry.StartsWith("snapshot.Save"));
+        var result = service.ToggleToRigMode();
+
+        Assert.Equal(3, result.Steps.Count);
+        Assert.False(result.Success);
+        Assert.Equal(ToggleStepOutcome.Succeeded, result.Steps.Single(s => s.StepName == "Monitor").Outcome);
+        Assert.Equal(ToggleStepOutcome.Succeeded, result.Steps.Single(s => s.StepName == "Audio").Outcome);
+        var appStep = result.Steps.Single(s => s.StepName == "App");
+        Assert.Equal(ToggleStepOutcome.Failed, appStep.Outcome);
+        Assert.Contains(callLog, entry => entry.StartsWith("snapshot.Save"));
     }
 
     [Fact]
@@ -396,5 +397,136 @@ public class ToggleServiceTests : IDisposable
             new ToggleService(settingsStore, snapshotStore, monitorController, null!, appController));
         Assert.Throws<ArgumentNullException>(() =>
             new ToggleService(settingsStore, snapshotStore, monitorController, audioController, null!));
+    }
+
+    // --- Phase 15: Optional Audio/App targets (APP-04/APP-05/AUDIO-03/AUDIO-04/AUDIO-05) ---
+    // Every optional field gets a paired Skipped (unset) test and a Failed (set-but-broken)
+    // test, per RESEARCH.md Pitfall 1/3 — never collapse "never configured" and "configured
+    // but now invalid" into the same outcome.
+
+    [Fact]
+    public void ToggleToRigMode_SkipsAudio_WhenRigAudioDeviceIdUnset()
+    {
+        var settings = new AppSettings
+        {
+            MonitorsToDisable = ConfiguredSettings.MonitorsToDisable,
+            NormalAudioDeviceId = ConfiguredSettings.NormalAudioDeviceId,
+            RigAudioDeviceId = null,
+            CompanionAppPath = ExistingCompanionAppPath,
+        };
+        var (service, callLog, _) = CreateService(settings);
+
+        var result = service.ToggleToRigMode();
+
+        Assert.True(result.Success);
+        var audioStep = result.Steps.Single(s => s.StepName == "Audio");
+        Assert.Equal(ToggleStepOutcome.Skipped, audioStep.Outcome);
+        var appStep = result.Steps.Single(s => s.StepName == "App");
+        Assert.Equal(ToggleStepOutcome.Succeeded, appStep.Outcome);
+        Assert.DoesNotContain(callLog, entry => entry.StartsWith("audio.SetDefault"));
+    }
+
+    [Fact]
+    public void ToggleToRigMode_FailsAudio_WhenRigAudioDeviceConfiguredButGone()
+    {
+        var (service, _, _) = CreateService(audioDeviceMissing: true);
+
+        var result = service.ToggleToRigMode();
+
+        Assert.False(result.Success);
+        var audioStep = result.Steps.Single(s => s.StepName == "Audio");
+        Assert.Equal(ToggleStepOutcome.Failed, audioStep.Outcome);
+        Assert.Contains("audio device", audioStep.Reason);
+        var appStep = result.Steps.Single(s => s.StepName == "App");
+        Assert.Equal(ToggleStepOutcome.NotAttempted, appStep.Outcome);
+    }
+
+    [Fact]
+    public void ToggleToRigMode_SkipsApp_WhenCompanionAppPathUnset()
+    {
+        var settings = new AppSettings
+        {
+            MonitorsToDisable = ConfiguredSettings.MonitorsToDisable,
+            NormalAudioDeviceId = ConfiguredSettings.NormalAudioDeviceId,
+            RigAudioDeviceId = ConfiguredSettings.RigAudioDeviceId,
+            CompanionAppPath = null,
+        };
+        var (service, callLog, _) = CreateService(settings);
+
+        var result = service.ToggleToRigMode();
+
+        Assert.True(result.Success);
+        var appStep = result.Steps.Single(s => s.StepName == "App");
+        Assert.Equal(ToggleStepOutcome.Skipped, appStep.Outcome);
+        Assert.DoesNotContain(callLog, entry => entry.StartsWith("app.LaunchOrFocus"));
+    }
+
+    [Fact]
+    public void ToggleToNormalMode_SkipsAudio_WhenNormalAudioDeviceIdUnset()
+    {
+        var settings = new AppSettings
+        {
+            MonitorsToDisable = ConfiguredSettings.MonitorsToDisable,
+            NormalAudioDeviceId = null,
+            RigAudioDeviceId = ConfiguredSettings.RigAudioDeviceId,
+            CompanionAppPath = ExistingCompanionAppPath,
+        };
+        var (service, callLog, _) = CreateService(settings);
+        service.ToggleToRigMode();
+        callLog.Clear();
+
+        var result = service.ToggleToNormalMode();
+
+        var audioStep = result.Steps.Single(s => s.StepName == "Audio");
+        Assert.Equal(ToggleStepOutcome.Skipped, audioStep.Outcome);
+        Assert.DoesNotContain(callLog, entry => entry.StartsWith("audio.SetDefault"));
+        Assert.DoesNotContain(callLog, entry => entry.StartsWith("audio.Restore"));
+        Assert.Equal("snapshot.Clear", callLog.Where(entry => entry.StartsWith("snapshot.")).Last());
+    }
+
+    [Fact]
+    public void ToggleToNormalMode_SkipsApp_WhenCompanionAppPathUnset()
+    {
+        var settings = new AppSettings
+        {
+            MonitorsToDisable = ConfiguredSettings.MonitorsToDisable,
+            NormalAudioDeviceId = ConfiguredSettings.NormalAudioDeviceId,
+            RigAudioDeviceId = ConfiguredSettings.RigAudioDeviceId,
+            CompanionAppPath = null,
+        };
+        var (service, callLog, _) = CreateService(settings);
+        service.ToggleToRigMode();
+        callLog.Clear();
+
+        var result = service.ToggleToNormalMode();
+
+        Assert.True(result.Success);
+        var appStep = result.Steps.Single(s => s.StepName == "App");
+        Assert.Equal(ToggleStepOutcome.Skipped, appStep.Outcome);
+        Assert.DoesNotContain(callLog, entry => entry.StartsWith("app.MinimizeIfRunning"));
+        Assert.Equal("snapshot.Clear", callLog.Where(entry => entry.StartsWith("snapshot.")).Last());
+    }
+
+    [Fact]
+    public void ToggleToRigMode_AllThreeStepsPresent_AudioAndAppSkipped_WhenBothUnset()
+    {
+        // D-04: the result always has exactly 3 steps regardless of what's configured;
+        // D-05: audio/app being unset never blocks the toggle.
+        var settings = new AppSettings
+        {
+            MonitorsToDisable = ConfiguredSettings.MonitorsToDisable,
+            NormalAudioDeviceId = null,
+            RigAudioDeviceId = null,
+            CompanionAppPath = null,
+        };
+        var (service, _, _) = CreateService(settings);
+
+        var result = service.ToggleToRigMode();
+
+        Assert.Equal(3, result.Steps.Count);
+        Assert.True(result.Success);
+        Assert.Equal(ToggleStepOutcome.Succeeded, result.Steps.Single(s => s.StepName == "Monitor").Outcome);
+        Assert.Equal(ToggleStepOutcome.Skipped, result.Steps.Single(s => s.StepName == "Audio").Outcome);
+        Assert.Equal(ToggleStepOutcome.Skipped, result.Steps.Single(s => s.StepName == "App").Outcome);
     }
 }
