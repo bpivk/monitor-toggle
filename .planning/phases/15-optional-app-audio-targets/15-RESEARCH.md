@@ -416,17 +416,17 @@ Not applicable in the usual "library/API evolved" sense — this phase is intern
 
 **All other claims in this research are either `[VERIFIED]` (direct source-tree reads, most of this document) or `[CITED]` (the one official-docs WebSearch, `TextBox.PlaceholderText`'s existence — not its `ReadOnly` interaction, which is separately flagged as A1).**
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `IsFullyConfigured`/`IsSettingsConfigured` be renamed once it no longer checks "fully" anything but the monitor set?**
    - What we know: D-05 locks the *behavior* (drop the three field checks); CONTEXT.md's `<code_context>` doesn't mandate a rename, and the method is called from `MainForm.cs` (`IsSettingsConfigured()`) as well as internally.
    - What's unclear: Whether leaving the name as-is (now semantically misleading — it no longer means "fully" configured) is acceptable, or whether a rename (e.g. `HasMinimumMonitorConfiguration`) is worth the larger diff (call-site updates in `MainForm.cs`, `ToggleServiceTests.cs`).
-   - Recommendation: Keep the name for this phase (minimize diff, matches "validation-gate relaxation, not a redesign" scope) but update the doc comment thoroughly (the existing D-07 comment at ToggleService.cs:197-200 is already stale in spirit and should be rewritten to reflect D-05, not just have code deleted out from under it). Flag rename as a Phase 18 cleanup-pass candidate if it bothers the team later.
+   - RESOLVED — Recommendation: Keep the name for this phase (minimize diff, matches "validation-gate relaxation, not a redesign" scope) but update the doc comment thoroughly (the existing D-07 comment at ToggleService.cs:197-200 is already stale in spirit and should be rewritten to reflect D-05, not just have code deleted out from under it). Flag rename as a Phase 18 cleanup-pass candidate if it bothers the team later.
 
 2. **Does `FakeAudioController` need a `Restore` call-log entry removed from `ToggleServiceTests.cs`'s existing `ToggleToNormalMode_RestoresAudioViaRestore_NeverSetDefault` test?**
    - What we know: That test (ToggleServiceTests.cs:123-134) currently asserts `audio.Restore` IS called and `audio.SetDefault` is NOT called during `ToggleToNormalMode` — this assertion is the literal opposite of AUDIO-04's required new behavior.
    - What's unclear: Nothing, really — this test's name and body directly encode the *old* behavior AUDIO-04 explicitly replaces.
-   - Recommendation: This test must be rewritten (not just updated) to assert the new contract: `audio.SetDefault:{NormalAudioDeviceId}` is called and `audio.Restore` is NOT called for the Audio step specifically (Monitor's `monitor.Restore` call is unaffected and should still appear). Flag this explicitly in the plan's task list — it's an easy one to miss since the test currently passes and nothing about compiling will surface it as wrong.
+   - RESOLVED — Recommendation: This test must be rewritten (not just updated) to assert the new contract: `audio.SetDefault:{NormalAudioDeviceId}` is called and `audio.Restore` is NOT called for the Audio step specifically (Monitor's `monitor.Restore` call is unaffected and should still appear). Flag this explicitly in the plan's task list — it's an easy one to miss since the test currently passes and nothing about compiling will surface it as wrong.
 
 ## Environment Availability
 

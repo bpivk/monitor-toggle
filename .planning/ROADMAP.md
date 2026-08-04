@@ -71,16 +71,26 @@ Full phase details: `.planning/milestones/v1.2-ROADMAP.md`
 **Depends on**: Nothing (first phase of v2.0)
 **Requirements**: APP-04, APP-05, AUDIO-03, AUDIO-04, AUDIO-05
 **Success Criteria** (what must be TRUE):
+
   1. Leaving the companion app path unset in Settings makes toggle-to-Rig skip launch/focus and toggle-to-Normal skip minimize entirely, with no error (APP-04)
   2. A configured app path pointing to a file that no longer exists at toggle time surfaces as a real `Failed` step, not treated as unset (APP-05)
   3. Leaving the Rig-mode audio device unset makes toggle-to-Rig skip Rig-direction audio switching entirely, with no error (AUDIO-03)
   4. Configuring a Normal-mode audio device makes it actually apply on toggle-to-Normal (replacing today's snapshot-based restore); leaving it unset skips Normal-direction audio switching (AUDIO-04)
   5. A configured audio device ID that no longer exists on the system surfaces as a real `Failed` step, not silently skipped (AUDIO-05)
+
 **Plans**: 4 plans
 Plans:
+**Wave 1**
+
 - [ ] 15-01-PLAN.md — Core contracts: Skipped outcome, Success predicate, checklist arm, IAudioController.TryResolveDevice + fake
-- [ ] 15-02-PLAN.md — ToggleService optional Audio/App both directions, Normal-mode SetDefault audio, relaxed gate + tests
 - [ ] 15-03-PLAN.md — Settings UI: Clear button, "(None...)" audio sentinel, relaxed Save gate, MainForm message reword
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 15-02-PLAN.md — ToggleService optional Audio/App both directions, Normal-mode SetDefault audio, relaxed gate + tests
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 15-04-PLAN.md — Full-solution regression gate + rig verification of all five success criteria
 
 ### Phase 16: Normal-Mode Explicit Monitor Config & Mode-Store Redesign
@@ -89,10 +99,12 @@ Plans:
 **Depends on**: Phase 15 (sequenced after per research risk-ordering — lowest-risk optional-target work first to build confidence before this phase's mode-tracking redesign; not a hard architectural dependency)
 **Requirements**: DISPLAY-09, DISPLAY-10, DISPLAY-11, DISPLAY-13
 **Success Criteria** (what must be TRUE):
+
   1. User can configure which monitors are enabled/disabled specifically for Normal mode in Settings, independent of and symmetric to Rig mode's existing monitor set configuration (DISPLAY-09)
   2. Toggling to Normal mode applies the explicitly configured Normal-mode monitor set directly, not a snapshot restored from before the last toggle (DISPLAY-10)
   3. The app correctly reports which mode (Rig/Normal) it's in immediately after an app restart, even when no snapshot file exists on disk (DISPLAY-11)
   4. If the app crashes or is killed mid-toggle, the next launch detects the interrupted toggle from a persisted marker and communicates it to the user (DISPLAY-13)
+
 **Plans**: TBD
 
 ### Phase 17: Manual Monitor Panel & Shared Safety Guard
@@ -101,12 +113,14 @@ Plans:
 **Depends on**: Phase 16 (reuses its unified `ActivateMonitors`/`DeactivateMonitors` controller-call shape and monitor-set model rather than introducing a second implementation)
 **Requirements**: DISPLAY-12, PANEL-01, PANEL-02, PANEL-03, PANEL-04, PANEL-05
 **Success Criteria** (what must be TRUE):
+
   1. A new panel shows one row/tile per detected monitor with its on/off status shown via icon, not just text (PANEL-01)
   2. User can enable/disable any individual monitor directly from the panel, independent of the Rig/Normal toggle action, and it takes effect immediately (PANEL-02)
   3. The panel's monitor list and status update live if a monitor is connected or disconnected while the panel is open (PANEL-03)
   4. Disabling a monitor from the panel is gated by the same `SkipMonitorConfirmation` setting as the Rig/Normal toggle (PANEL-04)
   5. The panel includes an Identify action that briefly overlays a number on each physical screen (PANEL-05)
   6. Attempting to disable the last remaining enabled monitor is rejected identically whether attempted via the Rig toggle, the Normal toggle, or the manual panel (DISPLAY-12)
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -116,10 +130,12 @@ Plans:
 **Depends on**: Phase 16 (the snapshot/restore subsystem is only confirmed dead once Normal mode's monitor-set rewrite has shipped), Phase 17 (cleanup follows all functional changes so nothing still-in-use gets deleted)
 **Requirements**: PERF-01, PERF-02, CLEANUP-01, CLEANUP-02
 **Success Criteria** (what must be TRUE):
+
   1. `Restore()`/`RestoreViaReconstruction()` and related snapshot-restore models are removed from the codebase, with any rig-specific knowledge they encoded reviewed and preserved elsewhere first (CLEANUP-01)
   2. The codebase shows measurably less duplication/cruft than before this phase (dead fields, dead code paths, redundant helpers removed), with no user-facing behavior change (CLEANUP-02)
   3. The self-contained exe is measurably smaller after applying `EnableCompressionInSingleFile`, `SatelliteResourceLanguages=en`, `InvariantGlobalization=true`, and the NAudio meta-package split — without enabling IL trimming (PERF-01)
   4. A full toggle round trip and a cold autostart boot are verified working correctly on real rig hardware after the exe-size changes, not just a build-output file-size diff (PERF-02)
+
 **Plans**: TBD
 
 ## Progress
