@@ -18,6 +18,10 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+      - run: dotnet test --no-build -c Release
+
       - name: Publish self-contained single-file exe
         run: dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -p:PublishProfile=win-x64
 
