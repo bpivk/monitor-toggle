@@ -4,8 +4,8 @@ milestone: v2.0
 milestone_name: Configurable Monitors, Optional Targets & Cleanup
 status: executing
 stopped_at: Phase 15 context gathered
-last_updated: "2026-08-04T16:36:44.627Z"
-last_activity: 2026-08-04 -- Phase 15 planning complete
+last_updated: "2026-08-04T16:46:35.234Z"
+last_activity: 2026-08-04 -- Phase 15 execution started
 progress:
   total_phases: 4
   completed_phases: 0
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-04)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before. (Note: v2.0 revises the "restores exactly how it was before" framing for Normal mode — see DISPLAY-10/AUDIO-04 and ROADMAP.md Phase 16.)
-**Current focus:** Phase 15: Optional App & Audio Targets
+**Current focus:** Phase 15 — optional-app-audio-targets
 
 ## Current Position
 
-Phase: 15 of 18 (Optional App & Audio Targets) — first phase of v2.0
-Plan: — of TBD
-Status: Ready to execute
-Last activity: 2026-08-04 -- Phase 15 planning complete
+Phase: 15 (optional-app-audio-targets) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 15
+Last activity: 2026-08-04 -- Phase 15 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
