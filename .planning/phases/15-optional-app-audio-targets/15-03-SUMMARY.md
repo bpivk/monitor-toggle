@@ -109,3 +109,14 @@ None - no external service configuration required.
 ---
 *Phase: 15-optional-app-audio-targets*
 *Completed: 2026-08-04*
+
+## Self-Check: PASSED
+
+- FOUND: src/RigToggle.App/SettingsForm.Designer.cs
+- FOUND: src/RigToggle.App/SettingsForm.cs
+- FOUND: src/RigToggle.App/MainForm.cs
+- FOUND: .planning/phases/15-optional-app-audio-targets/15-03-SUMMARY.md
+- FOUND commit: 94b719b (Task 1)
+- FOUND commit: ac77766 (Task 2)
+- FOUND commit: 622ffc3 (Task 3)
+- FOUND commit: b373145 (SUMMARY.md)
