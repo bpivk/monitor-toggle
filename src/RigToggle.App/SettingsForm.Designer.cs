@@ -65,6 +65,7 @@ namespace RigToggle.App
             this.lblAppPathCaption = new System.Windows.Forms.Label();
             this.txtAppPath = new System.Windows.Forms.TextBox();
             this.btnBrowse = new System.Windows.Forms.Button();
+            this.btnClearAppPath = new System.Windows.Forms.Button();
             this.lblAppWarning = new System.Windows.Forms.Label();
 
             this.chkEnableDebugLogging = new System.Windows.Forms.CheckBox();
@@ -277,6 +278,7 @@ namespace RigToggle.App
             this.pnlAppPath.Controls.Add(this.lblAppPathCaption);
             this.pnlAppPath.Controls.Add(this.txtAppPath);
             this.pnlAppPath.Controls.Add(this.btnBrowse);
+            this.pnlAppPath.Controls.Add(this.btnClearAppPath);
             this.pnlAppPath.Controls.Add(this.lblAppWarning);
             this.pnlAppPath.DragEnter += new System.Windows.Forms.DragEventHandler(this.AppPath_DragEnter);
             this.pnlAppPath.DragDrop += new System.Windows.Forms.DragEventHandler(this.AppPath_DragDrop);
@@ -295,7 +297,11 @@ namespace RigToggle.App
             this.txtAppPath.ReadOnly = true;
             this.txtAppPath.Text = "No app shortcut or .exe selected";
             this.txtAppPath.Location = new System.Drawing.Point(12, 22);
-            this.txtAppPath.Size = new System.Drawing.Size(288, 23);
+            // 15-03/D-01: narrowed from 288 to 220 to make room for btnClearAppPath on
+            // the same row without touching panel height or downstream control Y
+            // positions -- txtAppPath's range (x=12..232) stays a strict subset of the
+            // original x=12..300 span, so it never overlaps either sibling button.
+            this.txtAppPath.Size = new System.Drawing.Size(220, 23);
             this.txtAppPath.Name = "txtAppPath";
             this.txtAppPath.AllowDrop = true;
             this.txtAppPath.DragEnter += new System.Windows.Forms.DragEventHandler(this.AppPath_DragEnter);
@@ -305,8 +311,10 @@ namespace RigToggle.App
             // btnBrowse
             //
             this.btnBrowse.Text = "Browse…";
-            this.btnBrowse.Location = new System.Drawing.Point(306, 21);
-            this.btnBrowse.Size = new System.Drawing.Size(78, 25);
+            // 15-03/D-01: narrowed and moved left (from x=306,width=78) to make room for
+            // btnClearAppPath at x=314..384 on the same row.
+            this.btnBrowse.Location = new System.Drawing.Point(238, 21);
+            this.btnBrowse.Size = new System.Drawing.Size(70, 25);
             this.btnBrowse.Name = "btnBrowse";
             // 12-05/THEME-05 (12-REVIEW.md CR-02): FlatStyle.Flat, not .System -- the
             // Windows 11 rig proved FlatStyle.System buttons do NOT pick up dark-mode
@@ -316,6 +324,26 @@ namespace RigToggle.App
             // auto-apply pipeline via BorderSize=0 + explicit hover/pressed overrides.
             this.btnBrowse.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnBrowse.Click += new System.EventHandler(this.BtnBrowse_Click);
+
+            //
+            // btnClearAppPath
+            //
+            // 15-03/D-01: explicit Clear affordance -- txtAppPath is ReadOnly (see below),
+            // so there is no other way for the user to unset a previously-configured app
+            // path. Enabled only when a path is currently set (toggled from
+            // PopulateAppPathField/BtnClearAppPath_Click/BtnBrowse_Click/AppPath_DragDrop
+            // in SettingsForm.cs); starts disabled here since the initial state is
+            // resolved on Load from persisted settings.
+            this.btnClearAppPath.Text = "Clear";
+            this.btnClearAppPath.Location = new System.Drawing.Point(314, 21);
+            this.btnClearAppPath.Size = new System.Drawing.Size(70, 25);
+            this.btnClearAppPath.Name = "btnClearAppPath";
+            this.btnClearAppPath.Enabled = false;
+            // 12-05/THEME-05 (12-REVIEW.md CR-02): FlatStyle.Flat, not .System -- see
+            // btnBrowse's comment above for the full dotnet/winforms#13897 rationale.
+            // This applies identically to every themed button in this dialog.
+            this.btnClearAppPath.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnClearAppPath.Click += new System.EventHandler(this.BtnClearAppPath_Click);
 
             //
             // lblAppWarning
@@ -513,6 +541,7 @@ namespace RigToggle.App
         private System.Windows.Forms.Label lblAppPathCaption;
         private System.Windows.Forms.TextBox txtAppPath;
         private System.Windows.Forms.Button btnBrowse;
+        private System.Windows.Forms.Button btnClearAppPath;
         private System.Windows.Forms.Label lblAppWarning;
 
         private System.Windows.Forms.CheckBox chkEnableDebugLogging;

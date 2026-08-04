@@ -29,6 +29,15 @@ namespace RigToggle.App
         private int? _pendingHotkeyModifiers;
         private int? _pendingHotkeyKey;
 
+        // 15-03/D-01: the working (not-yet-saved) app-launch-target path, mirroring the
+        // _pendingHotkeyModifiers/_pendingHotkeyKey idiom above. txtAppPath.Text is a
+        // pure DISPLAY concern (shows the real path when set, a friendly "not
+        // configured" sentence when null) -- it must never be read back as the
+        // persisted value, or the literal placeholder text round-trips into
+        // AppSettings as a bogus "path" (RESEARCH.md Landmine). Null means "cleanly
+        // unset" (APP-04); set-but-invalid is a distinct, still-blocking state (D-06).
+        private string? _pendingAppPath;
+
         // Reentrancy/mode-tracking guard for the txtHotkey capture state machine —
         // mirrors the _updatingMonitorGridProgrammatically boolean-flag idiom already
         // established for the monitor grid's own programmatic-write guard.
@@ -46,9 +55,12 @@ namespace RigToggle.App
 
         /// <summary>
         /// Display/value wrapper for ComboBox binding (DisplayMember/ValueMember) —
-        /// 02-RESEARCH.md Pattern 2.
+        /// 02-RESEARCH.md Pattern 2. 15-03/D-02: Id widened to string? so a sentinel
+        /// instance (Id = null, DisplayLabel = "(None — don't switch audio)") can
+        /// represent "deliberately unset" as a real, always-present list entry rather
+        /// than a blank SelectedIndex = -1 state.
         /// </summary>
-        private sealed record PickerItem(string Id, string DisplayLabel);
+        private sealed record PickerItem(string? Id, string DisplayLabel);
 
         // 12-02: ctor param + field only in this plan -- SettingsForm's own
         // subscribe/OnThemeChanged/per-control theming lands in plan 12-03. Threaded
@@ -144,8 +156,9 @@ namespace RigToggle.App
                     RenderHotkeyIdleDisplay();
                 }
 
-                // 12-05/CR-02: re-theme all three buttons on every live flip.
+                // 12-05/CR-02: re-theme all buttons on every live flip.
                 ThemeApplier.ThemeButton(btnBrowse, IsDarkTheme);
+                ThemeApplier.ThemeButton(btnClearAppPath, IsDarkTheme);
                 ThemeApplier.ThemeButton(btnSaveSettings, IsDarkTheme);
                 ThemeApplier.ThemeButton(btnDiscardChanges, IsDarkTheme);
 
@@ -168,8 +181,9 @@ namespace RigToggle.App
             PopulateMonitorGrid();
             ThemeApplier.ThemeMonitorGrid(dgvMonitors, IsDarkTheme);
 
-            // 12-05/CR-02: theme all three buttons at load time too.
+            // 12-05/CR-02: theme all buttons at load time too.
             ThemeApplier.ThemeButton(btnBrowse, IsDarkTheme);
+            ThemeApplier.ThemeButton(btnClearAppPath, IsDarkTheme);
             ThemeApplier.ThemeButton(btnSaveSettings, IsDarkTheme);
             ThemeApplier.ThemeButton(btnDiscardChanges, IsDarkTheme);
 
@@ -525,7 +539,12 @@ namespace RigToggle.App
                 devices = Array.Empty<AudioDeviceInfo>();
             }
 
-            var items = devices.Select(d => new PickerItem(d.Id, d.FriendlyName)).ToList();
+            // 15-03/D-02: sentinel prepended unconditionally -- even when zero real
+            // devices are enumerated -- so "(None — don't switch audio)" is always a
+            // real, selectable list entry representing a deliberate choice, distinct
+            // from a blank/empty-list state.
+            var items = new List<PickerItem> { new(null, "(None — don't switch audio)") };
+            items.AddRange(devices.Select(d => new PickerItem(d.Id, d.FriendlyName)));
 
             PopulateAudioCombo(cboAudioNormal, errAudioNormal, lblAudioNormalWarning, items, _settings.NormalAudioDeviceId);
             PopulateAudioCombo(cboAudioRig, errAudioRig, lblAudioRigWarning, items, _settings.RigAudioDeviceId);
@@ -538,6 +557,10 @@ namespace RigToggle.App
 
             combo.SelectedIndexChanged -= OnPickerChanged;
 
+            // 15-03/D-02: items always contains at least the "(None...)" sentinel now
+            // (PopulateAudioPickers prepends it unconditionally), so this branch is no
+            // longer reachable in practice -- left in place defensively in case a future
+            // caller passes an empty list directly.
             if (items.Count == 0)
             {
                 combo.DataSource = null;
@@ -568,6 +591,14 @@ namespace RigToggle.App
                         ShowStaleWarning(errProvider, combo, warningLabel, "audio device");
                     }
                 }
+                else
+                {
+                    // 15-03/D-02: explicitly select the sentinel rather than leaving
+                    // SelectedIndex = -1 -- an intentional "None" choice reads as a
+                    // deliberate selection, not an unfinished form (the exact bug D-02
+                    // exists to remove: a blank combo previously blocked Save).
+                    combo.SelectedItem = items.First(i => i.Id is null);
+                }
             }
 
             combo.SelectedIndexChanged += OnPickerChanged;
@@ -579,28 +610,45 @@ namespace RigToggle.App
             ThemeApplier.ThemeComboBox(combo, IsDarkTheme);
         }
 
+        // 15-03: seeds _pendingAppPath from the persisted settings (Load-time only —
+        // this must NOT be called again after Clear/Browse/DragDrop, or it would
+        // silently overwrite the pending in-memory value with the stale saved one and
+        // undo the user's action). Use RenderAppPathDisplay() to re-render after those.
         private void PopulateAppPathField()
         {
             errApp.SetError(txtAppPath, string.Empty);
             lblAppWarning.Visible = false;
 
-            string? savedPath = _settings.CompanionAppPath;
-            if (savedPath is null)
+            _pendingAppPath = _settings.CompanionAppPath;
+            RenderAppPathDisplay();
+        }
+
+        // 15-03/D-01/Landmine: pure display concern, driven only by _pendingAppPath —
+        // never re-reads _settings.CompanionAppPath (see PopulateAppPathField's
+        // comment above for why). txtAppPath.Text is purely a rendered string, never
+        // round-tripped back into AppSettings at Save time.
+        private void RenderAppPathDisplay()
+        {
+            if (_pendingAppPath is null)
             {
-                // First-ever run: no warning (Pitfall 3).
+                // First-ever run or explicitly cleared (Pitfall 3 / D-01): no warning.
                 txtAppPath.Text = "No app shortcut or .exe selected";
             }
             else
             {
-                txtAppPath.Text = savedPath;
-                if (!IsValidLaunchTarget(savedPath))
+                txtAppPath.Text = _pendingAppPath;
+                if (!IsValidLaunchTarget(_pendingAppPath))
                 {
-                    // D-10: previously configured, but no longer resolves — inline warning.
-                    // The field itself can't be "unselected" like a ComboBox; leaving the
-                    // stale path visible alongside the warning lets the user see what to fix.
+                    // D-10/D-06: previously configured, but no longer resolves — inline
+                    // warning; still blocks Save ("broken != unset"). The field itself
+                    // can't be "unselected" like a ComboBox; leaving the stale path
+                    // visible alongside the warning lets the user see what to fix.
                     ShowStaleWarning(errApp, txtAppPath, lblAppWarning, "target app");
                 }
             }
+
+            // D-01: enabled only when a path is currently set.
+            btnClearAppPath.Enabled = _pendingAppPath is not null;
         }
 
         private static void ShowStaleWarning(ErrorProvider errProvider, Control control, Label warningLabel, string noun)
@@ -635,7 +683,11 @@ namespace RigToggle.App
         {
             bool audioNormalOk = cboAudioNormal.SelectedItem is PickerItem;
             bool audioRigOk = cboAudioRig.SelectedItem is PickerItem;
-            bool appPathOk = IsValidLaunchTarget(txtAppPath.Text);
+            // 15-03/D-06: true for cleanly-unset (_pendingAppPath is null) OR
+            // set-and-valid; false only for set-and-broken ("broken != unset"). Save is
+            // gated on the monitor grid only per D-05 — audio/app being unset never
+            // blocks it, but a configured-but-stale value still does.
+            bool appPathOk = _pendingAppPath is null || IsValidLaunchTarget(_pendingAppPath);
             bool monitorOk;
 
             if (!dgvMonitors.Enabled)
@@ -703,9 +755,24 @@ namespace RigToggle.App
             {
                 errApp.SetError(txtAppPath, string.Empty);
                 lblAppWarning.Visible = false;
+                _pendingAppPath = dlgOpenExe.FileName;
                 txtAppPath.Text = dlgOpenExe.FileName;
+                btnClearAppPath.Enabled = true;
                 ValidateSettingsForm();
             }
+        }
+
+        // 15-03/D-01: explicit Clear handler — the only way to unset the app path,
+        // since txtAppPath is ReadOnly. Re-renders via RenderAppPathDisplay() (not
+        // PopulateAppPathField(), which would re-read the stale _settings value and
+        // undo this clear — see PopulateAppPathField's comment).
+        private void BtnClearAppPath_Click(object? sender, EventArgs e)
+        {
+            _pendingAppPath = null;
+            errApp.SetError(txtAppPath, string.Empty);
+            lblAppWarning.Visible = false;
+            RenderAppPathDisplay();
+            ValidateSettingsForm();
         }
 
         // Drag-and-drop alternative to Browse (redesign: generalized "target app"
@@ -731,7 +798,9 @@ namespace RigToggle.App
             // resolution (ShellExecute handles both .lnk and .exe at launch time).
             errApp.SetError(txtAppPath, string.Empty);
             lblAppWarning.Visible = false;
+            _pendingAppPath = path;
             txtAppPath.Text = path;
+            btnClearAppPath.Enabled = true;
             ValidateSettingsForm();
         }
 
@@ -769,8 +838,11 @@ namespace RigToggle.App
 
             // Defensive guard only — btnSaveSettings.Enabled (ValidateSettingsForm) should
             // make this unreachable via the UI, but never persist a partial/invalid/
-            // would-leave-no-monitor-active selection.
-            if (audioNormalItem is null || audioRigItem is null || !IsValidLaunchTarget(txtAppPath.Text)
+            // would-leave-no-monitor-active selection. 15-03/D-06: mirrors
+            // ValidateSettingsForm's appPathOk expression exactly — cleanly-unset OR
+            // set-and-valid passes, set-and-broken still blocks.
+            if (audioNormalItem is null || audioRigItem is null
+                || !(_pendingAppPath is null || IsValidLaunchTarget(_pendingAppPath))
                 || (disableSelected.Count == 0 && enableSelected.Count == 0)
                 || !WouldLeaveAtLeastOneMonitorActive(_allMonitors, disableSelected, enableSelected))
             {
@@ -816,7 +888,10 @@ namespace RigToggle.App
                 NormalAudioDeviceName = audioNormalItem.DisplayLabel,
                 RigAudioDeviceId = audioRigItem.Id,
                 RigAudioDeviceName = audioRigItem.DisplayLabel,
-                CompanionAppPath = txtAppPath.Text,
+                // 15-03/T-15-04: persist from the dedicated _pendingAppPath field, never
+                // from txtAppPath.Text (whose "No app shortcut..." placeholder value
+                // would otherwise round-trip into AppSettings as a bogus path).
+                CompanionAppPath = _pendingAppPath,
                 SkipMonitorConfirmation = monitorsChanged ? false : _settings.SkipMonitorConfirmation,
                 EnableDebugLogging = chkEnableDebugLogging.Checked,
                 CloseMinimizesToTray = chkCloseMinimizesToTray.Checked,
