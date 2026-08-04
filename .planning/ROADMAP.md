@@ -105,7 +105,24 @@ Plans:
   3. The app correctly reports which mode (Rig/Normal) it's in immediately after an app restart, even when no snapshot file exists on disk (DISPLAY-11)
   4. If the app crashes or is killed mid-toggle, the next launch detects the interrupted toggle from a persisted marker and communicates it to the user (DISPLAY-13)
 
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+**Wave 1**
+
+- [ ] 16-01-PLAN.md — Core mode/marker stores: ToggleMode, ToggleInProgressMarker, IModeStore/IToggleInProgressStore + JSON impls + test doubles
+- [ ] 16-02-PLAN.md — Settings UI: AppSettings Normal-mode fields + second "Normal Mode" grid, reflow, theming, stale-prose fixes (DISPLAY-09)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 16-03-PLAN.md — ToggleService/Orchestrator/MonitorController rewrite: explicit Normal apply, IModeStore-backed mode, shared CR-01 helper, marker lifecycle, tests (DISPLAY-10/11/13)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 16-04-PLAN.md — App wiring: Program.cs bootstrap + StartupRecoveryChecker dialogs + MainForm unknown-mode guards (DISPLAY-11/13)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 16-05-PLAN.md — Full-solution regression gate + rig verification of all four success criteria
 
 ### Phase 17: Manual Monitor Panel & Shared Safety Guard
 
@@ -157,7 +174,7 @@ Plans:
 | 13. Tray & App Icon Redesign | v1.2 | 4/4 | Complete | 2026-08-03 |
 | 14. README & Release Documentation | v1.2 | 3/3 | Complete | 2026-08-03 |
 | 15. Optional App & Audio Targets | v2.0 | 4/4 | Complete    | 2026-08-04 |
-| 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 0/TBD | Not started | - |
+| 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 0/5 | Planned | - |
 | 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 0/TBD | Not started | - |
 | 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 0/TBD | Not started | - |
 
