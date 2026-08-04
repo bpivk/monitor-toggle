@@ -1,8 +1,8 @@
 ---
 phase: 13-tray-app-icon-redesign
 verified: 2026-08-03T16:26:50Z
-status: human_needed
-score: 5/5 must-haves verified (code-level); ICON-01..04 confirmed by prior rig checkpoints (13-03, 13-04 Task 3) but not independently re-observed by this verifier on real hardware
+status: passed
+score: 5/5 must-haves verified; ICON-01..04 confirmed by prior rig checkpoints (13-03, 13-04 Task 3) and formally closed via 13-HUMAN-UAT.md (2/2 passed, 0 pending) at v1.2 milestone close
 overrides_applied: 0
 gaps: []
 deferred: []
