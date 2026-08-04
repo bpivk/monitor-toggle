@@ -1,5 +1,27 @@
 # Milestones
 
+## v1.2 Visual Polish & Documentation (Shipped: 2026-08-04)
+
+**Phases completed:** 3 phases, 13 plans, 33 tasks
+
+**Key accomplishments:**
+
+- Core IThemeProvider/AppTheme contract, WindowsThemeProvider registry-read + live SystemEvents theme detection, and a DwmTitleBar facade over a new DwmSetWindowAttribute P/Invoke for Mica/rounded-corner requests — all built and tested green with no consumers wired yet.
+- Application.SetColorMode wired as the very first Main() statement, one composition-root WindowsThemeProvider threaded into every form, and MainForm + MonitorConfirmDialog get full launch-time + SystemEvents-driven live theme-follow (title bar, controls, flat buttons, Windows-11 Mica/rounded corners) — SettingsForm's own per-control theming is deferred to plan 12-03.
+- New `ThemeApplier` helper closes the confirmed `dgvMonitors` DataGridView and `txtHotkey` hand-rolled-`SystemColors` theming gaps, SettingsForm gains its own live theme-follow (subscribe/unsubscribe + marshaled `OnThemeChanged`) and Windows-11 DWM chrome, and all three `GroupBox`es become flat bordered `Panel`s with captions and zero layout drift — full rig-visual verification deferred to plan 12-04 per this phase's plan.
+- Release build + publish succeeded; rig verification on Windows 11 found the title bar, all buttons, and the Settings audio-device dropdowns still rendering in the light/white system theme in dark mode
+- Closes all three rig-confirmed dark-mode gaps from 12-04 (white title bar, white/light buttons, white audio-device dropdowns) by replacing three falsified "Application.SetColorMode will handle it" assumptions with explicit DWM/ThemeApplier overrides, plus the two low-cost robustness warnings (Dispose backstop, provider thread-safety lock) from the code review.
+- Rig re-verification on Windows 11 confirms the 12-05 fixes closed all three gaps: dark title bar, dark buttons (including hover/pressed states), and dark audio-device ComboBoxes
+- GDI+ icon generator (hand-rolled ICO writer, UI-SPEC-locked monitor/wheel/app geometry) executed end-to-end via a self-contained win-x64 publish + Wine, producing and round-trip-verifying regenerated `normal.ico`/`rig.ico` and a new `app.ico`.
+- Fixed the tray NotifyIcon's DPI-blur defect by requesting `SystemInformation.SmallIconSize` in both `Icon` constructors, and wired `app.ico` as the compiled exe's native Win32 icon via `<ApplicationIcon>`.
+- Rig verification on Windows 11 confirms the redesigned monitor/wheel tray icons and color exe icon satisfy all four ICON requirements — shape distinguishability, light/dark legibility, DPI sharpness at 100-200% scaling, and exe icon identity
+- Rewrote IconGeometry.cs's outline compositing to stroke-then-fill (eliminating interior seam lines by construction), added a pixel-level interior-artifact diagnostic to Program.cs that genuinely verifies clean silhouettes (not just ICO byte-container validity), and tuned rig.ico's outline-pen-width and radial geometry after the diagnostic caught a real defect the naive doubled-outline fix introduced. Rig-confirmed on real Windows 11 hardware: both tray icons render as clean single silhouettes on light and dark taskbars, no seam artifacts remain -- CR-01 is resolved.
+- MIT LICENSE plus two GitHub Actions workflows (windows-latest build+test on push/PR, tag-triggered self-contained exe publish+release) backing the README's badges and download flow with real, live infrastructure.
+- COMPLETE — All three tasks done. Repo bpivk/monitor-toggle is public; v1.0 and v1.1 exist as notes-only GitHub Releases with zero attached assets; no v1.2 release exists.
+- Rewrote root README.md with three live shields.io/GitHub-Actions badges, a generic feature overview and problem statement, download+build instructions, and four screenshot placeholders under a new docs/screenshots/ directory. Task 3's live-repo human verification passed after the orchestrator caught and fixed a real bug: build.yml was scoped to `branches: [main]` but this repo's actual default branch is `master`.
+
+---
+
 ## v1.1 Automation & Multi-Monitor (Shipped: 2026-08-01)
 
 **Phases completed:** 5 phases (6, 7, 8, 9, 11), 19 plans + 2 gap-closure quick tasks

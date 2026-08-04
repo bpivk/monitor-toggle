@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Visual Polish & Documentation
-status: milestone_complete
-stopped_at: Milestone complete (Phase 14 was final phase)
-last_updated: 2026-08-03T21:19:09.361Z
-last_activity: 2026-08-03 -- Phase 14 execution started
+status: Awaiting next milestone
+stopped_at: Phase 14 context gathered
+last_updated: "2026-08-04T06:26:10.653Z"
+last_activity: 2026-08-04 — Milestone v1.2 completed and archived
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 13
   completed_plans: 13
-  percent: 67
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,10 @@ See: .planning/PROJECT.md (updated 2026-08-01)
 
 ## Current Position
 
-Phase: 14
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-08-03
-
-Progress: [░░░░░░░░░░] 0%
+Phase: Milestone v1.2 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-08-04 — Milestone v1.2 completed and archived
 
 ## Performance Metrics
 
@@ -145,6 +143,4 @@ Resume file: .planning/phases/14-readme-release-documentation/14-CONTEXT.md
 
 ## Operator Next Steps
 
-- `/gsd:plan-phase 12` — plan Phase 12: Theme Infrastructure & Live Theme-Following
-
-</content>
+- Start the next milestone with /gsd-new-milestone

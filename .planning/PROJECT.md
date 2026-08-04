@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A Windows GUI utility that switches between "normal desktop mode" and "Moza rig mode" with one click — from the GUI, a tray menu, or a global keyboard shortcut. Toggling to rig mode disables the primary monitor at the OS level (so games default to the rig monitor instead), switches the default audio output to the rig speakers, and launches the Moza Companion app. Toggling back restores the exact previous monitor/audio state and minimizes the Moza Companion app. The app can run tray-resident with autostart, and now supports arbitrary multi-monitor configurations (not just a single primary monitor). Built for a single user's personal sim-racing rig setup.
+A Windows GUI utility that switches between "normal desktop mode" and "Moza rig mode" with one click — from the GUI, a tray menu, or a global keyboard shortcut. Toggling to rig mode disables the primary monitor at the OS level (so games default to the rig monitor instead), switches the default audio output to the rig speakers, and launches the Moza Companion app. Toggling back restores the exact previous monitor/audio state and minimizes the Moza Companion app. The app can run tray-resident with autostart, and supports arbitrary multi-monitor configurations (not just a single primary monitor). The GUI follows the Windows system light/dark theme live, and the tray/exe icons use a shape-distinct monitor-vs-steering-wheel motif. Distributed via a public GitHub repo (`bpivk/monitor-toggle`) with a GitHub-ready README, CI, and tagged releases. Built for a single user's personal sim-racing rig setup.
 
 ## Core Value
 
@@ -10,29 +10,16 @@ A single reliable action that disables the primary monitor (not just powers it o
 
 ## Current State
 
-**Shipped: v1.1 Automation & Multi-Monitor (2026-08-01)**
+**Shipped: v1.2 Visual Polish & Documentation (2026-08-04)**
 
-v1.1 removed the daily-use friction that remained after v1.0: the app no longer requires opening the GUI to toggle (tray residency + global hotkey), and monitor control generalized from one hardcoded primary monitor to arbitrary independently-configurable disable/enable sets. A shared reentrancy-safe orchestration helper (`ToggleOrchestrator`) now guards every trigger path against corrupted state from concurrent toggles. A late-breaking real need — independently configurable tray close/minimize behavior — was scoped and shipped as Phase 11, ahead of the originally-planned Phase 10 (CLI trigger), which was reviewed and permanently dropped at milestone close rather than delivered (see Requirements below).
+v1.2 replaced the default-WinForms look with a theme-aware, modern UI (live light/dark theme-follow across every control, Windows-11 Mica/rounded corners), gave the tray icons genuine shape-based visual distinction (monitor vs. steering-wheel silhouettes, colorblind-safe), and shipped a GitHub-ready README backed by real infrastructure that didn't exist before this milestone: an MIT LICENSE, two GitHub Actions workflows (CI build/test + tag-triggered release with exe attachment), the repo flipped from private to public, and v1.0/v1.1 backfilled as GitHub Releases. Two real bugs were caught only by rig/live verification, not static checks: a `dotnet/winforms` dark-mode theming false assumption (Phase 12 gap closure) and a `main`-vs-`master` CI trigger mismatch (Phase 14).
 
-**Scope decision, not a gap:** CLI trigger + single-instance IPC (TRIG-02/TRIG-03) was scoped for v1.1 but never built, and after review was decided permanently out of scope rather than deferred — tray and hotkey triggers already cover every trigger path this project needs. Full detail: `.planning/milestones/v1.1-REQUIREMENTS.md`.
+**Not yet done:** the four README screenshot placeholders (`docs/screenshots/*.png`) are intentionally still broken-image links — real screenshots must be supplied by the user from the rig (no Windows GUI in this build environment).
 
-## Current Milestone: v1.2 Visual Polish & Documentation — all phases complete, ready to close
-
-**Goal:** Replace the default-WinForms look with a theme-aware, modern UI and give the tray icons real visual distinction, plus a GitHub-ready README.
-
-**Target features (all shipped):**
-- GUI restyle: modern flat controls following Windows system light/dark mode (title bar via DWM API + re-themed controls), applied to MainForm and SettingsForm — Phase 12
-- Redesigned tray icon pair: visually distinct, well-designed icons for rig mode vs. normal mode (replaces the current functional-but-plain pair) — Phase 13
-- New README.md: feature overview + screenshots, install/build instructions, badges (build status, license, latest release) — Phase 14
-
-**Key context:** System-theme-following in WinForms has no built-in support — requires manual DWM API calls for the title bar plus re-coloring every control by hand; accepted as worthwhile complexity per explicit user call. Screenshots are still placeholders in the README — user must supply real screenshots from the rig (no Windows GUI available in this build environment). The GitHub repo (`bpivk/monitor-toggle`) was flipped from private to public as part of Phase 14, with v1.0/v1.1 backfilled as GitHub Releases and new CI/release automation added — none of this existed before v1.2.
-
-**Deferred from this milestone:** LOG-01 (toggle history/log) — still a nice-to-have, lower priority than visual polish.
-
-**Next step:** Run `/gsd:complete-milestone` to close out v1.2 and scope v2 work.
+**Next milestone:** Not yet scoped. Run `/gsd:new-milestone` to start.
 
 <details>
-<summary>Archived: v1.0 and v1.1 milestone framing (superseded)</summary>
+<summary>Archived: v1.0, v1.1, and v1.2 milestone framing (superseded)</summary>
 
 **v1.0 MVP target features (shipped 2026-07-26):** GUI settings view, one-click toggle in both directions, true OS-level monitor disable, default audio device switching, companion-app launch/focus/minimize, standalone .exe distribution.
 
@@ -44,6 +31,13 @@ v1.1 removed the daily-use friction that remained after v1.0: the app no longer 
 - Multi-monitor enable/disable configuration — generalizes v1.0's single "primary monitor to disable" to arbitrary multi-monitor desks
 
 **Deferred from v1.1:** LOG-01 (toggle history/log) — still a nice-to-have, lower priority than automation/multi-monitor.
+
+**v1.2 Visual Polish & Documentation target features (shipped 2026-08-04, as scoped 2026-08-02):**
+- GUI restyle: modern flat controls following Windows system light/dark mode (title bar via DWM API + re-themed controls), applied to MainForm and SettingsForm — Phase 12
+- Redesigned tray icon pair: visually distinct, well-designed icons for rig mode vs. normal mode (replaces the prior functional-but-plain pair) — Phase 13
+- New README.md: feature overview + screenshots, install/build instructions, badges (build status, license, latest release) — Phase 14
+
+**Deferred from v1.2:** LOG-01 (toggle history/log) — still a nice-to-have, lower priority than visual polish.
 
 </details>
 
@@ -75,7 +69,7 @@ v1.1 removed the daily-use friction that remained after v1.0: the app no longer 
 
 ### Active
 
-None — all v1.2 requirements validated. Ready for `/gsd:complete-milestone`.
+None — v1.2 shipped and closed. Next milestone not yet scoped; see `.planning/milestones/v1.2-REQUIREMENTS.md`'s v2 backlog (LOG-01, THEME-07/08/09) as candidates for `/gsd:new-milestone`.
 
 ### Out of Scope
 
@@ -92,10 +86,11 @@ None — all v1.2 requirements validated. Ready for `/gsd:complete-milestone`.
 - Personal single-user tool for a sim-racing setup: a Moza wheel/pedals rig sits to the right of the desk with its own monitor and its own speakers (rig mode audio/video). The primary desk monitor and a headset are the normal-use defaults.
 - Problem driving this: games launch on the primary monitor by default, and some games (e.g. BeamNG.drive) actively misbehave (self-minimize) when run on what Windows considers a secondary display. The fix is making the primary monitor genuinely absent from Windows' display list while racing.
 - No existing single app does this exact combination (monitor disable + audio switch + companion-app launch + tray/hotkey automation + multi-monitor sets as one preset toggle), though individual building blocks exist elsewhere. This project composes those capabilities into one custom GUI tool.
-- Shipped state as of v1.1 close (2026-08-01): ~6,900 LOC C# across a 4-project solution (Core/Windows/App/Tests), self-contained win-x64 single-file publish. v1.1 added 186 commits over ~6 days on top of v1.0's 221-commit, 2-day build.
+- Shipped state as of v1.2 close (2026-08-04): ~8,870 LOC C# across the solution (now including a dev-time-only `RigToggle.IconGen` generator project alongside Core/Windows/App/Tests), self-contained win-x64 single-file publish. v1.2 added 107 commits over ~2.3 days on top of v1.1's 186-commit, ~6-day build. Repo (`bpivk/monitor-toggle`) is now public with CI (GitHub Actions build+release workflows) and real GitHub Releases (v1.0, v1.1) — none of that existed before v1.2.
 - Post-v1.0-ship hardening (2026-07-26): Moza Companion window-focus-manipulation bug (H9) root-caused and fixed via relaunch-based (`ShellExecute`) activation instead of raw `SetForegroundWindow`/`ShowWindow` calls — see `.planning/debug/resolved/moza-foreground-focus.md`.
 - v1.1 rig-discovered/code-review-found bugs, all fixed and verified: `GetAllMonitors()` duplicate-row/dual-primary dedup; `Restore()` Source-ID staleness for enable-set monitors; migration guard re-corrupting an emptied disable set; non-exception-safe companion-app minimize step; `--tray` hidden-start not actually suppressing the window; autostart save-failure recovery itself throwing unhandled; hotkey owner-window-destroyed timing bug; Escape-closes-Settings-during-hotkey-capture; Phase 11's tray-preference lockout bug (two fix commits, rig-reverified at milestone close).
 - Known limitation carried forward unpatched: `LaunchOrFocus`/`MinimizeIfRunning` derive the running-process name from the configured launch-target path via `Path.GetFileNameWithoutExtension` — if the user configures a `.lnk` (not the target `.exe` itself), toggle-back's minimize may silently no-op. Documented, out of scope.
+- v1.2 CI hardening gaps flagged by code review, advisory/non-blocking, not yet addressed: `build.yml` has no explicit `permissions:` block despite running on `pull_request`; all three GitHub Actions are pinned to floating major-version tags rather than commit SHAs; `release.yml` publishes on tag push with no build/test gate beforehand; neither workflow sets `timeout-minutes`. Full detail: `.planning/phases/14-readme-release-documentation/14-REVIEW.md`.
 
 ## Constraints
 
@@ -152,4 +147,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-03 — Phase 14 (README & Release Documentation) complete; v1.2 Visual Polish & Documentation milestone fully shipped, ready for `/gsd:complete-milestone`.*
+*Last updated: 2026-08-04 — v1.2 Visual Polish & Documentation milestone closed and archived.*
