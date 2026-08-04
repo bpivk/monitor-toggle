@@ -76,7 +76,12 @@ Full phase details: `.planning/milestones/v1.2-ROADMAP.md`
   3. Leaving the Rig-mode audio device unset makes toggle-to-Rig skip Rig-direction audio switching entirely, with no error (AUDIO-03)
   4. Configuring a Normal-mode audio device makes it actually apply on toggle-to-Normal (replacing today's snapshot-based restore); leaving it unset skips Normal-direction audio switching (AUDIO-04)
   5. A configured audio device ID that no longer exists on the system surfaces as a real `Failed` step, not silently skipped (AUDIO-05)
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+- [ ] 15-01-PLAN.md — Core contracts: Skipped outcome, Success predicate, checklist arm, IAudioController.TryResolveDevice + fake
+- [ ] 15-02-PLAN.md — ToggleService optional Audio/App both directions, Normal-mode SetDefault audio, relaxed gate + tests
+- [ ] 15-03-PLAN.md — Settings UI: Clear button, "(None...)" audio sentinel, relaxed Save gate, MainForm message reword
+- [ ] 15-04-PLAN.md — Full-solution regression gate + rig verification of all five success criteria
 
 ### Phase 16: Normal-Mode Explicit Monitor Config & Mode-Store Redesign
 
@@ -135,7 +140,7 @@ Full phase details: `.planning/milestones/v1.2-ROADMAP.md`
 | 12. Theme Infrastructure & Live Theme-Following | v1.2 | 6/6 | Complete | 2026-08-03 |
 | 13. Tray & App Icon Redesign | v1.2 | 4/4 | Complete | 2026-08-03 |
 | 14. README & Release Documentation | v1.2 | 3/3 | Complete | 2026-08-03 |
-| 15. Optional App & Audio Targets | v2.0 | 0/TBD | Not started | - |
+| 15. Optional App & Audio Targets | v2.0 | 0/4 | Not started | - |
 | 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 0/TBD | Not started | - |
 | 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 0/TBD | Not started | - |
 | 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 0/TBD | Not started | - |
@@ -145,4 +150,4 @@ Full phase details: `.planning/milestones/v1.2-ROADMAP.md`
 Requirements not yet scoped into a milestone. See `.planning/REQUIREMENTS.md` "v2 Requirements (Deferred)" for the current deferred list (LOG-01 toggle history/log; THEME-07/08/09 accent-color highlight, custom toggle-switch control, manual theme override — all deferred at v1.2 scoping). CLI trigger/TRIG-02/TRIG-03 was reviewed at v1.1 close and decided permanently out of scope, not carried forward.
 
 ---
-*Next: `/gsd:plan-phase 15` to plan Phase 15: Optional App & Audio Targets.*
+*Next: `/gsd:execute-phase 15` to execute Phase 15: Optional App & Audio Targets.*
