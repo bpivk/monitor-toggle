@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Visual Polish & Documentation
 status: Awaiting next milestone
-stopped_at: Phase 14 context gathered
-last_updated: "2026-08-04T06:26:10.653Z"
+stopped_at: Milestone v1.2 complete and archived
+last_updated: "2026-08-04T06:30:00.000Z"
 last_activity: 2026-08-04 — Milestone v1.2 completed and archived
 progress:
   total_phases: 3
@@ -18,10 +18,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-08-01)
+See: .planning/PROJECT.md (updated 2026-08-04)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
-**Current focus:** Milestone complete
+**Current focus:** Planning next milestone
 
 ## Current Position
 
@@ -71,16 +71,7 @@ Last activity: 2026-08-04 — Milestone v1.2 completed and archived
 
 ### Decisions
 
-Full decision log lives in PROJECT.md's Key Decisions table.
-
-v1.2 roadmap decisions (from research, to be executed during planning, not yet implemented):
-
-- Base theming on `Application.SetColorMode(SystemColorMode.System)` (built into WinForms as of .NET 10, GA) rather than hand-rolling all control recoloring from scratch; patch its two documented gaps (no live-update; native MessageBox/OpenFileDialog stay light-mode) with custom code.
-- Live theme-change detection via `Microsoft.Win32.SystemEvents.UserPreferenceChanged` + manual `DwmSetWindowAttribute` re-apply — never fire the manual DWM call redundantly alongside `SetColorMode`'s own internal call (avoids title-bar flash).
-- All theming calls must run in `OnHandleCreated`, not `Form_Load`/`Shown`, so they don't silently no-op on the app's proven-fragile `--tray` hidden-start path.
-- Tray-icon-variant/contrast decisions must read the `SystemUsesLightTheme` registry key (taskbar/tray), not `AppsUseLightTheme` (app/window chrome) — the two are independent and conflating them was flagged as a documented pitfall.
-- Icon instances are pre-loaded/cached once at startup, never constructed per-swap, to avoid a GDI handle leak over this app's multi-hour tray-resident sessions.
-- No new NuGet packages required for this milestone — theming and icon work are BCL/WinForms-native plus dev-time-only asset tooling (ImageMagick/Inkscape).
+Full decision log lives in PROJECT.md's Key Decisions table. v1.2's decisions (theming approach, icon geometry, CI/release infrastructure) are all implemented and validated — see PROJECT.md for outcomes.
 
 ### Pending Todos
 
@@ -92,9 +83,7 @@ None.
 
 ### Blockers/Concerns
 
-- Actual Windows version of the rig PC is unconfirmed (Windows 10 vs. 11) — `Application.SetColorMode` dark mode and full control theming are Windows-11-only by documentation. Must be resolved as a prerequisite check early in Phase 12 planning, since it determines whether THEME-06's Windows 10 fallback path is exercised for real or only defensively coded.
-- Whether `SettingsForm` is instantiated fresh per open or reused/hidden is unconfirmed from research alone — must be verified against the actual codebase before writing theme-application/subscription code in Phase 12 (changes where `ThemeChanged` subscribe/unsubscribe must live).
-- `dotnet/winforms#12027` (stale ToolStrip brush cache on theme change) has no clean first-party fix — Phase 12 planning must explicitly decide accept-as-known-limitation vs. rebuild-ContextMenuStrip-on-theme-change.
+None open. All v1.2 blockers resolved during Phase 12 execution (rig confirmed Windows 11; `SettingsForm` lifecycle verified; `dotnet/winforms#12027` accepted as a documented known limitation — see PROJECT.md Key Decisions).
 
 ### Quick Tasks Completed
 
@@ -137,10 +126,10 @@ Resolved at v1.2 close (2026-08-04): Phase 13's `13-VERIFICATION.md` had the sam
 
 ## Session Continuity
 
-Last session: 2026-08-03T19:59:55.624Z
-Stopped at: Phase 14 context gathered
-Resume file: .planning/phases/14-readme-release-documentation/14-CONTEXT.md
+Last session: 2026-08-04T06:30:00.000Z
+Stopped at: Milestone v1.2 complete and archived
+Resume file: .planning/PROJECT.md
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- `/gsd:new-milestone` — start the next milestone (questioning → research → requirements → roadmap)
