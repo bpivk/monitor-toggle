@@ -87,7 +87,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 15-02-PLAN.md — ToggleService optional Audio/App both directions, Normal-mode SetDefault audio, relaxed gate + tests
+- [x] 15-02-PLAN.md — ToggleService optional Audio/App both directions, Normal-mode SetDefault audio, relaxed gate + tests
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -156,7 +156,7 @@ Plans:
 | 12. Theme Infrastructure & Live Theme-Following | v1.2 | 6/6 | Complete | 2026-08-03 |
 | 13. Tray & App Icon Redesign | v1.2 | 4/4 | Complete | 2026-08-03 |
 | 14. README & Release Documentation | v1.2 | 3/3 | Complete | 2026-08-03 |
-| 15. Optional App & Audio Targets | v2.0 | 2/4 | In Progress|  |
+| 15. Optional App & Audio Targets | v2.0 | 3/4 | In Progress|  |
 | 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 0/TBD | Not started | - |
 | 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 0/TBD | Not started | - |
 | 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 0/TBD | Not started | - |
