@@ -85,15 +85,18 @@ public sealed class FakeAudioController : IAudioController
     private readonly List<string> _callLog;
     private readonly string? _capturedDefaultDeviceId;
     private readonly bool _throwOnRestore;
+    private readonly bool _deviceExists;
 
     public FakeAudioController(
         List<string> callLog,
         string? capturedDefaultDeviceId = "fake-normal-device",
-        bool throwOnRestore = false)
+        bool throwOnRestore = false,
+        bool deviceExists = true)
     {
         _callLog = callLog;
         _capturedDefaultDeviceId = capturedDefaultDeviceId;
         _throwOnRestore = throwOnRestore;
+        _deviceExists = deviceExists;
     }
 
     public IReadOnlyList<AudioDeviceInfo> GetPlaybackDevices()
@@ -125,6 +128,18 @@ public sealed class FakeAudioController : IAudioController
             // ToggleToNormalMode still minimizes + clears even when this throws.
             throw new InvalidOperationException("Fake audio restore failure (simulated stale/missing device).");
         }
+    }
+
+    public AudioDeviceInfo? TryResolveDevice(string? deviceId)
+    {
+        _callLog.Add($"audio.TryResolveDevice:{deviceId}");
+
+        if (string.IsNullOrEmpty(deviceId) || !_deviceExists)
+        {
+            return null;
+        }
+
+        return new AudioDeviceInfo(deviceId, "Fake Speakers");
     }
 }
 

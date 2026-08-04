@@ -14,4 +14,13 @@ public interface IAudioController
     AudioState CaptureState();
     void SetDefault(string deviceId);
     void Restore(AudioState previousState);
+
+    /// <summary>
+    /// Phase 15/AUDIO-05: cheap existence check, promoted from
+    /// WindowsAudioController's existing internal helper, so ToggleService can
+    /// detect a configured-but-removed audio device without touching Windows
+    /// types. Returns null for both "not found" and "enumerator threw" — same
+    /// defensive contract TryResolveDevice already has.
+    /// </summary>
+    AudioDeviceInfo? TryResolveDevice(string? deviceId);
 }
