@@ -508,22 +508,25 @@ All entries below are this session's own design recommendations, not locked CONT
 
 **If this table is empty:** N/A — see entries above; all are design recommendations requiring plan/discuss confirmation, not locked facts.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Toggle-button gating while mode is Unknown**
    - What we know: D-06/D-07 lock the *startup* dialog; they don't specify ongoing behavior afterward.
    - What's unclear: Should `btnToggle` be disabled entirely until the mode file is fixed, or remain clickable and just re-show a short reminder each time (Pattern 3's recommendation)?
    - Recommendation: Re-show a short reminder per click (matches this app's existing "never permanently lock the UI, always allow retry" posture — e.g. the busy-flag rejection is also just a message, not a disabled button) — but confirm at plan time.
+   - RESOLVED: btnToggle stays clickable and re-shows a per-click reminder while mode is Unknown — settled in 16-UI-SPEC.md (mode-unknown UI states / Copywriting Contract) and implemented by Plan 16-04's startup mode-corruption dialog + MainForm guards; the button is never permanently disabled.
 
 2. **Mode-corruption recovery affordance**
    - What we know: The existing corrupted-snapshot precedent's recovery is purely textual ("delete the corrupted state file"), no in-app action.
    - What's unclear: Whether v2.0 should add a lightweight in-app recovery (e.g., a Settings-page "which mode am I actually in right now?" picker that reseeds `IModeStore` directly) instead of requiring manual file deletion.
    - Recommendation: Match the existing precedent (text-only) for this phase's scope; flag an in-app picker as a candidate enhancement, not a requirement, since it's not mentioned in any locked decision.
+   - RESOLVED: recovery is text-only (manual file deletion + restart), matching the corrupted-snapshot precedent — settled in 16-UI-SPEC.md (mode-corruption dialog copy) and implemented by Plan 16-04; no in-app recovery affordance is in this phase's scope.
 
 3. **Advisory (non-blocking) Settings-time warning when both grids independently disable every monitor**
    - What we know: PITFALLS.md Pitfall 2 explicitly forbids this from being the *safety mechanism* (that stays apply-time-only, in `WindowsMonitorController`).
    - What's unclear: Whether an advisory-only hint (informational, non-blocking) is worth adding for UX polish, given the milestone's own SUMMARY.md flags it only as "candidate... roadmap to accept or defer."
    - Recommendation: Treat as optional polish, not required for DISPLAY-09/10 to be considered complete.
+   - RESOLVED: the apply-time zero-survivors guard remains the sole safety mechanism (WindowsMonitorController, generalized to be mode-agnostic in Plan 16-03 Task 2); the advisory Settings-time hint is deferred as optional polish and is NOT planned in Plan 16-02 — settled per 16-UI-SPEC.md and PITFALLS.md Pitfall 2.
 
 ## Environment Availability
 
