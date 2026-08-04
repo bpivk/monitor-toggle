@@ -30,6 +30,7 @@ public static class ToggleResultFormatter
                 ToggleStepOutcome.Succeeded => $"{step.StepName}: OK",
                 ToggleStepOutcome.Failed => $"{step.StepName}: FAILED ({step.Reason})",
                 ToggleStepOutcome.NotAttempted => $"{step.StepName}: not attempted",
+                ToggleStepOutcome.Skipped => $"{step.StepName}: Skipped (not configured)",
                 _ => $"{step.StepName}: unknown",
             }));
     }
