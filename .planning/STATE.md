@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Configurable Monitors, Optional Targets & Cleanup
 status: planning
-last_updated: "2026-08-04T07:25:42.130Z"
+last_updated: "2026-08-04T07:40:00.000Z"
 last_activity: 2026-08-04
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -19,15 +19,17 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-08-04)
 
-**Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
-**Current focus:** Planning next milestone
+**Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before. (Note: v2.0 revises the "restores exactly how it was before" framing for Normal mode — see DISPLAY-10/AUDIO-04 and ROADMAP.md Phase 16.)
+**Current focus:** Phase 15: Optional App & Audio Targets
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-08-04 — Milestone v2.0 started
+Phase: 15 of 18 (Optional App & Audio Targets) — first phase of v2.0
+Plan: — of TBD
+Status: Ready to plan
+Last activity: 2026-08-04 — v2.0 roadmap created (Phases 15-18)
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -67,10 +69,11 @@ Last activity: 2026-08-04 — Milestone v2.0 started
 
 - Phase 11 edited: edited fields: title, goal, depends_on (corrected from Phase 10 to Phase 8)
 - v1.2 roadmap created 2026-08-02: 3 phases derived from THEME/ICON/DOCS requirement categories (coarse granularity). Phase 12 (Theme Infrastructure) sequenced first per research risk-priority (highest-novelty work; live-update gap and `--tray` handle-timing risk). Phase 13 (Tray & App Icon Redesign) is architecturally independent of Phase 12 but sequenced second by convention, not dependency. Phase 14 (README) sequenced last, depends on both since it documents/screenshots the finished visual result. Rig-only-catchable risks (live theme flip while running, both taskbar themes, extended-session GDI handle stability, `--tray` hidden-start timing, Windows 10 fallback) were folded into Phase 12/13 success criteria and plan-level human verification rather than a separate verification phase, consistent with this project's established UAT-per-phase pattern (Phase 8, 9, 11).
+- v2.0 roadmap created 2026-08-04: 4 phases (15-18) derived from the 19 v2.0 requirements (coarse granularity), continuing numbering from v1.2's Phase 14. Structure follows research/SUMMARY.md's proposed sequencing closely: Phase 15 (optional App/Audio targets) first as lowest-risk, no-prerequisite validation-gate relaxation; Phase 16 (Normal-mode explicit monitor config + mode-store redesign) second as the core, highest-risk piece — forces `IsInRigMode()` off snapshot-file-presence onto an explicit persisted flag, landed alongside the monitor-set rewrite per research's Pitfall 4/5 warnings; Phase 17 (manual monitor panel + shared safety guard) third, depends on Phase 16's controller-call unification so the panel doesn't introduce a second implementation of "toggle a monitor." DISPLAY-12 (safety guard enforced identically across Rig toggle, Normal toggle, and the manual panel) was assigned to Phase 17 rather than Phase 16 since full three-way enforcement can only be verified once the panel (the third path) exists. Phase 18 (cleanup + exe-size reduction) last, since the snapshot/restore subsystem is only confirmed genuinely dead once Phase 16 ships. DISPLAY-13 (crash-recovery marker) and PANEL-04/05 (confirmation gate, Identify action) — both resolved into requirements after research/SUMMARY.md was written — were folded into Phase 16 and Phase 17 respectively, consistent with the research's existing rationale for those phases.
 
 ### Decisions
 
-Full decision log lives in PROJECT.md's Key Decisions table. v1.2's decisions (theming approach, icon geometry, CI/release infrastructure) are all implemented and validated — see PROJECT.md for outcomes.
+Full decision log lives in PROJECT.md's Key Decisions table. v1.2's decisions (theming approach, icon geometry, CI/release infrastructure) are all implemented and validated — see PROJECT.md for outcomes. v2.0's open architectural question (does `NormalAudioDeviceId` gain real runtime effect?) is resolved as "yes" per REQUIREMENTS.md AUDIO-04 — Phase 15 delivers it.
 
 ### Pending Todos
 
@@ -82,7 +85,7 @@ None.
 
 ### Blockers/Concerns
 
-None open. All v1.2 blockers resolved during Phase 12 execution (rig confirmed Windows 11; `SettingsForm` lifecycle verified; `dotnet/winforms#12027` accepted as a documented known limitation — see PROJECT.md Key Decisions).
+None open.
 
 ### Quick Tasks Completed
 
@@ -98,7 +101,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| v2 | LOG-01 (toggle history/log) | Still deferred | Initial requirements definition (v1.0); re-deferred at v1.1 scoping, v1.1 close, and v1.2 scoping |
+| v2 | LOG-01 (toggle history/log) | Still deferred | Initial requirements definition (v1.0); re-deferred at v1.1 scoping, v1.1 close, v1.2 scoping, and not picked up for v2.0 |
 | v2 | THEME-07 (accent-color-aware highlight) | Deferred | v1.2 scoping 2026-08-02 |
 | v2 | THEME-08 (custom-drawn toggle-switch control) | Deferred | v1.2 scoping 2026-08-02 |
 | v2 | THEME-09 (manual theme override) | Deferred | v1.2 scoping 2026-08-02 |
@@ -126,10 +129,10 @@ Resolved at v1.2 close (2026-08-04): Phase 13's `13-VERIFICATION.md` had the sam
 
 ## Session Continuity
 
-Last session: 2026-08-04T06:30:00.000Z
-Stopped at: Milestone v1.2 complete and archived
-Resume file: .planning/PROJECT.md
+Last session: 2026-08-04T07:40:00.000Z
+Stopped at: v2.0 ROADMAP.md created (Phases 15-18), REQUIREMENTS.md traceability updated
+Resume file: .planning/ROADMAP.md
 
 ## Operator Next Steps
 
-- `/gsd:new-milestone` — start the next milestone (questioning → research → requirements → roadmap)
+- `/gsd:plan-phase 15` — plan Phase 15: Optional App & Audio Targets

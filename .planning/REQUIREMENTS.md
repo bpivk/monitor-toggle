@@ -17,7 +17,7 @@ Requirements for the v2.0 milestone (Configurable Monitors, Optional Targets & C
 ### Audio
 
 - [ ] **AUDIO-03**: User can leave the Rig-mode audio device unset; toggling to Rig mode skips Rig-direction audio switching entirely
-- [ ] **AUDIO-04**: User can configure a Normal-mode audio device that actually applies on toggle to Normal mode (replacing today's snapshot-based restore); leaving it unset skips Normal-direction audio switching entirely
+- [ ] **AUDIO-04**: User can configure a Normal-mode audio device that actually applies on toggle to Normal mode (replacing today's snapshot-based restore); leaving it unset skips Normal-direction audio switching
 - [ ] **AUDIO-05**: A configured-but-invalid audio device (no longer exists on the system) still surfaces as a real failure, not silently skipped
 
 ### Display
@@ -77,31 +77,31 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| APP-04 | TBD | Pending |
-| APP-05 | TBD | Pending |
-| AUDIO-03 | TBD | Pending |
-| AUDIO-04 | TBD | Pending |
-| AUDIO-05 | TBD | Pending |
-| DISPLAY-09 | TBD | Pending |
-| DISPLAY-10 | TBD | Pending |
-| DISPLAY-11 | TBD | Pending |
-| DISPLAY-12 | TBD | Pending |
-| DISPLAY-13 | TBD | Pending |
-| PANEL-01 | TBD | Pending |
-| PANEL-02 | TBD | Pending |
-| PANEL-03 | TBD | Pending |
-| PANEL-04 | TBD | Pending |
-| PANEL-05 | TBD | Pending |
-| PERF-01 | TBD | Pending |
-| PERF-02 | TBD | Pending |
-| CLEANUP-01 | TBD | Pending |
-| CLEANUP-02 | TBD | Pending |
+| APP-04 | Phase 15 | Pending |
+| APP-05 | Phase 15 | Pending |
+| AUDIO-03 | Phase 15 | Pending |
+| AUDIO-04 | Phase 15 | Pending |
+| AUDIO-05 | Phase 15 | Pending |
+| DISPLAY-09 | Phase 16 | Pending |
+| DISPLAY-10 | Phase 16 | Pending |
+| DISPLAY-11 | Phase 16 | Pending |
+| DISPLAY-12 | Phase 17 | Pending |
+| DISPLAY-13 | Phase 16 | Pending |
+| PANEL-01 | Phase 17 | Pending |
+| PANEL-02 | Phase 17 | Pending |
+| PANEL-03 | Phase 17 | Pending |
+| PANEL-04 | Phase 17 | Pending |
+| PANEL-05 | Phase 17 | Pending |
+| PERF-01 | Phase 18 | Pending |
+| PERF-02 | Phase 18 | Pending |
+| CLEANUP-01 | Phase 18 | Pending |
+| CLEANUP-02 | Phase 18 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19 ⚠️ (pending roadmap creation)
+- Mapped to phases: 19
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-08-04*
-*Last updated: 2026-08-04 after initial v2.0 definition*
+*Last updated: 2026-08-04 after v2.0 roadmap creation (Phases 15-18)*
