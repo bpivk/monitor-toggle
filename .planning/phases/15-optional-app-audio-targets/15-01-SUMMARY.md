@@ -100,6 +100,10 @@ None - no external service configuration required.
 - All 70 existing tests pass; `dotnet build` on both `RigToggle.Core` and `RigToggle.Tests` succeeds with 0 errors.
 - No blockers for Plans 02/03.
 
+## Self-Check: PASSED
+
+All 5 modified source files and the SUMMARY.md confirmed present on disk; all 3 commits (`9921a96`, `ed3a71b`, `29fa8a0`) confirmed present in git log.
+
 ---
 *Phase: 15-optional-app-audio-targets*
 *Completed: 2026-08-04*
