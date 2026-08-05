@@ -53,6 +53,11 @@ namespace RigToggle.App
         // (06-UI-SPEC.md Grid Spec § D-04 mechanism, RESEARCH.md Pitfall 5).
         private bool _updatingMonitorGridProgrammatically;
 
+        // 16-02: independent reentrancy guard for the Normal grid's own sibling-checkbox
+        // write — deliberately NOT shared with _updatingMonitorGridProgrammatically above,
+        // since the two grids are edited/committed independently (16-PATTERNS.md).
+        private bool _updatingMonitorGridNormalProgrammatically;
+
         /// <summary>
         /// Display/value wrapper for ComboBox binding (DisplayMember/ValueMember) —
         /// 02-RESEARCH.md Pattern 2. 15-03/D-02: Id widened to string? so a sentinel
@@ -103,6 +108,8 @@ namespace RigToggle.App
             this.Load += SettingsForm_Load;
             dgvMonitors.CurrentCellDirtyStateChanged += DgvMonitors_CurrentCellDirtyStateChanged;
             dgvMonitors.CellValueChanged += OnMonitorCellValueChanged;
+            dgvMonitorsNormal.CurrentCellDirtyStateChanged += DgvMonitorsNormal_CurrentCellDirtyStateChanged;
+            dgvMonitorsNormal.CellValueChanged += OnMonitorNormalCellValueChanged;
             cboAudioNormal.SelectedIndexChanged += OnPickerChanged;
             cboAudioRig.SelectedIndexChanged += OnPickerChanged;
 
@@ -142,6 +149,7 @@ namespace RigToggle.App
                 System.Windows.Forms.Application.SetColorMode(System.Windows.Forms.SystemColorMode.System);
                 DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDarkTheme);
                 ThemeApplier.ThemeMonitorGrid(dgvMonitors, IsDarkTheme);
+                ThemeApplier.ThemeMonitorGrid(dgvMonitorsNormal, IsDarkTheme);
 
                 // Re-render whatever txtHotkey state is currently active -- Recording
                 // needs its own re-apply (it's not driven by RenderHotkeyIdleDisplay),
@@ -179,7 +187,9 @@ namespace RigToggle.App
             // Re-enumerate on every open — no manual Refresh control exists (D-11).
             _settings = _settingsStore.Load();
             PopulateMonitorGrid();
+            PopulateMonitorGridNormal();
             ThemeApplier.ThemeMonitorGrid(dgvMonitors, IsDarkTheme);
+            ThemeApplier.ThemeMonitorGrid(dgvMonitorsNormal, IsDarkTheme);
 
             // 12-05/CR-02: theme all buttons at load time too.
             ThemeApplier.ThemeButton(btnBrowse, IsDarkTheme);
@@ -427,6 +437,57 @@ namespace RigToggle.App
             }
         }
 
+        // 16-02: PopulateMonitorGridNormal's self-analog — reuses the ALREADY-populated
+        // _allMonitors list from PopulateMonitorGrid() (no second GetAllMonitors() round
+        // trip), reading _settings.NormalMonitorsToDisable/NormalMonitorsToEnable instead.
+        // Must be called AFTER PopulateMonitorGrid() on every Load.
+        private void PopulateMonitorGridNormal()
+        {
+            errMonitor.SetError(dgvMonitorsNormal, string.Empty);
+            lblMonitorNormalWarning.Visible = false;
+
+            dgvMonitorsNormal.CellValueChanged -= OnMonitorNormalCellValueChanged;
+            dgvMonitorsNormal.Rows.Clear();
+
+            if (_allMonitors.Count == 0)
+            {
+                dgvMonitorsNormal.Enabled = false;
+                lblMonitorNormalWarning.Text = "No displays detected.";
+                lblMonitorNormalWarning.Visible = true;
+                dgvMonitorsNormal.CellValueChanged += OnMonitorNormalCellValueChanged;
+                return;
+            }
+
+            dgvMonitorsNormal.Enabled = true;
+
+            var disableSet = new HashSet<string>(_settings.NormalMonitorsToDisable ?? new List<string>());
+            var enableSet = new HashSet<string>(_settings.NormalMonitorsToEnable ?? new List<string>());
+
+            foreach (MonitorInfo monitor in _allMonitors)
+            {
+                string suffix = monitor.IsPrimary
+                    ? " (Primary)"
+                    : !monitor.IsActive
+                        ? " (currently OS-disabled)"
+                        : string.Empty;
+
+                int rowIndex = dgvMonitorsNormal.Rows.Add(
+                    monitor.FriendlyName + suffix,
+                    disableSet.Contains(monitor.DevicePath),
+                    enableSet.Contains(monitor.DevicePath));
+
+                dgvMonitorsNormal.Rows[rowIndex].Tag = monitor.DevicePath;
+            }
+
+            dgvMonitorsNormal.CellValueChanged += OnMonitorNormalCellValueChanged;
+
+            var staleDevicePathsNormal = GetStaleSavedDevicePathsNormal();
+            if (staleDevicePathsNormal.Count > 0)
+            {
+                ShowStaleMonitorWarningNormal(staleDevicePathsNormal.ToList());
+            }
+        }
+
         // Pitfall 5: a DataGridViewCheckBoxColumn cell doesn't commit its Value until the
         // cell loses focus — force an immediate commit so CellValueChanged fires on the
         // SAME click (required for D-04's single-click mutual exclusivity).
@@ -435,6 +496,15 @@ namespace RigToggle.App
             if (dgvMonitors.IsCurrentCellDirty && dgvMonitors.CurrentCell is DataGridViewCheckBoxCell)
             {
                 dgvMonitors.CommitEdit(DataGridViewDataErrorContexts.Commit);
+            }
+        }
+
+        // 16-02: Normal-grid self-analog of DgvMonitors_CurrentCellDirtyStateChanged above.
+        private void DgvMonitorsNormal_CurrentCellDirtyStateChanged(object? sender, EventArgs e)
+        {
+            if (dgvMonitorsNormal.IsCurrentCellDirty && dgvMonitorsNormal.CurrentCell is DataGridViewCheckBoxCell)
+            {
+                dgvMonitorsNormal.CommitEdit(DataGridViewDataErrorContexts.Commit);
             }
         }
 
@@ -474,6 +544,41 @@ namespace RigToggle.App
             ValidateSettingsForm();
         }
 
+        // 16-02: Normal-grid self-analog of OnMonitorCellValueChanged above — its own
+        // independent reentrancy guard (_updatingMonitorGridNormalProgrammatically), never
+        // the shared Rig-grid flag, since the two grids are edited independently.
+        private void OnMonitorNormalCellValueChanged(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0)
+            {
+                return; // column-header pseudo-event guard
+            }
+
+            if (!_updatingMonitorGridNormalProgrammatically
+                && (e.ColumnIndex == colDisableNormal.Index || e.ColumnIndex == colEnableNormal.Index))
+            {
+                DataGridViewRow row = dgvMonitorsNormal.Rows[e.RowIndex];
+                bool newValue = row.Cells[e.ColumnIndex].Value is true;
+
+                if (newValue)
+                {
+                    int siblingIndex = e.ColumnIndex == colDisableNormal.Index ? colEnableNormal.Index : colDisableNormal.Index;
+
+                    _updatingMonitorGridNormalProgrammatically = true;
+                    try
+                    {
+                        row.Cells[siblingIndex].Value = false;
+                    }
+                    finally
+                    {
+                        _updatingMonitorGridNormalProgrammatically = false;
+                    }
+                }
+            }
+
+            ValidateSettingsForm();
+        }
+
         // Reads the live grid state into two DevicePath sets — never trusts row index,
         // always the Tag set by PopulateMonitorGrid (06-PATTERNS.md Shared Patterns).
         private (HashSet<string> Disable, HashSet<string> Enable) GetGridSelection()
@@ -502,6 +607,33 @@ namespace RigToggle.App
             return (disable, enable);
         }
 
+        // 16-02: Normal-grid self-analog of GetGridSelection above.
+        private (HashSet<string> Disable, HashSet<string> Enable) GetGridSelectionNormal()
+        {
+            var disable = new HashSet<string>();
+            var enable = new HashSet<string>();
+
+            foreach (DataGridViewRow row in dgvMonitorsNormal.Rows)
+            {
+                if (row.Tag is not string devicePath)
+                {
+                    continue;
+                }
+
+                if (row.Cells[colDisableNormal.Index].Value is true)
+                {
+                    disable.Add(devicePath);
+                }
+
+                if (row.Cells[colEnableNormal.Index].Value is true)
+                {
+                    enable.Add(devicePath);
+                }
+            }
+
+            return (disable, enable);
+        }
+
         // Saved device paths (either set) that GetAllMonitors() no longer enumerates at
         // all — physically disconnected, not merely OS-disabled-but-connected.
         private HashSet<string> GetStaleSavedDevicePaths()
@@ -509,6 +641,15 @@ namespace RigToggle.App
             var enumeratedPaths = new HashSet<string>(_allMonitors.Select(m => m.DevicePath));
             IEnumerable<string> saved = (_settings.MonitorsToDisable ?? new List<string>())
                 .Concat(_settings.MonitorsToEnable ?? new List<string>());
+            return new HashSet<string>(saved.Where(p => !enumeratedPaths.Contains(p)));
+        }
+
+        // 16-02: Normal-grid self-analog of GetStaleSavedDevicePaths above.
+        private HashSet<string> GetStaleSavedDevicePathsNormal()
+        {
+            var enumeratedPaths = new HashSet<string>(_allMonitors.Select(m => m.DevicePath));
+            IEnumerable<string> saved = (_settings.NormalMonitorsToDisable ?? new List<string>())
+                .Concat(_settings.NormalMonitorsToEnable ?? new List<string>());
             return new HashSet<string>(saved.Where(p => !enumeratedPaths.Contains(p)));
         }
 
@@ -525,6 +666,14 @@ namespace RigToggle.App
             lblMonitorWarning.Text =
                 $"Previously configured monitor(s) not currently detected: {FormatMonitorNames(staleDevicePaths)} — settings preserved; reconnect the display to manage it here.";
             lblMonitorWarning.Visible = true;
+        }
+
+        // 16-02: Normal-grid self-analog of ShowStaleMonitorWarning above.
+        private void ShowStaleMonitorWarningNormal(IReadOnlyList<string> staleDevicePaths)
+        {
+            lblMonitorNormalWarning.Text =
+                $"Previously configured monitor(s) not currently detected: {FormatMonitorNames(staleDevicePaths)} — settings preserved; reconnect the display to manage it here.";
+            lblMonitorNormalWarning.Visible = true;
         }
 
         private void PopulateAudioPickers()
@@ -736,7 +885,34 @@ namespace RigToggle.App
                 }
             }
 
-            btnSaveSettings.Enabled = monitorOk && audioNormalOk && audioRigOk && appPathOk;
+            // 16-02/D-01: the Normal grid must NOT block Save when both sets are empty —
+            // an all-empty Normal config is valid (a monitor not listed is left
+            // untouched). No WouldLeaveAtLeastOneMonitorActive cross-check is applied
+            // here — that safety guard stays apply-time-only in
+            // WindowsMonitorController.DeactivateMonitors (RESEARCH.md Anti-Pattern).
+            // lblMonitorNormalWarning is advisory-only (stale-saved-monitor notice),
+            // never a blocking condition — monitorNormalOk is unconditionally true.
+            bool monitorNormalOk = true;
+
+            if (dgvMonitorsNormal.Enabled)
+            {
+                // Computed for its stale-warning side effect only (never used to flip
+                // monitorNormalOk) — keeps the advisory notice in sync with live edits,
+                // mirroring the Rig grid's own re-check-on-every-interaction behavior.
+                GetGridSelectionNormal();
+
+                var staleDevicePathsNormal = GetStaleSavedDevicePathsNormal();
+                if (staleDevicePathsNormal.Count > 0)
+                {
+                    ShowStaleMonitorWarningNormal(staleDevicePathsNormal.ToList());
+                }
+                else
+                {
+                    lblMonitorNormalWarning.Visible = false;
+                }
+            }
+
+            btnSaveSettings.Enabled = monitorOk && monitorNormalOk && audioNormalOk && audioRigOk && appPathOk;
         }
 
         // Accepts any existing .lnk or .exe as the launch target — a .lnk shortcut is
@@ -835,6 +1011,7 @@ namespace RigToggle.App
             var audioNormalItem = cboAudioNormal.SelectedItem as PickerItem;
             var audioRigItem = cboAudioRig.SelectedItem as PickerItem;
             var (disableSelected, enableSelected) = GetGridSelection();
+            var (disableSelectedNormal, enableSelectedNormal) = GetGridSelectionNormal();
 
             // Defensive guard only — btnSaveSettings.Enabled (ValidateSettingsForm) should
             // make this unreachable via the UI, but never persist a partial/invalid/
@@ -867,6 +1044,18 @@ namespace RigToggle.App
             var mergedEnable = new HashSet<string>(staleEnable);
             mergedEnable.UnionWith(enableSelected);
 
+            // 16-02: same stale-preserving merge for the Normal grid's sets.
+            IEnumerable<string> staleDisableNormal = (_settings.NormalMonitorsToDisable ?? new List<string>())
+                .Where(p => !enumeratedPaths.Contains(p));
+            IEnumerable<string> staleEnableNormal = (_settings.NormalMonitorsToEnable ?? new List<string>())
+                .Where(p => !enumeratedPaths.Contains(p));
+
+            var mergedDisableNormal = new HashSet<string>(staleDisableNormal);
+            mergedDisableNormal.UnionWith(disableSelectedNormal);
+
+            var mergedEnableNormal = new HashSet<string>(staleEnableNormal);
+            mergedEnableNormal.UnionWith(enableSelectedNormal);
+
             // Pitfall 4 / ToggleService.MonitorStateUnchanged precedent: List<string> has
             // no value equality and reordering-sensitive != comparison would mis-detect a
             // genuine change — use order-independent HashSet<string>.SetEquals against
@@ -884,6 +1073,8 @@ namespace RigToggle.App
                 MonitorFriendlyName = _settings.MonitorFriendlyName,
                 MonitorsToDisable = mergedDisable.ToList(),
                 MonitorsToEnable = mergedEnable.ToList(),
+                NormalMonitorsToDisable = mergedDisableNormal.ToList(),
+                NormalMonitorsToEnable = mergedEnableNormal.ToList(),
                 NormalAudioDeviceId = audioNormalItem.Id,
                 NormalAudioDeviceName = audioNormalItem.DisplayLabel,
                 RigAudioDeviceId = audioRigItem.Id,
