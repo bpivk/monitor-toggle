@@ -107,3 +107,13 @@ None - no external service configuration required.
 ---
 *Phase: 16-normal-mode-explicit-monitor-config-mode-store-redesign*
 *Completed: 2026-08-05*
+
+## Self-Check: PASSED
+
+- FOUND: src/RigToggle.Core/Models/AppSettings.cs
+- FOUND: src/RigToggle.App/SettingsForm.Designer.cs
+- FOUND: src/RigToggle.App/SettingsForm.cs
+- FOUND: .planning/phases/16-normal-mode-explicit-monitor-config-mode-store-redesign/16-02-SUMMARY.md
+- FOUND commit: fc5ee27 (Task 1)
+- FOUND commit: 8b2ea39 (Task 2)
+- FOUND commit: 68f4303 (SUMMARY.md)
