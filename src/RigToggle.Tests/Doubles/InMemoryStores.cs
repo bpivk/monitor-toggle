@@ -50,3 +50,54 @@ public sealed class InMemorySettingsStore : ISettingsStore
 
     public void Save(AppSettings settings) => Current = settings;
 }
+
+/// <summary>
+/// Hand-written in-memory IModeStore double. Records "mode.Save" to the shared call-log
+/// (Exists/TryLoad are read-only queries and intentionally not logged, matching
+/// InMemorySnapshotStore's convention). Unlike JsonModeStore, this double does not simulate
+/// corruption — a dedicated corrupt-file test, if needed, exercises JsonModeStore directly.
+/// </summary>
+public sealed class InMemoryModeStore : IModeStore
+{
+    private readonly List<string> _callLog;
+    private ToggleMode? _mode;
+
+    public InMemoryModeStore(List<string> callLog) => _callLog = callLog;
+
+    public bool Exists() => _mode is not null;
+
+    public ToggleMode? TryLoad() => _mode;
+
+    public void Save(ToggleMode mode)
+    {
+        _mode = mode;
+        _callLog.Add("mode.Save");
+    }
+}
+
+/// <summary>
+/// Hand-written in-memory IToggleInProgressStore double. Records "marker.Save" /
+/// "marker.Clear" to the shared call-log, matching InMemorySnapshotStore's convention so
+/// downstream ToggleService/ToggleOrchestrator tests can assert interaction ordering.
+/// </summary>
+public sealed class InMemoryToggleInProgressStore : IToggleInProgressStore
+{
+    private readonly List<string> _callLog;
+    private ToggleInProgressMarker? _marker;
+
+    public InMemoryToggleInProgressStore(List<string> callLog) => _callLog = callLog;
+
+    public ToggleInProgressMarker? TryLoad() => _marker;
+
+    public void Save(ToggleInProgressMarker marker)
+    {
+        _marker = marker;
+        _callLog.Add("marker.Save");
+    }
+
+    public void Clear()
+    {
+        _marker = null;
+        _callLog.Add("marker.Clear");
+    }
+}
