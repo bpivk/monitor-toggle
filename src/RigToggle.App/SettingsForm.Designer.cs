@@ -52,6 +52,15 @@ namespace RigToggle.App
             this.lblMonitorWarning = new System.Windows.Forms.Label();
             this.lblMonitorExplain = new System.Windows.Forms.Label();
 
+            this.pnlMonitorNormal = new System.Windows.Forms.Panel();
+            this.lblMonitorNormalCaption = new System.Windows.Forms.Label();
+            this.dgvMonitorsNormal = new System.Windows.Forms.DataGridView();
+            this.colMonitorNameNormal = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.colDisableNormal = new System.Windows.Forms.DataGridViewCheckBoxColumn();
+            this.colEnableNormal = new System.Windows.Forms.DataGridViewCheckBoxColumn();
+            this.lblMonitorNormalWarning = new System.Windows.Forms.Label();
+            this.lblMonitorNormalExplain = new System.Windows.Forms.Label();
+
             this.pnlAudioDevices = new System.Windows.Forms.Panel();
             this.lblAudioDevicesCaption = new System.Windows.Forms.Label();
             this.lblAudioNormalCaption = new System.Windows.Forms.Label();
@@ -98,7 +107,9 @@ namespace RigToggle.App
             ((System.ComponentModel.ISupportInitialize)(this.errAutostart)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.errHotkey)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dgvMonitors)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dgvMonitorsNormal)).BeginInit();
             this.pnlMonitor.SuspendLayout();
+            this.pnlMonitorNormal.SuspendLayout();
             this.pnlAudioDevices.SuspendLayout();
             this.pnlAppPath.SuspendLayout();
             this.SuspendLayout();
@@ -162,7 +173,7 @@ namespace RigToggle.App
             this.colDisable.HeaderText = "Off (Rig)";
             this.colDisable.Name = "colDisable";
             this.colDisable.Width = 66;
-            this.colDisable.ToolTipText = "Turns this monitor off when switching to Rig Mode. Restored automatically when switching back to Normal Mode.";
+            this.colDisable.ToolTipText = "Turns this monitor off when switching to Rig Mode.";
 
             //
             // colEnable
@@ -170,7 +181,7 @@ namespace RigToggle.App
             this.colEnable.HeaderText = "On (Rig)";
             this.colEnable.Name = "colEnable";
             this.colEnable.Width = 66;
-            this.colEnable.ToolTipText = "Turns this monitor on when switching to Rig Mode (for a monitor normally kept off, e.g. to save power). Turned off again automatically when switching back to Normal Mode.";
+            this.colEnable.ToolTipText = "Turns this monitor on when switching to Rig Mode (for a monitor normally kept off, e.g. to save power).";
 
             //
             // lblMonitorExplain
@@ -178,7 +189,7 @@ namespace RigToggle.App
             this.lblMonitorExplain.Location = new System.Drawing.Point(12, 22);
             this.lblMonitorExplain.Size = new System.Drawing.Size(372, 50);
             this.lblMonitorExplain.AutoSize = false;
-            this.lblMonitorExplain.Text = "Only controls what changes when switching TO Rig Mode. Normal Mode is always restored exactly as it was before — nothing to set up separately.";
+            this.lblMonitorExplain.Text = "Only controls what changes when switching TO Rig Mode. A monitor not listed here is left untouched.";
             this.lblMonitorExplain.Name = "lblMonitorExplain";
 
             //
@@ -191,10 +202,93 @@ namespace RigToggle.App
             this.lblMonitorWarning.Name = "lblMonitorWarning";
 
             //
+            // pnlMonitorNormal (16-02/D-04/D-05: second monitor grid, stacked directly
+            // below the Rig grid — same width/height, mirrors pnlMonitor's block exactly.)
+            //
+            this.pnlMonitorNormal.Location = new System.Drawing.Point(12, 258);
+            this.pnlMonitorNormal.Size = new System.Drawing.Size(396, 234);
+            this.pnlMonitorNormal.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.pnlMonitorNormal.Name = "pnlMonitorNormal";
+            this.pnlMonitorNormal.Controls.Add(this.lblMonitorNormalCaption);
+            this.pnlMonitorNormal.Controls.Add(this.lblMonitorNormalExplain);
+            this.pnlMonitorNormal.Controls.Add(this.dgvMonitorsNormal);
+            this.pnlMonitorNormal.Controls.Add(this.lblMonitorNormalWarning);
+
+            //
+            // lblMonitorNormalCaption
+            //
+            this.lblMonitorNormalCaption.Text = "Normal Mode";
+            this.lblMonitorNormalCaption.Location = new System.Drawing.Point(9, 9);
+            this.lblMonitorNormalCaption.AutoSize = true;
+            this.lblMonitorNormalCaption.Name = "lblMonitorNormalCaption";
+
+            //
+            // dgvMonitorsNormal
+            //
+            this.dgvMonitorsNormal.AllowUserToAddRows = false;
+            this.dgvMonitorsNormal.AllowUserToDeleteRows = false;
+            this.dgvMonitorsNormal.AllowUserToResizeRows = false;
+            this.dgvMonitorsNormal.AllowUserToResizeColumns = false;
+            this.dgvMonitorsNormal.RowHeadersVisible = false;
+            this.dgvMonitorsNormal.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.CellSelect;
+            this.dgvMonitorsNormal.MultiSelect = false;
+            this.dgvMonitorsNormal.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            this.dgvMonitorsNormal.EditMode = System.Windows.Forms.DataGridViewEditMode.EditOnEnter;
+            this.dgvMonitorsNormal.Location = new System.Drawing.Point(12, 80);
+            this.dgvMonitorsNormal.Size = new System.Drawing.Size(372, 120);
+            this.dgvMonitorsNormal.Name = "dgvMonitorsNormal";
+            this.dgvMonitorsNormal.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+            this.colMonitorNameNormal,
+            this.colDisableNormal,
+            this.colEnableNormal});
+
+            //
+            // colMonitorNameNormal
+            //
+            this.colMonitorNameNormal.HeaderText = "Monitor";
+            this.colMonitorNameNormal.Name = "colMonitorNameNormal";
+            this.colMonitorNameNormal.ReadOnly = true;
+            this.colMonitorNameNormal.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+
+            //
+            // colDisableNormal
+            //
+            this.colDisableNormal.HeaderText = "Off (Normal)";
+            this.colDisableNormal.Name = "colDisableNormal";
+            this.colDisableNormal.Width = 66;
+            this.colDisableNormal.ToolTipText = "Turns this monitor off when switching to Normal Mode.";
+
+            //
+            // colEnableNormal
+            //
+            this.colEnableNormal.HeaderText = "On (Normal)";
+            this.colEnableNormal.Name = "colEnableNormal";
+            this.colEnableNormal.Width = 66;
+            this.colEnableNormal.ToolTipText = "Turns this monitor on when switching to Normal Mode (for a monitor normally kept off, e.g. to save power).";
+
+            //
+            // lblMonitorNormalExplain
+            //
+            this.lblMonitorNormalExplain.Location = new System.Drawing.Point(12, 22);
+            this.lblMonitorNormalExplain.Size = new System.Drawing.Size(372, 50);
+            this.lblMonitorNormalExplain.AutoSize = false;
+            this.lblMonitorNormalExplain.Text = "Only controls what changes when switching TO Normal Mode. A monitor not listed here is left untouched.";
+            this.lblMonitorNormalExplain.Name = "lblMonitorNormalExplain";
+
+            //
+            // lblMonitorNormalWarning
+            //
+            this.lblMonitorNormalWarning.Location = new System.Drawing.Point(12, 206);
+            this.lblMonitorNormalWarning.Size = new System.Drawing.Size(372, 20);
+            this.lblMonitorNormalWarning.AutoSize = false;
+            this.lblMonitorNormalWarning.Visible = false;
+            this.lblMonitorNormalWarning.Name = "lblMonitorNormalWarning";
+
+            //
             // pnlAudioDevices (THEME-05: flat bordered Panel replacing the grpAudioDevices
             // GroupBox bevel. Same Location/Size as the original GroupBox.)
             //
-            this.pnlAudioDevices.Location = new System.Drawing.Point(12, 258);
+            this.pnlAudioDevices.Location = new System.Drawing.Point(12, 504);
             this.pnlAudioDevices.Size = new System.Drawing.Size(396, 132);
             this.pnlAudioDevices.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.pnlAudioDevices.Name = "pnlAudioDevices";
@@ -270,7 +364,7 @@ namespace RigToggle.App
             // the AppPath_DragEnter/AppPath_DragDrop wiring move here from the old
             // GroupBox verbatim -- must not be dropped (T-12-07).)
             //
-            this.pnlAppPath.Location = new System.Drawing.Point(12, 402);
+            this.pnlAppPath.Location = new System.Drawing.Point(12, 648);
             this.pnlAppPath.Size = new System.Drawing.Size(396, 76);
             this.pnlAppPath.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.pnlAppPath.Name = "pnlAppPath";
@@ -358,7 +452,7 @@ namespace RigToggle.App
             // chkEnableDebugLogging
             //
             this.chkEnableDebugLogging.Text = "Enable debug logging (writes to %LOCALAPPDATA%\\RigToggle\\debug.log)";
-            this.chkEnableDebugLogging.Location = new System.Drawing.Point(12, 484);
+            this.chkEnableDebugLogging.Location = new System.Drawing.Point(12, 730);
             this.chkEnableDebugLogging.Size = new System.Drawing.Size(396, 40);
             this.chkEnableDebugLogging.AutoSize = false;
             this.chkEnableDebugLogging.Name = "chkEnableDebugLogging";
@@ -367,7 +461,7 @@ namespace RigToggle.App
             // lblHotkeyCaption
             //
             this.lblHotkeyCaption.Text = "Hotkey:";
-            this.lblHotkeyCaption.Location = new System.Drawing.Point(12, 532);
+            this.lblHotkeyCaption.Location = new System.Drawing.Point(12, 778);
             this.lblHotkeyCaption.Size = new System.Drawing.Size(60, 20);
             this.lblHotkeyCaption.AutoSize = false;
             this.lblHotkeyCaption.Name = "lblHotkeyCaption";
@@ -385,14 +479,14 @@ namespace RigToggle.App
             this.txtHotkey.ReadOnly = true;
             this.txtHotkey.TabStop = false;
             this.txtHotkey.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.txtHotkey.Location = new System.Drawing.Point(76, 529);
+            this.txtHotkey.Location = new System.Drawing.Point(76, 775);
             this.txtHotkey.Size = new System.Drawing.Size(200, 23);
             this.txtHotkey.Name = "txtHotkey";
 
             //
             // lblHotkeyWarning
             //
-            this.lblHotkeyWarning.Location = new System.Drawing.Point(12, 556);
+            this.lblHotkeyWarning.Location = new System.Drawing.Point(12, 802);
             this.lblHotkeyWarning.Size = new System.Drawing.Size(396, 36);
             this.lblHotkeyWarning.AutoSize = false;
             this.lblHotkeyWarning.Visible = false;
@@ -402,7 +496,7 @@ namespace RigToggle.App
             // chkCloseMinimizesToTray
             //
             this.chkCloseMinimizesToTray.Text = "Closing the window (X) minimizes to tray";
-            this.chkCloseMinimizesToTray.Location = new System.Drawing.Point(12, 600);
+            this.chkCloseMinimizesToTray.Location = new System.Drawing.Point(12, 846);
             this.chkCloseMinimizesToTray.Size = new System.Drawing.Size(396, 24);
             this.chkCloseMinimizesToTray.AutoSize = false;
             this.chkCloseMinimizesToTray.Name = "chkCloseMinimizesToTray";
@@ -411,7 +505,7 @@ namespace RigToggle.App
             // chkMinimizeToTray
             //
             this.chkMinimizeToTray.Text = "Minimizing the window also sends it to tray";
-            this.chkMinimizeToTray.Location = new System.Drawing.Point(12, 632);
+            this.chkMinimizeToTray.Location = new System.Drawing.Point(12, 878);
             this.chkMinimizeToTray.Size = new System.Drawing.Size(396, 24);
             this.chkMinimizeToTray.AutoSize = false;
             this.chkMinimizeToTray.Name = "chkMinimizeToTray";
@@ -420,7 +514,7 @@ namespace RigToggle.App
             // chkStartWithWindows
             //
             this.chkStartWithWindows.Text = "Start with Windows";
-            this.chkStartWithWindows.Location = new System.Drawing.Point(12, 664);
+            this.chkStartWithWindows.Location = new System.Drawing.Point(12, 910);
             this.chkStartWithWindows.Size = new System.Drawing.Size(396, 24);
             this.chkStartWithWindows.AutoSize = false;
             this.chkStartWithWindows.Name = "chkStartWithWindows";
@@ -428,7 +522,7 @@ namespace RigToggle.App
             //
             // lblAutostartWarning
             //
-            this.lblAutostartWarning.Location = new System.Drawing.Point(12, 688);
+            this.lblAutostartWarning.Location = new System.Drawing.Point(12, 934);
             this.lblAutostartWarning.Size = new System.Drawing.Size(396, 20);
             this.lblAutostartWarning.AutoSize = false;
             this.lblAutostartWarning.Visible = false;
@@ -438,7 +532,7 @@ namespace RigToggle.App
             // btnSaveSettings
             //
             this.btnSaveSettings.Text = "Save Settings";
-            this.btnSaveSettings.Location = new System.Drawing.Point(180, 720);
+            this.btnSaveSettings.Location = new System.Drawing.Point(180, 966);
             this.btnSaveSettings.Size = new System.Drawing.Size(110, 32);
             this.btnSaveSettings.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnSaveSettings.Name = "btnSaveSettings";
@@ -451,7 +545,7 @@ namespace RigToggle.App
             // btnDiscardChanges
             //
             this.btnDiscardChanges.Text = "Discard Changes";
-            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 720);
+            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 966);
             this.btnDiscardChanges.Size = new System.Drawing.Size(110, 32);
             this.btnDiscardChanges.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.btnDiscardChanges.Name = "btnDiscardChanges";
@@ -481,7 +575,7 @@ namespace RigToggle.App
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(420, 768);
+            this.ClientSize = new System.Drawing.Size(420, 1014);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -491,6 +585,7 @@ namespace RigToggle.App
             this.Name = "SettingsForm";
 
             this.Controls.Add(this.pnlMonitor);
+            this.Controls.Add(this.pnlMonitorNormal);
             this.Controls.Add(this.pnlAudioDevices);
             this.Controls.Add(this.pnlAppPath);
             this.Controls.Add(this.chkEnableDebugLogging);
@@ -511,7 +606,9 @@ namespace RigToggle.App
             ((System.ComponentModel.ISupportInitialize)(this.errAutostart)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.errHotkey)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dgvMonitors)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dgvMonitorsNormal)).EndInit();
             this.pnlMonitor.ResumeLayout(false);
+            this.pnlMonitorNormal.ResumeLayout(false);
             this.pnlAudioDevices.ResumeLayout(false);
             this.pnlAppPath.ResumeLayout(false);
             this.ResumeLayout(false);
@@ -527,6 +624,15 @@ namespace RigToggle.App
         private System.Windows.Forms.DataGridViewCheckBoxColumn colEnable;
         private System.Windows.Forms.Label lblMonitorWarning;
         private System.Windows.Forms.Label lblMonitorExplain;
+
+        private System.Windows.Forms.Panel pnlMonitorNormal;
+        private System.Windows.Forms.Label lblMonitorNormalCaption;
+        private System.Windows.Forms.DataGridView dgvMonitorsNormal;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colMonitorNameNormal;
+        private System.Windows.Forms.DataGridViewCheckBoxColumn colDisableNormal;
+        private System.Windows.Forms.DataGridViewCheckBoxColumn colEnableNormal;
+        private System.Windows.Forms.Label lblMonitorNormalWarning;
+        private System.Windows.Forms.Label lblMonitorNormalExplain;
 
         private System.Windows.Forms.Panel pnlAudioDevices;
         private System.Windows.Forms.Label lblAudioDevicesCaption;

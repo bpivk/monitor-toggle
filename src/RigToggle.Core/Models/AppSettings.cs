@@ -22,6 +22,8 @@ public sealed class AppSettings
     public string? MonitorFriendlyName { get; set; }   // display-cache only, not used for matching
     public List<string>? MonitorsToDisable { get; set; }
     public List<string>? MonitorsToEnable { get; set; }
+    public List<string>? NormalMonitorsToDisable { get; set; }
+    public List<string>? NormalMonitorsToEnable { get; set; }
     public string? NormalAudioDeviceId { get; set; }
     public string? NormalAudioDeviceName { get; set; }
     public string? RigAudioDeviceId { get; set; }
