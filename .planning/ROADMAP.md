@@ -118,7 +118,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 16-04-PLAN.md — App wiring: Program.cs bootstrap + StartupRecoveryChecker dialogs + MainForm unknown-mode guards (DISPLAY-11/13)
+- [x] 16-04-PLAN.md — App wiring: Program.cs bootstrap + StartupRecoveryChecker dialogs + MainForm unknown-mode guards (DISPLAY-11/13)
 
 **Wave 4** *(blocked on Wave 3)*
 
@@ -174,7 +174,7 @@ Plans:
 | 13. Tray & App Icon Redesign | v1.2 | 4/4 | Complete | 2026-08-03 |
 | 14. README & Release Documentation | v1.2 | 3/3 | Complete | 2026-08-03 |
 | 15. Optional App & Audio Targets | v2.0 | 4/4 | Complete    | 2026-08-04 |
-| 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 3/5 | In Progress|  |
+| 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 4/5 | In Progress|  |
 | 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 0/TBD | Not started | - |
 | 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 0/TBD | Not started | - |
 
