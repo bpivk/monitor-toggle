@@ -11,9 +11,10 @@ namespace RigToggle.Tests;
 /// <summary>
 /// Proves ToggleOrchestrator's non-blocking single-flight guard (CORE-06): same- and
 /// cross-direction reentrancy rejection (D-01/D-02), flag release after a preflight
-/// exception (Pitfall 3), unguarded pass-throughs (D-04), and the exception-type
+/// exception (Pitfall 3), unguarded pass-throughs (D-04), the exception-type
 /// contract (D-05) that lets MainForm's existing catch block surface a busy-rejection
-/// with zero UI changes. All deterministic — no fixed-duration waits, no timing guess
+/// with zero UI changes, and the DISPLAY-13 crash-marker lifecycle wrapping every
+/// guarded toggle. All deterministic — no fixed-duration waits, no timing guess
 /// (07-RESEARCH.md Pitfall 2).
 /// </summary>
 public class ToggleOrchestratorTests : IDisposable
@@ -30,6 +31,7 @@ public class ToggleOrchestratorTests : IDisposable
             MonitorDevicePath = "\\\\?\\DISPLAY#PRIMARY",
             MonitorFriendlyName = "Primary Monitor",
             MonitorsToDisable = new List<string> { "\\\\?\\DISPLAY#PRIMARY" },
+            NormalMonitorsToDisable = new List<string> { "\\\\?\\DISPLAY#PRIMARY" },
             NormalAudioDeviceId = "normal-device-id",
             NormalAudioDeviceName = "Headset",
             RigAudioDeviceId = "rig-device-id",
@@ -48,13 +50,14 @@ public class ToggleOrchestratorTests : IDisposable
     {
         var callLog = new List<string>();
         var settingsStore = new InMemorySettingsStore(settings ?? ConfiguredSettings);
-        var snapshotStore = new InMemorySnapshotStore(callLog);
+        var modeStore = new InMemoryModeStore(callLog);
+        var markerStore = new InMemoryToggleInProgressStore(callLog);
         var monitor = monitorController ?? new FakeMonitorController(callLog);
         var audioController = new FakeAudioController(callLog);
         var appController = new FakeAppController(callLog);
 
-        var toggleService = new ToggleService(settingsStore, snapshotStore, monitor, audioController, appController);
-        var orchestrator = new ToggleOrchestrator(toggleService);
+        var toggleService = new ToggleService(settingsStore, modeStore, monitor, audioController, appController);
+        var orchestrator = new ToggleOrchestrator(toggleService, markerStore);
         return (orchestrator, callLog, settingsStore);
     }
 
@@ -73,6 +76,9 @@ public class ToggleOrchestratorTests : IDisposable
     [Fact]
     public void ToggleToNormalMode_Idle_DelegatesToToggleServiceAndReturnsItsResult()
     {
+        // DISPLAY-10: ToggleToNormalMode no longer restores from a snapshot — it
+        // applies its own explicit NormalMonitorsToDisable/ToEnable set via the same
+        // ActivateMonitors/DeactivateMonitors primitives Rig mode uses.
         var (orchestrator, callLog, _) = CreateOrchestrator();
         orchestrator.ToggleToRigMode();
         callLog.Clear();
@@ -80,7 +86,8 @@ public class ToggleOrchestratorTests : IDisposable
         var result = orchestrator.ToggleToNormalMode();
 
         Assert.True(result.Success);
-        Assert.Contains(callLog, entry => entry.StartsWith("monitor.Restore"));
+        Assert.Contains(callLog, entry => entry.StartsWith("monitor.ActivateMonitors"));
+        Assert.Contains(callLog, entry => entry.StartsWith("monitor.DeactivateMonitors"));
         Assert.False(orchestrator.IsInRigMode());
     }
 
@@ -160,9 +167,12 @@ public class ToggleOrchestratorTests : IDisposable
 
         try
         {
-            // ToggleService saves the snapshot BEFORE the Monitor mutation step runs, so by
-            // the time DeactivateMonitors is blocked, IsInRigMode() already reports true.
-            Assert.True(orchestrator.IsInRigMode());
+            // Pattern 2 (16-RESEARCH.md): the mode flag is now written only AFTER the
+            // Monitor step succeeds — the blocking double blocks INSIDE
+            // DeactivateMonitors, so the Monitor step has NOT completed yet and the
+            // mode flag has NOT flipped to Rig. IsInRigMode() must still be safely
+            // callable (and honestly report false) mid-mutation.
+            Assert.False(orchestrator.IsInRigMode());
             Assert.True(orchestrator.IsSettingsConfigured());
         }
         finally
@@ -172,6 +182,10 @@ public class ToggleOrchestratorTests : IDisposable
 
         var firstResult = firstCallTask.GetAwaiter().GetResult();
         Assert.True(firstResult.Success);
+
+        // Only after the blocked call completes successfully does the mode flag
+        // flip, proving the pass-through's value tracks confirmed success.
+        Assert.True(orchestrator.IsInRigMode());
     }
 
     [Fact]
@@ -199,5 +213,34 @@ public class ToggleOrchestratorTests : IDisposable
         var exception = new ToggleInProgressException("A toggle is already in progress.");
 
         Assert.IsAssignableFrom<InvalidOperationException>(exception);
+    }
+
+    [Fact]
+    public void RunGuarded_SavesAndClearsMarker_AroundSuccessfulToggle()
+    {
+        // DISPLAY-13: the crash marker is saved at the start of every guarded toggle
+        // and cleared in the finally on clean completion — surviving everything
+        // except a real process kill.
+        var (orchestrator, callLog, _) = CreateOrchestrator();
+
+        orchestrator.ToggleToRigMode();
+
+        var saveIndex = callLog.IndexOf("marker.Save");
+        var clearIndex = callLog.IndexOf("marker.Clear");
+        Assert.True(saveIndex >= 0, "Expected marker.Save to be recorded.");
+        Assert.True(clearIndex >= 0, "Expected marker.Clear to be recorded.");
+        Assert.True(saveIndex < clearIndex, "marker.Save must precede marker.Clear.");
+    }
+
+    [Fact]
+    public void IsModeKnown_IsPassThrough_TrueOnceAModeHasBeenWritten()
+    {
+        var (orchestrator, _, _) = CreateOrchestrator();
+
+        Assert.False(orchestrator.IsModeKnown());
+
+        orchestrator.ToggleToRigMode();
+
+        Assert.True(orchestrator.IsModeKnown());
     }
 }
