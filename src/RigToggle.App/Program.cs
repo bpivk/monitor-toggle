@@ -91,6 +91,26 @@ namespace RigToggle.App
             }
 
             var snapshotStore = new JsonSnapshotStore(Path.Combine(basePath, "state.json"));
+            var modeStore = new JsonModeStore(Path.Combine(basePath, "mode.json"));
+            var markerStore = new JsonToggleInProgressStore(Path.Combine(basePath, "toggle-in-progress.json"));
+
+            // 16-RESEARCH.md Pattern 1 (CRITICAL, one-time only): seed mode.json from
+            // legacy snapshot presence exactly once, when it does not yet exist. Never
+            // unconditionally default to Normal here — that would silently flip every
+            // existing Rig-mode user's true state on their first v2.0 launch and also
+            // trigger a spurious mode-corruption dialog below for every healthy install.
+            if (!modeStore.Exists())
+            {
+                modeStore.Save(snapshotStore.Exists() ? ToggleMode.Rig : ToggleMode.Normal);
+            }
+
+            // Pattern 3 (16-RESEARCH.md): the two blocking startup checks (mode
+            // corruption, crash-recovery) run after the bootstrap above and before any
+            // toggle-capable object is constructed or the tray-safe timing point below
+            // — on both the visible and --tray startup paths. Deliberately NOT wrapped
+            // in a try/catch: these are the one deliberate exception to this file's
+            // best-effort-swallow startup idiom (D-06/D-07).
+            StartupRecoveryChecker.Run(modeStore, markerStore);
 
             var monitorController = new WindowsMonitorController();
             var audioController = new WindowsAudioController();
@@ -105,7 +125,7 @@ namespace RigToggle.App
 
             var toggleService = new ToggleService(
                 settingsStore,
-                snapshotStore,
+                modeStore,
                 monitorController,
                 audioController,
                 appController);
@@ -113,7 +133,9 @@ namespace RigToggle.App
             // 07-01: every toggle trigger (this GUI button today; tray/hotkey/CLI in
             // Phases 8-10) must call through ToggleOrchestrator, never ToggleService
             // directly — it wraps ToggleService with the CORE-06 reentrancy guard.
-            var toggleOrchestrator = new ToggleOrchestrator(toggleService);
+            // 16-04: also threads markerStore through so RunGuarded can save/clear the
+            // DISPLAY-13 crash-in-progress marker around every guarded toggle.
+            var toggleOrchestrator = new ToggleOrchestrator(toggleService, markerStore);
 
             // TRIG-01: mainForm and SettingsFormFactory are mutually dependent (the
             // factory needs mainForm.TryRegisterConfiguredHotkey; MainForm's constructor
