@@ -115,3 +115,16 @@ None - no external service configuration required.
 ---
 *Phase: 16-normal-mode-explicit-monitor-config-mode-store-redesign*
 *Completed: 2026-08-07*
+
+## Self-Check: PASSED
+
+- FOUND: src/RigToggle.Core/ToggleService.cs
+- FOUND: src/RigToggle.Core/ToggleOrchestrator.cs
+- FOUND: src/RigToggle.Windows/WindowsMonitorController.cs
+- FOUND: src/RigToggle.Tests/ToggleServiceTests.cs
+- FOUND: src/RigToggle.Tests/ToggleOrchestratorTests.cs
+- FOUND: .planning/phases/16-normal-mode-explicit-monitor-config-mode-store-redesign/16-03-SUMMARY.md
+- FOUND commit: b769a8b (Task 1)
+- FOUND commit: 380f728 (Task 2)
+- FOUND commit: 6d35e9b (Task 3)
+- FOUND commit: cbe6e3e (SUMMARY.md + REQUIREMENTS.md metadata commit)
