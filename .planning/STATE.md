@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: Configurable Monitors, Optional Targets & Cleanup
 status: executing
 stopped_at: Phase 16 UI-SPEC approved
-last_updated: "2026-08-05T05:08:45.305Z"
-last_activity: 2026-08-05 -- Phase 16 execution started
+last_updated: "2026-08-07T21:59:55.109Z"
+last_activity: 2026-08-07 -- Phase 16 execution started
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 9
-  completed_plans: 4
+  completed_plans: 6
   percent: 25
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-08-04)
 Phase: 16 (normal-mode-explicit-monitor-config-mode-store-redesign) — EXECUTING
 Plan: 1 of 5
 Status: Executing Phase 16
-Last activity: 2026-08-05 -- Phase 16 execution started
+Last activity: 2026-08-07 -- Phase 16 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
