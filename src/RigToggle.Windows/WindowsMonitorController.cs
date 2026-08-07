@@ -304,8 +304,7 @@ public sealed class WindowsMonitorController : IMonitorController
             // in the disable-set, or a laptop with only its built-in display, when
             // Switch to Rig Mode is pressed.
             throw new InvalidOperationException(
-                "Cannot disable all configured monitors — at least one active display must " +
-                "remain. Connect and enable another display before switching to Rig Mode.");
+                "Cannot disable all configured monitors — at least one active display must remain.");
         }
 
         // Unchanged uniform-shift idiom, generalized to a multi-target primary check:
