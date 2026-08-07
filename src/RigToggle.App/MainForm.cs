@@ -254,6 +254,20 @@ namespace RigToggle.App
         /// </summary>
         private void RefreshUi()
         {
+            // DISPLAY-11/T-16-09: an unknown mode (mode file missing/corrupted) must
+            // never default to either Rig or Normal wording — the IsInRigMode() branch
+            // below is only meaningful once the mode is actually known. The notify
+            // icon is deliberately left at its current safe default rather than picked
+            // here (there is no "unknown" icon glyph this phase).
+            if (!_orchestrator.IsModeKnown())
+            {
+                lblMode.Text = "Mode: Unknown";
+                btnToggle.Text = "Toggle";
+                trayToggleMenuItem.Text = "Toggle";
+                notifyIcon.Text = "Rig Toggle — Mode Unknown";
+                return;
+            }
+
             bool isInRigMode = _orchestrator.IsInRigMode();
             lblMode.Text = isInRigMode ? "Mode: Rig" : "Mode: Normal";
             btnToggle.Text = isInRigMode ? "Switch to Normal Mode" : "Switch to Rig Mode";
@@ -276,6 +290,20 @@ namespace RigToggle.App
 
             try
             {
+                if (!_orchestrator.IsModeKnown())
+                {
+                    // T-16-09: refuse to toggle from an unknown mode rather than
+                    // guessing a direction — mirrors the corrupted-snapshot precedent's
+                    // "verify manually" posture. LOCKED copy (16-UI-SPEC.md).
+                    MessageBox.Show(
+                        this,
+                        "Rig Toggle's current mode is unknown — fix or delete the mode file, then restart the app, before toggling.",
+                        "Rig Toggle",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                    return;
+                }
+
                 if (_orchestrator.IsInRigMode())
                 {
                     result = _orchestrator.ToggleToNormalMode();
@@ -573,6 +601,18 @@ namespace RigToggle.App
         /// </summary>
         private void TrayToggleMenuItem_Click(object? sender, EventArgs e)
         {
+            if (!_orchestrator.IsModeKnown())
+            {
+                // T-16-09/D-08: balloon chrome only, never MessageBox, for the tray
+                // trigger — matches this handler's existing no-GUI-chrome guarantee.
+                notifyIcon.ShowBalloonTip(
+                    3000,
+                    "Rig Toggle",
+                    "Current mode is unknown — restart the app to fix, or check Settings.",
+                    ToolTipIcon.Warning);
+                return;
+            }
+
             ToggleResult result;
 
             try
@@ -620,6 +660,18 @@ namespace RigToggle.App
         /// </summary>
         private void HandleHotkeyToggle()
         {
+            if (!_orchestrator.IsModeKnown())
+            {
+                // T-16-09/D-08: balloon chrome only, never MessageBox, for the hotkey
+                // trigger — matches this handler's existing no-GUI-chrome guarantee.
+                notifyIcon.ShowBalloonTip(
+                    3000,
+                    "Rig Toggle",
+                    "Current mode is unknown — restart the app to fix, or check Settings.",
+                    ToolTipIcon.Warning);
+                return;
+            }
+
             ToggleResult result;
 
             try
