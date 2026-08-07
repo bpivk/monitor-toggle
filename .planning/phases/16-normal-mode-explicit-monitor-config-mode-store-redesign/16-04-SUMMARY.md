@@ -101,3 +101,14 @@ None - no external service configuration required.
 ---
 *Phase: 16-normal-mode-explicit-monitor-config-mode-store-redesign*
 *Completed: 2026-08-07*
+
+## Self-Check: PASSED
+
+- FOUND: src/RigToggle.App/StartupRecoveryChecker.cs
+- FOUND: src/RigToggle.App/Program.cs
+- FOUND: src/RigToggle.App/MainForm.cs
+- FOUND: .planning/phases/16-normal-mode-explicit-monitor-config-mode-store-redesign/16-04-SUMMARY.md
+- FOUND commit: bca6fe0 (Task 1)
+- FOUND commit: 132ec10 (Task 2)
+- FOUND commit: 0692835 (Task 3)
+- FOUND commit: 4f4d137 (SUMMARY.md metadata commit)
