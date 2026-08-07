@@ -4,11 +4,17 @@ using RigToggle.Core.Models;
 namespace RigToggle.Core;
 
 /// <summary>
-/// Orchestrates the snapshot-before-mutate toggle sequence (D-08/ARCHITECTURE.md Pattern 2)
-/// entirely through the ISettingsStore/ISnapshotStore/IMonitorController/IAudioController/
-/// IAppController interfaces — zero Windows API references live here. Current mode is
-/// derived from snapshot-file presence (D-14), not a separate flag. CORE-04 partial-failure
-/// reporting is deliberately asymmetric between the two directions: ToggleToRigMode is
+/// Orchestrates the toggle sequence entirely through the ISettingsStore/IModeStore/
+/// IMonitorController/IAudioController/IAppController interfaces — zero Windows API
+/// references live here. Current mode is tracked via an explicit IModeStore flag
+/// (DISPLAY-11), not derived from snapshot-file presence — the mode flag is written
+/// only AFTER the Monitor step of the relevant direction has confirmed success, in
+/// both directions. Both toggle directions apply their own explicit, symmetric
+/// monitor set (Rig: MonitorsToDisable/MonitorsToEnable; Normal:
+/// NormalMonitorsToDisable/NormalMonitorsToEnable) via the same
+/// ActivateMonitors/DeactivateMonitors primitives — Normal mode no longer restores
+/// from a pre-toggle snapshot (DISPLAY-10). CORE-04 partial-failure reporting is
+/// deliberately asymmetric between the two directions: ToggleToRigMode is
 /// stop-on-first-failure (D-04) because the forward steps have real dependencies — there is
 /// no point switching audio or launching the companion app if the monitor never actually
 /// disabled — while ToggleToNormalMode is isolate-and-continue (D-05, unchanged since
@@ -16,29 +22,28 @@ namespace RigToggle.Core;
 /// state and a failure in one should not block attempting the others. This asymmetry is
 /// intentional and must not be "fixed" into false symmetry.
 ///
-/// A second, unrelated asymmetry (D-02, added Phase 6): the disable-set is
-/// snapshot-restored via IMonitorController.Restore, but the enable-set is ALWAYS
-/// unconditionally re-disabled via DeactivateMonitors — never snapshot-restored. See the
-/// inline comment on that call inside ToggleToNormalMode for the full rationale. This is
-/// also intentional and must not be "fixed" into snapshot-based symmetry.
+/// The shared <see cref="ReconcileModeAfterMonitorFailure"/> helper preserves the CR-01
+/// "never let the mode flag misrepresent whether the display was really touched" safety
+/// net — reachable from BOTH toggle directions now that both call the same guarded
+/// DeactivateMonitors.
 /// </summary>
 public sealed class ToggleService
 {
     private readonly ISettingsStore _settingsStore;
-    private readonly ISnapshotStore _snapshotStore;
+    private readonly IModeStore _modeStore;
     private readonly IMonitorController _monitorController;
     private readonly IAudioController _audioController;
     private readonly IAppController _appController;
 
     public ToggleService(
         ISettingsStore settingsStore,
-        ISnapshotStore snapshotStore,
+        IModeStore modeStore,
         IMonitorController monitorController,
         IAudioController audioController,
         IAppController appController)
     {
         _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
-        _snapshotStore = snapshotStore ?? throw new ArgumentNullException(nameof(snapshotStore));
+        _modeStore = modeStore ?? throw new ArgumentNullException(nameof(modeStore));
         _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
         _audioController = audioController ?? throw new ArgumentNullException(nameof(audioController));
         _appController = appController ?? throw new ArgumentNullException(nameof(appController));
@@ -63,9 +68,8 @@ public sealed class ToggleService
         if (!IsFullyConfigured(settings))
         {
             // Guard against WR-01: without this check, an unconfigured (null-field)
-            // AppSettings would still make it through to _snapshotStore.Save() below,
-            // durably persisting a garbage snapshot and flipping IsInRigMode() to true
-            // (D-14) even though nothing was actually captured or changed.
+            // AppSettings would proceed straight into a real mutation attempt with
+            // nothing meaningful configured.
             throw new InvalidOperationException(
                 "Rig Toggle settings are not fully configured. Open Settings and choose at least one monitor to disable or enable before switching to Rig Mode.");
         }
@@ -76,11 +80,10 @@ public sealed class ToggleService
         // D-04's "the result always has all 3 steps." The check now lives inside the App
         // step body below (TryExecuteOptionalStep), running only when a path is configured.
 
+        // Pattern 2 (16-RESEARCH.md): capture a pre-mutation baseline for the shared
+        // CR-01 reconcile helper, not to persist a restore payload — the mode flag is
+        // now written only AFTER the Monitor step's real outcome is known, never before.
         var monitorState = _monitorController.CaptureState();
-        var audioState = _audioController.CaptureState();
-
-        // Snapshot MUST be persisted before any mutation call (D-08/CORE-03 guarantee).
-        _snapshotStore.Save(new Models.StateSnapshot(monitorState, audioState));
 
         var steps = new List<ToggleStepResult>();
 
@@ -107,34 +110,18 @@ public sealed class ToggleService
             steps.Add(new ToggleStepResult("Audio", ToggleStepOutcome.NotAttempted, null));
             steps.Add(new ToggleStepResult("App", ToggleStepOutcome.NotAttempted, null));
 
-            // CR-01 (code review): WindowsMonitorController.Disable has pre-mutation
-            // validation guards (target not active / target is the only active display)
-            // that throw before any real CCD mutation is attempted — in that case
-            // nothing on the machine actually changed, so the snapshot saved above must
-            // not be left behind. Leaving it would flip IsInRigMode() to true (MainForm
-            // would show "Mode: Rig") at the exact moment this same result reports
-            // "Monitor: FAILED", even though the display was never touched. Re-capture
-            // and compare against the state captured before Disable() ran; clear the
-            // snapshot only if nothing changed. If re-capture throws, or the states
-            // differ (a real, possibly partial mutation did happen), the snapshot is
-            // kept — a retry or manual restore needs it, and silently discarding the
-            // only copy of that state would be worse than leaving it.
-            try
-            {
-                if (MonitorStateUnchanged(monitorState, _monitorController.CaptureState()))
-                {
-                    _snapshotStore.Clear();
-                }
-            }
-            catch
-            {
-                // Re-capture failed — can't confirm nothing changed, so err toward
-                // keeping the snapshot rather than risking silent loss of recoverable
-                // state.
-            }
+            // CR-01/Pattern 2 (16-RESEARCH.md): the shared reconcile helper recaptures
+            // MonitorState and refrains from writing a new mode when the topology
+            // changed but doesn't cleanly match either target — the mode flag never
+            // claims a mode the display didn't actually reach.
+            ReconcileModeAfterMonitorFailure(monitorState);
 
             return new ToggleResult(steps);
         }
+
+        // Mode is written only after a confirmed successful Monitor step (Pattern 2),
+        // mirrored identically in ToggleToNormalMode below.
+        _modeStore.Save(Models.ToggleMode.Rig);
 
         // Phase 15/AUDIO-03/APP-04: Audio and App are now optional in both directions.
         // TryExecuteOptionalStep records a Skipped step (not blocking) when the field is
@@ -237,6 +224,45 @@ public sealed class ToggleService
         before.TargetDevicePath == after.TargetDevicePath && before.Paths.SequenceEqual(after.Paths);
 
     /// <summary>
+    /// Shared CR-01 safety net (16-RESEARCH.md Pattern 2), called from BOTH
+    /// ToggleToRigMode's and ToggleToNormalMode's Monitor-step failure paths — both
+    /// directions now call the same guarded DeactivateMonitors, so both can hit a
+    /// zero-survivors (or other) guard failure and both need the same protection
+    /// against the mode flag misrepresenting whether the display was really touched.
+    /// Recaptures MonitorState and compares against the state captured before the
+    /// mutation attempt:
+    /// - Unchanged (a pre-mutation guard threw before any real CCD mutation): the
+    ///   mode flag is left exactly as-is — nothing needs undoing because nothing
+    ///   happened.
+    /// - Changed (a real, possibly partial mutation did happen): the mode flag is
+    ///   still left at its PRIOR value rather than guessing a new one — the physical
+    ///   topology no longer cleanly matches either configured target, and this phase
+    ///   deliberately does not introduce a third "Indeterminate" mode value.
+    /// - Re-capture itself throws: same fail-safe posture — do nothing, leave the
+    ///   mode flag as-is rather than guess.
+    /// In every sub-case the mode flag is simply never written here — unlike the
+    /// retired pre-mutation snapshot design, there is nothing to "clear."
+    /// </summary>
+    private void ReconcileModeAfterMonitorFailure(Models.MonitorState before)
+    {
+        try
+        {
+            if (MonitorStateUnchanged(before, _monitorController.CaptureState()))
+            {
+                return;
+            }
+
+            // Partial mutation: leave the mode flag at its prior value (Assumptions
+            // Log A3, 16-RESEARCH.md) rather than guess a new mode.
+        }
+        catch
+        {
+            // Re-capture failed — can't confirm anything, same fail-safe posture as
+            // the original CR-01 catch block: do nothing, leave the mode flag as-is.
+        }
+    }
+
+    /// <summary>
     /// True when the monitor set is configured (at least one monitor in either
     /// MonitorsToDisable or MonitorsToEnable). Phase 15/D-05: Audio and App targets are
     /// now genuinely optional (AUDIO-03/AUDIO-04/APP-04) — leaving them unset never blocks
@@ -257,173 +283,128 @@ public sealed class ToggleService
         settings.MonitorsToDisable?.Count > 0 || settings.MonitorsToEnable?.Count > 0;
 
     /// <summary>
-    /// Loads the snapshot and restores the monitor state it captured via
-    /// IMonitorController.Restore. Phase 15/AUDIO-04: the Audio step no longer reads the
-    /// snapshot at all — it applies settings.NormalAudioDeviceId via the same
-    /// forward-mode SetDefault call the rig-mode path uses, skipped when unset
-    /// (AUDIO-03's optional-target pattern mirrored for the Normal direction).
-    /// snapshot.Audio becomes unread dead data as a result (still captured/persisted,
-    /// just never consumed here — Phase 18 cleanup scope). Minimizes the companion app
-    /// if running (or Skipped if unset, Phase 15/APP-04), then clears the snapshot last
-    /// so IsInRigMode() flips back to false. Isolate-and-continue (D-05): unlike
-    /// ToggleToRigMode's stop-on-first-failure, every restore step here is attempted
-    /// regardless of whether an earlier one failed, and no step throws — each outcome
-    /// is recorded as a ToggleStepResult instead (D-02).
+    /// Applies the explicit Normal-mode monitor set (DISPLAY-10) — mirrors
+    /// ToggleToRigMode's Monitor-step shape exactly, against
+    /// settings.NormalMonitorsToDisable/NormalMonitorsToEnable instead of Rig's
+    /// MonitorsToDisable/MonitorsToEnable. No snapshot restore path remains: a
+    /// monitor not listed in either Normal-mode set is left untouched (D-01), the
+    /// same documented default Rig mode already uses. Audio applies
+    /// settings.NormalAudioDeviceId via the same forward-mode SetDefault call the
+    /// Rig-mode path uses (unchanged since Phase 15/AUDIO-04), skipped when unset.
+    /// The App step minimizes the companion app if running (or Skipped if unset,
+    /// Phase 15/APP-04). Isolate-and-continue (D-05): every step here is attempted
+    /// regardless of whether an earlier one failed, and no step throws — each
+    /// outcome is recorded as a ToggleStepResult instead (D-02).
     ///
-    /// Monitor restore failure is NOT swallowed (04-CONTEXT.md D-05): a failed monitor
-    /// restore leaves the user's screen disabled, so it is recorded as a Failed step so
-    /// MainForm's checklist can surface it, and the snapshot must survive the failure so
-    /// a retry has the exact prior state to restore from. Clearing the snapshot on a
-    /// failed monitor restore would silently and permanently discard the only copy of
-    /// that state. Audio restore is still attempted even if monitor restore failed
-    /// (independent subsystem — a monitor-driver hiccup shouldn't also block a
-    /// potentially-successful audio restore); the monitor failure is recorded as the
-    /// "App" step's NotAttempted afterward (not re-thrown), and MinimizeIfRunning/Clear
-    /// below are skipped in that case since D-05 says no further recovery is attempted.
+    /// Monitor-step failure is NOT swallowed (04-CONTEXT.md D-05): a failed Monitor
+    /// step means the physical display state may not match either mode, so it is
+    /// recorded as a Failed step so MainForm's checklist can surface it. The shared
+    /// ReconcileModeAfterMonitorFailure helper (Pattern 2) decides whether the mode
+    /// flag should be left as-is — see that method's own doc comment. Audio is not
+    /// attempted when Monitor fails (D-05: no further recovery is attempted once the
+    /// display state itself is in question).
     ///
     /// Gap-closure 03-04 (AUDIO-02 recovery / APP-03 reachability, T-03-04-02): audio
-    /// restore keeps its original swallow-and-continue behavior — a genuinely-gone
-    /// audio device (unplugged) can never succeed on retry, so MinimizeIfRunning and
-    /// Clear must still run afterward instead of getting permanently stuck. This does
-    /// NOT apply to the monitor restore path above it.
-    ///
-    /// Snapshot-corruption handling: IsInRigMode()/Exists() reports true purely from file
-    /// presence, but JsonSnapshotStore.Load() independently degrades to null on a
-    /// corrupted/truncated state.json. Treating "corrupted" the same as "never existed"
-    /// would silently skip both restores and still clear the file — permanently
-    /// discarding the only recoverable state while reporting success. wasInRigMode
-    /// distinguishes the two so a corrupted file fails loudly instead (still an exception
-    /// — this preflight-style guard fires before any step runs, so it stays outside the
-    /// ToggleResult contract, matching ToggleToRigMode's preflight guards).
+    /// failure keeps its original swallow-and-continue behavior — a genuinely-gone
+    /// audio device (unplugged) can never succeed on retry, so MinimizeIfRunning must
+    /// still run afterward instead of getting permanently stuck. This does NOT apply
+    /// to the Monitor step above it.
     /// </summary>
     public ToggleResult ToggleToNormalMode()
     {
         var settings = _settingsStore.Load();
-
-        bool wasInRigMode = _snapshotStore.Exists();
-        var snapshot = _snapshotStore.Load();
-
         var steps = new List<ToggleStepResult>();
 
-        if (snapshot is null)
-        {
-            if (wasInRigMode)
-            {
-                throw new InvalidOperationException(
-                    "The saved rig-mode state file exists but could not be read (corrupted). " +
-                    "Your monitor and audio device were NOT restored automatically. Fix or " +
-                    "delete the corrupted state file before retrying.");
-            }
+        // Pattern 2 (16-RESEARCH.md): pre-mutation baseline for the shared CR-01
+        // reconcile helper — the mode flag is written only after the Monitor step's
+        // real outcome is known.
+        var monitorState = _monitorController.CaptureState();
 
-            // WR-01 (code review): never was in rig mode (no snapshot ever existed) —
-            // there is nothing to restore. Falling through to the companion-app block
-            // below would minimize the app even though ToggleToRigMode never ran, and
-            // Clear() would operate on a snapshot that never existed. ToggleToNormalMode
-            // is public with no enforced "must be in rig mode" precondition (MainForm
-            // happens to gate calls behind IsInRigMode(), but other/future callers are
-            // not required to), so this must be a real no-op, not an implicit fallthrough.
-            return new ToggleResult(new List<ToggleStepResult>());
+        var disableSet = (settings.NormalMonitorsToDisable ?? new List<string>()).ToHashSet();
+        var enableSet = (settings.NormalMonitorsToEnable ?? new List<string>()).ToHashSet();
+
+        Exception? monitorFailure = null;
+        try
+        {
+            // Same 06-RESEARCH.md Pitfall 2 ordering constraint as ToggleToRigMode's
+            // Monitor step: ActivateMonitors MUST run BEFORE DeactivateMonitors.
+            _monitorController.ActivateMonitors(enableSet);
+            _monitorController.DeactivateMonitors(disableSet);
+        }
+        catch (Exception ex)
+        {
+            // IN-02 (code review): traced for the same reason as every other step
+            // failure in this codebase — no other logging exists, and a Trace
+            // breadcrumb outlives the single ToggleStepResult/MessageBox prompt.
+            System.Diagnostics.Trace.WriteLine($"Normal-mode monitor apply failed: {ex}");
+            monitorFailure = ex;
+        }
+
+        steps.Add(new ToggleStepResult(
+            "Monitor",
+            monitorFailure is null ? ToggleStepOutcome.Succeeded : ToggleStepOutcome.Failed,
+            monitorFailure?.Message));
+
+        if (monitorFailure is not null)
+        {
+            // D-05: no further recovery is attempted once the Monitor step fails —
+            // Audio/App below are skipped (NotAttempted), and the shared reconcile
+            // helper decides the mode-flag outcome.
+            ReconcileModeAfterMonitorFailure(monitorState);
+            steps.Add(new ToggleStepResult("Audio", ToggleStepOutcome.NotAttempted, null));
+            steps.Add(new ToggleStepResult("App", ToggleStepOutcome.NotAttempted, null));
+            return new ToggleResult(steps);
+        }
+
+        // Mode is written only after a confirmed successful Monitor step (Pattern 2),
+        // mirrored identically in ToggleToRigMode above.
+        _modeStore.Save(Models.ToggleMode.Normal);
+
+        // Phase 15/AUDIO-04: applies settings.NormalAudioDeviceId via SetDefault, the
+        // same optional-target pattern Rig mode already uses for RigAudioDeviceId,
+        // skipped when unset. Isolate-and-continue preserved: a failure here does not
+        // block MinimizeIfRunning below.
+        Exception? audioFailure = null;
+        ToggleStepOutcome audioOutcome;
+        if (string.IsNullOrEmpty(settings.NormalAudioDeviceId))
+        {
+            audioOutcome = ToggleStepOutcome.Skipped;
         }
         else
         {
-            Exception? monitorFailure = null;
             try
             {
-                _monitorController.Restore(snapshot.Monitor);
+                if (_audioController.TryResolveDevice(settings.NormalAudioDeviceId) is null)
+                {
+                    throw new InvalidOperationException(
+                        "The configured Normal-mode audio device could not be found. Open Settings and reselect it.");
+                }
 
-                // D-02 (deliberate asymmetry, NOT a bug — do not "fix" into snapshot-based
-                // symmetry): enable-set monitors are ALWAYS re-disabled on toggle-back,
-                // never snapshot-restored. An enable-set monitor is disabled by definition
-                // before ToggleToRigMode runs — entering rig mode activated it via
-                // ActivateMonitors, so toggle-back's only job is to undo that single
-                // activation by deactivating it again, unconditionally. This call MUST run
-                // AFTER Restore (same 06-RESEARCH.md Pitfall 2 ordering as the rig-mode
-                // Monitor step: Restore's own crash-recovery fallback uses Extend
-                // internally, and ApplyTopology(Extend) would otherwise reactivate the
-                // enable-set monitors via the CCD persistence database). An empty enable
-                // set makes this a no-op.
-                _monitorController.DeactivateMonitors((settings.MonitorsToEnable ?? new List<string>()).ToHashSet());
+                _audioController.SetDefault(settings.NormalAudioDeviceId);
+                audioOutcome = ToggleStepOutcome.Succeeded;
             }
             catch (Exception ex)
             {
-                // IN-02 (code review): traced for the same reason as the audio-restore
-                // catch below and TryExecuteStep above — every step failure in this
-                // codebase is captured in the returned ToggleStepResult and surfaced to
-                // the user via a single MessageBox prompt, but only a Trace breadcrumb
-                // also survives past that prompt's lifetime. Previously only the audio
-                // path below did this, which was an inconsistent, unjustified asymmetry.
-                System.Diagnostics.Trace.WriteLine($"Monitor restore failed: {ex}");
-                monitorFailure = ex;
-            }
-
-            // Phase 15/AUDIO-04: Normal-mode audio no longer restores from the pre-toggle
-            // snapshot — it now applies settings.NormalAudioDeviceId via SetDefault, the
-            // same optional-target pattern Rig mode already uses for RigAudioDeviceId,
-            // skipped when unset. snapshot.Audio becomes unread dead data (still captured
-            // and persisted, just never consumed here) — cleanup is Phase 18 scope.
-            // Isolate-and-continue is preserved: this stays inside the same try/catch
-            // shape as the old Restore call so a monitor failure above does not block
-            // this, and this failing does not block MinimizeIfRunning/Clear below.
-            Exception? audioFailure = null;
-            ToggleStepOutcome audioOutcome;
-            if (string.IsNullOrEmpty(settings.NormalAudioDeviceId))
-            {
-                audioOutcome = ToggleStepOutcome.Skipped;
-            }
-            else
-            {
-                try
-                {
-                    if (_audioController.TryResolveDevice(settings.NormalAudioDeviceId) is null)
-                    {
-                        throw new InvalidOperationException(
-                            "The configured Normal-mode audio device could not be found. Open Settings and reselect it.");
-                    }
-
-                    _audioController.SetDefault(settings.NormalAudioDeviceId);
-                    audioOutcome = ToggleStepOutcome.Succeeded;
-                }
-                catch (Exception ex)
-                {
-                    // Gap-closure 03-04: audio failure is intentionally swallowed
-                    // (continues rather than short-circuiting) — see class-level remarks.
-                    // Traced for the same reason as every other step failure now (IN-02
-                    // code review): this codebase has no other logging, and a Trace
-                    // breadcrumb outlives the single ToggleStepResult/MessageBox prompt.
-                    System.Diagnostics.Trace.WriteLine($"Audio switch failed, continuing: {ex}");
-                    audioFailure = ex;
-                    audioOutcome = ToggleStepOutcome.Failed;
-                }
-            }
-
-            steps.Add(new ToggleStepResult(
-                "Monitor",
-                monitorFailure is null ? ToggleStepOutcome.Succeeded : ToggleStepOutcome.Failed,
-                monitorFailure?.Message));
-            steps.Add(new ToggleStepResult("Audio", audioOutcome, audioFailure?.Message));
-
-            if (monitorFailure is not null)
-            {
-                // D-05: no further recovery is attempted once monitor restore fails —
-                // MinimizeIfRunning/Clear below are skipped and the snapshot survives.
-                steps.Add(new ToggleStepResult("App", ToggleStepOutcome.NotAttempted, null));
-                return new ToggleResult(steps);
+                // Gap-closure 03-04: audio failure is intentionally swallowed
+                // (continues rather than short-circuiting) — see class-level remarks.
+                // Traced for the same reason as every other step failure now (IN-02
+                // code review): this codebase has no other logging, and a Trace
+                // breadcrumb outlives the single ToggleStepResult/MessageBox prompt.
+                System.Diagnostics.Trace.WriteLine($"Audio switch failed, continuing: {ex}");
+                audioFailure = ex;
+                audioOutcome = ToggleStepOutcome.Failed;
             }
         }
 
+        steps.Add(new ToggleStepResult("Audio", audioOutcome, audioFailure?.Message));
+
         // CompanionAppPath can be null/empty if settings.json is corrupted
         // (JsonSettingsStore.Load() degrades to a blank AppSettings on any read
-        // failure) — propagating null into MinimizeIfRunning would throw and prevent
-        // Clear() below from ever running, permanently stranding the UI in "Rig" mode
-        // even after monitor/audio were already restored successfully above.
+        // failure) — propagating null into MinimizeIfRunning would throw.
         if (!string.IsNullOrEmpty(settings.CompanionAppPath))
         {
-            // CR-02 (code review): this was the only step in ToggleToNormalMode not
-            // wrapped in try/catch, contradicting the class doc's own "isolate-and-
-            // continue... no step throws" invariant (D-05). Monitor/Audio have already
-            // been restored by this point — an exception here (e.g. process gone
-            // between snapshot-load and minimize) must not propagate and skip Clear()
-            // below, which would strand IsInRigMode() reporting true forever.
+            // CR-02 (code review): wrapped in try/catch, matching the class doc's own
+            // "isolate-and-continue... no step throws" invariant (D-05).
             try
             {
                 _appController.MinimizeIfRunning(settings.CompanionAppPath);
@@ -442,16 +423,22 @@ public sealed class ToggleService
             steps.Add(new ToggleStepResult("App", ToggleStepOutcome.Skipped, null));
         }
 
-        // CR-02: Clear() must run regardless of the App step's outcome above — Monitor
-        // and Audio are already restored, so the snapshot's job is done either way.
-        _snapshotStore.Clear();
-
         return new ToggleResult(steps);
     }
 
     /// <summary>
-    /// Current mode is derived from snapshot-file presence (D-14) — no separate
-    /// in-memory/persisted flag exists.
+    /// True when the current mode is unambiguously known — the mode file exists and
+    /// parsed successfully. False when the file is missing or corrupted, per D-06:
+    /// the app fails loudly (via the startup dialog) rather than silently defaulting
+    /// to a mode. Exposed for MainForm's toggle-trigger guards (Plan 04).
     /// </summary>
-    public bool IsInRigMode() => _snapshotStore.Exists();
+    public bool IsModeKnown() => _modeStore.TryLoad() is not null;
+
+    /// <summary>
+    /// Current mode is read from IModeStore (DISPLAY-11), not derived from
+    /// snapshot-file presence. Thin convenience wrapper — does NOT default a
+    /// null/corrupted mode to Normal; callers needing to distinguish "known Normal"
+    /// from "unknown" must use IsModeKnown() first.
+    /// </summary>
+    public bool IsInRigMode() => _modeStore.TryLoad() == Models.ToggleMode.Rig;
 }

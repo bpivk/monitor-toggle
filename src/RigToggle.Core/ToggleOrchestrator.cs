@@ -31,6 +31,7 @@ namespace RigToggle.Core;
 public sealed class ToggleOrchestrator
 {
     private readonly ToggleService _toggleService;
+    private readonly Abstractions.IToggleInProgressStore _markerStore;
 
     // 0 = idle, 1 = a toggle is in flight. Interlocked.CompareExchange makes the
     // "is anyone in flight?" check and "claim it" set a single atomic operation —
@@ -38,14 +39,15 @@ public sealed class ToggleOrchestrator
     // rejected immediately, it never waits and is never queued.
     private int _busy;
 
-    public ToggleOrchestrator(ToggleService toggleService)
+    public ToggleOrchestrator(ToggleService toggleService, Abstractions.IToggleInProgressStore markerStore)
     {
         _toggleService = toggleService ?? throw new ArgumentNullException(nameof(toggleService));
+        _markerStore = markerStore ?? throw new ArgumentNullException(nameof(markerStore));
     }
 
-    public ToggleResult ToggleToRigMode() => RunGuarded(_toggleService.ToggleToRigMode);
+    public ToggleResult ToggleToRigMode() => RunGuarded(ToggleMode.Rig, _toggleService.ToggleToRigMode);
 
-    public ToggleResult ToggleToNormalMode() => RunGuarded(_toggleService.ToggleToNormalMode);
+    public ToggleResult ToggleToNormalMode() => RunGuarded(ToggleMode.Normal, _toggleService.ToggleToNormalMode);
 
     // D-04 pass-throughs — pure reads, no guard. Safe to call at any time, including
     // while a toggle is in flight (mirrors how MainForm.RefreshUi() already calls
@@ -53,7 +55,22 @@ public sealed class ToggleOrchestrator
     public bool IsInRigMode() => _toggleService.IsInRigMode();
     public bool IsSettingsConfigured() => _toggleService.IsSettingsConfigured();
 
-    private ToggleResult RunGuarded(Func<ToggleResult> pipeline)
+    // DISPLAY-11 pass-through — lets MainForm's toggle-trigger guards check whether
+    // the mode is unambiguously known (mode file present and parsed successfully)
+    // before branching on IsInRigMode()'s value at all.
+    public bool IsModeKnown() => _toggleService.IsModeKnown();
+
+    /// <summary>
+    /// DISPLAY-13 crash-detection marker lifecycle: Save() at the start of every
+    /// guarded toggle, Clear() in the finally on clean completion. If the marker is
+    /// still present on the next launch, the previous toggle did not finish cleanly
+    /// (a real process kill/crash) — this is distinct from and unrelated to
+    /// <see cref="ToggleInProgressException"/> below, which is the existing
+    /// in-memory, same-process reentrancy guard (CORE-06). Do not conflate the two:
+    /// the marker survives a crash by design; the exception exists entirely in
+    /// memory and can never survive one.
+    /// </summary>
+    private ToggleResult RunGuarded(ToggleMode targetMode, Func<ToggleResult> pipeline)
     {
         if (Interlocked.CompareExchange(ref _busy, 1, 0) != 0)
         {
@@ -63,10 +80,18 @@ public sealed class ToggleOrchestrator
 
         try
         {
+            _markerStore.Save(new ToggleInProgressMarker(targetMode, DateTimeOffset.UtcNow));
             return pipeline();
         }
         finally
         {
+            // Clears on any managed exception path (including ToggleService's own
+            // preflight InvalidOperationExceptions) — mirrors the busy-flag's own
+            // finally discipline. Deliberately does NOT clear on a real process
+            // kill/crash — that is exactly the condition DISPLAY-13 exists to detect
+            // at next launch.
+            _markerStore.Clear();
+
             // Must run even when ToggleService throws (its own preflight
             // InvalidOperationExceptions, or anything unexpected) — otherwise a
             // single failed toggle would permanently wedge the app in "busy" and
