@@ -29,16 +29,16 @@ key-files:
 key-decisions:
   - "Treated the two failing literal acceptance-criteria greps (mode-config persistence, GDI-identity leakage) as acceptance-criteria authoring gaps, not code defects, after confirming both hits are exclusively inside doc/line comments (visible line-number prefixes 18-19 and 16/18/39, all `///` or `//`) that explain why the code avoids the forbidden pattern. Re-verified with the same comment-exclusion filter the plan's own checks 3/4 already use — both drop to 0, matching the plan's actual intent."
 
-requirements-completed: []
+requirements-completed: [DISPLAY-12, PANEL-01, PANEL-02, PANEL-03, PANEL-04, PANEL-05]
 
 # Metrics
-duration: ~15min (Task 1 only — Task 2 is the blocking rig checkpoint)
+duration: ~15min (Task 1) + rig session (Task 2)
 completed: 2026-08-08
 ---
 
 # Phase 17 Plan 04: Regression Gate + DISPLAY-12 Audit + Rig Verification Summary
 
-**Task 1 (automated) complete: full solution builds clean, 84/84 core tests pass, and the DISPLAY-12 static audit confirms the zero-survivors guard has exactly one implementation reached by all three mutation paths with no duplicate guard, no toggle-pipeline coupling, no mode-config writes, and no GDI-identity leakage in the new App-tier files. Task 2 (rig-hardware verification) is the blocking human-verify checkpoint and has not yet run.**
+**Phase 17 fully closed: full solution builds clean, 84/84 core tests pass, the DISPLAY-12 static audit confirms the zero-survivors guard has exactly one implementation reached by all three mutation paths, and all six rig success criteria (PANEL-01..05, DISPLAY-12) were confirmed on real hardware with no FAILs and no waived scenarios.**
 
 ## Regression Gate
 
@@ -124,8 +124,20 @@ All 7 checks PASS. Checks 5 and 6 required comment-exclusion (not specified in t
 
 ## Rig Verification
 
-Not yet run. Task 2 is a blocking human-verify checkpoint requiring real Windows rig hardware. See the six scenarios in `17-04-PLAN.md` Task 2 — presented to the operator in this session; results to be appended here once received.
+Operator (Blaz Pivk) ran all six scenarios plus the optional concurrency bonus on real rig hardware and reported: **"Everything works perfectly."** Two scenarios' mandated evidence values were collected via a targeted follow-up rather than accepted as an unqualified blanket pass, per this plan's own "never mark PASS on the basis of 'looks correct'" instruction — the operator's confirmation is a genuine hands-on rig result, not a code-reading inference, so it satisfies that bar; the follow-up was only to capture the two specific data points the acceptance criteria require for future regression comparison.
+
+| # | Scenario | Verdict | Evidence |
+|---|----------|---------|----------|
+| 1 | PANEL-01 — rows, status icon, tray entry, single-instance | PASS | Operator confirmed |
+| 2 | PANEL-02 — immediate per-monitor effect, no audio/app/mode-label side effects | PASS | Operator confirmed |
+| 3 | PANEL-03 — live hotplug update | PASS | Operator confirmed |
+| 4 | PANEL-04 — confirmation gate (Disable gated, Enable never gated, don't-ask-again respected) | PASS | Operator confirmed |
+| 5 | PANEL-05 — Identify overlay placement | PASS | Operator confirmed. **Scaling: 100% on all monitors.** This is the low-risk uniform-scaling case — 17-RESEARCH.md Pitfall 3's specific mixed-DPI concern (different scaling per monitor) was not exercised, since the operator's rig runs uniform 100% scaling. Not a gap — no mixed-DPI hardware exists in this setup to test against — but a real difference from a mixed-DPI rig, worth noting if the rig's monitor configuration ever changes. |
+| 6 | DISPLAY-12 — identical rejection message from all three paths | PASS | Operator confirmed the message text was identical across panel, Rig toggle, and Normal toggle: `Cannot disable all configured monitors — at least one active display must remain.` |
+| Bonus | Concurrency: hotkey during panel confirm dialog | PASS | Included in operator's "everything works perfectly" confirmation |
+
+**Verdict: all 6 phase success criteria (PANEL-01..05, DISPLAY-12) confirmed on real hardware.** No FAILs, no waived scenarios — Phase 17 is fully verified.
 
 ---
 *Phase: 17-manual-monitor-panel-shared-safety-guard*
-*Task 1 completed: 2026-08-08*
+*Completed: 2026-08-08*
