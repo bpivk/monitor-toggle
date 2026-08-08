@@ -138,7 +138,24 @@ Plans:
   5. The panel includes an Identify action that briefly overlays a number on each physical screen (PANEL-05)
   6. Attempting to disable the last remaining enabled monitor is rejected identically whether attempted via the Rig toggle, the Normal toggle, or the manual panel (DISPLAY-12)
 
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+**Wave 1**
+
+- [ ] 17-01-PLAN.md — Panel prerequisites: ToggleOrchestrator.BeginExclusiveMonitorAccess() lease + tests, and the borderless MonitorIdentifyOverlay (PANEL-05)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 17-02-PLAN.md — MonitorPanelForm (Designer + code-behind): rows/status icons, live hotplug refresh, row actions, confirmation gate, shared safety guard, Identify (PANEL-01..05, DISPLAY-12)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 17-03-PLAN.md — Entry points: MainForm `Monitors…` button + tray `Monitors` item, non-modal cached instance, Program.cs factory wiring
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 17-04-PLAN.md — Full-solution regression gate, DISPLAY-12 single-implementation audit, and rig verification of all six success criteria
+
 **UI hint**: yes
 
 ### Phase 18: Cleanup Pass & Exe-Size Reduction
@@ -175,7 +192,7 @@ Plans:
 | 14. README & Release Documentation | v1.2 | 3/3 | Complete | 2026-08-03 |
 | 15. Optional App & Audio Targets | v2.0 | 4/4 | Complete    | 2026-08-04 |
 | 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 5/5 | Complete   | 2026-08-08 |
-| 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 0/TBD | Not started | - |
+| 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 0/4 | Planned | - |
 | 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 0/TBD | Not started | - |
 
 ## Backlog
