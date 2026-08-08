@@ -336,6 +336,23 @@ the retired snapshot-presence/D-14 mechanism.
 
 ---
 
+## Resolution (2026-08-08)
+
+All 8 findings addressed:
+
+- **CR-01** (crash-marker `Clear()` can wedge the busy flag) — fixed, commit `dd9290a`. Nested try/catch around `_markerStore.Clear()` in `ToggleOrchestrator.RunGuarded`'s finally block, plus a guarded `Clear()` in `JsonToggleInProgressStore`. Regression test added (`RunGuarded_ReleasesFlag_EvenWhenMarkerClearThrows`).
+- **CR-02** (no feedback for empty Normal set) — fixed, commit `725333e`, as an advisory-only warning (not a migration or blocking guard — D-01's "empty is valid" and REQUIREMENTS.md's "no smart migration" stay locked and unchanged). Fires in `SettingsForm` when the Rig grid has a selection but the Normal grid doesn't.
+- **WR-01** (missing `UnauthorizedAccessException` catch) — fixed, commit `55b9a76`, in both `JsonModeStore.TryLoad()` and `JsonToggleInProgressStore.TryLoad()`.
+- **WR-02** (undefined enum values deserialize silently) — fixed, commit `55b9a76`, via `Enum.IsDefined` validation in `JsonModeStore.TryLoad()`.
+- **WR-03** (dead branch in `ReconcileModeAfterMonitorFailure`) — not fixed. Cosmetic only per the review's own assessment ("not incorrect today"); deferred rather than risk touching CR-01-adjacent logic for a clarity-only change.
+- **WR-04** (unguarded `_modeStore.Save()`) — fixed, commit `9ab33e5`, via a `TrySaveMode` helper that traces and swallows.
+- **WR-05** (duplicated tray/hotkey handlers) — fixed, commit `8356bea`, extracted to `PerformBackgroundToggle`.
+- **IN-01** (stale snapshot-presence doc comments) — fixed, commit `8356bea`.
+
+`dotnet build RigToggle.sln` — 0 errors. `dotnet test src/RigToggle.Tests/RigToggle.Tests.csproj` — 79/79 pass (78 + 1 new CR-01 regression test).
+
+---
+
 _Reviewed: 2026-08-08_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
