@@ -336,17 +336,19 @@ if (!modeStore.Exists())
 
 **If this table is empty:** N/A — three low-risk assumptions logged above, none block planning.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the NAudio split also add an explicit `NAudio.Core` reference?**
    - What we know: `NAudio.Wasapi` alone was sufficient to build the full solution cleanly this session (confirmed live).
    - What's unclear: Whether relying on `NAudio.Wasapi`'s transitive dependency on `NAudio.Core` (rather than an explicit direct reference) could be considered less explicit/maintainable by a future reader.
    - Recommendation: Use `NAudio.Wasapi` alone (matches "smallest set of packages that builds cleanly," verified this session) unless the planner's team convention prefers explicit transitive-dependency declarations — this is a style choice, not a correctness question.
+   - RESOLVED: 18-03-PLAN.md uses `NAudio.Wasapi` alone, per the recommendation above.
 
 2. **Exact wording/threshold for PERF-02's "cold autostart boot" verification.**
    - What we know: The app has a `--tray` hidden-start path (`StartupArgs.ShouldStartHidden`) used for autostart, and `EnableCompressionInSingleFile` has a documented (but unmeasured-in-this-app) startup-cost tradeoff.
    - What's unclear: This codebase has no existing startup-time telemetry/benchmark to compare against — "cold boot" timing will necessarily be an informal stopwatch/subjective comparison on the rig, not a precise regression threshold.
    - Recommendation: Treat this as a qualitative rig checkpoint ("does autostart still feel instant / does the tray icon still appear promptly") rather than inventing a precise millisecond SLA this codebase has never measured before — consistent with this project's existing UAT-style rig verification pattern (Phases 8/9/11/15/16/17), which uses pass/fail human judgment, not numeric benchmarks.
+   - RESOLVED: 18-06-PLAN.md's rig checkpoint treats cold-boot as a qualitative pass/fail check, per the recommendation above.
 
 ## Environment Availability
 
