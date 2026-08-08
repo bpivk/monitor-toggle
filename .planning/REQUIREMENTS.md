@@ -22,7 +22,7 @@ Requirements for the v2.0 milestone (Configurable Monitors, Optional Targets & C
 
 ### Display
 
-- [ ] **DISPLAY-09**: User can configure which monitors are enabled/disabled specifically for Normal mode, symmetric to Rig mode's existing monitor set configuration
+- [x] **DISPLAY-09**: User can configure which monitors are enabled/disabled specifically for Normal mode, symmetric to Rig mode's existing monitor set configuration
 - [x] **DISPLAY-10**: Toggling to Normal mode applies the explicitly configured Normal-mode monitor set instead of restoring a pre-toggle snapshot
 - [x] **DISPLAY-11**: App tracks current mode (Rig/Normal) via an explicit persisted flag, independent of whether a snapshot file exists on disk
 - [ ] **DISPLAY-12**: The "at least one monitor must remain enabled" safety guard is enforced identically across Rig toggle, Normal toggle, and the new manual panel, from one shared codepath
@@ -82,7 +82,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUDIO-03 | Phase 15 | Complete |
 | AUDIO-04 | Phase 15 | Complete |
 | AUDIO-05 | Phase 15 | Complete |
-| DISPLAY-09 | Phase 16 | Pending |
+| DISPLAY-09 | Phase 16 | Complete |
 | DISPLAY-10 | Phase 16 | Complete |
 | DISPLAY-11 | Phase 16 | Complete |
 | DISPLAY-12 | Phase 17 | Pending |
