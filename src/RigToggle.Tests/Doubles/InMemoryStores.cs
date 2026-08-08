@@ -101,3 +101,20 @@ public sealed class InMemoryToggleInProgressStore : IToggleInProgressStore
         _callLog.Add("marker.Clear");
     }
 }
+
+/// <summary>
+/// CR-01 (code review) regression double: IToggleInProgressStore whose Clear() always
+/// throws, simulating a marker-cleanup I/O failure (AV lock, sharing violation,
+/// permissions). Save()/TryLoad() behave normally so the rest of the guarded-toggle
+/// pipeline is unaffected — only marker cleanup is broken.
+/// </summary>
+public sealed class ThrowingClearToggleInProgressStore : IToggleInProgressStore
+{
+    private ToggleInProgressMarker? _marker;
+
+    public ToggleInProgressMarker? TryLoad() => _marker;
+
+    public void Save(ToggleInProgressMarker marker) => _marker = marker;
+
+    public void Clear() => throw new IOException("Simulated marker cleanup failure.");
+}

@@ -90,12 +90,24 @@ public sealed class ToggleOrchestrator
             // finally discipline. Deliberately does NOT clear on a real process
             // kill/crash — that is exactly the condition DISPLAY-13 exists to detect
             // at next launch.
-            _markerStore.Clear();
+            //
+            // CR-01 (code review): wrapped in its own try/catch so a marker-cleanup
+            // I/O failure (AV lock, sharing violation, permissions) can never prevent
+            // the busy-flag release below — best-effort, matching
+            // JsonToggleInProgressStore.TryLoad()'s own degrade-rather-than-throw
+            // philosophy for this file.
+            try
+            {
+                _markerStore.Clear();
+            }
+            catch
+            {
+                // Best-effort marker cleanup — must never block the busy-flag release.
+            }
 
-            // Must run even when ToggleService throws (its own preflight
-            // InvalidOperationExceptions, or anything unexpected) — otherwise a
-            // single failed toggle would permanently wedge the app in "busy" and
-            // every future request (including a well-formed one) would be
+            // Must run even when ToggleService or the marker cleanup above throws —
+            // otherwise a single failed toggle would permanently wedge the app in
+            // "busy" and every future request (including a well-formed one) would be
             // rejected forever.
             Volatile.Write(ref _busy, 0);
         }

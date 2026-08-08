@@ -46,18 +46,19 @@ public class ToggleOrchestratorTests : IDisposable
 
     private (ToggleOrchestrator Orchestrator, List<string> CallLog, InMemorySettingsStore SettingsStore) CreateOrchestrator(
         AppSettings? settings = null,
-        IMonitorController? monitorController = null)
+        IMonitorController? monitorController = null,
+        IToggleInProgressStore? markerStore = null)
     {
         var callLog = new List<string>();
         var settingsStore = new InMemorySettingsStore(settings ?? ConfiguredSettings);
         var modeStore = new InMemoryModeStore(callLog);
-        var markerStore = new InMemoryToggleInProgressStore(callLog);
+        var marker = markerStore ?? new InMemoryToggleInProgressStore(callLog);
         var monitor = monitorController ?? new FakeMonitorController(callLog);
         var audioController = new FakeAudioController(callLog);
         var appController = new FakeAppController(callLog);
 
         var toggleService = new ToggleService(settingsStore, modeStore, monitor, audioController, appController);
-        var orchestrator = new ToggleOrchestrator(toggleService, markerStore);
+        var orchestrator = new ToggleOrchestrator(toggleService, marker);
         return (orchestrator, callLog, settingsStore);
     }
 
@@ -230,6 +231,22 @@ public class ToggleOrchestratorTests : IDisposable
         Assert.True(saveIndex >= 0, "Expected marker.Save to be recorded.");
         Assert.True(clearIndex >= 0, "Expected marker.Clear to be recorded.");
         Assert.True(saveIndex < clearIndex, "marker.Save must precede marker.Clear.");
+    }
+
+    [Fact]
+    public void RunGuarded_ReleasesFlag_EvenWhenMarkerClearThrows()
+    {
+        // CR-01 (code review): a marker-cleanup I/O failure (AV lock, sharing
+        // violation, permissions) must never wedge the busy flag — a subsequent,
+        // well-formed call must still succeed rather than throwing
+        // ToggleInProgressException forever.
+        var (orchestrator, _, _) = CreateOrchestrator(markerStore: new ThrowingClearToggleInProgressStore());
+
+        var firstResult = orchestrator.ToggleToRigMode();
+        Assert.True(firstResult.Success);
+
+        var secondResult = orchestrator.ToggleToNormalMode();
+        Assert.True(secondResult.Success);
     }
 
     [Fact]

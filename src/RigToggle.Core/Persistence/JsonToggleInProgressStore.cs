@@ -57,13 +57,36 @@ public sealed class JsonToggleInProgressStore : IToggleInProgressStore
         {
             return null;
         }
+        catch (UnauthorizedAccessException)
+        {
+            // WR-01 (code review): a permissions problem (restrictive ACLs, AV
+            // quarantine) is a sibling of IOException, not a subtype — must be caught
+            // separately so StartupRecoveryChecker.Run() (deliberately unguarded)
+            // degrades to its own dialog instead of crashing with an unhandled
+            // exception at the first line of Main()'s recovery check.
+            return null;
+        }
     }
 
     public void Clear()
     {
-        if (Exists())
+        // CR-01 (code review): File.Delete can throw (AV lock, sharing violation,
+        // permissions) — degrade to a no-op rather than propagate, matching
+        // TryLoad()'s own graceful-degradation contract. The caller
+        // (ToggleOrchestrator.RunGuarded) also wraps this call defensively, but this
+        // guard holds even if some future caller doesn't.
+        try
         {
-            File.Delete(_path);
+            if (Exists())
+            {
+                File.Delete(_path);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 }
