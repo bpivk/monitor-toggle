@@ -150,7 +150,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 17-03-PLAN.md — Entry points: MainForm `Monitors…` button + tray `Monitors` item, non-modal cached instance, Program.cs factory wiring
+- [x] 17-03-PLAN.md — Entry points: MainForm `Monitors…` button + tray `Monitors` item, non-modal cached instance, Program.cs factory wiring
 
 **Wave 4** *(blocked on Wave 3)*
 
@@ -192,7 +192,7 @@ Plans:
 | 14. README & Release Documentation | v1.2 | 3/3 | Complete | 2026-08-03 |
 | 15. Optional App & Audio Targets | v2.0 | 4/4 | Complete    | 2026-08-04 |
 | 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 5/5 | Complete   | 2026-08-08 |
-| 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 2/4 | In Progress|  |
+| 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 3/4 | In Progress|  |
 | 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 0/TBD | Not started | - |
 
 ## Backlog
