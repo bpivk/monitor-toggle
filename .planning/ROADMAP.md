@@ -170,7 +170,22 @@ Plans:
   3. The self-contained exe is measurably smaller after applying `EnableCompressionInSingleFile`, `SatelliteResourceLanguages=en`, `InvariantGlobalization=true`, and the NAudio meta-package split — without enabling IL trimming (PERF-01)
   4. A full toggle round trip and a cold autostart boot are verified working correctly on real rig hardware after the exe-size changes, not just a build-output file-size diff (PERF-02)
 
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+**Wave 1**
+
+- [ ] 18-01-PLAN.md — Delete the snapshot-persistence subsystem + audio-side Restore; rewire the Program.cs legacy-mode bootstrap to a bare File.Exists check (CLEANUP-01)
+- [ ] 18-02-PLAN.md — Preserve the rig-discovered CCD knowledge, then delete monitor Restore/RestoreViaReconstruction/_originalPathsCache/CopyOutputTechnology/AssignSource and their 6 tests (CLEANUP-01)
+- [ ] 18-03-PLAN.md — Apply the four MSBuild exe-size levers (compression, satellite languages, invariant globalization, NAudio.Wasapi split) and measure the byte delta (PERF-01)
+- [ ] 18-04-PLAN.md — Close the four reviewed code-quality findings: IN-04 dead branch, IN-03 sentinel name, IN-02 checklist wording + test, WR-03 branch tracing (CLEANUP-02)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 18-05-PLAN.md — Strip Restore from the test doubles, close IN-01's dead test knob, drop the vacuous assertions, and run the tree-wide zero-reference audit (CLEANUP-01/02)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 18-06-PLAN.md — Merged-tree regression gate, final exe-size measurement, and rig verification of cold autostart boot + full toggle round trip (PERF-01/PERF-02)
 
 ## Progress
 
