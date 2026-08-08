@@ -18,9 +18,13 @@ namespace RigToggle.App
     /// determination.
     ///
     /// Phase 8 (TRAY-01/03/04/05, NOTIF-01): also tray-resident — hosts a NotifyIcon +
-    /// ContextMenuStrip (Switch mode / Settings / Exit), redirects window Close to
-    /// hide-to-tray, restores on left-click, and fires a balloon toast on every
-    /// tray-menu toggle.
+    /// ContextMenuStrip (Switch mode / Settings / Monitors / Exit), redirects window
+    /// Close to hide-to-tray, restores on left-click, and fires a balloon toast on
+    /// every tray-menu toggle.
+    ///
+    /// Phase 17 (PANEL-01/02/03): the Monitors entry (button + tray item) opens a
+    /// non-modal MonitorPanelForm via the shared OpenMonitorPanel() helper -- see that
+    /// method's doc comment for the four deliberate divergences from OpenSettingsDialog.
     /// </summary>
     public partial class MainForm : Form
     {
@@ -28,7 +32,14 @@ namespace RigToggle.App
         private readonly ISettingsStore _settingsStore;
         private readonly IMonitorController _monitorController;
         private readonly Func<SettingsForm> _settingsFormFactory;
+        private readonly Func<MonitorPanelForm> _monitorPanelFormFactory;
         private readonly IThemeProvider _themeProvider;
+
+        // 17-03/PANEL-03: cached non-modal panel instance -- a closed non-modal Form
+        // disposes itself, so OpenMonitorPanel() re-creates only when this is null or
+        // already disposed. Do not make this a using/transient-per-open pattern like
+        // SettingsForm; the panel must be re-focusable, not re-created, on a second click.
+        private MonitorPanelForm? _monitorPanelForm;
 
         private System.Drawing.Icon? _normalIcon;
         private System.Drawing.Icon? _rigIcon;
@@ -47,12 +58,14 @@ namespace RigToggle.App
             ISettingsStore settingsStore,
             IMonitorController monitorController,
             Func<SettingsForm> settingsFormFactory,
+            Func<MonitorPanelForm> monitorPanelFormFactory,
             IThemeProvider themeProvider)
         {
             _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
             _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
             _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
             _settingsFormFactory = settingsFormFactory ?? throw new ArgumentNullException(nameof(settingsFormFactory));
+            _monitorPanelFormFactory = monitorPanelFormFactory ?? throw new ArgumentNullException(nameof(monitorPanelFormFactory));
             _themeProvider = themeProvider ?? throw new ArgumentNullException(nameof(themeProvider));
 
             InitializeComponent();
@@ -83,6 +96,7 @@ namespace RigToggle.App
                 DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDark);
                 ThemeApplier.ThemeButton(btnToggle, IsDark);
                 ThemeApplier.ThemeButton(btnSettings, IsDark);
+                ThemeApplier.ThemeButton(btnMonitors, IsDark);
                 Refresh();
             }
             catch
@@ -167,6 +181,7 @@ namespace RigToggle.App
             // on both startup paths, unlike OnLoad/OnShown.
             ThemeApplier.ThemeButton(btnToggle, IsDark);
             ThemeApplier.ThemeButton(btnSettings, IsDark);
+            ThemeApplier.ThemeButton(btnMonitors, IsDark);
         }
 
         /// <summary>
@@ -455,6 +470,47 @@ namespace RigToggle.App
             settingsForm.ShowDialog(this);
             TryRegisterConfiguredHotkey();
             RefreshUi();
+        }
+
+        private void BtnMonitors_Click(object? sender, EventArgs e) => OpenMonitorPanel();
+
+        private void TrayMonitorsMenuItem_Click(object? sender, EventArgs e) => OpenMonitorPanel();
+
+        /// <summary>
+        /// PANEL-01/02/03: shared entry point for the Monitors button and tray item.
+        /// Deliberately diverges from OpenSettingsDialog in four ways -- do not
+        /// "normalize" any of them toward the Settings shape:
+        ///
+        /// 1. Non-modal Show(), never ShowDialog() -- PANEL-03 requires the panel to
+        ///    live-refresh (hotplug events) while open, and it must not block MainForm
+        ///    or the tray context menu.
+        /// 2. Cached instance, not fresh-per-open -- a closed non-modal Form disposes
+        ///    itself, so a second click must re-focus the existing window rather than
+        ///    construct a duplicate; the IsDisposed check below is the re-create guard.
+        /// 3. The hotkey is deliberately left registered for the panel's whole
+        ///    lifetime, unlike Settings' whole-dialog unregister/re-register (TRIG-01/
+        ///    D-07). The panel has no mid-edit state a hotkey toggle could race; that
+        ///    race is instead handled by Plan 17-01's BeginExclusiveMonitorAccess()
+        ///    lease acquired inside the panel around each mutation.
+        /// 4. No RefreshUi() call afterwards -- panel actions mutate live monitor
+        ///    topology but never the Rig/Normal mode flag, so MainForm's mode
+        ///    indicator has nothing to re-derive.
+        /// </summary>
+        private void OpenMonitorPanel()
+        {
+            if (_monitorPanelForm is null || _monitorPanelForm.IsDisposed)
+            {
+                _monitorPanelForm = _monitorPanelFormFactory();
+            }
+
+            _monitorPanelForm.Show();
+
+            if (_monitorPanelForm.WindowState == FormWindowState.Minimized)
+            {
+                _monitorPanelForm.WindowState = FormWindowState.Normal;
+            }
+
+            _monitorPanelForm.Activate();
         }
 
         /// <summary>
