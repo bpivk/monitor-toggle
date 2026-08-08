@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Configurable Monitors, Optional Targets & Cleanup
 status: executing
-stopped_at: Phase 16 execution complete, human verification pending
-last_updated: "2026-08-08T12:10:00.000Z"
-last_activity: 2026-08-08 -- Phase 16 all 5 plans executed, code review (8 findings, all fixed), verified human_needed (2 rig items outstanding)
+stopped_at: Phase 16 complete (verification passed)
+last_updated: "2026-08-08T13:00:00.000Z"
+last_activity: 2026-08-08 -- Phase 16 human verification resolved: Settings layout confirmed passed on rig, DISPLAY-13 crash-mid-toggle test waived via documented override (accepted by Blaz Pivk)
 progress:
   total_phases: 4
   completed_phases: 1
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-04)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before. (Note: v2.0 revises the "restores exactly how it was before" framing for Normal mode — see DISPLAY-10/AUDIO-04 and ROADMAP.md Phase 16.)
-**Current focus:** Phase 16 — normal-mode-explicit-monitor-config-mode-store-redesign (execution complete, human verification pending — see Pending Todos)
+**Current focus:** Phase 16 — complete. Next: Phase 17 (Manual Monitor Panel & Shared Safety Guard)
 
 ## Current Position
 
-Phase: 16 (normal-mode-explicit-monitor-config-mode-store-redesign) — HUMAN VERIFICATION PENDING
+Phase: 16 (normal-mode-explicit-monitor-config-mode-store-redesign) — COMPLETE
 Plan: 5 of 5
-Status: All plans executed and code-reviewed; 16-VERIFICATION.md status is human_needed (DISPLAY-09/10/11 verified from code + rig evidence; DISPLAY-13 and the post-gap-closure Settings layout need real-hardware confirmation — see 16-HUMAN-UAT.md)
-Last activity: 2026-08-08 -- Phase 16 execution, code review, and verification complete
+Status: All plans executed, code-reviewed (8 findings, all fixed), and verified. 16-VERIFICATION.md status is passed (4/4 must-haves — 3 verified from code + rig evidence, 1 passed via documented override).
+Last activity: 2026-08-08 -- Phase 16 human verification resolved
 
-Progress: [██████████] 100% (plans) — phase-goal verification: human_needed
+Progress: [██████████] 100% — phase-goal verification: passed
 
 ## Performance Metrics
 
@@ -79,7 +79,7 @@ Full decision log lives in PROJECT.md's Key Decisions table. v1.2's decisions (t
 
 ### Pending Todos
 
-- Phase 16 human verification (`16-HUMAN-UAT.md`, 2 pending items — real rig required): (1) kill the app mid-toggle and confirm the crash-recovery dialog fires and clears `toggle-in-progress.json` (DISPLAY-13's one end-to-end-unconfirmed path); (2) re-open Settings and visually confirm the post-gap-closure side-by-side grid layout (commit `098d10c`) has no overlap/clipping and themes correctly in dark mode. Neither is believed to be a real defect (both mechanisms are code-verified/unit-tested or build-verified) — this is closing out verification completeness, matching the precedent set by Phase 11/13's own human_needed → passed resolutions.
+None.
 
 ### Known Limitations
 
@@ -129,13 +129,14 @@ Resolved at v1.1 close (2026-08-01): Phase 11's `11-HUMAN-UAT.md` (2 pending hum
 
 Resolved at v1.2 close (2026-08-04): Phase 13's `13-VERIFICATION.md` had the same stale-status issue as Phase 11 above — body already showed ICON-01..04 confirmed on real rig hardware via prior in-phase checkpoints (13-03, 13-04 Task 3), frontmatter `status: human_needed` was stale and flipped to `passed` (commit `38d756a`). No longer an open item.
 
+Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-13 real crash-mid-toggle test, post-gap-closure Settings layout re-confirmation). Item 2 (Settings layout) confirmed passed directly by the user on the real rig. Item 1 (DISPLAY-13) was formally waived rather than tested — user judged the exact-crash-mid-toggle scenario niche/low-probability and not worth dedicated rig time; recorded as a documented override (`accepted_by: "Blaz Pivk"`, `accepted_at: 2026-08-08`) in `16-VERIFICATION.md` frontmatter per `verification-overrides.md` convention, not a false "tested and passed" claim. `16-VERIFICATION.md` status updated `human_needed` → `passed`. No longer an open item.
+
 ## Session Continuity
 
-Last session: 2026-08-08T12:10:00.000Z
-Stopped at: Phase 16 execution complete, human verification pending
-Resume file: .planning/phases/16-normal-mode-explicit-monitor-config-mode-store-redesign/16-HUMAN-UAT.md
+Last session: 2026-08-08T13:00:00.000Z
+Stopped at: Phase 16 complete (verification passed)
+Resume file: .planning/phases/16-normal-mode-explicit-monitor-config-mode-store-redesign/16-VERIFICATION.md
 
 ## Operator Next Steps
 
-- Run the 2 pending rig checks in `16-HUMAN-UAT.md`, then update `16-VERIFICATION.md` status `human_needed` → `passed` (see Phase 11/13 precedent in Deferred Items below for the exact resolution pattern)
-- `/gsd:plan-phase 17` — plan Phase 17: Manual Monitor Panel & Shared Safety Guard (once Phase 16's human verification closes, or in parallel if preferred — Phase 17 depends on Phase 16's code, not its verification status)
+- `/gsd:plan-phase 17` — plan Phase 17: Manual Monitor Panel & Shared Safety Guard
