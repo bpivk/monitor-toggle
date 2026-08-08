@@ -52,10 +52,12 @@ namespace RigToggle.App
             this.lblMode = new System.Windows.Forms.Label();
             this.btnToggle = new System.Windows.Forms.Button();
             this.btnSettings = new System.Windows.Forms.Button();
+            this.btnMonitors = new System.Windows.Forms.Button();
             this.notifyIcon = new System.Windows.Forms.NotifyIcon(this.components);
             this.trayContextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.trayToggleMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.traySettingsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.trayMonitorsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.traySeparator = new System.Windows.Forms.ToolStripSeparator();
             this.trayExitMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 
@@ -99,6 +101,21 @@ namespace RigToggle.App
             this.btnSettings.Click += new System.EventHandler(this.BtnSettings_Click);
 
             //
+            // btnMonitors
+            //
+            // 17-03/PANEL-01: 8px gap below btnSettings (which ends at y=140), pixel-
+            // matching the existing btnToggle -> btnSettings gap (100 -> 108). Checked
+            // against ClientSize (320, 200) -- btnMonitors ends at y=180, leaving a 20px
+            // bottom margin, which already exceeds the form's 16px margin rhythm, so
+            // ClientSize is deliberately left unchanged by this plan.
+            this.btnMonitors.Text = "Monitors…";
+            this.btnMonitors.Location = new System.Drawing.Point(16, 148);
+            this.btnMonitors.Size = new System.Drawing.Size(288, 32);
+            this.btnMonitors.Name = "btnMonitors";
+            this.btnMonitors.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnMonitors.Click += new System.EventHandler(this.BtnMonitors_Click);
+
+            //
             // trayToggleMenuItem
             //
             // Text left at a safe default; RefreshUi() overrides it every call with
@@ -113,6 +130,13 @@ namespace RigToggle.App
             this.traySettingsMenuItem.Text = "Settings";
             this.traySettingsMenuItem.Name = "traySettingsMenuItem";
             this.traySettingsMenuItem.Click += new System.EventHandler(this.TraySettingsMenuItem_Click);
+
+            //
+            // trayMonitorsMenuItem
+            //
+            this.trayMonitorsMenuItem.Text = "Monitors";
+            this.trayMonitorsMenuItem.Name = "trayMonitorsMenuItem";
+            this.trayMonitorsMenuItem.Click += new System.EventHandler(this.TrayMonitorsMenuItem_Click);
 
             //
             // traySeparator
@@ -137,11 +161,13 @@ namespace RigToggle.App
             //
             // trayContextMenu
             //
-            // Exact order per TRAY-03/08-UI-SPEC.md: Switch mode -> Settings -> separator -> Exit.
+            // Exact order per TRAY-03/08-UI-SPEC.md, extended by 17-UI-SPEC.md: Switch
+            // mode -> Settings -> Monitors -> separator -> Exit.
             this.trayContextMenu.Name = "trayContextMenu";
             this.trayContextMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
                 this.trayToggleMenuItem,
                 this.traySettingsMenuItem,
+                this.trayMonitorsMenuItem,
                 this.traySeparator,
                 this.trayExitMenuItem});
 
@@ -178,6 +204,7 @@ namespace RigToggle.App
             this.Controls.Add(this.lblMode);
             this.Controls.Add(this.btnToggle);
             this.Controls.Add(this.btnSettings);
+            this.Controls.Add(this.btnMonitors);
 
             this.ResumeLayout(false);
         }
@@ -187,10 +214,12 @@ namespace RigToggle.App
         private System.Windows.Forms.Label lblMode;
         private System.Windows.Forms.Button btnToggle;
         private System.Windows.Forms.Button btnSettings;
+        private System.Windows.Forms.Button btnMonitors;
         private System.Windows.Forms.NotifyIcon notifyIcon;
         private System.Windows.Forms.ContextMenuStrip trayContextMenu;
         private System.Windows.Forms.ToolStripMenuItem trayToggleMenuItem;
         private System.Windows.Forms.ToolStripMenuItem traySettingsMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem trayMonitorsMenuItem;
         private System.Windows.Forms.ToolStripSeparator traySeparator;
         private System.Windows.Forms.ToolStripMenuItem trayExitMenuItem;
     }
