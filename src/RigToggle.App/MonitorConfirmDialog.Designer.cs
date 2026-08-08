@@ -59,7 +59,7 @@ namespace RigToggle.App
             //
             // chkDontAskAgain
             //
-            this.chkDontAskAgain.Text = "Don't ask again";
+            this.chkDontAskAgain.Text = "Don't ask again for any monitor change";
             this.chkDontAskAgain.Location = new System.Drawing.Point(12, 88);
             this.chkDontAskAgain.Size = new System.Drawing.Size(200, 24);
             this.chkDontAskAgain.Name = "chkDontAskAgain";
