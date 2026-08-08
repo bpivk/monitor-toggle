@@ -81,7 +81,7 @@ namespace RigToggle.App
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             Color dotColor = isActive ? Color.FromArgb(46, 204, 113) : Color.FromArgb(200, 60, 60);
             using var brush = new SolidBrush(dotColor);
-            g.FillEllipse(brush, 0, 0, 11, 11);
+            g.FillEllipse(brush, 0, 0, 12, 12);
             return bmp;
         }
 
@@ -147,9 +147,26 @@ namespace RigToggle.App
         // side-effect-free beyond re-populating the grid.
         private void OnDisplaySettingsChanged(object? sender, EventArgs e)
         {
+            // WR-01 (code review): this panel is closable/re-openable (unlike
+            // MainForm, which is effectively app-lifetime), and
+            // SystemEvents.DisplaySettingsChanged can fire on a background thread at
+            // the exact moment the panel is closing -- IsDisposed must be checked
+            // BEFORE touching InvokeRequired/BeginInvoke, and BeginInvoke itself
+            // guarded, or a race here throws ObjectDisposedException off the UI
+            // thread, which is unhandled and crashes the whole process.
+            if (IsDisposed) return;
+
             if (InvokeRequired)
             {
-                BeginInvoke(new Action(() => OnDisplaySettingsChanged(sender, e)));
+                try
+                {
+                    BeginInvoke(new Action(() => OnDisplaySettingsChanged(sender, e)));
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Panel was closed between the IsDisposed check above and this
+                    // BeginInvoke call -- expected under real hotplug timing, not an error.
+                }
                 return;
             }
 
@@ -165,9 +182,19 @@ namespace RigToggle.App
 
         private void OnThemeChanged(object? sender, EventArgs e)
         {
+            // WR-01 (code review): same disposed-race guard as OnDisplaySettingsChanged
+            // above -- ThemeChanged can also fire off the UI thread mid-close.
+            if (IsDisposed) return;
+
             if (InvokeRequired)
             {
-                BeginInvoke(new Action(() => OnThemeChanged(sender, e)));
+                try
+                {
+                    BeginInvoke(new Action(() => OnThemeChanged(sender, e)));
+                }
+                catch (ObjectDisposedException)
+                {
+                }
                 return;
             }
 
@@ -247,6 +274,20 @@ namespace RigToggle.App
                     {
                         settings.SkipMonitorConfirmation = true;
                         _settingsStore.Save(settings);
+                    }
+
+                    // WR-03 (code review): ShowDialog() runs a nested message loop that
+                    // dispatches queued messages, including a hotplug-triggered
+                    // OnDisplaySettingsChanged -> PopulateMonitorGrid() that can clear
+                    // and rebuild _allMonitors while this dialog was open (17-RESEARCH.md
+                    // Pitfall 1). Re-validate devicePath against the (possibly refreshed)
+                    // list before acting on the pre-dialog snapshot -- a monitor unplugged
+                    // during the confirm dialog must not be passed to DeactivateMonitors.
+                    if (!_allMonitors.Any(m => m.DevicePath == devicePath))
+                    {
+                        MessageBox.Show(this, "This monitor is no longer connected.", "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        PopulateMonitorGrid();
+                        return;
                     }
                 }
 
@@ -340,7 +381,24 @@ namespace RigToggle.App
                 // overlay would be invisible and unclosable-looking.
                 if (snapshot.ResolutionWidth <= 0 || snapshot.ResolutionHeight <= 0) continue;
 
-                new MonitorIdentifyOverlay(snapshot, number).Show();
+                try
+                {
+                    // WR-04 (code review): matches this codebase's "diagnostic/cosmetic
+                    // code must never crash" convention (see OnThemeChanged,
+                    // OnDisplaySettingsChanged above) -- a single overlay's construction
+                    // failing (GDI resource exhaustion, etc.) must not abort the
+                    // remaining overlays or throw out of this Button.Click handler.
+                    // WR-06: Owner ties the overlay's lifetime to this panel so closing
+                    // the panel while an overlay is still on screen doesn't leave a
+                    // dangling ownerless TopMost window.
+                    var overlay = new MonitorIdentifyOverlay(snapshot, number) { Owner = this };
+                    overlay.Show();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine($"BtnIdentify_Click: overlay for {devicePath} failed: {ex}");
+                }
+
                 number++;
             }
         }
