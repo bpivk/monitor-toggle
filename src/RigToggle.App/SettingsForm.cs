@@ -838,6 +838,7 @@ namespace RigToggle.App
             // blocks it, but a configured-but-stale value still does.
             bool appPathOk = _pendingAppPath is null || IsValidLaunchTarget(_pendingAppPath);
             bool monitorOk;
+            bool rigGridHasSelection = false;
 
             if (!dgvMonitors.Enabled)
             {
@@ -851,6 +852,7 @@ namespace RigToggle.App
             else
             {
                 var (disableSelected, enableSelected) = GetGridSelection();
+                rigGridHasSelection = disableSelected.Count > 0 || enableSelected.Count > 0;
 
                 if (!WouldLeaveAtLeastOneMonitorActive(_allMonitors, disableSelected, enableSelected))
                 {
@@ -890,21 +892,30 @@ namespace RigToggle.App
             // untouched). No WouldLeaveAtLeastOneMonitorActive cross-check is applied
             // here — that safety guard stays apply-time-only in
             // WindowsMonitorController.DeactivateMonitors (RESEARCH.md Anti-Pattern).
-            // lblMonitorNormalWarning is advisory-only (stale-saved-monitor notice),
+            // lblMonitorNormalWarning is advisory-only (stale-saved-monitor notice, and
+            // now also the CR-02 empty-Normal-while-Rig-configured notice below) —
             // never a blocking condition — monitorNormalOk is unconditionally true.
             bool monitorNormalOk = true;
 
             if (dgvMonitorsNormal.Enabled)
             {
-                // Computed for its stale-warning side effect only (never used to flip
-                // monitorNormalOk) — keeps the advisory notice in sync with live edits,
-                // mirroring the Rig grid's own re-check-on-every-interaction behavior.
-                GetGridSelectionNormal();
+                var (disableSelectedNormal, enableSelectedNormal) = GetGridSelectionNormal();
 
                 var staleDevicePathsNormal = GetStaleSavedDevicePathsNormal();
                 if (staleDevicePathsNormal.Count > 0)
                 {
                     ShowStaleMonitorWarningNormal(staleDevicePathsNormal.ToList());
+                }
+                else if (rigGridHasSelection && disableSelectedNormal.Count == 0 && enableSelectedNormal.Count == 0)
+                {
+                    // CR-02 (code review): D-01 deliberately allows an all-empty Normal
+                    // config (nothing to undo — a monitor not listed is left untouched),
+                    // but a user who configured the Rig grid and never touched the
+                    // Normal grid is far more likely to have simply missed the second
+                    // grid than to have intentionally chosen "Normal mode changes
+                    // nothing." Advisory only — never blocks Save, matching D-01 exactly.
+                    lblMonitorNormalWarning.Text = "No Normal-mode monitors configured — switching to Normal Mode won't change any monitor. If you meant to mirror your Rig-mode choices, configure this grid too.";
+                    lblMonitorNormalWarning.Visible = true;
                 }
                 else
                 {
