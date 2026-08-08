@@ -12,8 +12,10 @@ namespace RigToggle.App
     /// is injected by the composition root (Program.cs, Anti-Pattern 2 in
     /// 02-RESEARCH.md). Mode is derived from ToggleOrchestrator.IsInRigMode() (07-01:
     /// every toggle call now routes through the reentrancy-safe orchestrator rather
-    /// than ToggleService directly), which itself derives from snapshot-file presence
-    /// (D-14) — correct on startup even after a crash while in Rig mode.
+    /// than ToggleService directly), which itself derives from the explicit
+    /// IModeStore-persisted mode flag (DISPLAY-11) — correct on startup regardless of
+    /// snapshot-file presence, which this app no longer writes or reads for mode
+    /// determination.
     ///
     /// Phase 8 (TRAY-01/03/04/05, NOTIF-01): also tray-resident — hosts a NotifyIcon +
     /// ContextMenuStrip (Switch mode / Settings / Exit), redirects window Close to
@@ -249,8 +251,9 @@ namespace RigToggle.App
         }
 
         /// <summary>
-        /// Re-derives the mode indicator (from snapshot-file presence, D-14). Called
-        /// on startup and after every toggle/Settings-dialog close.
+        /// Re-derives the mode indicator (from the explicit IModeStore-persisted mode
+        /// flag, DISPLAY-11). Called on startup and after every toggle/Settings-dialog
+        /// close.
         /// </summary>
         private void RefreshUi()
         {
@@ -599,55 +602,7 @@ namespace RigToggle.App
         /// the toast is redundant when the window is already visible, but D-08 requires
         /// it every time regardless.
         /// </summary>
-        private void TrayToggleMenuItem_Click(object? sender, EventArgs e)
-        {
-            if (!_orchestrator.IsModeKnown())
-            {
-                // T-16-09/D-08: balloon chrome only, never MessageBox, for the tray
-                // trigger — matches this handler's existing no-GUI-chrome guarantee.
-                notifyIcon.ShowBalloonTip(
-                    3000,
-                    "Rig Toggle",
-                    "Current mode is unknown — restart the app to fix, or check Settings.",
-                    ToolTipIcon.Warning);
-                return;
-            }
-
-            ToggleResult result;
-
-            try
-            {
-                result = _orchestrator.IsInRigMode()
-                    ? _orchestrator.ToggleToNormalMode()
-                    : _orchestrator.ToggleToRigMode();
-            }
-            catch (ToggleInProgressException ex)
-            {
-                notifyIcon.ShowBalloonTip(
-                    3000,
-                    "Rig Toggle",
-                    ToggleResultFormatter.TruncateForBalloon(ex.Message),
-                    ToolTipIcon.Warning);
-                return;
-            }
-            catch (Exception ex)
-            {
-                notifyIcon.ShowBalloonTip(
-                    3000,
-                    "Rig Toggle",
-                    ToggleResultFormatter.TruncateForBalloon($"Something went wrong while toggling: {ex.GetType().Name}: {ex.Message}"),
-                    ToolTipIcon.Warning);
-                return;
-            }
-
-            RefreshUi();
-
-            notifyIcon.ShowBalloonTip(
-                3000,
-                ToggleResultFormatter.FormatModeTitle(_orchestrator.IsInRigMode()),
-                ToggleResultFormatter.TruncateForBalloon(ToggleResultFormatter.FormatChecklist(result)),
-                result.Success ? ToolTipIcon.Info : ToolTipIcon.Warning);
-        }
+        private void TrayToggleMenuItem_Click(object? sender, EventArgs e) => PerformBackgroundToggle();
 
         /// <summary>
         /// TRIG-01: the global-hotkey toggle handler, dispatched from WndProc on
@@ -658,12 +613,21 @@ namespace RigToggle.App
         /// through notifyIcon.ShowBalloonTip, NEVER MessageBox.Show -- a hotkey-triggered
         /// toggle must never surface GUI chrome.
         /// </summary>
-        private void HandleHotkeyToggle()
+        private void HandleHotkeyToggle() => PerformBackgroundToggle();
+
+        /// <summary>
+        /// WR-05 (code review): shared body for TrayToggleMenuItem_Click and
+        /// HandleHotkeyToggle, which were previously line-for-line identical method
+        /// bodies — extracted so any future fix (balloon wording, exception handling)
+        /// only needs to be made once. See the two callers' doc comments for the
+        /// no-GUI-chrome contract this method upholds.
+        /// </summary>
+        private void PerformBackgroundToggle()
         {
             if (!_orchestrator.IsModeKnown())
             {
-                // T-16-09/D-08: balloon chrome only, never MessageBox, for the hotkey
-                // trigger — matches this handler's existing no-GUI-chrome guarantee.
+                // T-16-09/D-08: balloon chrome only, never MessageBox, for the
+                // tray/hotkey triggers — matches their existing no-GUI-chrome guarantee.
                 notifyIcon.ShowBalloonTip(
                     3000,
                     "Rig Toggle",
