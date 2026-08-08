@@ -49,7 +49,21 @@ public sealed class JsonModeStore : IModeStore
 
         try
         {
-            return JsonSerializer.Deserialize<ToggleMode>(File.ReadAllText(_path));
+            var mode = JsonSerializer.Deserialize<ToggleMode>(File.ReadAllText(_path));
+
+            // WR-02 (code review): System.Text.Json deserializes any JSON integer into
+            // an enum-typed property without validating it against defined members —
+            // e.g. a hand-edited/corrupted "2" would silently become an
+            // out-of-range ToggleMode instead of failing. Explicitly reject anything
+            // that isn't a real ToggleMode member so corruption fails loudly (D-06/
+            // D-07) rather than defaulting to whatever IsInRigMode()'s equality check
+            // happens to evaluate an undefined value as.
+            if (!Enum.IsDefined(typeof(ToggleMode), mode))
+            {
+                return null;
+            }
+
+            return mode;
         }
         catch (JsonException)
         {
@@ -57,6 +71,15 @@ public sealed class JsonModeStore : IModeStore
         }
         catch (IOException)
         {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // WR-01 (code review): a permissions problem (restrictive ACLs, AV
+            // quarantine) is a sibling of IOException, not a subtype — must be caught
+            // separately so StartupRecoveryChecker.Run() (deliberately unguarded)
+            // degrades to its own dialog instead of crashing with an unhandled
+            // exception at the first line of Main()'s recovery check.
             return null;
         }
     }
