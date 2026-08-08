@@ -25,16 +25,16 @@ Requirements for the v2.0 milestone (Configurable Monitors, Optional Targets & C
 - [x] **DISPLAY-09**: User can configure which monitors are enabled/disabled specifically for Normal mode, symmetric to Rig mode's existing monitor set configuration
 - [x] **DISPLAY-10**: Toggling to Normal mode applies the explicitly configured Normal-mode monitor set instead of restoring a pre-toggle snapshot
 - [x] **DISPLAY-11**: App tracks current mode (Rig/Normal) via an explicit persisted flag, independent of whether a snapshot file exists on disk
-- [ ] **DISPLAY-12**: The "at least one monitor must remain enabled" safety guard is enforced identically across Rig toggle, Normal toggle, and the new manual panel, from one shared codepath
+- [x] **DISPLAY-12**: The "at least one monitor must remain enabled" safety guard is enforced identically across Rig toggle, Normal toggle, and the new manual panel, from one shared codepath
 - [x] **DISPLAY-13**: A lightweight "toggle in progress" marker persists across the toggle operation, so a crash mid-toggle can be detected and communicated to the user on next launch
 
 ### Panel
 
-- [ ] **PANEL-01**: New GUI panel shows one row/tile per detected monitor, with live status shown via icon (not just text)
-- [ ] **PANEL-02**: User can enable/disable any monitor directly from this panel, independent of the Rig/Normal toggle action, with immediate effect
-- [ ] **PANEL-03**: Panel reflects live monitor state, updating on connect/disconnect while the panel is open
-- [ ] **PANEL-04**: Disabling a monitor from the panel is gated by the existing `SkipMonitorConfirmation` setting, same as the Rig/Normal toggle
-- [ ] **PANEL-05**: Panel includes an Identify action that briefly overlays a number on each physical screen
+- [x] **PANEL-01**: New GUI panel shows one row/tile per detected monitor, with live status shown via icon (not just text)
+- [x] **PANEL-02**: User can enable/disable any monitor directly from this panel, independent of the Rig/Normal toggle action, with immediate effect
+- [x] **PANEL-03**: Panel reflects live monitor state, updating on connect/disconnect while the panel is open
+- [x] **PANEL-04**: Disabling a monitor from the panel is gated by the existing `SkipMonitorConfirmation` setting, same as the Rig/Normal toggle
+- [x] **PANEL-05**: Panel includes an Identify action that briefly overlays a number on each physical screen
 
 ### Perf
 
@@ -85,13 +85,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DISPLAY-09 | Phase 16 | Complete |
 | DISPLAY-10 | Phase 16 | Complete |
 | DISPLAY-11 | Phase 16 | Complete |
-| DISPLAY-12 | Phase 17 | Pending |
+| DISPLAY-12 | Phase 17 | Complete |
 | DISPLAY-13 | Phase 16 | Complete |
-| PANEL-01 | Phase 17 | Pending |
-| PANEL-02 | Phase 17 | Pending |
-| PANEL-03 | Phase 17 | Pending |
-| PANEL-04 | Phase 17 | Pending |
-| PANEL-05 | Phase 17 | Pending |
+| PANEL-01 | Phase 17 | Complete |
+| PANEL-02 | Phase 17 | Complete |
+| PANEL-03 | Phase 17 | Complete |
+| PANEL-04 | Phase 17 | Complete |
+| PANEL-05 | Phase 17 | Complete |
 | PERF-01 | Phase 18 | Pending |
 | PERF-02 | Phase 18 | Pending |
 | CLEANUP-01 | Phase 18 | Pending |
