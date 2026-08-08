@@ -134,7 +134,7 @@ namespace RigToggle.App
             // Positioned at the GroupBox's native caption inset (~9px from the panel's
             // top-left) so every re-parented child below keeps its existing Location
             // unchanged (UI-SPEC Spacing contract -- pixel-parity, not a new token).
-            this.lblMonitorCaption.Text = "Monitor";
+            this.lblMonitorCaption.Text = "Rig Mode";
             this.lblMonitorCaption.Location = new System.Drawing.Point(9, 9);
             this.lblMonitorCaption.AutoSize = true;
             this.lblMonitorCaption.Name = "lblMonitorCaption";
@@ -170,7 +170,7 @@ namespace RigToggle.App
             //
             // colDisable
             //
-            this.colDisable.HeaderText = "Off (Rig)";
+            this.colDisable.HeaderText = "Off";
             this.colDisable.Name = "colDisable";
             this.colDisable.Width = 66;
             this.colDisable.ToolTipText = "Turns this monitor off when switching to Rig Mode.";
@@ -178,7 +178,7 @@ namespace RigToggle.App
             //
             // colEnable
             //
-            this.colEnable.HeaderText = "On (Rig)";
+            this.colEnable.HeaderText = "On";
             this.colEnable.Name = "colEnable";
             this.colEnable.Width = 66;
             this.colEnable.ToolTipText = "Turns this monitor on when switching to Rig Mode (for a monitor normally kept off, e.g. to save power).";
@@ -202,10 +202,11 @@ namespace RigToggle.App
             this.lblMonitorWarning.Name = "lblMonitorWarning";
 
             //
-            // pnlMonitorNormal (16-02/D-04/D-05: second monitor grid, stacked directly
-            // below the Rig grid — same width/height, mirrors pnlMonitor's block exactly.)
+            // pnlMonitorNormal (16-02/D-04/D-05, re-flowed by rig feedback: second
+            // monitor grid, side by side with the Rig grid — same width/height, mirrors
+            // pnlMonitor's block exactly.)
             //
-            this.pnlMonitorNormal.Location = new System.Drawing.Point(12, 258);
+            this.pnlMonitorNormal.Location = new System.Drawing.Point(420, 12);
             this.pnlMonitorNormal.Size = new System.Drawing.Size(396, 234);
             this.pnlMonitorNormal.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.pnlMonitorNormal.Name = "pnlMonitorNormal";
@@ -253,7 +254,7 @@ namespace RigToggle.App
             //
             // colDisableNormal
             //
-            this.colDisableNormal.HeaderText = "Off (Normal)";
+            this.colDisableNormal.HeaderText = "Off";
             this.colDisableNormal.Name = "colDisableNormal";
             this.colDisableNormal.Width = 66;
             this.colDisableNormal.ToolTipText = "Turns this monitor off when switching to Normal Mode.";
@@ -261,7 +262,7 @@ namespace RigToggle.App
             //
             // colEnableNormal
             //
-            this.colEnableNormal.HeaderText = "On (Normal)";
+            this.colEnableNormal.HeaderText = "On";
             this.colEnableNormal.Name = "colEnableNormal";
             this.colEnableNormal.Width = 66;
             this.colEnableNormal.ToolTipText = "Turns this monitor on when switching to Normal Mode (for a monitor normally kept off, e.g. to save power).";
@@ -288,7 +289,7 @@ namespace RigToggle.App
             // pnlAudioDevices (THEME-05: flat bordered Panel replacing the grpAudioDevices
             // GroupBox bevel. Same Location/Size as the original GroupBox.)
             //
-            this.pnlAudioDevices.Location = new System.Drawing.Point(12, 504);
+            this.pnlAudioDevices.Location = new System.Drawing.Point(12, 258);
             this.pnlAudioDevices.Size = new System.Drawing.Size(396, 132);
             this.pnlAudioDevices.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.pnlAudioDevices.Name = "pnlAudioDevices";
@@ -364,7 +365,7 @@ namespace RigToggle.App
             // the AppPath_DragEnter/AppPath_DragDrop wiring move here from the old
             // GroupBox verbatim -- must not be dropped (T-12-07).)
             //
-            this.pnlAppPath.Location = new System.Drawing.Point(12, 648);
+            this.pnlAppPath.Location = new System.Drawing.Point(12, 402);
             this.pnlAppPath.Size = new System.Drawing.Size(396, 76);
             this.pnlAppPath.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.pnlAppPath.Name = "pnlAppPath";
@@ -452,7 +453,7 @@ namespace RigToggle.App
             // chkEnableDebugLogging
             //
             this.chkEnableDebugLogging.Text = "Enable debug logging (writes to %LOCALAPPDATA%\\RigToggle\\debug.log)";
-            this.chkEnableDebugLogging.Location = new System.Drawing.Point(12, 730);
+            this.chkEnableDebugLogging.Location = new System.Drawing.Point(12, 484);
             this.chkEnableDebugLogging.Size = new System.Drawing.Size(396, 40);
             this.chkEnableDebugLogging.AutoSize = false;
             this.chkEnableDebugLogging.Name = "chkEnableDebugLogging";
@@ -461,7 +462,7 @@ namespace RigToggle.App
             // lblHotkeyCaption
             //
             this.lblHotkeyCaption.Text = "Hotkey:";
-            this.lblHotkeyCaption.Location = new System.Drawing.Point(12, 778);
+            this.lblHotkeyCaption.Location = new System.Drawing.Point(12, 532);
             this.lblHotkeyCaption.Size = new System.Drawing.Size(60, 20);
             this.lblHotkeyCaption.AutoSize = false;
             this.lblHotkeyCaption.Name = "lblHotkeyCaption";
@@ -479,14 +480,14 @@ namespace RigToggle.App
             this.txtHotkey.ReadOnly = true;
             this.txtHotkey.TabStop = false;
             this.txtHotkey.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.txtHotkey.Location = new System.Drawing.Point(76, 775);
+            this.txtHotkey.Location = new System.Drawing.Point(76, 529);
             this.txtHotkey.Size = new System.Drawing.Size(200, 23);
             this.txtHotkey.Name = "txtHotkey";
 
             //
             // lblHotkeyWarning
             //
-            this.lblHotkeyWarning.Location = new System.Drawing.Point(12, 802);
+            this.lblHotkeyWarning.Location = new System.Drawing.Point(12, 556);
             this.lblHotkeyWarning.Size = new System.Drawing.Size(396, 36);
             this.lblHotkeyWarning.AutoSize = false;
             this.lblHotkeyWarning.Visible = false;
@@ -496,7 +497,7 @@ namespace RigToggle.App
             // chkCloseMinimizesToTray
             //
             this.chkCloseMinimizesToTray.Text = "Closing the window (X) minimizes to tray";
-            this.chkCloseMinimizesToTray.Location = new System.Drawing.Point(12, 846);
+            this.chkCloseMinimizesToTray.Location = new System.Drawing.Point(12, 600);
             this.chkCloseMinimizesToTray.Size = new System.Drawing.Size(396, 24);
             this.chkCloseMinimizesToTray.AutoSize = false;
             this.chkCloseMinimizesToTray.Name = "chkCloseMinimizesToTray";
@@ -505,7 +506,7 @@ namespace RigToggle.App
             // chkMinimizeToTray
             //
             this.chkMinimizeToTray.Text = "Minimizing the window also sends it to tray";
-            this.chkMinimizeToTray.Location = new System.Drawing.Point(12, 878);
+            this.chkMinimizeToTray.Location = new System.Drawing.Point(12, 632);
             this.chkMinimizeToTray.Size = new System.Drawing.Size(396, 24);
             this.chkMinimizeToTray.AutoSize = false;
             this.chkMinimizeToTray.Name = "chkMinimizeToTray";
@@ -514,7 +515,7 @@ namespace RigToggle.App
             // chkStartWithWindows
             //
             this.chkStartWithWindows.Text = "Start with Windows";
-            this.chkStartWithWindows.Location = new System.Drawing.Point(12, 910);
+            this.chkStartWithWindows.Location = new System.Drawing.Point(12, 664);
             this.chkStartWithWindows.Size = new System.Drawing.Size(396, 24);
             this.chkStartWithWindows.AutoSize = false;
             this.chkStartWithWindows.Name = "chkStartWithWindows";
@@ -522,7 +523,7 @@ namespace RigToggle.App
             //
             // lblAutostartWarning
             //
-            this.lblAutostartWarning.Location = new System.Drawing.Point(12, 934);
+            this.lblAutostartWarning.Location = new System.Drawing.Point(12, 688);
             this.lblAutostartWarning.Size = new System.Drawing.Size(396, 20);
             this.lblAutostartWarning.AutoSize = false;
             this.lblAutostartWarning.Visible = false;
@@ -532,7 +533,7 @@ namespace RigToggle.App
             // btnSaveSettings
             //
             this.btnSaveSettings.Text = "Save Settings";
-            this.btnSaveSettings.Location = new System.Drawing.Point(180, 966);
+            this.btnSaveSettings.Location = new System.Drawing.Point(180, 720);
             this.btnSaveSettings.Size = new System.Drawing.Size(110, 32);
             this.btnSaveSettings.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnSaveSettings.Name = "btnSaveSettings";
@@ -545,7 +546,7 @@ namespace RigToggle.App
             // btnDiscardChanges
             //
             this.btnDiscardChanges.Text = "Discard Changes";
-            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 966);
+            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 720);
             this.btnDiscardChanges.Size = new System.Drawing.Size(110, 32);
             this.btnDiscardChanges.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.btnDiscardChanges.Name = "btnDiscardChanges";
@@ -575,7 +576,7 @@ namespace RigToggle.App
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(420, 1014);
+            this.ClientSize = new System.Drawing.Size(828, 768);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
