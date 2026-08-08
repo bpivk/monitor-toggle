@@ -363,22 +363,27 @@ Not applicable in the traditional "library ecosystem evolved" sense — this pha
 | A2 | A runtime-drawn status dot (`Graphics.FillEllipse`) is preferable to a new embedded `.ico`/`.png` asset pair for PANEL-01's icon. | Standard Stack / Alternatives Considered, Pattern 3 | LOW — purely a style choice; either approach satisfies PANEL-01's "icon, not just text" requirement equally. |
 | A3 | The panel should NOT share `ToggleOrchestrator`'s exact busy-guard type, but the planner should decide whether some serialization is needed between panel actions and Rig/Normal toggles. | Common Pitfalls (Pitfall 4), Open Questions | MEDIUM — if no serialization is added and the concurrency scenario is more reachable in practice than this research estimates (e.g. if the rig's real usage pattern involves leaving the panel open while also using the hotkey), a real race against `WindowsMonitorController`'s stateful `_originalPathsCache` could produce a confusing CCD validation failure. Recommend the planner explicitly resolve this via a plan-level decision (add a lightweight shared guard, or accept the risk with rig verification) rather than leaving it implicit. |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All three questions below were resolved during Phase 17 planning. Each carries an inline `RESOLVED:` note naming the plan/decision that closed it; the original text is preserved for provenance.
 
 1. **Should panel monitor actions be serialized against `ToggleOrchestrator`'s busy state?**
    - What we know: `ToggleOrchestrator` has an `Interlocked.CompareExchange`-based busy-guard protecting `ToggleService.ToggleToRigMode`/`ToggleToNormalMode` against each other, but the panel is architecturally required (PANEL-02, Pattern 2) to bypass `ToggleOrchestrator` and call `IMonitorController` directly. `WindowsMonitorController` is a shared, stateful singleton.
    - What's unclear: How reachable the race actually is in real single-user rig usage (requires a non-modal panel open + a near-simultaneous hotkey/tray toggle), and whether the cost of adding a second guard is worth it for a low-probability race in a single-user tool.
    - Recommendation: Surface this as a discuss-phase or plan-time decision. A cheap mitigation: expose a `ToggleOrchestrator.IsBusy` read-only pass-through and have the panel refuse a mutation (with a clear message) while a toggle is in flight — this reuses the existing flag without requiring the panel to route through `ToggleService`.
+   - **RESOLVED (17-01-PLAN.md `<planner_decision>`):** Yes — serialize. Plan 17-01 Task 1 adds `ToggleOrchestrator.BeginExclusiveMonitorAccess()`, an `IDisposable` lease that claims the *existing* `_busy` flag via the same `Interlocked.CompareExchange(ref _busy, 1, 0)` primitive `RunGuarded` uses, giving bidirectional mutual exclusion. The `IsBusy` pass-through suggested here was explicitly rejected as TOCTOU-racy across `MonitorConfirmDialog.ShowDialog()`'s nested message loop (which does dispatch `WM_HOTKEY`), and because it offers no protection in the panel-holds/toggle-arrives direction. The lease deliberately does not write the DISPLAY-13 crash marker.
 
 2. **Exact panel entry point: tray-only, or also reachable from `MainForm`?**
    - What we know: The existing tray context menu (`trayToggleMenuItem`/`traySettingsMenuItem`/`trayExitMenuItem`) is the natural place for a new "Monitors..." entry, matching the app's tray-resident design (Phase 8). `MainForm` itself currently only has a Toggle button and a Settings button.
    - What's unclear: Whether the user also wants a `MainForm` button (like `btnSettings`) for the panel, or tray-menu-only access is sufficient.
    - Recommendation: Add to the tray menu at minimum (consistent, always-available entry point regardless of whether `MainForm` is visible); adding a `MainForm` button too is a low-cost additive option the planner can decide on. This should ideally be confirmed via discuss-phase given the phase's `**UI hint**: yes` marker in ROADMAP.md.
+   - **RESOLVED (17-03-PLAN.md, Tasks 1-2):** Both. Plan 17-03 adds a `Monitors…` button to `MainForm` (at `(16, 148)`, matching `btnSettings`' shape) *and* a `Monitors` tray context-menu entry, with both routed through a single `OpenMonitorPanel()` method. Copy and tray ordering are locked in 17-UI-SPEC.md.
 
 3. **Does Identify's "number" need to be user-configurable/persistent, or is a fresh 1..N assignment on each Identify click sufficient?**
    - What we know: PANEL-05 only requires "briefly overlays a number on each physical screen" — no requirement ties the number to a specific persisted monitor identity across sessions.
    - What's unclear: Nothing blocking — this is confirmed sufficient as a fresh, session-local, grid-row-order-derived assignment (Pattern 6).
    - Recommendation: No persistence needed; assign numbers from the panel's current row display order each time Identify is invoked.
+   - **RESOLVED (answered inline in this research; carried into 17-01 Task 2 / Pattern 6):** No persistence. `MonitorIdentifyOverlay` takes the ordinal as a plain `int number` constructor argument, assigned fresh from the panel's current row display order on each Identify click.
 
 ## Environment Availability
 
