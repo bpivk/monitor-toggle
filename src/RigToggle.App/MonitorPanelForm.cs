@@ -187,12 +187,162 @@ namespace RigToggle.App
 
         private void DgvMonitorPanel_CellClick(object? sender, DataGridViewCellEventArgs e)
         {
-            // Implemented in 17-02 Task 3.
+            if (e.RowIndex < 0 || e.ColumnIndex != colAction.Index) return;
+
+            DataGridViewRow row = dgvMonitorPanel.Rows[e.RowIndex];
+            if (row.Tag is not string devicePath) return;
+
+            MonitorInfo? monitor = _allMonitors.FirstOrDefault(m => m.DevicePath == devicePath);
+            if (monitor is null) return;
+
+            if (monitor.IsActive)
+            {
+                DisableMonitor(devicePath, monitor.FriendlyName);
+            }
+            else
+            {
+                EnableMonitor(devicePath);
+            }
+        }
+
+        // Claims the 17-01 lease BEFORE the confirmation dialog opens, because
+        // MonitorConfirmDialog.ShowDialog() runs a nested message loop that
+        // dispatches WM_HOTKEY -- without this, a hotkey-triggered toggle could
+        // start underneath a half-finished panel action. Consumed via `using` at
+        // every panel mutation call site (DisableMonitor/EnableMonitor).
+        private IDisposable? TryAcquireMonitorAccess()
+        {
+            try
+            {
+                return _orchestrator.BeginExclusiveMonitorAccess();
+            }
+            catch (ToggleInProgressException ex)
+            {
+                // Information (not Warning) matches how MainForm.BtnToggle_Click
+                // already classifies a busy rejection: an expected condition, not
+                // an error.
+                MessageBox.Show(this, ex.Message, "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return null;
+            }
+        }
+
+        private void DisableMonitor(string devicePath, string friendlyName)
+        {
+            IDisposable? lease = TryAcquireMonitorAccess();
+            if (lease is null) return;
+
+            using (lease)
+            {
+                var settings = _settingsStore.Load();
+                if (!settings.SkipMonitorConfirmation)
+                {
+                    // enableNames is always empty here -- PANEL-04 gates Disable
+                    // only; Enable can never trigger the zero-survivors failure mode.
+                    using var confirmDialog = new MonitorConfirmDialog(
+                        new[] { friendlyName },
+                        Array.Empty<string>(),
+                        _themeProvider);
+                    if (confirmDialog.ShowDialog(this) != DialogResult.OK) return;
+                    if (confirmDialog.DontAskAgain)
+                    {
+                        settings.SkipMonitorConfirmation = true;
+                        _settingsStore.Save(settings);
+                    }
+                }
+
+                try
+                {
+                    // The panel calls this exact method directly -- the same one
+                    // both toggle directions already call -- so no monitor-count
+                    // pre-check is written here; the safety guard lives solely in
+                    // the Windows adapter's own DeactivateMonitors implementation.
+                    _monitorController.DeactivateMonitors(new HashSet<string> { devicePath });
+                }
+                catch (InvalidOperationException ex)
+                {
+                    // 17-UI-SPEC.md Copywriting Contract: ex.Message reused
+                    // verbatim, never reworded per call site -- one shared
+                    // codepath, one shared message.
+                    MessageBox.Show(this, ex.Message, "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, $"{ex.GetType().Name}: {ex.Message}", "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                finally
+                {
+                    // Reflect whatever partial state the OS is actually in, whether
+                    // the mutation succeeded or failed.
+                    PopulateMonitorGrid();
+                }
+            }
+        }
+
+        private void EnableMonitor(string devicePath)
+        {
+            IDisposable? lease = TryAcquireMonitorAccess();
+            if (lease is null) return;
+
+            using (lease)
+            {
+                try
+                {
+                    _monitorController.ActivateMonitors(new HashSet<string> { devicePath });
+                }
+                catch (InvalidOperationException ex)
+                {
+                    MessageBox.Show(this, ex.Message, "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, $"{ex.GetType().Name}: {ex.Message}", "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                finally
+                {
+                    PopulateMonitorGrid();
+                }
+            }
         }
 
         private void BtnIdentify_Click(object? sender, EventArgs e)
         {
-            // Implemented in 17-02 Task 3.
+            MonitorState state;
+            try
+            {
+                state = _monitorController.CaptureState();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"{ex.GetType().Name}: {ex.Message}", "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Tolerant of duplicate keys.
+            var snapshotsByPath = state.Paths.GroupBy(s => s.DevicePath).ToDictionary(g => g.Key, g => g.First());
+
+            // Identify is read-only (CaptureState() mutates no topology), so it does
+            // not acquire the exclusive lease -- blocking it during a toggle would
+            // be gratuitous.
+            //
+            // Iterate grid rows in display order, not state.Paths order, so the
+            // overlay numbers match what the user is looking at (17-RESEARCH.md
+            // Pattern 6).
+            int number = 1;
+            foreach (DataGridViewRow row in dgvMonitorPanel.Rows)
+            {
+                if (row.Tag is not string devicePath) continue;
+
+                // An OS-disabled monitor has no active desktop surface, so
+                // CaptureState() legitimately has no coordinates for it -- skip.
+                if (!snapshotsByPath.TryGetValue(devicePath, out MonitorPathSnapshot? snapshot)) continue;
+
+                // Defensive against a degenerate CCD mode record -- a zero-size
+                // overlay would be invisible and unclosable-looking.
+                if (snapshot.ResolutionWidth <= 0 || snapshot.ResolutionHeight <= 0) continue;
+
+                new MonitorIdentifyOverlay(snapshot, number).Show();
+                number++;
+            }
         }
     }
 }
