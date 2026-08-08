@@ -16,6 +16,12 @@ namespace RigToggle.Tests;
 /// with zero UI changes, and the DISPLAY-13 crash-marker lifecycle wrapping every
 /// guarded toggle. All deterministic — no fixed-duration waits, no timing guess
 /// (07-RESEARCH.md Pitfall 2).
+///
+/// Also proves BeginExclusiveMonitorAccess()'s bidirectional mutual exclusion with the
+/// Rig/Normal toggle path (T-17-01/T-17-02/T-17-03, Phase 17 Plan 01): a manual monitor
+/// mutation cannot begin while a toggle is in flight and vice versa (both sharing the
+/// single _busy flag), the lease never writes the DISPLAY-13 crash marker, and the
+/// lease releases the flag exactly once even under a double-dispose.
 /// </summary>
 public class ToggleOrchestratorTests : IDisposable
 {
@@ -259,5 +265,93 @@ public class ToggleOrchestratorTests : IDisposable
         orchestrator.ToggleToRigMode();
 
         Assert.True(orchestrator.IsModeKnown());
+    }
+
+    [Fact]
+    public void BeginExclusiveMonitorAccess_WhileToggleInFlight_ThrowsToggleInProgress()
+    {
+        // T-17-01: a manual monitor mutation must be rejected while a Rig/Normal
+        // toggle holds the shared _busy flag.
+        using var enteredGuardedRegion = new ManualResetEventSlim(false);
+        using var releaseFirstCall = new ManualResetEventSlim(false);
+        var (orchestrator, _, _) = CreateOrchestrator(
+            monitorController: new BlockingMonitorController(enteredGuardedRegion, releaseFirstCall));
+
+        var firstCallTask = Task.Run(() => orchestrator.ToggleToRigMode());
+        Assert.True(enteredGuardedRegion.Wait(GuardedRegionWaitTimeout), "Blocking step was never entered.");
+
+        try
+        {
+            Assert.Throws<ToggleInProgressException>(() => orchestrator.BeginExclusiveMonitorAccess());
+        }
+        finally
+        {
+            releaseFirstCall.Set();
+        }
+
+        var firstResult = firstCallTask.GetAwaiter().GetResult();
+        Assert.True(firstResult.Success);
+    }
+
+    [Fact]
+    public void ToggleToRigMode_WhileExclusiveMonitorAccessHeld_ThrowsToggleInProgress()
+    {
+        // T-17-01/D-02: one shared flag guards both directions — a manual monitor
+        // action holding the lease must reject both ToggleToRigMode and
+        // ToggleToNormalMode.
+        var (orchestrator, _, _) = CreateOrchestrator();
+
+        using var lease = orchestrator.BeginExclusiveMonitorAccess();
+
+        Assert.Throws<ToggleInProgressException>(() => orchestrator.ToggleToRigMode());
+        Assert.Throws<ToggleInProgressException>(() => orchestrator.ToggleToNormalMode());
+    }
+
+    [Fact]
+    public void BeginExclusiveMonitorAccess_Dispose_ReleasesFlagForSubsequentToggle()
+    {
+        // T-17-02: disposing the lease must release the busy flag so the next
+        // toggle succeeds.
+        var (orchestrator, _, _) = CreateOrchestrator();
+
+        var lease = orchestrator.BeginExclusiveMonitorAccess();
+        lease.Dispose();
+
+        var result = orchestrator.ToggleToRigMode();
+        Assert.True(result.Success);
+    }
+
+    [Fact]
+    public void BeginExclusiveMonitorAccess_DoesNotWriteCrashRecoveryMarker()
+    {
+        // T-17-03/DISPLAY-13: a manual monitor action is not a toggle — acquiring
+        // and disposing the lease must never touch the crash-recovery marker.
+        var (orchestrator, callLog, _) = CreateOrchestrator();
+
+        using (var lease = orchestrator.BeginExclusiveMonitorAccess())
+        {
+            // Intentionally empty — the lease itself is what's under test.
+        }
+
+        Assert.DoesNotContain("marker.Save", callLog);
+        Assert.DoesNotContain("marker.Clear", callLog);
+    }
+
+    [Fact]
+    public void BeginExclusiveMonitorAccess_DoubleDispose_DoesNotReleaseAnotherHoldersLease()
+    {
+        // T-17-02: the lease must release the flag exactly once, so a stale
+        // double-dispose of an earlier lease can never steal a later holder's claim.
+        var (orchestrator, _, _) = CreateOrchestrator();
+
+        var leaseA = orchestrator.BeginExclusiveMonitorAccess();
+        leaseA.Dispose();
+
+        var leaseB = orchestrator.BeginExclusiveMonitorAccess();
+        leaseA.Dispose(); // stale double-dispose of A must not release B's claim
+
+        Assert.Throws<ToggleInProgressException>(() => orchestrator.BeginExclusiveMonitorAccess());
+
+        leaseB.Dispose();
     }
 }
