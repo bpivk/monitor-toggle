@@ -146,7 +146,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 17-02-PLAN.md — MonitorPanelForm (Designer + code-behind): rows/status icons, live hotplug refresh, row actions, confirmation gate, shared safety guard, Identify (PANEL-01..05, DISPLAY-12)
+- [x] 17-02-PLAN.md — MonitorPanelForm (Designer + code-behind): rows/status icons, live hotplug refresh, row actions, confirmation gate, shared safety guard, Identify (PANEL-01..05, DISPLAY-12)
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -192,7 +192,7 @@ Plans:
 | 14. README & Release Documentation | v1.2 | 3/3 | Complete | 2026-08-03 |
 | 15. Optional App & Audio Targets | v2.0 | 4/4 | Complete    | 2026-08-04 |
 | 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 5/5 | Complete   | 2026-08-08 |
-| 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 1/4 | In Progress|  |
+| 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 2/4 | In Progress|  |
 | 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 0/TBD | Not started | - |
 
 ## Backlog
