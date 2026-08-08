@@ -4,14 +4,14 @@ milestone: v2.0
 milestone_name: Configurable Monitors, Optional Targets & Cleanup
 status: executing
 stopped_at: Phase 16 complete (verification passed)
-last_updated: "2026-08-08T13:00:00.000Z"
-last_activity: 2026-08-08 -- Phase 16 human verification resolved: Settings layout confirmed passed on rig, DISPLAY-13 crash-mid-toggle test waived via documented override (accepted by Blaz Pivk)
+last_updated: "2026-08-08T16:59:33.739Z"
+last_activity: 2026-08-08 -- Phase 17 planning complete
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 9
+  completed_phases: 2
+  total_plans: 13
   completed_plans: 9
-  percent: 100
+  percent: 50
 ---
 
 # Project State
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-08-04)
 
 Phase: 16 (normal-mode-explicit-monitor-config-mode-store-redesign) — COMPLETE
 Plan: 5 of 5
-Status: All plans executed, code-reviewed (8 findings, all fixed), and verified. 16-VERIFICATION.md status is passed (4/4 must-haves — 3 verified from code + rig evidence, 1 passed via documented override).
-Last activity: 2026-08-08 -- Phase 16 human verification resolved
+Status: Ready to execute
+Last activity: 2026-08-08 -- Phase 17 planning complete
 
 Progress: [██████████] 100% — phase-goal verification: passed
 
