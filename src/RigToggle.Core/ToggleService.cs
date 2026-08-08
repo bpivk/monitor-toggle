@@ -121,7 +121,7 @@ public sealed class ToggleService
 
         // Mode is written only after a confirmed successful Monitor step (Pattern 2),
         // mirrored identically in ToggleToNormalMode below.
-        _modeStore.Save(Models.ToggleMode.Rig);
+        TrySaveMode(Models.ToggleMode.Rig);
 
         // Phase 15/AUDIO-03/APP-04: Audio and App are now optional in both directions.
         // TryExecuteOptionalStep records a Skipped step (not blocking) when the field is
@@ -263,6 +263,30 @@ public sealed class ToggleService
     }
 
     /// <summary>
+    /// WR-04 (code review): _modeStore.Save() runs immediately after the Monitor
+    /// step has already made a real, successful physical change — an unguarded write
+    /// failure here (disk full, sharing violation, AV lock) would propagate out of
+    /// ToggleToRigMode()/ToggleToNormalMode() entirely, breaking D-04's "the result
+    /// always has all 3 steps" contract and leaving Audio/App never attempted after
+    /// the display was already mutated. Traced (IN-02 convention) and swallowed so
+    /// the caller always gets a full ToggleResult; the persisted mode flag may then
+    /// lag the physical state until a later successful toggle corrects it, which is
+    /// the same fail-safe posture ReconcileModeAfterMonitorFailure already uses above
+    /// for the read side of this exact ambiguity.
+    /// </summary>
+    private void TrySaveMode(Models.ToggleMode mode)
+    {
+        try
+        {
+            _modeStore.Save(mode);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"Failed to persist mode flag ({mode}): {ex}");
+        }
+    }
+
+    /// <summary>
     /// True when the monitor set is configured (at least one monitor in either
     /// MonitorsToDisable or MonitorsToEnable). Phase 15/D-05: Audio and App targets are
     /// now genuinely optional (AUDIO-03/AUDIO-04/APP-04) — leaving them unset never blocks
@@ -358,7 +382,7 @@ public sealed class ToggleService
 
         // Mode is written only after a confirmed successful Monitor step (Pattern 2),
         // mirrored identically in ToggleToRigMode above.
-        _modeStore.Save(Models.ToggleMode.Normal);
+        TrySaveMode(Models.ToggleMode.Normal);
 
         // Phase 15/AUDIO-04: applies settings.NormalAudioDeviceId via SetDefault, the
         // same optional-target pattern Rig mode already uses for RigAudioDeviceId,
