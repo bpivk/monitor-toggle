@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Configurable Monitors, Optional Targets & Cleanup
 status: executing
-stopped_at: Phase 16 complete (verification passed)
-last_updated: "2026-08-08T17:07:56.960Z"
-last_activity: 2026-08-08 -- Phase 17 execution started
+stopped_at: Phase 17 complete (verification passed)
+last_updated: "2026-08-08T19:20:00.000Z"
+last_activity: 2026-08-08 -- Phase 17 execution, code review, and verification complete
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 13
-  completed_plans: 9
-  percent: 50
+  completed_plans: 13
+  percent: 100
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-04)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before. (Note: v2.0 revises the "restores exactly how it was before" framing for Normal mode — see DISPLAY-10/AUDIO-04 and ROADMAP.md Phase 16.)
-**Current focus:** Phase 17 — manual-monitor-panel-shared-safety-guard
+**Current focus:** Phase 17 — complete. Next: Phase 18 (Cleanup Pass & Exe-Size Reduction)
 
 ## Current Position
 
-Phase: 17 (manual-monitor-panel-shared-safety-guard) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 17
-Last activity: 2026-08-08 -- Phase 17 execution started
+Phase: 17 (manual-monitor-panel-shared-safety-guard) — COMPLETE
+Plan: 4 of 4
+Status: All plans executed, code-reviewed (9 findings — 7 fixed, 2 deliberate non-fixes), and verified. 17-VERIFICATION.md status is passed (6/6 must-haves — all confirmed on real rig hardware, no gaps, no overrides needed).
+Last activity: 2026-08-08 -- Phase 17 execution, code review, and verification complete
 
 Progress: [██████████] 100% — phase-goal verification: passed
 
@@ -57,6 +57,8 @@ Progress: [██████████] 100% — phase-goal verification: pas
 | 13 | 4 | - | - |
 | 14 | 3 | - | - |
 | 15 | 4 | - | - |
+| 16 | 5 | - | - |
+| 17 | 4 | - | - |
 
 **Recent Trend:**
 
@@ -133,10 +135,10 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-08T13:00:00.000Z
-Stopped at: Phase 16 complete (verification passed)
-Resume file: .planning/phases/16-normal-mode-explicit-monitor-config-mode-store-redesign/16-VERIFICATION.md
+Last session: 2026-08-08T19:20:00.000Z
+Stopped at: Phase 17 complete (verification passed)
+Resume file: .planning/phases/17-manual-monitor-panel-shared-safety-guard/17-VERIFICATION.md
 
 ## Operator Next Steps
 
-- `/gsd:plan-phase 17` — plan Phase 17: Manual Monitor Panel & Shared Safety Guard
+- `/gsd:plan-phase 18` — plan Phase 18: Cleanup Pass & Exe-Size Reduction (final phase of v2.0 milestone)
