@@ -125,3 +125,11 @@ None. Both deliverables are fully wired: `BeginExclusiveMonitorAccess()` is exer
 ---
 *Phase: 17-manual-monitor-panel-shared-safety-guard*
 *Completed: 2026-08-08*
+
+## Self-Check: PASSED
+
+- FOUND: src/RigToggle.App/MonitorIdentifyOverlay.cs
+- FOUND: b930bb2 (test commit)
+- FOUND: 3aceaa4 (feat commit)
+- FOUND: 0a282fb (feat commit)
+- FOUND: 6722557 (docs commit, this SUMMARY)
