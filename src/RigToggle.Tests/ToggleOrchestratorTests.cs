@@ -338,6 +338,19 @@ public class ToggleOrchestratorTests : IDisposable
     }
 
     [Fact]
+    public void BeginExclusiveMonitorAccess_WhileAnotherLeaseHeld_ThrowsToggleInProgress()
+    {
+        // IN-01 (code review): panel-to-panel exclusion — a second manual monitor
+        // action must be rejected while a first lease is already held, the same
+        // way a second toggle is rejected while a toggle is in flight.
+        var (orchestrator, _, _) = CreateOrchestrator();
+
+        using var firstLease = orchestrator.BeginExclusiveMonitorAccess();
+
+        Assert.Throws<ToggleInProgressException>(() => orchestrator.BeginExclusiveMonitorAccess());
+    }
+
+    [Fact]
     public void BeginExclusiveMonitorAccess_DoubleDispose_DoesNotReleaseAnotherHoldersLease()
     {
         // T-17-02: the lease must release the flag exactly once, so a stale
