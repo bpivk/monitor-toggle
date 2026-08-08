@@ -61,6 +61,64 @@ public sealed class ToggleOrchestrator
     public bool IsModeKnown() => _toggleService.IsModeKnown();
 
     /// <summary>
+    /// Phase 17 (PANEL-02, T-17-01/T-17-02/T-17-03): claims exclusive access to the
+    /// shared monitor-controller state for a manual monitor panel action.
+    ///
+    /// (a) This shares ONE flag — the same <see cref="_busy"/> field <see cref="RunGuarded"/>
+    /// uses via the identical <c>Interlocked.CompareExchange</c> claim primitive — so a
+    /// manual monitor mutation and a Rig/Normal toggle are mutually exclusive in both
+    /// directions: acquiring this lease while a toggle is in flight throws, and a
+    /// toggle requested while this lease is held also throws.
+    ///
+    /// (b) It exists because the manual monitor panel (Phase 17, PANEL-02) deliberately
+    /// bypasses <see cref="ToggleService"/> yet mutates the same stateful
+    /// <c>WindowsMonitorController</c> singleton, and <c>MonitorConfirmDialog.ShowDialog()</c>'s
+    /// nested message loop can dispatch <c>WM_HOTKEY</c> mid-action, making a panel-action /
+    /// hotkey-toggle race reachable without this guard.
+    ///
+    /// (c) It deliberately never calls <see cref="_markerStore"/>.Save/Clear — a manual
+    /// monitor action is not a toggle, and writing the DISPLAY-13 crash marker here would
+    /// make a crash during a manual monitor action surface a spurious "interrupted toggle"
+    /// recovery dialog at next launch, naming a <see cref="ToggleMode"/> the user never
+    /// selected. This asymmetry with <see cref="RunGuarded"/> is deliberate.
+    ///
+    /// (d) It is non-blocking and rejects immediately, never queues — same D-01 discipline
+    /// as <see cref="RunGuarded"/>.
+    /// </summary>
+    public IDisposable BeginExclusiveMonitorAccess()
+    {
+        if (Interlocked.CompareExchange(ref _busy, 1, 0) != 0)
+        {
+            throw new ToggleInProgressException(
+                "A toggle is already in progress. Wait for it to finish, then try again.");
+        }
+
+        return new ExclusiveMonitorAccessLease(this);
+    }
+
+    /// <summary>
+    /// T-17-02: releases <see cref="_busy"/> exactly once. Holds an <c>int _released</c>
+    /// guard so a double-dispose (or a `using` plus a manual extra <c>Dispose()</c> call)
+    /// can never clear a different holder's claim — the flag is only written when this
+    /// lease transitions from "held" to "released" for the first time.
+    /// </summary>
+    private sealed class ExclusiveMonitorAccessLease : IDisposable
+    {
+        private readonly ToggleOrchestrator _owner;
+        private int _released;
+
+        public ExclusiveMonitorAccessLease(ToggleOrchestrator owner) => _owner = owner;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _released, 1) == 0)
+            {
+                Volatile.Write(ref _owner._busy, 0);
+            }
+        }
+    }
+
+    /// <summary>
     /// DISPLAY-13 crash-detection marker lifecycle: Save() at the start of every
     /// guarded toggle, Clear() in the finally on clean completion. If the marker is
     /// still present on the next launch, the previous toggle did not finish cleanly
