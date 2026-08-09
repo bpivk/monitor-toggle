@@ -810,9 +810,76 @@ namespace RigToggle.App
             }
         }
 
-        // Implemented in Plan 19-03 (TILE-04).
+        /// <summary>
+        /// TILE-04: port of MonitorPanelForm.BtnIdentify_Click with exactly two
+        /// deliberate changes: the iteration source (the canonical
+        /// _lastKnownMonitors list instead of DataGridView rows, which no longer
+        /// exist) and the counter semantics (increments even on skip -- see below).
+        /// </summary>
         private void BtnIdentify_Click(object? sender, EventArgs e)
         {
+            MonitorState state;
+            try
+            {
+                state = _monitorController.CaptureState();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"{ex.GetType().Name}: {ex.Message}", "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Tolerant of duplicate keys, ported as-is.
+            var snapshotsByPath = state.Paths.GroupBy(s => s.DevicePath).ToDictionary(g => g.Key, g => g.First());
+
+            // Identify is read-only (CaptureState() mutates no topology), so this
+            // handler does not take any exclusive access lease -- blocking it during
+            // a toggle would be gratuitous. Ported rationale, unchanged.
+            //
+            // Iterate the same canonical _lastKnownMonitors list RefreshMonitorTiles()
+            // used to number the tiles, so overlay number N and tile number N always
+            // name the same physical monitor (19-RESEARCH.md Pitfall 6).
+            int number = 1;
+            foreach (MonitorInfo monitor in _lastKnownMonitors)
+            {
+                // An OS-disabled monitor has no active desktop surface, so
+                // CaptureState() legitimately has no coordinates for it -- skip.
+                // DIVERGENCE from the retired panel: the retired panel did NOT
+                // increment the counter on skip. Incrementing here is required so
+                // an OS-disabled monitor still consumes its ordinal and every later
+                // overlay keeps matching its tile -- do not "fix" this back to the
+                // retired panel's behavior.
+                if (!snapshotsByPath.TryGetValue(monitor.DevicePath, out MonitorPathSnapshot? snapshot))
+                {
+                    number++;
+                    continue;
+                }
+
+                // Defensive against a degenerate CCD mode record -- a zero-size
+                // overlay would be invisible and look unclosable.
+                if (snapshot.ResolutionWidth <= 0 || snapshot.ResolutionHeight <= 0)
+                {
+                    number++;
+                    continue;
+                }
+
+                try
+                {
+                    // A single overlay's construction failing (GDI exhaustion, etc.)
+                    // must not abort the remaining overlays or throw out of this
+                    // Button.Click handler. Owner = this retargets the overlay's
+                    // lifetime to this window (the retired panel targeted itself),
+                    // so no dangling ownerless TopMost window can survive.
+                    var overlay = new MonitorIdentifyOverlay(snapshot, number) { Owner = this };
+                    overlay.Show();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine($"BtnIdentify_Click: overlay for {monitor.DevicePath} failed: {ex}");
+                }
+
+                number++;
+            }
         }
 
         /// <summary>
