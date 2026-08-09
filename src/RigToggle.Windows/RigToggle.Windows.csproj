@@ -11,7 +11,11 @@
 
   <ItemGroup>
     <PackageReference Include="WindowsDisplayAPI" Version="1.3.0.13" />
-    <PackageReference Include="NAudio" Version="2.3.0" />
+    <!-- This project's only NAudio usage is `using NAudio.CoreAudioApi;` in
+         WindowsAudioController.cs; those types live in NAudio.Wasapi. The meta-package's
+         WinMM/Midi/Asio/WinForms/Dmo backends were never used, so this swap requires zero
+         source changes because the namespace is unchanged (18-RESEARCH.md). -->
+    <PackageReference Include="NAudio.Wasapi" Version="2.3.0" />
   </ItemGroup>
 
   <ItemGroup>

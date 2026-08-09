@@ -16,6 +16,17 @@
          read directly by Explorer/Alt-Tab/taskbar shell APIs — a separate mechanism from the
          EmbeddedResource+LogicalName tray icons below (13-RESEARCH.md Pattern 4). -->
     <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+    <!-- Excludes localized satellite resource assemblies (WindowsDisplayAPI, NAudio.Wasapi,
+         and the BCL) from the self-contained publish output. Must be `en`, not `en-US` — `en-US`
+         matches only the en-US-specific satellites and would leave generic `en` satellites in
+         place (18-RESEARCH.md Pitfall 2). -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- Disables ICU culture-data loading. Confirmed safe: no user-facing culture-dependent
+         date/number formatting exists anywhere in src/ — the only DateTime.Now/ToString
+         ("HH:mm:ss.fff") uses are debug trace lines, MonitorIdentifyOverlay already formats its
+         number labels with CultureInfo.InvariantCulture explicitly, and the solution contains
+         zero .resx files (18-RESEARCH.md Pitfall 3). -->
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
