@@ -8,13 +8,12 @@ namespace RigToggle.Core.Persistence;
 /// Atomic JSON persistence for the explicit ToggleMode value. Target path is supplied
 /// by the caller (composition root, Plan 04) — expected to be
 /// %LocalAppData%\RigToggle\mode.json. Save() uses the same temp-file +
-/// File.Move(..., overwrite: true) atomic-write pattern as JsonSnapshotStore/
-/// JsonSettingsStore, so an interrupted write cannot corrupt the prior good file.
+/// File.Move(..., overwrite: true) atomic-write pattern as JsonSettingsStore/
+/// JsonToggleInProgressStore, so an interrupted write cannot corrupt the prior good file.
 /// TryLoad() degrades BOTH a malformed/hand-edited file (JsonException) AND an
 /// interrupted read (IOException, e.g. antivirus lock, mid-write 0-byte file) to
-/// null rather than throwing — matching JsonSettingsStore's more complete two-
-/// exception coverage rather than JsonSnapshotStore's single-exception coverage
-/// (T-16-01).
+/// null rather than throwing — matching JsonSettingsStore's more complete
+/// exception coverage (T-16-01).
 /// </summary>
 public sealed class JsonModeStore : IModeStore
 {

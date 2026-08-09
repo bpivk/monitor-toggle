@@ -9,10 +9,10 @@ namespace RigToggle.Core.Persistence;
 /// Target path is supplied by the caller (composition root, Plan 04) — expected to
 /// be %LocalAppData%\RigToggle\toggle-in-progress.json. Save() uses the same
 /// temp-file + File.Move(..., overwrite: true) atomic-write pattern as
-/// JsonSnapshotStore/JsonModeStore. TryLoad() degrades both a malformed/hand-edited
+/// JsonModeStore. TryLoad() degrades both a malformed/hand-edited
 /// file (JsonException) and an interrupted read (IOException) to null rather than
-/// throwing. Clear() deletes the file only when it exists, mirroring
-/// JsonSnapshotStore.Clear().
+/// throwing. Clear() deletes the file only when it exists, a no-op when it is
+/// already absent.
 /// </summary>
 public sealed class JsonToggleInProgressStore : IToggleInProgressStore
 {

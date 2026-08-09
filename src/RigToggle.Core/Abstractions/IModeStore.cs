@@ -4,8 +4,8 @@ namespace RigToggle.Core.Abstractions;
 
 /// <summary>
 /// Persistence contract for the explicit current-mode value (ToggleMode). Replaces
-/// ISnapshotStore's role as the mode indicator (D-14) now that Normal mode no longer
-/// restores from a snapshot. TryLoad() returns null when the file is missing OR fails
+/// the retired snapshot-file-presence mode indicator (D-14, removed in Phase 18) now
+/// that Normal mode no longer restores from a snapshot. TryLoad() returns null when the file is missing OR fails
 /// to parse — callers distinguish "never bootstrapped" (Exists() == false) from
 /// "exists but corrupted" (Exists() == true, TryLoad() == null) at startup, so a
 /// corrupted mode file can fail loudly instead of silently defaulting to a mode
