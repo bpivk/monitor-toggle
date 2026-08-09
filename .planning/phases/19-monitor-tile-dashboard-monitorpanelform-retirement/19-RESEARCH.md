@@ -541,17 +541,21 @@ private void BtnIdentify_Click(object? sender, EventArgs e)
 
 **If this table is empty:** N/A — see entries above. A1 is the one assumption with real correctness risk if wrong; A2/A3 are low-risk, explicitly-discretionary tuning values.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+Both questions below were closed during planning of this phase. Each carries an inline `**RESOLVED**` marker citing the plan/task that settled it. The original analysis is retained unedited for traceability.
 
 1. **Should the tile strip's canonical monitor order be `DevicePath`-sorted, or "first-seen" (insertion-order-stable across refreshes)?**
    - What we know: `GetAllMonitors()`'s returned order is active-monitors-first (from `GetActiveMonitors()`), then newly-discovered inactive targets appended — this order is not guaranteed stable/sorted by any human-meaningful key (not by `DevicePath` string, not by any positional/first-plugged concept).
    - What's unclear: whether "ordered by monitor number" (D-08) should mean "sorted by `DevicePath` for determinism" (simplest, fully stable) or "whatever order `GetAllMonitors()` happens to return, held stable within a session" (matches current Identify behavior most literally, but only "stable" until a hotplug event reshuffles the underlying list).
    - Recommendation: sort by `DevicePath` (a stable string) at the top of `RefreshMonitorTiles()` before assigning both tile position and tile number — this guarantees tiles do not silently reorder between hotplug refreshes purely because of noise in enumeration order, which the current `MonitorPanelForm` implementation does not explicitly guard against (it takes `GetAllMonitors()`'s raw order as row order every refresh). Flag this as a planning decision, not settled by this research.
+   - **RESOLVED** — Recommendation adopted verbatim. `19-02-PLAN.md` Task 3 (STEP C) establishes `OrderBy(m => m.DevicePath, StringComparer.Ordinal)` as the single canonical ordering, and its acceptance criteria pin it to exactly one call site (`grep -c 'OrderBy(m => m.DevicePath, StringComparer.Ordinal)' ... outputs 1`) so the tile strip and the ported Identify handler cannot re-sort independently (Pitfall 6 / D-08). Recorded in `19-UI-SPEC.md`'s "Tile order" row.
 
 2. **Does `MainForm.AutoSize = true` interact correctly with `FormBorderStyle.FixedDialog` and the tray-icon/hidden-start lifecycle (`InitializeTrayState()` runs before the form is ever shown)?**
    - What we know: `FixedDialog` blocks *user* resize, not programmatic/`AutoSize`-driven resize — this is documented WinForms behavior, not something this project has proven itself yet (no existing Form in this codebase uses `AutoSize = true`).
    - What's unclear: whether `AutoSize`'s layout pass behaves identically when the form's `Handle` exists but the form was never `Show()`n (the `--tray` startup path, where `InitializeTrayState()` — not `OnLoad`/`OnShown` — does the tile-population work) — this project's own `08-RESEARCH.md Pitfall 6` history shows `Load`/`Shown`-timing assumptions have bitten this codebase before under `--tray` specifically.
    - Recommendation: verify `AutoSize` resizing occurs correctly (window is the right size the first time it's actually `Show()`n after a `--tray` launch, not just after a subsequent tile-count change) as an explicit rig checkpoint in this phase's plan — do not assume it "just works" under `--tray` without checking, per this project's own established rig-verification discipline.
+   - **RESOLVED** — Structurally avoided rather than answered. `19-02-PLAN.md` Tasks 2/3 do not use `Form.AutoSize` at all: `tileStrip.AutoSize = false`, and `LayoutDashboard()` computes `ClientSize` arithmetically from tile count via a font-derived `Scaled()` helper, with no dependence on a WinForms layout pass having run. This removes the unproven `AutoSize`-under-`--tray` timing risk from the critical path entirely (only `FlowLayoutPanel.WrapContents` row-wrapping remains, within an explicitly-set width). The residual question — that the manually computed size is correct on the FIRST `Show()` after a `--tray` start — is still verified on hardware as a rig checkpoint in `19-05-PLAN.md`. `19-UI-SPEC.md`'s "Window auto-size" row was updated to document this mechanism.
 
 ## Environment Availability
 
