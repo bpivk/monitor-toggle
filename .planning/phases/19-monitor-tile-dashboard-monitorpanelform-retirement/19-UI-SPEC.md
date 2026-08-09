@@ -27,6 +27,8 @@ created: 2026-08-09
 | Icon library | none — all icon geometry procedurally drawn via `System.Drawing`/`GraphicsPath` (ported subset of `IconGeometry.BuildMonitorPath`, per D-01/Pitfall 7 — `RigToggle.IconGen` itself stays dev-time-only and unreferenced) |
 | Font | Segoe UI, 9pt system default — inherited via `Form.Font`/`AutoScaleDimensions = (7F, 15F)`, matching every existing form in this codebase. This phase introduces no new font size or weight (see Typography below) |
 
+**Visual anchor:** The tile row is MainForm's primary visual focal point — largest surface area, first in reading/tab order (D-09), and the only element carrying the accent-color fill (Color, below). The Identify button, toggle, and Settings gear are progressively de-emphasized below it, both in position and in visual weight.
+
 ---
 
 ## Spacing Scale
