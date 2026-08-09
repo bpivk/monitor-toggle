@@ -38,13 +38,13 @@ Requirements for the v2.0 milestone (Configurable Monitors, Optional Targets & C
 
 ### Perf
 
-- [ ] **PERF-01**: Self-contained exe size is reduced via MSBuild-level configuration (`EnableCompressionInSingleFile`, `SatelliteResourceLanguages=en`, `InvariantGlobalization=true`, NAudio meta-package split) — without enabling IL trimming
-- [ ] **PERF-02**: Exe-size changes are verified on real rig hardware (cold autostart boot timing plus a full toggle round trip), not just a build-output file-size diff
+- [x] **PERF-01**: Self-contained exe size is reduced via MSBuild-level configuration (`EnableCompressionInSingleFile`, `SatelliteResourceLanguages=en`, `InvariantGlobalization=true`, NAudio meta-package split) — without enabling IL trimming
+- [x] **PERF-02**: Exe-size changes are verified on real rig hardware (cold autostart boot timing plus a full toggle round trip), not just a build-output file-size diff
 
 ### Cleanup
 
-- [ ] **CLEANUP-01**: Dead code from the retired snapshot-restore mechanism (`Restore()`/`RestoreViaReconstruction()` and related snapshot models) is removed, after being reviewed for any rig-specific knowledge worth preserving elsewhere first
-- [ ] **CLEANUP-02**: General code-quality pass across the codebase — reduced duplication/cruft accumulated across three prior milestones, no user-facing behavior change
+- [x] **CLEANUP-01**: Dead code from the retired snapshot-restore mechanism (`Restore()`/`RestoreViaReconstruction()` and related snapshot models) is removed, after being reviewed for any rig-specific knowledge worth preserving elsewhere first
+- [x] **CLEANUP-02**: General code-quality pass across the codebase — reduced duplication/cruft accumulated across three prior milestones, no user-facing behavior change
 
 ## v2 Requirements (Deferred)
 
@@ -92,10 +92,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PANEL-03 | Phase 17 | Complete |
 | PANEL-04 | Phase 17 | Complete |
 | PANEL-05 | Phase 17 | Complete |
-| PERF-01 | Phase 18 | Pending |
-| PERF-02 | Phase 18 | Pending |
-| CLEANUP-01 | Phase 18 | Pending |
-| CLEANUP-02 | Phase 18 | Pending |
+| PERF-01 | Phase 18 | Complete |
+| PERF-02 | Phase 18 | Complete |
+| CLEANUP-01 | Phase 18 | Complete |
+| CLEANUP-02 | Phase 18 | Complete |
 
 **Coverage:**
 - v2.0 requirements: 19 total
