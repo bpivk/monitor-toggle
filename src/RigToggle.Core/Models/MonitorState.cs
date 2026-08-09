@@ -12,8 +12,9 @@ namespace RigToggle.Core.Models;
 /// just the target) because Phase 4's repositioning-aware disable shifted every
 /// surviving path's coordinates, and a since-retired snapshot-restore mechanism needed
 /// to undo that shift for every display, not just reactivate the disabled one
-/// (DISPLAY-02). That restore path was removed in Phase 18 once Phase 16 replaced it
-/// with explicit per-mode target application; this record's shape was kept as-is
-/// because CR-01's comparison still needs the same full-topology snapshot.
+/// (DISPLAY-02). That restore path was made dead by Phase 16 (which replaced it with
+/// explicit per-mode target application) and was physically deleted in Phase 18; this
+/// record's shape was kept as-is because CR-01's comparison still needs the same
+/// full-topology snapshot.
 /// </summary>
 public sealed record MonitorState(IReadOnlyList<MonitorPathSnapshot> Paths, string TargetDevicePath);
