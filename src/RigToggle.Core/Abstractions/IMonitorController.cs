@@ -3,10 +3,10 @@ using RigToggle.Core.Models;
 namespace RigToggle.Core.Abstractions;
 
 /// <summary>
-/// Monitor enumeration and CCD-level activate/deactivate/restore contract. Implemented
+/// Monitor enumeration and CCD-level activate/deactivate contract. Implemented
 /// by RigToggle.Windows.WindowsMonitorController. Read methods (GetActiveMonitors,
 /// GetAllMonitors, CaptureState) are real starting Phase 2/6; mutating methods
-/// (ActivateMonitors, DeactivateMonitors, Restore) are real starting Phase 4/6
+/// (ActivateMonitors, DeactivateMonitors) are real starting Phase 4/6
 /// (02-RESEARCH.md Pattern 1; 04-RESEARCH.md Patterns 1/2/3/4; 06-RESEARCH.md
 /// Patterns 1/2/3 for the N-monitor generalization).
 /// </summary>
@@ -40,6 +40,4 @@ public interface IMonitorController
     /// and the toggle-back enable-set teardown (D-02).
     /// </summary>
     void DeactivateMonitors(IReadOnlySet<string> monitorDevicePaths);
-
-    void Restore(MonitorState previousState);
 }
