@@ -63,7 +63,7 @@ public sealed class WindowsMonitorController : IMonitorController
     // GetActiveMonitors() (already correct, GetActivePaths()-based) rather than
     // reading IsGDIPrimary/IsPathActive off potentially-stale inactive PathInfo
     // entries — the same "inactive-path fields are unreliable" landmine already
-    // worked around elsewhere in this file (Restore()/DeactivateMonitors()). Targets
+    // worked around elsewhere in this file (DeactivateMonitors()). Targets
     // are filtered to IsAvailable before FriendlyName/DevicePath are touched
     // (06-RESEARCH.md Pitfall 1's "pitfall inside the pitfall" — those getters throw
     // TargetNotAvailableException otherwise). Actual dedup/merge logic lives in the
@@ -155,22 +155,23 @@ public sealed class WindowsMonitorController : IMonitorController
     // Real Extend-based activation of previously OS-disabled monitors (06-RESEARCH.md
     // Pattern 2) — the load-bearing generalization answer: NEVER manually reconstruct
     // PathTargetInfo/mode info for a previously-inactive target (already tried and
-    // abandoned in this exact codebase's Restore() history, three separate rig-tested
-    // validation failures — see Restore()'s own doc comment below). Instead reuse the
-    // exact same zero-argument PathInfo.ApplyTopology(Extend) call Restore()'s
-    // crash-recovery fallback already proves works: Extend takes no path/mode
-    // arguments at all and lets the OS pick mode/position from the CCD persistence
-    // database's last-known extend layout for currently-available targets.
+    // abandoned in this codebase's now-deleted Restore() history — three separate
+    // rig-tested validation failures, preserved in .planning/debug/knowledge-base.md's
+    // ccd-topology-restore-findings entry, Phase 18). Instead this uses the same
+    // zero-argument PathInfo.ApplyTopology(Extend) call that history proved works:
+    // Extend takes no path/mode arguments at all and lets the OS pick mode/position
+    // from the CCD persistence database's last-known extend layout for
+    // currently-available targets.
     //
     // Pitfall 2 ordering contract (06-RESEARCH.md): this method MUST run BEFORE
     // DeactivateMonitors on rig-mode entry. Extend restores the persistence
     // database's last-known layout, which still includes any disable-set monitor(s)
     // as active if DeactivateMonitors' saveToDatabase:false call already ran first —
     // silently undoing the disable. On toggle-back, the mirror-image rule applies to
-    // DeactivateMonitors(enableSet): it must run AFTER Restore(), not before, for the
-    // same reason (Restore()'s crash-recovery fallback also uses Extend internally).
-    // ToggleService is the enforcement point for this ordering; documented here too so
-    // a reader of this adapter alone still understands the contract.
+    // DeactivateMonitors(enableSet): it must run AFTER ActivateMonitors, not before,
+    // for the same reason. ToggleService is the enforcement point for this ordering;
+    // documented here too so a reader of this adapter alone still understands the
+    // contract.
     public void ActivateMonitors(IReadOnlySet<string> monitorDevicePaths)
     {
         if (monitorDevicePaths.Count == 0) return;
@@ -188,7 +189,7 @@ public sealed class WindowsMonitorController : IMonitorController
         // just to be thorough.
         if (monitorDevicePaths.All(currentlyActiveDevicePaths.Contains)) return;
 
-        // Early availability guard (mirrors Restore() Step 1) — a clear,
+        // Early availability guard — a clear,
         // domain-specific error instead of a confusing generic CCD failure if a
         // configured enable-set monitor is physically unplugged/undetected.
         PathInfo[] allPaths = PathInfo.GetAllPaths(virtualModeAware: false);
