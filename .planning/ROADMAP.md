@@ -174,10 +174,10 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 18-01-PLAN.md — Delete the snapshot-persistence subsystem + audio-side Restore; rewire the Program.cs legacy-mode bootstrap to a bare File.Exists check (CLEANUP-01)
-- [ ] 18-02-PLAN.md — Preserve the rig-discovered CCD knowledge, then delete monitor Restore/RestoreViaReconstruction/_originalPathsCache/CopyOutputTechnology/AssignSource and their 6 tests (CLEANUP-01)
-- [ ] 18-03-PLAN.md — Apply the four MSBuild exe-size levers (compression, satellite languages, invariant globalization, NAudio.Wasapi split) and measure the byte delta (PERF-01)
-- [ ] 18-04-PLAN.md — Close the four reviewed code-quality findings: IN-04 dead branch, IN-03 sentinel name, IN-02 checklist wording + test, WR-03 branch tracing (CLEANUP-02)
+- [x] 18-01-PLAN.md — Delete the snapshot-persistence subsystem + audio-side Restore; rewire the Program.cs legacy-mode bootstrap to a bare File.Exists check (CLEANUP-01)
+- [x] 18-02-PLAN.md — Preserve the rig-discovered CCD knowledge, then delete monitor Restore/RestoreViaReconstruction/_originalPathsCache/CopyOutputTechnology/AssignSource and their 6 tests (CLEANUP-01)
+- [x] 18-03-PLAN.md — Apply the four MSBuild exe-size levers (compression, satellite languages, invariant globalization, NAudio.Wasapi split) and measure the byte delta (PERF-01)
+- [x] 18-04-PLAN.md — Close the four reviewed code-quality findings: IN-04 dead branch, IN-03 sentinel name, IN-02 checklist wording + test, WR-03 branch tracing (CLEANUP-02)
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -208,7 +208,7 @@ Plans:
 | 15. Optional App & Audio Targets | v2.0 | 4/4 | Complete    | 2026-08-04 |
 | 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 5/5 | Complete   | 2026-08-08 |
 | 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 4/4 | Complete   | 2026-08-08 |
-| 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 0/TBD | Not started | - |
+| 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 4/6 | In Progress|  |
 
 ## Backlog
 
