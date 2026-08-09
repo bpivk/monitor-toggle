@@ -242,6 +242,13 @@ public sealed class ToggleService
     ///   mode flag as-is rather than guess.
     /// In every sub-case the mode flag is simply never written here — unlike the
     /// retired pre-mutation snapshot design, there is nothing to "clear."
+    ///
+    /// 16-REVIEW.md WR-03: the three cases below were previously observationally
+    /// indistinguishable (all three did nothing). Each now emits its own Trace
+    /// diagnostic, using this file's established fully-qualified Trace.WriteLine
+    /// idiom (see the other step-failure call sites above), so debug.log can
+    /// distinguish no-change/safe from partial-mutation from recapture-failure —
+    /// the mode-flag behavior itself (never write here) is unchanged.
     /// </summary>
     private void ReconcileModeAfterMonitorFailure(Models.MonitorState before)
     {
@@ -249,16 +256,22 @@ public sealed class ToggleService
         {
             if (MonitorStateUnchanged(before, _monitorController.CaptureState()))
             {
+                System.Diagnostics.Trace.WriteLine(
+                    "Monitor step failed with no observable topology change; mode flag deliberately left at its prior value.");
                 return;
             }
 
             // Partial mutation: leave the mode flag at its prior value (Assumptions
             // Log A3, 16-RESEARCH.md) rather than guess a new mode.
+            System.Diagnostics.Trace.WriteLine(
+                "Monitor step failed after a partial topology mutation; mode flag deliberately left at its prior value rather than guessed.");
         }
-        catch
+        catch (Exception ex)
         {
             // Re-capture failed — can't confirm anything, same fail-safe posture as
             // the original CR-01 catch block: do nothing, leave the mode flag as-is.
+            System.Diagnostics.Trace.WriteLine(
+                $"Monitor state re-capture failed during reconcile; nothing could be confirmed, mode flag left as-is: {ex}");
         }
     }
 

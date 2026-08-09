@@ -52,6 +52,17 @@ public class ToggleResultFormatterTests
         Assert.Equal("App: not attempted", ToggleResultFormatter.FormatChecklist(result));
     }
 
+    [Fact]
+    public void FormatChecklist_SkippedStep_RendersLowercaseSkipped()
+    {
+        var result = new ToggleResult(new List<ToggleStepResult>
+        {
+            new("Audio", ToggleStepOutcome.Skipped, null),
+        });
+
+        Assert.Equal("Audio: skipped (not configured)", ToggleResultFormatter.FormatChecklist(result));
+    }
+
     [Theory]
     [InlineData(true, "Switched to Rig Mode")]
     [InlineData(false, "Switched to Normal Mode")]
