@@ -158,3 +158,9 @@ None - no external service configuration required.
 ---
 *Phase: 18-cleanup-pass-exe-size-reduction*
 *Completed: 2026-08-09*
+
+## Self-Check: PASSED
+
+- FOUND: .planning/phases/18-cleanup-pass-exe-size-reduction/18-03-SUMMARY.md
+- FOUND: bf14b38 (Task 1 commit)
+- FOUND: 6ae0818 (Task 2 / summary commit)
