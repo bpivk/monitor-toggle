@@ -2,25 +2,24 @@
 
 ## What This Is
 
-A Windows GUI utility that switches between "normal desktop mode" and "Moza rig mode" with one click — from the GUI, a tray menu, or a global keyboard shortcut. Toggling to rig mode disables the primary monitor at the OS level (so games default to the rig monitor instead), switches the default audio output to the rig speakers, and launches the Moza Companion app. Toggling back restores the exact previous monitor/audio state and minimizes the Moza Companion app. The app can run tray-resident with autostart, and supports arbitrary multi-monitor configurations (not just a single primary monitor). The GUI follows the Windows system light/dark theme live, and the tray/exe icons use a shape-distinct monitor-vs-steering-wheel motif. Distributed via a public GitHub repo (`bpivk/monitor-toggle`) with a GitHub-ready README, CI, and tagged releases. Built for a single user's personal sim-racing rig setup.
+A Windows GUI utility that switches between "normal desktop mode" and "Moza rig mode" with one click — from the GUI, a tray menu, or a global keyboard shortcut. Toggling to rig mode disables the primary monitor at the OS level (so games default to the rig monitor instead), switches the default audio output to the rig speakers, and launches the Moza Companion app. Toggling back applies Normal mode's own explicitly configured monitor set and audio device — symmetric with how Rig mode already works — and minimizes the Moza Companion app. Both the companion app and either mode's audio device can be left unset, in which case that toggle step is skipped cleanly with no error, while a target that's configured but genuinely broken (missing file, removed device) still surfaces as a real failure. A separate live Manual Monitor Panel lets the user enable/disable any monitor on demand, independent of the Rig/Normal toggle. The app can run tray-resident with autostart, and supports arbitrary multi-monitor configurations (not just a single primary monitor). The GUI follows the Windows system light/dark theme live, and the tray/exe icons use a shape-distinct monitor-vs-steering-wheel motif. Distributed via a public GitHub repo (`bpivk/monitor-toggle`) with a GitHub-ready README, CI, tagged releases, and a self-contained exe roughly 58% smaller than pre-v2.0. Built for a single user's personal sim-racing rig setup.
 
 ## Core Value
 
-A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches (e.g. BeamNG.drive minimizing itself) reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before.
+A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches (e.g. BeamNG.drive minimizing itself) reliably open on the rig monitor — and just as reliably applies Normal mode's own explicitly configured monitor/audio state on toggle-back. (Revised at v2.0: the original "restores everything to exactly how it was before" framing described snapshot-restore, which v2.0 replaced with an explicit, symmetric Normal-mode configuration — see DISPLAY-10/AUDIO-04 and the v2.0 archive below.)
 
 ## Current State
 
-**Shipped: v1.2 Visual Polish & Documentation (2026-08-04)**
+**Shipped: v2.0 Configurable Monitors, Optional Targets & Cleanup (2026-08-09)**
 
-v1.2 replaced the default-WinForms look with a theme-aware, modern UI (live light/dark theme-follow across every control, Windows-11 Mica/rounded corners), gave the tray icons genuine shape-based visual distinction (monitor vs. steering-wheel silhouettes, colorblind-safe), and shipped a GitHub-ready README backed by real infrastructure that didn't exist before this milestone: an MIT LICENSE, two GitHub Actions workflows (CI build/test + tag-triggered release with exe attachment), the repo flipped from private to public, and v1.0/v1.1 backfilled as GitHub Releases. Two real bugs were caught only by rig/live verification, not static checks: a `dotnet/winforms` dark-mode theming false assumption (Phase 12 gap closure) and a `main`-vs-`master` CI trigger mismatch (Phase 14).
+v2.0 made the companion app and both audio-device targets genuinely optional (unset skips cleanly, broken still fails loudly), replaced Normal mode's snapshot-restore with an explicitly configured monitor set symmetric to Rig mode's, moved mode-tracking off snapshot-file-presence onto a persisted `IModeStore` flag with crash-mid-toggle recovery, added a live Manual Monitor Panel with a safety guard shared across all three monitor-mutation paths, and closed out the milestone by deleting the now-dead snapshot-restore subsystem entirely (751 net lines removed) and shrinking the self-contained exe from 116.9 MB to 49.4 MB (57.79% smaller) via MSBuild-only configuration — no IL trimming, no code changes. All four phases were rig-verified on real Windows 11 hardware with no FAILs and no waived scenarios at close.
 
-**Not yet done:** the four README screenshot placeholders (`docs/screenshots/*.png`) are intentionally still broken-image links — real screenshots must be supplied by the user from the rig (no Windows GUI in this build environment).
+**Not yet done:** the four README screenshot placeholders (`docs/screenshots/*.png`) are still broken-image links from v1.2 — real screenshots must be supplied by the user from the rig (no Windows GUI in this build environment). No next milestone scoped yet — see Backlog in `.planning/ROADMAP.md`.
 
-## Current Milestone: v2.0 Configurable Monitors, Optional Targets & Cleanup
+<details>
+<summary>Archived: v2.0 milestone framing (superseded)</summary>
 
-**Goal:** Replace snapshot-restore with explicit per-mode monitor configuration, make app/audio targets optional, add a live manual monitor toggle panel, and reduce exe size + clean up code.
-
-**Target features:**
+**v2.0 Configurable Monitors, Optional Targets & Cleanup target features (shipped 2026-08-09, as scoped 2026-08-04):**
 - App path becomes optional — when unset, toggle skips launch/focus/minimize entirely
 - Audio devices become optional per role — when unset, toggle skips audio switching entirely
 - Normal mode gets an explicit configured monitor set (which monitors on/off), replacing snapshot-restore
@@ -30,7 +29,9 @@ v1.2 replaced the default-WinForms look with a theme-aware, modern UI (live ligh
 - Reduce self-contained exe size (without enabling IL trimming — COM/P-Invoke code gets falsely stripped, per existing project guidance)
 - Code quality/cleanup pass across the 3-milestone-old codebase
 
-**Key context:** This milestone revises the project's stated Core Value ("restores everything to exactly how it was before") — Normal mode moves from snapshot-restore to an explicitly configured target state, matching how Rig mode already works. The "at least one monitor enabled" safety guard is explicitly preserved across this redesign. Exe size reduction must find savings other than trimming, since `PublishTrimmed=true` is documented as unsafe for this codebase's COM/P-Invoke-heavy surface.
+All eight target features shipped as scoped; no scope was dropped or added mid-milestone.
+
+</details>
 
 <details>
 <summary>Archived: v1.0, v1.1, and v1.2 milestone framing (superseded)</summary>
@@ -61,11 +62,11 @@ v1.2 replaced the default-WinForms look with a theme-aware, modern UI (live ligh
 
 - [x] GUI includes a settings view where the user selects: which monitor is the "primary to disable," which audio devices are the toggle pair, and which app (path) to launch/minimize — Validated in Phase 2: Foundations & GUI Shell
 - [x] Toggling to rig mode switches the default audio output device to the rig speakers — Validated in Phase 3: App & Audio Control
-- [x] Toggling back restores the exact previous default audio device across all relevant audio roles — Validated in Phase 3
+- [x] Toggling back restores the exact previous default audio device across all relevant audio roles — Validated in Phase 3 (superseded at v2.0: Normal-mode audio now applies an explicitly configured device via `SetDefault`, not a restored snapshot — see AUDIO-04)
 - [x] Toggling to rig mode launches the Moza Companion app if it isn't already running; if it's already running, brings it to focus instead of launching a duplicate instance — Validated in Phase 3, mechanism superseded post-ship (H9 focus-manipulation bug, fixed via relaunch-based `ShellExecute` activation, rig-confirmed both directions). Settings generalized to accept any `.lnk`/`.exe` target.
 - [x] Toggling back minimizes the Moza Companion app window (best-effort) — Validated in Phase 3; refined post-ship to skip the minimize call when the window is already hidden/tray-only
 - [x] Toggling to rig mode disables the primary monitor at the OS level (true disable) — Validated in Phase 4: Monitor Control (Production)
-- [x] Toggling back restores the exact monitor configuration that was active immediately before toggling to rig mode — Validated in Phase 4, hardened in Phase 5's crash-recovery fallback
+- [x] Toggling back restores the exact monitor configuration that was active immediately before toggling to rig mode — Validated in Phase 4, hardened in Phase 5's crash-recovery fallback (superseded at v2.0: Normal mode now applies its own explicitly configured monitor set, not a restored snapshot — see DISPLAY-10; the underlying `Restore()` mechanism was deleted in Phase 18/CLEANUP-01)
 - [x] User can toggle from normal mode to rig mode in one action from a GUI window — Validated in Phase 5: Orchestration, Full Toggle & Packaging
 - [x] User can toggle back from rig mode to normal mode in one action — Validated in Phase 5
 - [x] Distributed as a standalone Windows .exe (no separate runtime install required to run it) — Validated in Phase 5
@@ -88,10 +89,24 @@ v1.2 replaced the default-WinForms look with a theme-aware, modern UI (live ligh
 - [x] User can leave the Rig-mode audio device unset; toggling to Rig mode skips Rig-direction audio switching entirely (AUDIO-03) — Validated in Phase 15
 - [x] User can configure a Normal-mode audio device that actually applies on toggle to Normal mode, replacing snapshot-based restore; leaving it unset skips Normal-direction audio switching (AUDIO-04) — Validated in Phase 15, rig-confirmed the Windows default device actually switches
 - [x] A configured-but-invalid audio device still surfaces as a real failure, not silently skipped (AUDIO-05) — Validated in Phase 15, rig-confirmed with a removed USB device
+- [x] User can configure which monitors are enabled/disabled specifically for Normal mode, independent of and symmetric to Rig mode's existing config (DISPLAY-09) — Validated in Phase 16: Normal-Mode Explicit Monitor Config & Mode-Store Redesign
+- [x] Toggling to Normal mode applies the explicitly configured Normal-mode monitor set directly, not a snapshot restored from before the last toggle (DISPLAY-10) — Validated in Phase 16, rig-confirmed
+- [x] App correctly reports which mode (Rig/Normal) it's in immediately after an app restart, even with no snapshot file on disk (DISPLAY-11) — Validated in Phase 16 (`IModeStore`-backed persisted flag)
+- [x] A crash or kill mid-toggle is detected on next launch via a persisted marker and communicated to the user (DISPLAY-13) — Validated in Phase 16; DISPLAY-13's exact-crash-mid-toggle rig scenario was formally waived rather than live-tested (user judged it niche/low-probability), recorded as a documented override in `16-VERIFICATION.md`
+- [x] New GUI panel shows one row/tile per detected monitor with live on/off status via icon, not just text (PANEL-01) — Validated in Phase 17: Manual Monitor Panel & Shared Safety Guard
+- [x] User can enable/disable any individual monitor directly from the panel, independent of the Rig/Normal toggle, taking effect immediately (PANEL-02) — Validated in Phase 17
+- [x] Panel's monitor list and status update live on connect/disconnect while open (PANEL-03) — Validated in Phase 17
+- [x] Disabling a monitor from the panel is gated by the same `SkipMonitorConfirmation` setting as the Rig/Normal toggle (PANEL-04) — Validated in Phase 17
+- [x] Panel includes an Identify action overlaying a number on each physical screen (PANEL-05) — Validated in Phase 17
+- [x] The "at least one monitor enabled" safety guard is enforced identically whether attempted via Rig toggle, Normal toggle, or the manual panel (DISPLAY-12) — Validated in Phase 17; static audit confirmed exactly one implementation reached by all three mutation paths
+- [x] Dead snapshot-restore code (`Restore()`/`RestoreViaReconstruction()` and related models) removed after preserving any rig-specific knowledge it encoded (CLEANUP-01) — Validated in Phase 18; CCD findings preserved in `.planning/debug/knowledge-base.md`
+- [x] Codebase shows measurably less duplication/cruft with no user-facing behavior change (CLEANUP-02) — Validated in Phase 18
+- [x] Self-contained exe measurably smaller via `EnableCompressionInSingleFile`, `SatelliteResourceLanguages=en`, `InvariantGlobalization=true`, and the NAudio meta-package split, without IL trimming (PERF-01) — Validated in Phase 18: 116,946,229 → 49,356,430 bytes (57.79% reduction)
+- [x] A full toggle round trip and cold autostart boot verified working on real rig hardware after the exe-size changes (PERF-02) — Validated in Phase 18, rig-confirmed
 
 ### Active
 
-Defining/executing remaining v2.0 requirements (DISPLAY-09 through DISPLAY-13 and beyond) — see `.planning/REQUIREMENTS.md`.
+None — v2.0 shipped all 20 scoped requirements. Next milestone not yet scoped; see `.planning/ROADMAP.md` Backlog and run `/gsd:new-milestone`.
 
 ### Out of Scope
 
@@ -109,6 +124,8 @@ Defining/executing remaining v2.0 requirements (DISPLAY-09 through DISPLAY-13 an
 - Problem driving this: games launch on the primary monitor by default, and some games (e.g. BeamNG.drive) actively misbehave (self-minimize) when run on what Windows considers a secondary display. The fix is making the primary monitor genuinely absent from Windows' display list while racing.
 - No existing single app does this exact combination (monitor disable + audio switch + companion-app launch + tray/hotkey automation + multi-monitor sets as one preset toggle), though individual building blocks exist elsewhere. This project composes those capabilities into one custom GUI tool.
 - Shipped state as of v1.2 close (2026-08-04): ~8,870 LOC C# across the solution (now including a dev-time-only `RigToggle.IconGen` generator project alongside Core/Windows/App/Tests), self-contained win-x64 single-file publish. v1.2 added 107 commits over ~2.3 days on top of v1.1's 186-commit, ~6-day build. Repo (`bpivk/monitor-toggle`) is now public with CI (GitHub Actions build+release workflows) and real GitHub Releases (v1.0, v1.1) — none of that existed before v1.2.
+- Shipped state as of v2.0 close (2026-08-09): 165 commits over 5 days on top of v1.2, net +17,474/-1,971 lines across 120 files. The snapshot-restore subsystem (monitor + audio) is fully gone from the codebase — replaced by explicit `IModeStore`-tracked Rig/Normal configs — and the self-contained publish exe shrank 57.79% (116.9 MB → 49.4 MB) via MSBuild config alone, both confirmed on real rig hardware, not just build-output diffs.
+- Five rig-discovered `WindowsDisplayAPI`/CCD findings that the deleted `Restore()`/`RestoreViaReconstruction()` code encoded were extracted into `.planning/debug/knowledge-base.md` before deletion (Phase 18, CLEANUP-01), so that operational knowledge isn't lost with the code.
 - Post-v1.0-ship hardening (2026-07-26): Moza Companion window-focus-manipulation bug (H9) root-caused and fixed via relaunch-based (`ShellExecute`) activation instead of raw `SetForegroundWindow`/`ShowWindow` calls — see `.planning/debug/resolved/moza-foreground-focus.md`.
 - v1.1 rig-discovered/code-review-found bugs, all fixed and verified: `GetAllMonitors()` duplicate-row/dual-primary dedup; `Restore()` Source-ID staleness for enable-set monitors; migration guard re-corrupting an emptied disable set; non-exception-safe companion-app minimize step; `--tray` hidden-start not actually suppressing the window; autostart save-failure recovery itself throwing unhandled; hotkey owner-window-destroyed timing bug; Escape-closes-Settings-during-hotkey-capture; Phase 11's tray-preference lockout bug (two fix commits, rig-reverified at milestone close).
 - Known limitation carried forward unpatched: `LaunchOrFocus`/`MinimizeIfRunning` derive the running-process name from the configured launch-target path via `Path.GetFileNameWithoutExtension` — if the user configures a `.lnk` (not the target `.exe` itself), toggle-back's minimize may silently no-op. Documented, out of scope.
@@ -122,14 +139,14 @@ Defining/executing remaining v2.0 requirements (DISPLAY-09 through DISPLAY-13 an
 - **Monitor control**: Must achieve true OS-level display disable/enable (Windows CCD API or equivalent), not merely a monitor power signal — power-off leaves Windows still treating the display as connected/active
 - **Audio control**: Must be able to set the Windows default audio playback device programmatically
 - **App control**: Must be able to detect if the Moza Companion app is already running (to avoid duplicate launches) and manipulate its window (focus / minimize) via Win32 window APIs
-- **State restore**: Must snapshot the active monitor + audio configuration at toggle-time so toggle-back can restore that exact prior state, not a fixed default
+- **Target state**: Both Rig mode and Normal mode apply an explicit, independently configured monitor set and audio device (revised at v2.0 — superseded the original v1.0 "snapshot the state before toggle and restore it exactly" constraint; the snapshot-restore mechanism itself was removed in Phase 18/CLEANUP-01)
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | True OS-level monitor disable, not power-off | Games must see only one display; power-off doesn't remove it from Windows' display list | Validated Phase 4 |
-| Remember-previous-state restore, not a fixed "normal" preset | Toggle-back should always match whatever was actually active before | Validated Phase 3 (audio), Phase 4 (monitor), hardened Phase 5 |
+| Remember-previous-state restore, not a fixed "normal" preset | Toggle-back should always match whatever was actually active before | Validated Phase 3 (audio), Phase 4 (monitor), hardened Phase 5 — superseded at v2.0 by explicit symmetric Normal-mode config (see below), original mechanism deleted Phase 18 |
 | Standalone .exe packaging | No runtime-install friction | Validated Phase 5 |
 | Manual launch only, no autostart/tray/hotkey in v1 | Keep v1 scope tight; validate the GUI-click flow before adding automation | Held for v1.0 — TRIG-01/TRAY-01/NOTIF-01 taken up and shipped in v1.1 |
 | Best-effort minimize instead of guaranteed close-without-kill for Moza Companion | Can't be forced externally unless the target app supports it itself | Validated Phase 3 |
@@ -154,6 +171,13 @@ Defining/executing remaining v2.0 requirements (DISPLAY-09 through DISPLAY-13 an
 | Distinct `Skipped` toggle-step outcome, never conflated with `NotAttempted` or `Failed` | An unset target must never trigger a "did not fully complete" warning, but a configured-but-broken target must still fail loudly — a two-state boolean couldn't represent both | Validated Phase 15, rig-confirmed both toggle directions |
 | Normal-mode audio device applies via `SetDefault`, not `Restore(snapshot.Audio)` | AUDIO-04 requires the configured Normal-mode device to genuinely become the Windows default on toggle-to-Normal, not whatever was previously snapshotted | Validated Phase 15, rig-confirmed in the Windows sound flyout |
 | `IsFullyConfigured`/Save gate relaxed to the monitor-set check only; a broken (not merely unset) app/audio target still blocks Save | Now-optional targets shouldn't block Save just for being unset, but "broken" (moved .exe, removed device) must remain distinguishable from "unset" everywhere, including at Save time | Validated Phase 15, rig-confirmed |
+| Mode tracked via a new `IModeStore`-backed persisted flag, not snapshot-file presence | Snapshot-file presence was only ever a proxy for "which mode am I in"; DISPLAY-11 requires correct mode reporting even with no snapshot on disk | Validated Phase 16, rig-confirmed |
+| Normal mode applies its own explicit, symmetric monitor set directly, not a restored pre-toggle snapshot | Matches how Rig mode's monitor config already works; removes the "restore whatever was there before" ambiguity DISPLAY-10 was scoped to fix | Validated Phase 16, rig-confirmed |
+| Disk-persisted `ToggleInProgressMarker` wraps every guarded toggle, checked by a new `StartupRecoveryChecker` at launch | DISPLAY-13 requires a crash mid-toggle to be detectable and communicated on next launch, not silently ignored | Validated Phase 16 (exact crash-mid-toggle scenario formally waived by user as niche, not tested live) |
+| `ToggleOrchestrator.BeginExclusiveMonitorAccess()` lease shares the existing `_busy` flag with `RunGuarded` | Gives the new Manual Monitor Panel and the Rig/Normal toggle bidirectional mutual exclusion without a second locking mechanism | Validated Phase 17, rig-confirmed |
+| Manual Monitor Panel mutates monitors through the exact same `IMonitorController.DeactivateMonitors`/`ActivateMonitors` calls the toggle already uses | Gives DISPLAY-12's "at least one monitor enabled" guard a single shared implementation across all three mutation paths, with zero new guard code to keep in sync | Validated Phase 17, static audit + rig-confirmed |
+| Snapshot-restore subsystem (`Restore`/`RestoreViaReconstruction`, related models) fully deleted, not deprecated-in-place | Confirmed genuinely dead once Phase 16's explicit-config rewrite shipped; rig-specific CCD knowledge it encoded was extracted to `.planning/debug/knowledge-base.md` first | Validated Phase 18, rig-confirmed no behavior change |
+| Exe-size reduction via four MSBuild-only levers (compression, satellite-language trim, invariant globalization, NAudio meta-package split), `PublishTrimmed` left explicitly false | IL trimming's static analysis was already documented as unsafe for this codebase's COM/P-Invoke-heavy surface; MSBuild config alone still delivered a 57.79% size cut | Validated Phase 18, rig-confirmed cold boot + toggle round trip |
 
 ## Evolution
 
@@ -173,4 +197,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-04 — Phase 15 (Optional App & Audio Targets) complete, rig-verified.*
+*Last updated: 2026-08-09 — v2.0 milestone shipped (Phases 15-18), all requirements validated.*

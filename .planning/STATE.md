@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Configurable Monitors, Optional Targets & Cleanup
-status: executing
+status: Awaiting next milestone
 stopped_at: Phase 18 complete (verification passed) — v2.0 milestone all phases done
-last_updated: "2026-08-09T09:05:00.000Z"
-last_activity: 2026-08-09 -- Phase 18 execution, code review, and verification complete
+last_updated: "2026-08-09T10:09:01.114Z"
+last_activity: 2026-08-09 — Milestone v2.0 completed and archived
 progress:
   total_phases: 4
   completed_phases: 4
@@ -18,19 +18,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-08-04)
+See: .planning/PROJECT.md (updated 2026-08-09)
 
-**Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before. (Note: v2.0 revises the "restores exactly how it was before" framing for Normal mode — see DISPLAY-10/AUDIO-04 and ROADMAP.md Phase 16.)
-**Current focus:** v2.0 milestone complete — all 4 phases (15, 16, 17, 18) done. Ready for milestone close.
+**Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably applies Normal mode's own explicitly configured monitor/audio state on toggle-back (revised at v2.0 — see DISPLAY-10/AUDIO-04).
+**Current focus:** v2.0 shipped 2026-08-09. No milestone in progress — next milestone not yet scoped, run `/gsd:new-milestone`.
 
 ## Current Position
 
-Phase: 18 (cleanup-pass-exe-size-reduction) — COMPLETE
-Plan: 6 of 6
-Status: All plans executed, code-reviewed (1 warning + 2 info, all resolved), and verified. 18-VERIFICATION.md status is passed (4/4 must-haves — snapshot-restore removed with rig knowledge preserved, 751 net lines removed, exe 57.79% smaller, cold-boot + toggle round trip confirmed on real rig hardware).
-Last activity: 2026-08-09 -- Phase 18 execution, code review, and verification complete
-
-Progress: [██████████] 100% — phase-goal verification: passed (v2.0 milestone: 4/4 phases complete)
+Phase: Milestone v2.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-08-09 — Milestone v2.0 completed and archived
 
 ## Performance Metrics
 
@@ -77,7 +75,7 @@ Progress: [██████████] 100% — phase-goal verification: pas
 
 ### Decisions
 
-Full decision log lives in PROJECT.md's Key Decisions table. v1.2's decisions (theming approach, icon geometry, CI/release infrastructure) are all implemented and validated — see PROJECT.md for outcomes. v2.0's open architectural question (does `NormalAudioDeviceId` gain real runtime effect?) is resolved as "yes" per REQUIREMENTS.md AUDIO-04 — Phase 15 delivers it.
+Full decision log lives in PROJECT.md's Key Decisions table. v2.0's decisions (optional-target skip/fail semantics, `IModeStore`-backed mode tracking, explicit symmetric Normal-mode config replacing snapshot-restore, shared Manual Monitor Panel safety guard, MSBuild-only exe-size levers) are all implemented, rig-verified, and validated — see PROJECT.md for outcomes.
 
 ### Pending Todos
 
@@ -117,7 +115,7 @@ Permanently out of scope (not v2 candidates):
 | out-of-scope | TRIG-02 (CLI toggle argument) | Removed — not needed | v1.1 milestone close 2026-08-01 — Phase 10 never planned/executed; tray+hotkey triggers already cover the daily-use need, user confirmed CLI trigger unnecessary |
 | out-of-scope | TRIG-03 (CLI status query argument) | Removed — not needed | v1.1 milestone close 2026-08-01 — same as TRIG-02 |
 
-Items acknowledged and deferred at v1.0 milestone close on 2026-07-26, reconfirmed at v1.1 close on 2026-08-01, reconfirmed again at v1.2 close on 2026-08-04 (pre-close artifact audit — all are scanner false positives, not real gaps, confirmed by direct inspection each time):
+Items acknowledged and deferred at v1.0 milestone close on 2026-07-26, reconfirmed at v1.1 close on 2026-08-01, reconfirmed again at v1.2 close on 2026-08-04, and reconfirmed once more at v2.0 close on 2026-08-09 (pre-close artifact audit — all are scanner false positives, not real gaps, confirmed by direct inspection each time):
 
 | Category | Item | Status |
 |----------|------|--------|
@@ -141,4 +139,4 @@ Resume file: .planning/phases/18-cleanup-pass-exe-size-reduction/18-VERIFICATION
 
 ## Operator Next Steps
 
-- `/gsd:complete-milestone` — all 4 v2.0 phases (15/16/17/18) are complete and verified; close out the v2.0 milestone and prepare for the next one
+- Start the next milestone with /gsd-new-milestone

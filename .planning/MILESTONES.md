@@ -1,5 +1,22 @@
 # Milestones
 
+## v2.0 Configurable Monitors, Optional Targets & Cleanup (Shipped: 2026-08-09)
+
+**Phases completed:** 4 phases (15, 16, 17, 18), 19 plans
+**Git range:** v1.2 → HEAD (165 commits, 120 files changed, +17,474/-1,971 lines)
+**Timeline:** 2026-08-04 → 2026-08-09 (5 days)
+
+**Key accomplishments:**
+
+- Made the companion app and both audio-device targets genuinely optional in `ToggleService` — unset targets skip cleanly with no error, while a configured-but-broken target (missing exe, removed device) still surfaces as a real failure — and gave `NormalAudioDeviceId` real runtime effect for the first time (Phase 15, APP-04/05, AUDIO-03/04/05)
+- Replaced snapshot-based Normal-mode restore with an explicitly configured, symmetric Normal-mode monitor set, moved "which mode am I in" off snapshot-file-presence onto a persisted `IModeStore` flag, and added a disk-persisted crash-in-progress marker with startup recovery dialogs (Phase 16, DISPLAY-09/10/11/13)
+- Added a live Manual Monitor Panel (per-monitor status icons, immediate enable/disable, hotplug refresh, Identify overlay) that mutates monitors through the exact same controller calls as the Rig/Normal toggle, so the "at least one monitor enabled" safety guard is enforced from one shared codepath across all three mutation paths (Phase 17, PANEL-01..05, DISPLAY-12)
+- Removed the now-dead snapshot-restore subsystem (`Restore`/`RestoreViaReconstruction` and related models) after preserving the rig-specific CCD knowledge it encoded, netting 751 fewer lines with zero user-facing behavior change (Phase 18, CLEANUP-01/02)
+- Shrunk the self-contained publish exe from 116.9 MB to 49.4 MB (57.79% reduction) using four MSBuild-only levers — compression, satellite-language trim, invariant globalization, NAudio meta-package split — with no IL trimming and no code changes (Phase 18, PERF-01)
+- All four phases rig-verified on real Windows 11 hardware (cold autostart boot, full toggle round trips, panel interactions) with no FAILs and no waived scenarios at close; all 20 v2.0 requirements shipped
+
+---
+
 ## v1.2 Visual Polish & Documentation (Shipped: 2026-08-04)
 
 **Phases completed:** 3 phases, 13 plans, 33 tasks
