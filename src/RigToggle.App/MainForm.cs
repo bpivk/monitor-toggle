@@ -20,18 +20,16 @@ namespace RigToggle.App
     /// determination.
     ///
     /// Phase 8 (TRAY-01/03/04/05, NOTIF-01): also tray-resident — hosts a NotifyIcon +
-    /// ContextMenuStrip (Switch mode / Settings / Monitors / Exit), redirects window
-    /// Close to hide-to-tray, restores on left-click, and fires a balloon toast on
-    /// every tray-menu toggle.
+    /// ContextMenuStrip (Switch mode / Settings / Exit), redirects window Close to
+    /// hide-to-tray, restores on left-click, and fires a balloon toast on every
+    /// tray-menu toggle.
     ///
-    /// Phase 17 (PANEL-01/02/03): the Monitors entry (button + tray item) opens a
-    /// non-modal MonitorPanelForm via the shared OpenMonitorPanel() helper -- see that
-    /// method's doc comment for the four deliberate divergences from OpenSettingsDialog.
-    /// The Monitors BUTTON has since been replaced by the inline tile dashboard below
-    /// (TILE-01/MAIN-01/MAIN-02, Plan 19-02) -- the tray Monitors entry is retired
-    /// separately in Plan 19-04, so it stays reachable as a side-by-side reference
-    /// until the tile dashboard is proven. MainForm is now also the sole
-    /// SystemEvents.DisplaySettingsChanged subscriber for the tile row (see the
+    /// Phase 19 (TILE-07): the standalone monitor panel form and both its entry points
+    /// (the Monitors button and the tray Monitors item) are retired now that the tile
+    /// dashboard has fully absorbed the panel's capability. Per-monitor enable/disable,
+    /// hotplug refresh, the confirmation gate, and Identify all live inline on this
+    /// form as the monitor-tile dashboard (TILE-01..06, MAIN-01/02). MainForm is the
+    /// sole SystemEvents.DisplaySettingsChanged subscriber for the tile row (see the
     /// constructor and Dispose(bool)).
     /// </summary>
     public partial class MainForm : Form
@@ -40,7 +38,6 @@ namespace RigToggle.App
         private readonly ISettingsStore _settingsStore;
         private readonly IMonitorController _monitorController;
         private readonly Func<SettingsForm> _settingsFormFactory;
-        private readonly Func<MonitorPanelForm> _monitorPanelFormFactory;
         private readonly IThemeProvider _themeProvider;
 
         // TILE-01: live tile instances, reconciled (not rebuilt) against monitor count
@@ -73,12 +70,6 @@ namespace RigToggle.App
         private const int GearSizePx = 32;
         private const int EmptyStateHeightPx = 40;
 
-        // 17-03/PANEL-03: cached non-modal panel instance -- a closed non-modal Form
-        // disposes itself, so OpenMonitorPanel() re-creates only when this is null or
-        // already disposed. Do not make this a using/transient-per-open pattern like
-        // SettingsForm; the panel must be re-focusable, not re-created, on a second click.
-        private MonitorPanelForm? _monitorPanelForm;
-
         private System.Drawing.Icon? _normalIcon;
         private System.Drawing.Icon? _rigIcon;
 
@@ -96,14 +87,12 @@ namespace RigToggle.App
             ISettingsStore settingsStore,
             IMonitorController monitorController,
             Func<SettingsForm> settingsFormFactory,
-            Func<MonitorPanelForm> monitorPanelFormFactory,
             IThemeProvider themeProvider)
         {
             _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
             _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
             _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
             _settingsFormFactory = settingsFormFactory ?? throw new ArgumentNullException(nameof(settingsFormFactory));
-            _monitorPanelFormFactory = monitorPanelFormFactory ?? throw new ArgumentNullException(nameof(monitorPanelFormFactory));
             _themeProvider = themeProvider ?? throw new ArgumentNullException(nameof(themeProvider));
 
             InitializeComponent();
@@ -119,7 +108,7 @@ namespace RigToggle.App
             // refresh during exactly that state. TILE-06 only requires refresh while
             // visible -- an always-on subscription satisfies that as a strict
             // superset. Dispose(bool)'s unsubscribe (MainForm.Designer.cs) is a
-            // real-process-exit backstop only. Do NOT copy MonitorPanelForm's
+            // real-process-exit backstop only. Do NOT copy a closable form's
             // subscribe-in-ctor / unsubscribe-on-close pattern here -- that pattern is
             // correct for a closable-and-reopenable form and wrong for this one.
             Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
@@ -546,45 +535,6 @@ namespace RigToggle.App
             RefreshUi();
         }
 
-        private void TrayMonitorsMenuItem_Click(object? sender, EventArgs e) => OpenMonitorPanel();
-
-        /// <summary>
-        /// PANEL-01/02/03: shared entry point for the Monitors button and tray item.
-        /// Deliberately diverges from OpenSettingsDialog in four ways -- do not
-        /// "normalize" any of them toward the Settings shape:
-        ///
-        /// 1. Non-modal Show(), never ShowDialog() -- PANEL-03 requires the panel to
-        ///    live-refresh (hotplug events) while open, and it must not block MainForm
-        ///    or the tray context menu.
-        /// 2. Cached instance, not fresh-per-open -- a closed non-modal Form disposes
-        ///    itself, so a second click must re-focus the existing window rather than
-        ///    construct a duplicate; the IsDisposed check below is the re-create guard.
-        /// 3. The hotkey is deliberately left registered for the panel's whole
-        ///    lifetime, unlike Settings' whole-dialog unregister/re-register (TRIG-01/
-        ///    D-07). The panel has no mid-edit state a hotkey toggle could race; that
-        ///    race is instead handled by Plan 17-01's BeginExclusiveMonitorAccess()
-        ///    lease acquired inside the panel around each mutation.
-        /// 4. No RefreshUi() call afterwards -- panel actions mutate live monitor
-        ///    topology but never the Rig/Normal mode flag, so MainForm's mode
-        ///    indicator has nothing to re-derive.
-        /// </summary>
-        private void OpenMonitorPanel()
-        {
-            if (_monitorPanelForm is null || _monitorPanelForm.IsDisposed)
-            {
-                _monitorPanelForm = _monitorPanelFormFactory();
-            }
-
-            _monitorPanelForm.Show();
-
-            if (_monitorPanelForm.WindowState == FormWindowState.Minimized)
-            {
-                _monitorPanelForm.WindowState = FormWindowState.Normal;
-            }
-
-            _monitorPanelForm.Activate();
-        }
-
         /// <summary>
         /// TILE-01/D-08: (re)populates the tile row from the ONE canonical
         /// DevicePath-ordered monitor list. GetAllMonitors()'s raw order is active
@@ -705,10 +655,11 @@ namespace RigToggle.App
         }
 
         /// <summary>
-        /// TILE-02/TILE-03: port of MonitorPanelForm.DisableMonitor/EnableMonitor
-        /// with zero simplification -- the only intentional changes are the entry
-        /// point (a tile instead of a grid cell) and the refresh target
-        /// (RefreshMonitorTiles() instead of PopulateMonitorGrid()). DISPLAY-12's
+        /// TILE-02/TILE-03: port of the retired standalone panel's
+        /// DisableMonitor/EnableMonitor with zero simplification -- the only
+        /// intentional changes are the entry point (a tile instead of a grid cell)
+        /// and the refresh target (RefreshMonitorTiles() instead of
+        /// PopulateMonitorGrid()). DISPLAY-12's
         /// zero-survivors guard is deliberately NOT duplicated here -- this method
         /// calls the same WindowsMonitorController.DeactivateMonitors both toggle
         /// directions already call, so the guard living solely in that adapter
@@ -811,8 +762,8 @@ namespace RigToggle.App
         }
 
         /// <summary>
-        /// TILE-04: port of MonitorPanelForm.BtnIdentify_Click with exactly two
-        /// deliberate changes: the iteration source (the canonical
+        /// TILE-04: port of the retired standalone panel's BtnIdentify_Click with
+        /// exactly two deliberate changes: the iteration source (the canonical
         /// _lastKnownMonitors list instead of DataGridView rows, which no longer
         /// exist) and the counter semantics (increments even on skip -- see below).
         /// </summary>
@@ -977,8 +928,8 @@ namespace RigToggle.App
         }
 
         /// <summary>
-        /// TILE-06/T-19-04: hotplug refresh handler, ported from
-        /// MonitorPanelForm.OnDisplaySettingsChanged's exact IsDisposed ->
+        /// TILE-06/T-19-04: hotplug refresh handler, ported from the retired
+        /// standalone panel's OnDisplaySettingsChanged's exact IsDisposed ->
         /// InvokeRequired -> BeginInvoke -> try/catch marshalling shape. Unlike the
         /// panel's version, this handler's IsDisposed guard covers real process exit
         /// rather than a close-while-event-in-flight race, because MainForm is never
