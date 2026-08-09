@@ -3,17 +3,16 @@ using RigToggle.Core.Models;
 namespace RigToggle.Core.Abstractions;
 
 /// <summary>
-/// Audio playback endpoint enumeration and default-device switch/restore contract.
-/// Implemented by RigToggle.Windows.WindowsAudioController. Read methods
-/// (GetPlaybackDevices, CaptureState) are real starting Phase 2; SetDefault/Restore
-/// are no-op stubs until Phase 3 (02-RESEARCH.md Pattern 1).
+/// Audio playback endpoint enumeration and forward-only default-device switch
+/// contract. Implemented by RigToggle.Windows.WindowsAudioController: enumeration
+/// (GetPlaybackDevices), per-role capture (CaptureState), forward application
+/// (SetDefault), and existence resolution (TryResolveDevice).
 /// </summary>
 public interface IAudioController
 {
     IReadOnlyList<AudioDeviceInfo> GetPlaybackDevices();
     AudioState CaptureState();
     void SetDefault(string deviceId);
-    void Restore(AudioState previousState);
 
     /// <summary>
     /// Phase 15/AUDIO-05: cheap existence check, promoted from
