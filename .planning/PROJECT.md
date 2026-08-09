@@ -14,7 +14,21 @@ A single reliable action that disables the primary monitor (not just powers it o
 
 v2.0 made the companion app and both audio-device targets genuinely optional (unset skips cleanly, broken still fails loudly), replaced Normal mode's snapshot-restore with an explicitly configured monitor set symmetric to Rig mode's, moved mode-tracking off snapshot-file-presence onto a persisted `IModeStore` flag with crash-mid-toggle recovery, added a live Manual Monitor Panel with a safety guard shared across all three monitor-mutation paths, and closed out the milestone by deleting the now-dead snapshot-restore subsystem entirely (751 net lines removed) and shrinking the self-contained exe from 116.9 MB to 49.4 MB (57.79% smaller) via MSBuild-only configuration — no IL trimming, no code changes. All four phases were rig-verified on real Windows 11 hardware with no FAILs and no waived scenarios at close.
 
-**Not yet done:** the four README screenshot placeholders (`docs/screenshots/*.png`) are still broken-image links from v1.2 — real screenshots must be supplied by the user from the rig (no Windows GUI in this build environment). No next milestone scoped yet — see Backlog in `.planning/ROADMAP.md`.
+**Not yet done:** the four README screenshot placeholders (`docs/screenshots/*.png`) are still broken-image links from v1.2 — real screenshots must be supplied by the user from the rig (no Windows GUI in this build environment).
+
+## Current Milestone: v2.1 Modern UI Redesign & Theme Backlog
+
+**Goal:** Replace both windows' bolted-on-feature layout with an intentional, modern design — MainForm becomes a monitor-tile dashboard leading into the mode toggle, SettingsForm gets a real layout pass, and the deferred theme backlog (accent color, custom toggle switch, manual override) closes out.
+
+**Target features:**
+- MainForm redesign: clickable per-monitor tiles (icon + number, live on/off status) as the primary screen, Rig/Normal toggle button placed after the tile row, Settings relocated to a secondary/bottom position
+- Monitor tiles absorb the standalone Monitors panel's functionality (direct toggle, Identify action moved near the tiles, existing `SkipMonitorConfirmation` safety gate preserved) — the separate `MonitorPanelForm` and its entry points (MainForm button + tray item) are retired
+- SettingsForm layout pass: fix overlapping/crowded controls, better grouping and spacing for the two monitor grids, audio dropdowns, app path, and hotkey box
+- THEME-08: the Rig/Normal toggle becomes a custom-drawn toggle-switch control instead of a plain button
+- THEME-07: key interactive elements pick up the Windows accent color instead of a fixed palette
+- THEME-09: a manual light/dark override setting, independent of live Windows theme-follow
+
+**Key context:** This milestone retires Phase 17's standalone Manual Monitor Panel (`MonitorPanelForm`) by folding its capability directly into the redesigned MainForm — the panel's underlying `IMonitorController.DeactivateMonitors`/`ActivateMonitors` calls and the shared DISPLAY-12 safety guard stay, only the separate window and its two entry points go away. LOG-01 (toggle history/log) was considered and explicitly dropped — not carried forward again.
 
 <details>
 <summary>Archived: v2.0 milestone framing (superseded)</summary>
@@ -106,7 +120,7 @@ All eight target features shipped as scoped; no scope was dropped or added mid-m
 
 ### Active
 
-None — v2.0 shipped all 20 scoped requirements. Next milestone not yet scoped; see `.planning/ROADMAP.md` Backlog and run `/gsd:new-milestone`.
+Defining v2.1 requirements (MainForm/SettingsForm redesign, monitor-panel retirement, THEME-07/08/09) — see `.planning/REQUIREMENTS.md`.
 
 ### Out of Scope
 

@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Configurable Monitors, Optional Targets & Cleanup
-status: Awaiting next milestone
-stopped_at: Phase 18 complete (verification passed) — v2.0 milestone all phases done
-last_updated: "2026-08-09T10:09:01.114Z"
-last_activity: 2026-08-09 — Milestone v2.0 completed and archived
+milestone: v2.1
+milestone_name: Modern UI Redesign & Theme Backlog
+status: planning
+last_updated: "2026-08-09T11:47:52.716Z"
+last_activity: 2026-08-09
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 19
-  completed_plans: 19
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-09)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably applies Normal mode's own explicitly configured monitor/audio state on toggle-back (revised at v2.0 — see DISPLAY-10/AUDIO-04).
-**Current focus:** v2.0 shipped 2026-08-09. No milestone in progress — next milestone not yet scoped, run `/gsd:new-milestone`.
+**Current focus:** v2.1 Modern UI Redesign & Theme Backlog — defining requirements (MainForm/SettingsForm redesign, monitor-panel retirement, THEME-07/08/09).
 
 ## Current Position
 
-Phase: Milestone v2.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-08-09 — Milestone v2.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-08-09 — Milestone v2.1 started
 
 ## Performance Metrics
 
@@ -103,10 +102,10 @@ Items acknowledged and carried forward from previous milestone close:
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| v2 | LOG-01 (toggle history/log) | Still deferred | Initial requirements definition (v1.0); re-deferred at v1.1 scoping, v1.1 close, v1.2 scoping, and not picked up for v2.0 |
-| v2 | THEME-07 (accent-color-aware highlight) | Deferred | v1.2 scoping 2026-08-02 |
-| v2 | THEME-08 (custom-drawn toggle-switch control) | Deferred | v1.2 scoping 2026-08-02 |
-| v2 | THEME-09 (manual theme override) | Deferred | v1.2 scoping 2026-08-02 |
+| dropped | LOG-01 (toggle history/log) | Dropped, not carried forward | Deferred at v1.0, v1.1, v1.2, and v2.0 scoping; explicitly dropped by user at v2.1 scoping 2026-08-09 — will not resurface as a backlog candidate |
+| v2.1 | THEME-07 (accent-color-aware highlight) | Picked up for v2.1 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 2026-08-09 |
+| v2.1 | THEME-08 (custom-drawn toggle-switch control) | Picked up for v2.1 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 2026-08-09 |
+| v2.1 | THEME-09 (manual theme override) | Picked up for v2.1 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 2026-08-09 |
 
 Permanently out of scope (not v2 candidates):
 
