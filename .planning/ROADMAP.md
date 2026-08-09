@@ -93,7 +93,7 @@ Full phase details: `.planning/milestones/v2.0-ROADMAP.md`
 Plans:
 **Wave 1**
 
-- [ ] 19-01-PLAN.md — Standalone building blocks: ported GDI+ monitor-icon geometry helper + the MonitorTile presentational UserControl (unwired)
+- [x] 19-01-PLAN.md — Standalone building blocks: ported GDI+ monitor-icon geometry helper + the MonitorTile presentational UserControl (unwired)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -178,7 +178,7 @@ Plans:
 | 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 5/5 | Complete   | 2026-08-08 |
 | 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 4/4 | Complete   | 2026-08-08 |
 | 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 6/6 | Complete   | 2026-08-09 |
-| 19. Monitor-Tile Dashboard & MonitorPanelForm Retirement | v2.1 | 0/TBD | Not started | - |
+| 19. Monitor-Tile Dashboard & MonitorPanelForm Retirement | v2.1 | 1/5 | In Progress|  |
 | 20. Custom Toggle-Switch Control | v2.1 | 0/TBD | Not started | - |
 | 21. Accent-Color Reading & Live Update | v2.1 | 0/TBD | Not started | - |
 | 22. Manual Light/Dark Override | v2.1 | 0/TBD | Not started | - |
