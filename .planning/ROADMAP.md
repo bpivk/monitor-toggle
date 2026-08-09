@@ -101,7 +101,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 19-03-PLAN.md — Tiles go live: ported mutation path (lease → confirmation gate → IMonitorController call → refresh) + Identify handler
+- [x] 19-03-PLAN.md — Tiles go live: ported mutation path (lease → confirmation gate → IMonitorController call → refresh) + Identify handler
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -178,7 +178,7 @@ Plans:
 | 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 5/5 | Complete   | 2026-08-08 |
 | 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 4/4 | Complete   | 2026-08-08 |
 | 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 6/6 | Complete   | 2026-08-09 |
-| 19. Monitor-Tile Dashboard & MonitorPanelForm Retirement | v2.1 | 2/5 | In Progress|  |
+| 19. Monitor-Tile Dashboard & MonitorPanelForm Retirement | v2.1 | 3/5 | In Progress|  |
 | 20. Custom Toggle-Switch Control | v2.1 | 0/TBD | Not started | - |
 | 21. Accent-Color Reading & Live Update | v2.1 | 0/TBD | Not started | - |
 | 22. Manual Light/Dark Override | v2.1 | 0/TBD | Not started | - |
