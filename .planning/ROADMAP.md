@@ -181,7 +181,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 18-05-PLAN.md — Strip Restore from the test doubles, close IN-01's dead test knob, drop the vacuous assertions, and run the tree-wide zero-reference audit (CLEANUP-01/02)
+- [x] 18-05-PLAN.md — Strip Restore from the test doubles, close IN-01's dead test knob, drop the vacuous assertions, and run the tree-wide zero-reference audit (CLEANUP-01/02)
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -208,7 +208,7 @@ Plans:
 | 15. Optional App & Audio Targets | v2.0 | 4/4 | Complete    | 2026-08-04 |
 | 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 5/5 | Complete   | 2026-08-08 |
 | 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 4/4 | Complete   | 2026-08-08 |
-| 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 4/6 | In Progress|  |
+| 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 5/6 | In Progress|  |
 
 ## Backlog
 
