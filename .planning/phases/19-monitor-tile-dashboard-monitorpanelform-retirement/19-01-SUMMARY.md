@@ -77,3 +77,12 @@ None — both files are additive, unwired building blocks by design (per the pla
 ## Threat Flags
 
 None. Both new files match the plan's own `<threat_model>` register (T-19-01/02/03, T-19-SC) exactly — no new surface introduced beyond what that register already covers.
+
+## Self-Check: PASSED
+
+- FOUND: src/RigToggle.App/MonitorIconGeometry.cs
+- FOUND: src/RigToggle.App/Controls/MonitorTile.cs
+- FOUND: .planning/phases/19-monitor-tile-dashboard-monitorpanelform-retirement/19-01-SUMMARY.md
+- FOUND commit: 3b73192 (Task 1 — MonitorIconGeometry)
+- FOUND commit: 5ddc05f (Task 2 — MonitorTile)
+- FOUND commit: b87c3b5 (docs — this summary)
