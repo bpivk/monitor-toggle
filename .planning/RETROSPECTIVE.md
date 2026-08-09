@@ -75,6 +75,45 @@
 
 ---
 
+## Milestone: v2.0 — Configurable Monitors, Optional Targets & Cleanup
+
+**Shipped:** 2026-08-09
+**Phases:** 4 (15-18) | **Plans:** 19 | **Sessions:** multiple (spanning discuss/plan/execute across phases 15-18, plus rig checkpoints)
+
+### What Was Built
+- Genuinely optional companion-app and audio-device targets: unset skips the corresponding toggle step cleanly with no error, while a configured-but-broken target (missing exe, removed device) still fails loudly — and `NormalAudioDeviceId` gained real runtime effect for the first time via `SetDefault` (Phase 15, 5/5 requirements).
+- A full mode-tracking redesign: Normal mode now applies its own explicitly configured, symmetric monitor set instead of restoring a pre-toggle snapshot; "which mode am I in" moved off snapshot-file-presence onto a persisted `IModeStore` flag; a disk-persisted crash-in-progress marker plus `StartupRecoveryChecker` dialogs detect and surface a crash mid-toggle (Phase 16, 4/4 requirements).
+- A live Manual Monitor Panel (per-monitor status icons, immediate enable/disable, hotplug refresh, Identify overlay) that mutates monitors through the exact same controller calls the Rig/Normal toggle already uses, so the "at least one monitor enabled" safety guard has exactly one implementation across all three mutation paths (Phase 17, 6/6 requirements).
+- Full removal of the now-dead snapshot-restore subsystem after preserving its rig-discovered CCD knowledge in a durable knowledge-base entry, a general code-quality pass closing four review findings, and a 57.79% self-contained exe-size reduction (116.9 MB → 49.4 MB) via four MSBuild-only levers with no IL trimming (Phase 18, 4/4 requirements).
+
+### What Worked
+- **Risk-ordered phase sequencing paid off again.** Phase 15 (lowest-risk, no-prerequisite validation-gate relaxation) landed first to build confidence before Phase 16's higher-risk mode-tracking redesign; Phase 18's cleanup was correctly held until last, since the snapshot-restore subsystem was only confirmed genuinely dead once Phase 16's rewrite shipped — deleting it earlier would have removed code still in use.
+- **Reusing existing shapes instead of inventing new ones.** Phase 16's `IModeStore`/`IToggleInProgressStore` were built to mirror the existing `ISnapshotStore`/`JsonSnapshotStore`/`InMemorySnapshotStore` pattern exactly, and Phase 17's Manual Monitor Panel mutates monitors through the exact same `IMonitorController.DeactivateMonitors`/`ActivateMonitors` calls the toggle already used — both choices meant DISPLAY-12's safety guard needed zero new code to stay consistent across three mutation paths, verified by a static audit rather than by hoping three independent implementations stayed in sync.
+- **A rig checkpoint mid-phase (16-05) caught and root-caused a false alarm before it became a real fix.** A manually-hand-typed `toggle-in-progress.json` producing no recovery dialog looked like a defect, but was correctly traced to hand-typed JSON not matching `System.Text.Json`'s default integer enum encoding — not a code bug. Distinguishing "test artifact is wrong" from "code is wrong" avoided a wasted fix cycle.
+- **Preserving domain knowledge before deleting the code that encoded it.** Phase 18 explicitly extracted five rig-discovered CCD findings from the doomed `Restore()`/`RestoreViaReconstruction()` code into `.planning/debug/knowledge-base.md` before deletion — the same discipline this project used for other hard-won rig knowledge, applied here to a cleanup phase rather than a debug session.
+
+### What Was Inefficient
+- All four phases' code reviews came back `issues_found` rather than clean on the first pass (Phase 15: `IAudioController.Restore` left dead after the `SetDefault` switch, plus an `is null` vs `IsNullOrEmpty` unset-check mismatch between `SettingsForm.cs` and `ToggleService.cs`; similar small correctness/consistency gaps recurred in Phases 16-18) — each required a follow-up fix-and-reverify pass rather than landing clean. None were severe, but four consecutive `issues_found` outcomes suggests the plan-checker/pattern-mapper step could be tightened to catch "old method still referenced after its caller is rewired away" and "two call sites re-implement the same null-check differently" before code review, not after.
+- Phase 15's review debt (dead `IAudioController.Restore`, the null-check mismatch) was explicitly deferred to Phase 18 rather than fixed inline — the right call given Phase 18 was already scoped as the cleanup phase, but it meant carrying two known small inconsistencies across three phases before closing them, with the risk they get forgotten if Phase 18 had been cut from scope.
+- DISPLAY-13's exact-crash-mid-toggle rig scenario was ultimately waived rather than tested (user judged it niche/low-probability) — a reasonable call, but it was scoped as a rig-verify requirement from the start; recognizing during Phase 16 planning that this specific scenario is hard to trigger deliberately on real hardware (vs. the other, more reproducible rig checks) might have suggested waiving it earlier rather than carrying it as an open UAT item through two sessions.
+
+### Patterns Established
+- **Mirror existing store/controller shapes when adding a parallel concept**, rather than inventing a new pattern — `IModeStore` copying `ISnapshotStore`'s shape and the Manual Monitor Panel reusing the toggle's own controller calls both eliminated a class of "guard enforced in N places, they drift" bug by construction.
+- **Extract domain knowledge before deleting the code that encoded it.** When a cleanup phase removes code that happened to encode hard-won environment-specific facts (here: CCD API quirks discovered only via rig hardware), pull those facts into a durable reference doc as an explicit task before the deletion task, not as an afterthought.
+- **A static "single implementation, N call sites" audit is a valid substitute for N independent manual checks** when a shared-guard requirement (DISPLAY-12) spans multiple entry points — Phase 17 verified this by code audit, not by manually re-testing the guard three times.
+
+### Key Lessons
+1. Deferring known review debt to a later, already-planned cleanup phase is legitimate risk management, not procrastination — but treat every deferred item as a tracked line item (this project used `15-REVIEW.md`'s findings as literal Phase 18 task inputs, IN-01 through IN-04) so "we'll clean it up later" has a concrete later, not an implicit one.
+2. When a phase scopes a rig-verify requirement around a scenario that's inherently hard to trigger deliberately on real hardware (a crash at one specific instant mid-operation), flag that difficulty at planning time — the option to formally waive it with documented rationale is available and legitimate, but surfacing it early avoids carrying an open UAT item across multiple sessions before reaching the same conclusion.
+3. Reusing an existing pattern's exact shape (a store interface, a controller call) for a new-but-parallel concept isn't just less code — it structurally prevents the "guard enforced in three places, one drifts" bug class that a shared-safety-invariant requirement (like DISPLAY-12) is specifically worried about.
+
+### Cost Observations
+- Model mix: planning delegated to Opus (gsd-planner), research/execution/verification delegated to Sonnet, consistent with prior milestones.
+- Sessions: multiple, spanning discuss-phase → plan-phase → execute-phase across all 4 phases, each including at least one real-rig checkpoint, plus this milestone-close session.
+- Notable: this was the fastest milestone by calendar time (5 days across 165 commits, v1.1's 6-day/186-commit pace) despite being architecturally the riskiest (Phase 16's mode-tracking redesign touched the core toggle path) — attributable to the risk-ordered phase sequencing and the "mirror existing shapes" pattern reducing net-new design surface.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -84,6 +123,7 @@
 | v1.0 | 1 | 5 | First milestone — established the risk-first phase ordering (validate the one unproven hardware assumption before any GUI work) and the evidence-before-fix debugging discipline used throughout post-ship hardening. |
 | v1.1 | — | 5 (6-9, 11) | Automation milestone (tray/hotkey triggers, multi-monitor generalization) — retrospective section not captured at close; see MILESTONES.md for accomplishments. |
 | v1.2 | multiple | 3 (12-14) | Visual-polish + docs milestone — extended rig-verification discipline from v1.0's debug session into a general pattern (live verification over static checks), and added a new class of phase: infrastructure-as-documentation (Phase 14 needed real CI/public-repo/releases to make a README honest, not just prose). |
+| v2.0 | multiple | 4 (15-18) | Redesign + cleanup milestone — replaced a core architectural mechanism (snapshot-restore) with an explicit-config pattern mid-project, ordered by risk (lowest-risk optional-target work first, highest-risk mode-tracking redesign second, cleanup last once the old mechanism was confirmed dead) rather than roadmap order alone. |
 
 ### Cumulative Quality
 
@@ -91,8 +131,11 @@
 |-----------|-------|----------|---------------------|
 | v1.0 | 11 xUnit facts (Core logic, recording test doubles) | Core orchestration logic only — Windows adapters unverifiable without rig hardware | 2 (WindowsDisplayAPI, NAudio) |
 | v1.2 | Existing suite extended (RigToggle.Tests, RigToggle.Windows.Tests); Phase 12 6/6, Phase 13 5/5, Phase 14 14/14 must-haves verified | Theme/icon logic covered by existing test projects; Phase 14's CI/release infra has no unit tests (verified live instead — GitHub Actions run + gh/curl checks) | 0 new NuGet packages (theme/icon work is BCL/WinForms-native + dev-time GDI+); Phase 14 added 3 GitHub Actions (checkout, setup-dotnet, action-gh-release) as its only new "dependencies" |
+| v2.0 | Existing suite net-shrunk to 81/81 core tests after removing snapshot-restore's tests alongside its code (still 100% green); Phase 17 84/84 mid-milestone before Phase 18's dead-test removal | Optional-target skip/fail paths, mode-store persistence, and the shared monitor-safety-guard all unit-covered; all rig-only scenarios (crash-mid-toggle timing, hotplug, cold boot) verified live, not simulated | 0 new NuGet packages — the entire milestone (mode store, panel, exe-size levers) used only existing dependencies plus MSBuild configuration |
 
 ### Top Lessons (Verified Across Milestones)
 
 1. Evidence-before-fix discipline, once established, directly correlates with fix success rate in this project's one hardware-gated debug session (4/5 blind fixes failed pre-discipline; the fixes that followed evidence-gathering succeeded).
 2. Live/deployed verification (rig hardware, real CI runs, live GitHub state) catches bugs that static/grep-based acceptance criteria structurally cannot — confirmed again in v1.2 across three independent phases (theming, icon rendering, CI trigger scoping), extending the v1.0 lesson from "debugging a regression" to "verifying a phase before calling it done."
+3. Risk-ordered phase sequencing (lowest-risk validation first, highest-risk redesign second, cleanup last) keeps a milestone's riskiest architectural change from also being its first — confirmed in v2.0, where Phase 16's core mode-tracking redesign benefited from confidence built by Phase 15's lower-risk optional-target work, and Phase 18's cleanup was correctly held until the code it was deleting was verifiably dead.
+4. Mirroring an existing store/controller shape for a new-but-parallel concept, rather than inventing a new pattern, structurally prevents "guard enforced in N places, one drifts" bugs — v2.0's `IModeStore` (mirroring `ISnapshotStore`) and Manual Monitor Panel (reusing the toggle's own controller calls) both avoided a class of bug a shared-safety-invariant requirement is specifically worried about, verified by static audit rather than N independent manual checks.
