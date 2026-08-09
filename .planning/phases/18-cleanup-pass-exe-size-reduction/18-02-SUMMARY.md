@@ -155,6 +155,7 @@ None.
 
 None — this plan only deletes code and adds a documentation entry; no new network endpoints, auth paths, file access patterns, or schema changes were introduced. See the plan's own `<threat_model>` (T-18-02-01 through T-18-02-04, T-18-02-SC) for the pre-declared threat register, all dispositioned `mitigate`/`accept` and satisfied by this execution as described in that table.
 
-## Self-Check
+## Self-Check: PASSED
 
-To be appended after file-existence and commit verification.
+- All 6 created/modified files confirmed present on disk (`.planning/debug/knowledge-base.md`, `src/RigToggle.Windows/WindowsMonitorController.cs`, `src/RigToggle.Core/Abstractions/IMonitorController.cs`, `src/RigToggle.Windows/AssemblyInfo.cs`, `src/RigToggle.Windows.Tests/WindowsMonitorControllerTests.cs`, this SUMMARY.md)
+- All 4 commit hashes confirmed present in `git log --oneline --all`: `76b3e85` (Task 1), `6393180` (Task 2), `2705a8f` (Task 3), `fa15997` (SUMMARY.md)
