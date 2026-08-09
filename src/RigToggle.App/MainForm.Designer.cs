@@ -36,7 +36,7 @@ namespace RigToggle.App
                 // subscription itself (MainForm.cs constructor) is held for the whole
                 // app lifetime and must NEVER be gated on Hide()/Show()/visibility --
                 // MainForm is hidden-not-closed during tray-resident operation, unlike
-                // the closable MonitorPanelForm, whose subscribe-in-ctor /
+                // a closable Form, whose subscribe-in-ctor /
                 // unsubscribe-when-the-window-closes pattern must not be copied here.
                 Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             }
@@ -69,7 +69,6 @@ namespace RigToggle.App
             this.trayContextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.trayToggleMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.traySettingsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.trayMonitorsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.traySeparator = new System.Windows.Forms.ToolStripSeparator();
             this.trayExitMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 
@@ -168,10 +167,10 @@ namespace RigToggle.App
             //
             // btnIdentify
             //
-            // TILE-04: single shared Identify action, ported from
-            // MonitorPanelForm.BtnIdentify_Click with Owner retargeted to MainForm
-            // (MainForm.cs). Location/Size below are PLACEHOLDER defaults --
-            // LayoutDashboard() overwrites both on every population/hotplug.
+            // TILE-04: single shared Identify action, with Owner retargeted to
+            // MainForm (MainForm.cs, BtnIdentify_Click). Location/Size below are
+            // PLACEHOLDER defaults -- LayoutDashboard() overwrites both on every
+            // population/hotplug.
             this.btnIdentify.Name = "btnIdentify";
             this.btnIdentify.Text = "Identify";
             this.btnIdentify.Size = new System.Drawing.Size(100, 32);
@@ -196,13 +195,6 @@ namespace RigToggle.App
             this.traySettingsMenuItem.Click += new System.EventHandler(this.TraySettingsMenuItem_Click);
 
             //
-            // trayMonitorsMenuItem
-            //
-            this.trayMonitorsMenuItem.Text = "Monitors";
-            this.trayMonitorsMenuItem.Name = "trayMonitorsMenuItem";
-            this.trayMonitorsMenuItem.Click += new System.EventHandler(this.TrayMonitorsMenuItem_Click);
-
-            //
             // traySeparator
             //
             this.traySeparator.Name = "traySeparator";
@@ -225,13 +217,15 @@ namespace RigToggle.App
             //
             // trayContextMenu
             //
-            // Exact order per TRAY-03/08-UI-SPEC.md, extended by 17-UI-SPEC.md: Switch
-            // mode -> Settings -> Monitors -> separator -> Exit.
+            // Exact order per TRAY-03/08-UI-SPEC.md: Switch mode -> Settings ->
+            // separator -> Exit. This reverts to the pre-Phase-17 three-item order now
+            // that the standalone panel's tray entry is retired (TILE-07/Plan 19-04)
+            // -- the tile dashboard on MainForm itself has fully absorbed that
+            // capability.
             this.trayContextMenu.Name = "trayContextMenu";
             this.trayContextMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
                 this.trayToggleMenuItem,
                 this.traySettingsMenuItem,
-                this.trayMonitorsMenuItem,
                 this.traySeparator,
                 this.trayExitMenuItem});
 
@@ -296,7 +290,6 @@ namespace RigToggle.App
         private System.Windows.Forms.ContextMenuStrip trayContextMenu;
         private System.Windows.Forms.ToolStripMenuItem trayToggleMenuItem;
         private System.Windows.Forms.ToolStripMenuItem traySettingsMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem trayMonitorsMenuItem;
         private System.Windows.Forms.ToolStripSeparator traySeparator;
         private System.Windows.Forms.ToolStripMenuItem trayExitMenuItem;
     }

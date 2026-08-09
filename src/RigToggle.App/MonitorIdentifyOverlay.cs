@@ -8,8 +8,9 @@ namespace RigToggle.App
 {
     /// <summary>
     /// PANEL-05: a borderless, topmost, full-screen per-monitor overlay showing an
-    /// ordinal identify number, used by MonitorPanelForm's "Identify" action (Plan 02)
-    /// to let the user visually map grid rows to physical monitors.
+    /// ordinal identify number, used by MainForm's Identify action on the
+    /// monitor-tile dashboard (TILE-04) to let the user visually map tiles to
+    /// physical monitors.
     ///
     /// Positioned and sized exclusively from a CCD-sourced <see cref="MonitorPathSnapshot"/>
     /// (from IMonitorController.CaptureState()) — never from

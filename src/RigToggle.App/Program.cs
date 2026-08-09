@@ -149,17 +149,7 @@ namespace RigToggle.App
             MainForm mainForm = null!;
             SettingsForm SettingsFormFactory() => new SettingsForm(monitorController, audioController, settingsStore, autostartConfigurator, themeProvider, mainForm.TryRegisterConfiguredHotkey, mainForm.ApplyTrayVisibility);
 
-            // 17-03/T-17-12: unlike SettingsFormFactory above, this factory captures no
-            // mainForm member, so it has no part in the textual-scope cycle the comment
-            // above describes -- it consumes only already-constructed composition-root
-            // locals (no new adapter is created). The panel is deliberately given
-            // toggleOrchestrator solely for BeginExclusiveMonitorAccess() -- never to run
-            // a toggle -- and deliberately NOT given audioController, appController,
-            // autostartConfigurator, modeStore, or markerStore, so it structurally cannot
-            // switch audio, launch processes, change autostart, or write mode state.
-            MonitorPanelForm MonitorPanelFormFactory() => new MonitorPanelForm(monitorController, settingsStore, themeProvider, toggleOrchestrator);
-
-            mainForm = new MainForm(toggleOrchestrator, settingsStore, monitorController, SettingsFormFactory, MonitorPanelFormFactory, themeProvider);
+            mainForm = new MainForm(toggleOrchestrator, settingsStore, monitorController, SettingsFormFactory, themeProvider);
 
             // Pitfall 6: prime the tray icon/menu BEFORE either Run branch — under
             // --tray the form's own Load event never fires since the form is never
