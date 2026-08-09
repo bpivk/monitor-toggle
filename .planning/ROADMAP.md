@@ -89,7 +89,28 @@ Full phase details: `.planning/milestones/v2.0-ROADMAP.md`
   3. User can Tab between tiles and press Space or Enter to toggle the currently focused tile
   4. An Identify action near the tiles briefly overlays a number on each physical screen
   5. The Rig/Normal toggle sits directly below the tile row and Settings is relocated to a secondary, de-emphasized position; the standalone `MonitorPanelForm` and both its entry points (MainForm button, tray menu item) no longer exist
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+**Wave 1**
+
+- [ ] 19-01-PLAN.md — Standalone building blocks: ported GDI+ monitor-icon geometry helper + the MonitorTile presentational UserControl (unwired)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 19-02-PLAN.md — MainForm hosts the tile dashboard: layout, read-only population from canonical ordering, hotplug refresh, theming both call sites
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 19-03-PLAN.md — Tiles go live: ported mutation path (lease → confirmation gate → IMonitorController call → refresh) + Identify handler
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 19-04-PLAN.md — Retire MonitorPanelForm and both entry points (TILE-07)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 19-05-PLAN.md — Full-solution regression gate, four static audits, and rig verification of all five success criteria
+
 **UI hint**: yes
 
 ### Phase 20: Custom Toggle-Switch Control
