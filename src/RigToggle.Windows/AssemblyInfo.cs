@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 
-// Exposes internal members (CopyOutputTechnology, AssignSource) to
+// Exposes internal members (MergeAllMonitors, AnyRectanglesOverlap) to
 // RigToggle.Windows.Tests for direct unit testing without live display hardware
-// (04-03 SUMMARY.md WR-05/WR-06).
+// (06-RESEARCH.md dedup/geometry work; quick task 260728-qj1's duplicate-row/
+// dual-primary regression fix).
 [assembly: InternalsVisibleTo("RigToggle.Windows.Tests")]
