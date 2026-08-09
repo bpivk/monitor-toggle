@@ -61,7 +61,7 @@ Full phase details: `.planning/milestones/v1.2-ROADMAP.md`
 - [x] **Phase 15: Optional App & Audio Targets** - Companion app and per-role audio devices become optional; toggle skips cleanly when unset but a configured-but-broken target still surfaces as a real failure (completed 2026-08-04)
 - [x] **Phase 16: Normal-Mode Explicit Monitor Config & Mode-Store Redesign** - Normal mode applies an explicitly configured monitor set instead of snapshot-restore, with mode tracked via a persisted flag and crash-mid-toggle detection (completed 2026-08-08)
 - [x] **Phase 17: Manual Monitor Panel & Shared Safety Guard** - A live panel lets the user enable/disable any monitor on demand, with the "at least one monitor enabled" guard enforced identically everywhere monitors can be mutated (completed 2026-08-08)
-- [ ] **Phase 18: Cleanup Pass & Exe-Size Reduction** - Dead snapshot-restore code removed, general code-quality pass, and exe size reduced via MSBuild config, rig-verified
+- [x] **Phase 18: Cleanup Pass & Exe-Size Reduction** - Dead snapshot-restore code removed, general code-quality pass, and exe size reduced via MSBuild config, rig-verified (completed 2026-08-09)
 
 ## Phase Details
 
@@ -185,7 +185,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 18-06-PLAN.md — Merged-tree regression gate, final exe-size measurement, and rig verification of cold autostart boot + full toggle round trip (PERF-01/PERF-02)
+- [x] 18-06-PLAN.md — Merged-tree regression gate, final exe-size measurement, and rig verification of cold autostart boot + full toggle round trip (PERF-01/PERF-02)
 
 ## Progress
 
@@ -208,7 +208,7 @@ Plans:
 | 15. Optional App & Audio Targets | v2.0 | 4/4 | Complete    | 2026-08-04 |
 | 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 5/5 | Complete   | 2026-08-08 |
 | 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 4/4 | Complete   | 2026-08-08 |
-| 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 5/6 | In Progress|  |
+| 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 6/6 | Complete   | 2026-08-09 |
 
 ## Backlog
 
