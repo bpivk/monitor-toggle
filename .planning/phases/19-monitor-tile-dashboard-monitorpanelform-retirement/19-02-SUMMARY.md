@@ -139,3 +139,13 @@ Derived from `LayoutDashboard()`'s arithmetic at 100% scale (`Scaled()` is a no-
 ---
 *Phase: 19-monitor-tile-dashboard-monitorpanelform-retirement*
 *Completed: 2026-08-09*
+
+## Self-Check: PASSED
+
+- FOUND: src/RigToggle.App/ThemeApplier.cs
+- FOUND: src/RigToggle.App/MainForm.Designer.cs
+- FOUND: src/RigToggle.App/MainForm.cs
+- FOUND: .planning/phases/19-monitor-tile-dashboard-monitorpanelform-retirement/19-02-SUMMARY.md
+- FOUND commit: 46d5ea3 (Task 1 — ThemeApplier.ThemeMonitorTile)
+- FOUND commit: 8e38838 (Task 2 — MainForm.Designer.cs)
+- FOUND commit: 24ed7f8 (Task 3 — MainForm.cs)
