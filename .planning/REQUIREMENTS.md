@@ -47,7 +47,19 @@ Requirements for the v2.1 milestone (Modern UI Redesign & Theme Backlog). Each m
 
 ## Traceability
 
-_Filled in by the roadmapper when phases are created._
-
 | Requirement | Phase |
 |-------------|-------|
+| TILE-01 | Phase 19 |
+| TILE-02 | Phase 19 |
+| TILE-03 | Phase 19 |
+| TILE-04 | Phase 19 |
+| TILE-05 | Phase 19 |
+| TILE-06 | Phase 19 |
+| TILE-07 | Phase 19 |
+| MAIN-01 | Phase 19 |
+| MAIN-02 | Phase 19 |
+| THEME-08 | Phase 20 |
+| THEME-07 | Phase 21 |
+| THEME-09 | Phase 22 |
+| SETTINGS-01 | Phase 23 |
+| SETTINGS-02 | Phase 23 |

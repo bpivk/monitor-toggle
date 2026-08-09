@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Modern UI Redesign & Theme Backlog
-status: planning
-last_updated: "2026-08-09T11:47:52.716Z"
+status: ready_to_plan
+last_updated: "2026-08-09T12:15:00.000Z"
 last_activity: 2026-08-09
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-09)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably applies Normal mode's own explicitly configured monitor/audio state on toggle-back (revised at v2.0 — see DISPLAY-10/AUDIO-04).
-**Current focus:** v2.1 Modern UI Redesign & Theme Backlog — defining requirements (MainForm/SettingsForm redesign, monitor-panel retirement, THEME-07/08/09).
+**Current focus:** v2.1 Modern UI Redesign & Theme Backlog — roadmap created (Phases 19-23), ready to plan Phase 19.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-08-09 — Milestone v2.1 started
+Phase: 19 of 23 (Monitor-Tile Dashboard & MonitorPanelForm Retirement)
+Plan: — (not yet planned)
+Status: Ready to plan
+Last activity: 2026-08-09 — Roadmap created for v2.1 (Phases 19-23, 100% requirement coverage)
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -56,6 +58,7 @@ Last activity: 2026-08-09 — Milestone v2.1 started
 | 15 | 4 | - | - |
 | 16 | 5 | - | - |
 | 17 | 4 | - | - |
+| 18 | 6 | - | - |
 
 **Recent Trend:**
 
@@ -71,6 +74,7 @@ Last activity: 2026-08-09 — Milestone v2.1 started
 - Phase 11 edited: edited fields: title, goal, depends_on (corrected from Phase 10 to Phase 8)
 - v1.2 roadmap created 2026-08-02: 3 phases derived from THEME/ICON/DOCS requirement categories (coarse granularity). Phase 12 (Theme Infrastructure) sequenced first per research risk-priority (highest-novelty work; live-update gap and `--tray` handle-timing risk). Phase 13 (Tray & App Icon Redesign) is architecturally independent of Phase 12 but sequenced second by convention, not dependency. Phase 14 (README) sequenced last, depends on both since it documents/screenshots the finished visual result. Rig-only-catchable risks (live theme flip while running, both taskbar themes, extended-session GDI handle stability, `--tray` hidden-start timing, Windows 10 fallback) were folded into Phase 12/13 success criteria and plan-level human verification rather than a separate verification phase, consistent with this project's established UAT-per-phase pattern (Phase 8, 9, 11).
 - v2.0 roadmap created 2026-08-04: 4 phases (15-18) derived from the 19 v2.0 requirements (coarse granularity), continuing numbering from v1.2's Phase 14. Structure follows research/SUMMARY.md's proposed sequencing closely: Phase 15 (optional App/Audio targets) first as lowest-risk, no-prerequisite validation-gate relaxation; Phase 16 (Normal-mode explicit monitor config + mode-store redesign) second as the core, highest-risk piece — forces `IsInRigMode()` off snapshot-file-presence onto an explicit persisted flag, landed alongside the monitor-set rewrite per research's Pitfall 4/5 warnings; Phase 17 (manual monitor panel + shared safety guard) third, depends on Phase 16's controller-call unification so the panel doesn't introduce a second implementation of "toggle a monitor." DISPLAY-12 (safety guard enforced identically across Rig toggle, Normal toggle, and the manual panel) was assigned to Phase 17 rather than Phase 16 since full three-way enforcement can only be verified once the panel (the third path) exists. Phase 18 (cleanup + exe-size reduction) last, since the snapshot/restore subsystem is only confirmed genuinely dead once Phase 16 ships. DISPLAY-13 (crash-recovery marker) and PANEL-04/05 (confirmation gate, Identify action) — both resolved into requirements after research/SUMMARY.md was written — were folded into Phase 16 and Phase 17 respectively, consistent with the research's existing rationale for those phases.
+- v2.1 roadmap created 2026-08-09: 5 phases (19-23) derived from the 14 v2.1 requirements (TILE-01..07, MAIN-01..02, SETTINGS-01..02, THEME-07..09; coarse granularity), continuing numbering from v2.0's Phase 18. Structure follows research/SUMMARY.md's proposed sequencing closely: Phase 19 (monitor-tile dashboard + MonitorPanelForm retirement) first — highest complexity/regression-risk, absorbs all 5 of the retiring panel's behaviors (TILE-01..07) plus the toggle/Settings repositioning (MAIN-01/02), sequenced so the tile replacement is proven working before the standalone panel is deleted. Phase 20 (custom toggle-switch control, THEME-08) second, right after the dashboard stabilizes since it redraws the same button Phase 19 repositions — avoids compounding two risky UI changes in one diff. Phase 21 (accent-color reading, THEME-07) third, soft-ordered before Phase 22 since it's architecturally independent but pairs naturally with an accent-tinted switch. Phase 22 (manual light/dark override, THEME-09) fourth, last among theme work since it decorates whatever `IThemeProvider` interface Phase 21 leaves behind. Phase 23 (SettingsForm layout pass) last — fully independent of every other phase, scheduled as the natural mop-up/filler with no dependency edges. All 14 requirements mapped 1:1, no orphans.
 
 ### Decisions
 
@@ -86,7 +90,7 @@ None.
 
 ### Blockers/Concerns
 
-None open.
+None open. Research flags Phase 21 (accent color) and Phase 22 (manual override) as needing deeper research during planning — see `.planning/research/SUMMARY.md` "Research Flags" — no official Microsoft documentation confirms which registry key/API is "the" accent color, and the manual-override/live-theme-follow composition needs careful sequencing relative to the `IsDark` property consolidation.
 
 ### Quick Tasks Completed
 
@@ -103,9 +107,9 @@ Items acknowledged and carried forward from previous milestone close:
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
 | dropped | LOG-01 (toggle history/log) | Dropped, not carried forward | Deferred at v1.0, v1.1, v1.2, and v2.0 scoping; explicitly dropped by user at v2.1 scoping 2026-08-09 — will not resurface as a backlog candidate |
-| v2.1 | THEME-07 (accent-color-aware highlight) | Picked up for v2.1 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 2026-08-09 |
-| v2.1 | THEME-08 (custom-drawn toggle-switch control) | Picked up for v2.1 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 2026-08-09 |
-| v2.1 | THEME-09 (manual theme override) | Picked up for v2.1 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 2026-08-09 |
+| v2.1 | THEME-07 (accent-color-aware highlight) | Scoped into v2.1 Phase 21 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 roadmap 2026-08-09 |
+| v2.1 | THEME-08 (custom-drawn toggle-switch control) | Scoped into v2.1 Phase 20 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 roadmap 2026-08-09 |
+| v2.1 | THEME-09 (manual theme override) | Scoped into v2.1 Phase 22 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 roadmap 2026-08-09 |
 
 Permanently out of scope (not v2 candidates):
 
@@ -132,10 +136,10 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-09T09:05:00.000Z
-Stopped at: Phase 18 complete (verification passed) — v2.0 milestone all phases done
-Resume file: .planning/phases/18-cleanup-pass-exe-size-reduction/18-VERIFICATION.md
+Last session: 2026-08-09T12:15:00.000Z
+Stopped at: v2.1 ROADMAP.md created (Phases 19-23, 14/14 requirements mapped) — ready to plan Phase 19
+Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Run `/gsd:plan-phase 19` to plan the Monitor-Tile Dashboard & MonitorPanelForm Retirement phase
