@@ -90,7 +90,7 @@ namespace RigToggle.App
                 }
             }
 
-            var snapshotStore = new JsonSnapshotStore(Path.Combine(basePath, "state.json"));
+            string legacyStateJsonPath = Path.Combine(basePath, "state.json");
             var modeStore = new JsonModeStore(Path.Combine(basePath, "mode.json"));
             var markerStore = new JsonToggleInProgressStore(Path.Combine(basePath, "toggle-in-progress.json"));
 
@@ -101,7 +101,7 @@ namespace RigToggle.App
             // trigger a spurious mode-corruption dialog below for every healthy install.
             if (!modeStore.Exists())
             {
-                modeStore.Save(snapshotStore.Exists() ? ToggleMode.Rig : ToggleMode.Normal);
+                modeStore.Save(File.Exists(legacyStateJsonPath) ? ToggleMode.Rig : ToggleMode.Normal);
             }
 
             // Pattern 3 (16-RESEARCH.md): the two blocking startup checks (mode
