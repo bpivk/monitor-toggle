@@ -4,8 +4,8 @@ milestone: v2.0
 milestone_name: Configurable Monitors, Optional Targets & Cleanup
 status: executing
 stopped_at: Phase 17 complete (verification passed)
-last_updated: "2026-08-08T22:31:00.051Z"
-last_activity: 2026-08-08 -- Phase 18 planning complete
+last_updated: "2026-08-09T08:24:59.418Z"
+last_activity: 2026-08-09 -- Phase 18 execution started
 progress:
   total_phases: 4
   completed_phases: 3
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-04)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before. (Note: v2.0 revises the "restores exactly how it was before" framing for Normal mode — see DISPLAY-10/AUDIO-04 and ROADMAP.md Phase 16.)
-**Current focus:** Phase 17 — complete. Next: Phase 18 (Cleanup Pass & Exe-Size Reduction)
+**Current focus:** Phase 18 — cleanup-pass-exe-size-reduction
 
 ## Current Position
 
-Phase: 17 (manual-monitor-panel-shared-safety-guard) — COMPLETE
-Plan: 4 of 4
-Status: Ready to execute
-Last activity: 2026-08-08 -- Phase 18 planning complete
+Phase: 18 (cleanup-pass-exe-size-reduction) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 18
+Last activity: 2026-08-09 -- Phase 18 execution started
 
 Progress: [██████████] 100% — phase-goal verification: passed
 
