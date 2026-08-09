@@ -174,3 +174,14 @@ None — this plan only deletes dead test-double code, closes a dead test knob, 
 ## Next Phase Readiness
 
 CLEANUP-01 and CLEANUP-02 are both fully closed by this plan combined with 18-01/18-02: zero API-level `Restore` references remain in `src/`, the snapshot-persistence subsystem is gone, and every surviving bare-word `Restore` mention is either an unrelated English usage or an explicitly past-tense historical note. This was the last plan depending on 18-01/18-02's contract changes; remaining Phase 18 plans (18-03, 18-04, 18-06) are independent or already complete.
+
+## Self-Check: PASSED
+
+- FOUND: src/RigToggle.Tests/Doubles/FakeControllers.cs
+- FOUND: src/RigToggle.Tests/Doubles/BlockingMonitorController.cs
+- FOUND: src/RigToggle.Core/Models/MonitorState.cs
+- FOUND: src/RigToggle.Tests/ToggleServiceTests.cs
+- FOUND: .planning/phases/18-cleanup-pass-exe-size-reduction/18-05-SUMMARY.md
+- FOUND commit: eb77a75 (Task 1)
+- FOUND commit: 9783a29 (Task 2)
+- FOUND commit: 9ee706e (docs: SUMMARY.md)
