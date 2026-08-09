@@ -1,400 +1,335 @@
 # Architecture Research
 
-**Domain:** v2.0 redesign of an existing four-project .NET 10 WinForms desktop app (RigToggle.Core / RigToggle.Windows / RigToggle.App / RigToggle.Tests) — configurable per-mode monitor targets replacing snapshot-restore, optional app/audio targets, a new live manual-monitor panel, and a shared safety/concurrency story.
-**Researched:** 2026-08-04
-**Confidence:** HIGH on integration points and component placement (verified directly against the real source tree — `ToggleService.cs`, `ToggleOrchestrator.cs`, `WindowsMonitorController.cs`, `WindowsAudioController.cs`, `AppSettings.cs`, `JsonSnapshotStore.cs`, `MainForm.cs`, `SettingsForm.cs`, `Program.cs`). MEDIUM on one specific recommendation flagged explicitly below (whether audio also drops snapshot-restore in Normal mode) — the milestone's literal feature list only mandates this for the monitor step; extending it to audio is this research's own inference from evidence in the codebase (an already-existing-but-unwired `NormalAudioDeviceId` field), not a directly-stated requirement, and should be confirmed during roadmap/planning rather than treated as settled.
+**Domain:** Windows WinForms desktop utility — v2.1 UI redesign (MonitorPanelForm retirement into MainForm, custom toggle-switch control, accent-color theming, manual theme override)
+**Researched:** 2026-08-09
+**Confidence:** HIGH (based on direct reading of the current `src/` implementation — `MainForm.cs`, `MonitorPanelForm.cs`, `ToggleOrchestrator.cs`, `ThemeApplier.cs`, `WindowsThemeProvider.cs`, `IMonitorController.cs`, `IThemeProvider.cs`, `AppSettings.cs`, `SettingsForm.cs`, `MonitorIdentifyOverlay.cs`, `DwmTitleBar.cs`, `Program.cs` — plus WebSearch-verified (MEDIUM confidence) research on the Windows accent-color API for THEME-07's net-new surface)
+
+> **Supersedes** the previous (2026-08-04, v2.0-scoped) version of this file — that content described the now-shipped configurable-monitors/optional-targets/manual-panel milestone and is no longer current. This file is scoped entirely to v2.1.
 
 ## Standard Architecture
 
 ### System Overview
 
-This is not a new subsystem — v2.0 is a redesign threaded through the existing four-project solution, reusing the same Core-interface / Windows-adapter / App-composition-root pattern already established for every prior milestone (`IMonitorController`/`WindowsMonitorController`, `IAudioController`/`WindowsAudioController`, etc.).
+This is a 4-project .NET 10 solution (`RigToggle.Core` / `RigToggle.Windows` / `RigToggle.App` / `RigToggle.Tests`, plus a dev-time `RigToggle.IconGen`). v2.1 touches only `RigToggle.App` (WinForms UI) and adds a small amount of net-new `RigToggle.Core` (a settings-driven decorator) and `RigToggle.Windows` (an accent-color reader) — it does **not** touch `ToggleService`, `WindowsMonitorController`'s mutation methods, or `WindowsThemeProvider`'s existing OS-signal behavior.
 
 ```
-┌───────────────────────────────────────────────────────────────────────────────┐
-│ RigToggle.App  (composition root, Program.cs)                                  │
-│                                                                                   │
-│  ┌──────────────┐   ┌───────────────┐   ┌─────────────────────────────────┐  │
-│  │ MainForm      │   │ SettingsForm   │   │ MonitorPanelForm (NEW)          │  │
-│  │ mode label,   │   │ Rig-mode grid  │   │ non-modal, live per-monitor     │  │
-│  │ Toggle button,│   │ (existing) +   │   │ enable/disable + status icons,  │  │
-│  │ Settings btn, │   │ NEW Normal-    │   │ independent of toggle direction │  │
-│  │ NEW "Monitors"│   │ mode grid      │   │                                  │  │
-│  │ button opens  │   │ section        │   │ calls ManualMonitorService,      │  │
-│  │ MonitorPanel  │   │                │   │ NOT ToggleOrchestrator           │  │
-│  └──────┬────────┘   └───────┬────────┘   └────────────┬─────────────────────┘  │
-│         │ ToggleOrchestrator │ ISettingsStore            │ ManualMonitorService  │
-│         ▼                    ▼                           ▼                      │
-│  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │ RigToggle.Core                                                          │  │
-│  │                                                                          │  │
-│  │  SingleFlightGuard (NEW, extracted from ToggleOrchestrator)             │  │
-│  │    - ONE shared Interlocked.CompareExchange busy-flag instance          │  │
-│  │    - injected into BOTH ToggleOrchestrator AND ManualMonitorService     │  │
-│  │        ┌───────────────────┐        ┌────────────────────────────┐    │  │
-│  │        │ ToggleOrchestrator │        │ ManualMonitorService (NEW)  │    │  │
-│  │        │ (existing shape,   │        │ thin wrapper: Activate/     │    │  │
-│  │        │  now delegates to  │        │ Deactivate a single monitor │    │  │
-│  │        │  SingleFlightGuard)│        │ via SingleFlightGuard        │    │  │
-│  │        └─────────┬──────────┘        └──────────────┬───────────────┘    │  │
-│  │                  ▼                                    ▼                   │  │
-│  │        ToggleService (MODIFIED)               IMonitorController          │  │
-│  │        - Normal-mode Monitor step:             .ActivateMonitors/          │  │
-│  │          apply configured Normal set,           DeactivateMonitors        │  │
-│  │          not Restore(snapshot)                 (UNCHANGED — same          │  │
-│  │        - App/Audio steps: skip when              methods, same safety     │  │
-│  │          settings field is null                  guard, reused as-is)     │  │
-│  │        - mode tracked via IModeStore                                      │  │
-│  │          (repurposed from ISnapshotStore),                                │  │
-│  │          not snapshot-file presence                                       │  │
-│  └────────────────────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────┬──────────────────────────────────────────────┘
-                                    │ ProjectReference
-                                    ▼
-┌───────────────────────────────────────────────────────────────────────────────┐
-│ RigToggle.Windows — WindowsMonitorController/WindowsAudioController UNCHANGED  │
-│ at the method-signature level. ActivateMonitors/DeactivateMonitors' existing   │
-│ "at least one active display must remain" guard (already in                    │
-│ DeactivateMonitors, see Data Flow below) is reused verbatim by both the        │
-│ toggle path and the new manual panel — this is what satisfies feature 5        │
-│ ("one shared validation point, not duplicated logic") with ZERO new code.      │
-│ WindowsMonitorController.Restore()/RestoreViaReconstruction() (~260 LOC)       │
-│ become DEAD (no caller) once ToggleToNormalMode stops calling Restore().       │
-└───────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         RigToggle.App (WinForms UI)                       │
+├──────────────────────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────┐   ┌───────────────────┐                  │
+│  │ MainForm (redesigned)       │   │ SettingsForm        │                │
+│  │  - mode indicator            │   │ (layout pass only,  │                │
+│  │  - ToggleSwitch (THEME-08)  │   │  logic unchanged;   │                │
+│  │  - MonitorTile[] strip      │   │  + Theme Override    │                │
+│  │    (folded from             │   │    radio group)      │                │
+│  │    MonitorPanelForm)        │   └─────────┬────────────┘                │
+│  │  - tray icon/menu (as-is)   │             │ Save() -> callback          │
+│  └───────────┬──────────────────┘             │  (mirrors ApplyTrayVisibility)│
+│              │ owns/subscribes                │                            │
+│  ┌───────────▼───────────────┐   ┌────────────▼──────────────┐            │
+│  │ MonitorTile (NEW,          │   │ MonitorConfirmDialog        │          │
+│  │ UserControl, dumb/         │   │ (unchanged)                 │          │
+│  │ presentational)            │   └──────────────────────────────┘        │
+│  └─────────────────────────────┘                                          │
+│  ┌─────────────────────────────┐  ┌──────────────────────────────┐        │
+│  │ ToggleSwitch (NEW, THEME-08) │  │ MonitorIdentifyOverlay        │        │
+│  │ custom-drawn Control         │  │ (unchanged; Owner retargeted  │        │
+│  │ accent-aware fill (THEME-07) │  │  from MonitorPanelForm to    │        │
+│  └─────────────────────────────┘  │  MainForm)                    │        │
+│                                     └──────────────────────────────┘        │
+│  ThemeApplier (extended: ThemeMonitorTile / ThemeToggleSwitch helpers)     │
+├──────────────────────────────────────────────────────────────────────────┤
+│                          RigToggle.Core (no Windows APIs)                 │
+├──────────────────────────────────────────────────────────────────────────┤
+│  ToggleOrchestrator (UNCHANGED) ── BeginExclusiveMonitorAccess() lease    │
+│  IThemeProvider (EXTENDED: + AccentColor, + AccentColorChanged)          │
+│  OverridableThemeProvider (NEW — decorator, IThemeProvider)              │
+│  AppSettings (EXTENDED: + ThemeOverride : AppTheme?)                     │
+├──────────────────────────────────────────────────────────────────────────┤
+│                       RigToggle.Windows (real OS adapters)                │
+├──────────────────────────────────────────────────────────────────────────┤
+│  WindowsMonitorController (UNCHANGED — DISPLAY-12 guard lives here only) │
+│  WindowsThemeProvider (EXTENDED: same SystemEvents subscription now also │
+│    reads/diffs DwmGetColorizationColor for AccentColor)                  │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Component Responsibilities
 
-| Component | Responsibility | Layer / Status |
-|-----------|----------------|-----------------|
-| `AppSettings` | Gains `NormalMonitorsToDisable`/`NormalMonitorsToEnable` (new, mirrors existing `MonitorsToDisable`/`MonitorsToEnable`, which become implicitly "the Rig-mode set" — do not rename them, see Data Model section). `CompanionAppPath`, `RigAudioDeviceId` become genuinely optional (already nullable — the change is in `ToggleService`'s validation/branching, not the model). | `RigToggle.Core.Models` — **MODIFIED** |
-| `IModeStore` | Repurposed `ISnapshotStore`: a minimal persisted "is a toggle currently in Rig mode" marker, replacing D-14's "mode == snapshot file exists" trick now that there is no snapshot payload to key off. Same `Exists()`/`Clear()` shape; `Save(StateSnapshot)` becomes something like `SetRigMode()` (no payload). | `RigToggle.Core.Abstractions` — **MODIFIED (repurposed)**, was `ISnapshotStore` |
-| `ToggleService` | Normal-mode Monitor step becomes symmetric with Rig-mode's: `ActivateMonitors(normalEnableSet); DeactivateMonitors(normalDisableSet);` instead of `Restore(snapshot.Monitor)`. App step (`LaunchOrFocus`) and each direction's Audio step are skipped (recorded `NotAttempted`, not `Failed`) when the relevant settings field is null. Mode flag flips via `IModeStore` at the same points the snapshot used to be saved/cleared (see Data Flow). | `RigToggle.Core` — **MODIFIED** |
-| `SingleFlightGuard` | NEW: the non-blocking `Interlocked.CompareExchange` busy-flag logic extracted verbatim out of `ToggleOrchestrator` into its own small class, so it can be shared. Same D-01 semantics (non-blocking, immediate rejection, no queueing). | `RigToggle.Core` — **NEW** (extracted) |
-| `ToggleOrchestrator` | Unchanged public shape/behavior; internally delegates to an injected `SingleFlightGuard` instance instead of owning `_busy` itself. Gains a read-only `IsBusy` passthrough if the panel needs to grey out its buttons proactively (optional, see Anti-Patterns). | `RigToggle.Core` — **MODIFIED (internal only)** |
-| `ManualMonitorService` | NEW: thin wrapper exposing `Activate(string devicePath)` / `Deactivate(string devicePath)`, guarded by the **same** `SingleFlightGuard` instance `ToggleOrchestrator` uses — a toggle in flight rejects a manual panel action and vice versa. Calls straight through to `IMonitorController`, no new business logic. | `RigToggle.Core` — **NEW** |
-| `WindowsMonitorController` | `ActivateMonitors`/`DeactivateMonitors` **unchanged** — already implement the exact primitives both the redesigned `ToggleService` and the new `ManualMonitorService` need, including the existing "at least one active display must remain" throw inside `DeactivateMonitors` (line ~297-309 of the current file). `Restore()`/`RestoreViaReconstruction()` (~260 LOC) become dead once nothing calls them. | `RigToggle.Windows` — **MODIFIED (net LOC decrease)** |
-| `WindowsAudioController` | `SetDefault`/`CaptureState` unchanged. `Restore()` becomes dead **only if** the recommended audio redesign (see below) is adopted; otherwise stays live. | `RigToggle.Windows` — **MODIFIED or UNCHANGED**, see Data Model section |
-| `MainForm` | Gains one new button ("Monitors…") that opens/activates the new `MonitorPanelForm` (lazily constructed, kept as a singleton reference so re-clicking brings the existing instance forward instead of creating duplicates — same idea as `NotifyIcon_MouseClick`'s show/restore pattern already in this file). No other change to `MainForm`'s toggle/tray/hotkey logic — `RefreshUi()` keeps deriving from `_orchestrator.IsInRigMode()`, now backed by `IModeStore` instead of snapshot presence, with zero call-site changes. | `RigToggle.App` — **MODIFIED (additive)** |
-| `MonitorPanelForm` | NEW non-modal `Form`: lists every monitor from `IMonitorController.GetAllMonitors()` with a status icon (active/OS-disabled) and an Enable/Disable action per row, backed by `ManualMonitorService`. A manual "Refresh" action re-queries `GetAllMonitors()` — no live push/polling for externally-caused changes (e.g. unplugging a monitor) is in scope; this mirrors `SettingsForm`'s existing one-shot `PopulateMonitorGrid()` pattern, just re-invoked on demand instead of once at `Load`. | `RigToggle.App` — **NEW** |
-| `SettingsForm` | Gains a second monitor-target section (Normal-mode disable/enable sets), most naturally as a second `DataGridView` or a mode-selector toggling which set the existing grid edits — implementation detail for planning, not architecture. The **existing** `dgvMonitors` continues to edit `MonitorsToDisable`/`MonitorsToEnable` (Rig-mode set) unchanged. Validation (`ValidateSettingsForm`) gains a parallel check for the Normal-mode set and relaxes the current hard-requirement on `CompanionAppPath`/`RigAudioDeviceId` (features 1/2) to "required only if the user is configuring that target," not "required unconditionally." | `RigToggle.App` — **MODIFIED** |
-| `JsonSettingsStore` | Needs a **new, one-time migration branch** (same shape as the existing `MonitorDevicePath` → `MonitorsToDisable` migration at lines 55-58): if `NormalMonitorsToDisable`/`NormalMonitorsToEnable` are both null on load from a pre-v2.0 settings.json, they stay null (not silently populated from anything) — v2.0's `IsFullyConfigured` gate should require the user to configure Normal-mode targets once via Settings before Rig-mode toggling is available again post-upgrade (see Anti-Patterns — do NOT try to auto-derive a Normal-mode set from the retired snapshot mechanism). | `RigToggle.Core.Persistence` — **MODIFIED** |
-
-## Data Model: Where the Normal-Mode Monitor Set Belongs
-
-**Recommendation: two new sibling fields on `AppSettings`, not a rename of the existing pair.**
-
-```csharp
-public sealed class AppSettings
-{
-    // ... existing fields unchanged ...
-
-    // EXISTING — becomes, in effect, "the Rig-mode target set." Do not rename:
-    // renaming forces a migration-guard rewrite (JsonSettingsStore.cs lines 39-58
-    // key off these exact field names) for zero behavioral benefit.
-    public List<string>? MonitorsToDisable { get; set; }
-    public List<string>? MonitorsToEnable { get; set; }
-
-    // NEW — the Normal-mode target set, parallel in shape and semantics.
-    public List<string>? NormalMonitorsToDisable { get; set; }
-    public List<string>? NormalMonitorsToEnable { get; set; }
-}
-```
-
-Rationale:
-- **Symmetry with the existing, already-proven pattern.** `ToggleService.ToggleToRigMode`'s Monitor step is already exactly `ActivateMonitors(enableSet); DeactivateMonitors(disableSet);` sourced from `MonitorsToEnable`/`MonitorsToDisable`. The milestone context explicitly asks for Normal mode to become "parallel to how Rig mode already applies its configured disable-set" — two new fields with the same `List<string>?` shape, consumed by the exact same `IMonitorController.ActivateMonitors`/`DeactivateMonitors` primitives, is the literal parallel, not a new data shape or a new interface method.
-- **No new `IMonitorController` surface needed.** `ActivateMonitors`/`DeactivateMonitors` already take an arbitrary `IReadOnlySet<string>` — they have no idea whether the caller is "Rig mode," "Normal mode," or the new manual panel. This is the single biggest simplification v2.0 gets almost for free: the Windows-adapter layer requires **zero changes** to support the redesign.
-- **Renaming `MonitorsToDisable`/`MonitorsToEnable` to `RigMonitorsToDisable`/`RigMonitorsToEnable` was considered and rejected** for this recommendation: it's more "correct-looking" but touches `JsonSettingsStore`'s migration guard (which specifically checks `loaded.MonitorsToDisable is null`, per the CR-01 fix documented inline — see D-08/CR-01 comments), every existing test (`ToggleServiceTests`, `JsonStoreTests`, `ToggleOrchestratorTests` all construct `AppSettings` with these exact field names), and `SettingsForm`'s existing grid-binding code, for a purely cosmetic gain. If the team wants the rename for clarity, do it as an isolated, mechanical, test-covered rename commit — not bundled into this redesign.
-- **Null-vs-empty semantics carry over unchanged.** Consistent with the existing convention (`AppSettings`'s own doc comment: "a null field means never configured... not stale"), `NormalMonitorsToDisable == null` means "not yet configured," `NormalMonitorsToDisable == []` means "deliberately configured as empty" (identical to how `MonitorsToDisable` already works, including the CR-01 lesson about not conflating null with empty in a migration guard).
-
-## Mode Tracking: `ISnapshotStore` → `IModeStore` (repurposed, not simply deleted)
-
-This is the load-bearing architectural consequence of feature 3 that the milestone context does not spell out directly, and it must be solved for the redesign to work at all.
-
-**The problem:** `ToggleOrchestrator.IsInRigMode()` → `ToggleService.IsInRigMode()` → `_snapshotStore.Exists()` (D-14, `ToggleService.cs` line 380). Every mode-dependent UI decision in the app — `MainForm.RefreshUi()`'s label/button text/tray icon/tooltip, the tray and hotkey toggle handlers' branch between `ToggleToRigMode()`/`ToggleToNormalMode()`, `BtnToggle_Click`'s branch — ultimately reads this one boolean. It currently works because "a state snapshot exists on disk" and "we are in Rig mode" happen to be the same fact. Once Normal mode stops depending on that snapshot for its own restore logic, snapshot-file-presence stops being a meaningful proxy for "which mode are we in" — nothing is left updating or consulting it for that purpose.
-
-**Recommendation: repurpose `ISnapshotStore`/`JsonSnapshotStore` into a minimal mode marker, keeping the exact same file-presence idiom.**
-
-```csharp
-// RigToggle.Core/Abstractions/IModeStore.cs (was ISnapshotStore.cs)
-public interface IModeStore
-{
-    bool IsInRigMode();      // was Exists()
-    void SetRigMode();       // was Save(StateSnapshot) — no payload needed anymore
-    void SetNormalMode();    // was Clear()
-}
-```
-
-- Keeps `JsonSnapshotStore`'s already-correct atomic temp-file + `File.Move(..., overwrite: true)` write pattern (crash-safe writes, D-08-equivalent for this new marker) — this is genuinely reusable machinery, not boilerplate to throw away.
-- Keeps the crash-recovery property D-14 was designed for: if the process dies mid-toggle or is killed by Task Manager, the next startup still reads the correct last-known mode from disk, because the marker file's presence (not an in-memory flag) is authoritative — exactly the property `ToggleOrchestratorTests`/`MainForm`'s doc comments already rely on ("correct on startup even after a crash while in Rig mode").
-- Every existing call site (`ToggleOrchestrator.IsInRigMode()`, `MainForm.RefreshUi()`, the tray/hotkey handlers, `BtnToggle_Click`) needs **zero changes** beyond the method name if kept identical, or a one-line rename — none of them need to know mode tracking changed shape underneath.
-- **When to flip the flag** (mirrors today's exact ordering, just swapping "snapshot save/clear" for "flag set/clear"): `SetRigMode()` should fire after the Monitor step of `ToggleToRigMode` succeeds (not before, since a failed Monitor step today means Audio/App are never attempted and nothing really changed — flipping the mode indicator before confirming the mutation actually happened would misrepresent state, unlike the old design where the snapshot had to be saved before mutation for restore-safety reasons that no longer apply once there's no restore). `SetNormalMode()` should fire at the same point `_snapshotStore.Clear()` fires today in `ToggleToNormalMode` — after the Monitor+Audio+App steps have all been attempted, but only reached if Monitor didn't fail (preserving the existing D-05 "no further recovery, snapshot/flag survives a failed monitor restore" invariant, now read as "mode stays Rig so a retry has an accurate starting point").
-
-**Fate of the rest of the old snapshot subsystem — the direct answer to "partially or fully dead":**
-
-| Type/Method | Fate | Why |
-|---|---|---|
-| `ISnapshotStore`/`JsonSnapshotStore` | **Repurposed** into `IModeStore`/`JsonModeStore` (see above) | Its file-presence-as-flag mechanism is exactly what mode tracking still needs |
-| `StateSnapshot` record | **Dead** | Nothing constructs or reads the combined Monitor+Audio payload anymore once neither side restores from it |
-| `MonitorState`, `MonitorPathSnapshot` (as a *restore* payload) | **Dead as restore input.** `MonitorState` itself (the return type of `IMonitorController.CaptureState()`) may still have a legitimate use — see note below | `IMonitorController.Restore(MonitorState)` has no caller once `ToggleToNormalMode` stops calling it |
-| `IMonitorController.Restore(MonitorState)` / `WindowsMonitorController.Restore()` + `RestoreViaReconstruction()` (~260 LOC, the single largest method in the codebase) | **Dead — the single biggest cleanup-pass target (feature 7)** | No remaining caller anywhere in `RigToggle.App`/`RigToggle.Core` once `ToggleService` stops calling it |
-| `IMonitorController.CaptureState()` / `WindowsMonitorController.CaptureState()` | **Recommend keeping**, but its only remaining caller becomes the existing `ToggleToRigMode` CR-01 fix (re-capture-and-compare to decide whether a failed Disable actually mutated anything) — worth re-examining during cleanup whether that fix still needs full-topology capture or can be simplified now that its downstream consumer (the snapshot) no longer exists in the same form | Still structurally useful, but its *purpose* narrows — flag for the cleanup-pass phase to look at, not a clear-cut keep-as-is |
-| `AudioState`, `AudioRoleState` (as a *restore* payload) | **Dead only if** the audio redesign below is adopted; **otherwise stays fully alive** | See next section |
-| `IAudioController.Restore(AudioState)` / `WindowsAudioController.Restore()` | **Dead only if** the audio redesign below is adopted | See next section |
-
-## Audio: Does It Also Need to Drop Snapshot-Restore? (MEDIUM-confidence recommendation, not a stated requirement)
-
-The milestone's literal feature list scopes feature 3 ("explicit configured set replacing snapshot-restore") to the **monitor** step only; feature 2 ("audio devices become optional per role") only says skip-when-unset, which is a separate concern from restore-vs-configured-target. Taken completely literally, `ToggleToNormalMode`'s audio step could keep calling `_audioController.Restore(snapshot.Audio)` unchanged, and only the monitor half of the redesign would apply.
-
-However, three pieces of direct evidence in the existing codebase point toward extending the same redesign to audio, and this research recommends doing so:
-
-1. **`AppSettings.NormalAudioDeviceId` already exists and is already collected in `SettingsForm`** (bound at `SettingsForm.cs` line 530, saved at line 815) **but is never read by `ToggleService` at all** — grep confirms its only runtime consumers are `ToggleService.IsFullyConfigured`'s validation check (line 203) and test setup. This is a latent, already-scaffolded field with no wired behavior — exactly the shape of something "meant to be used" that the original v1.0/v1.1 design left for later.
-2. **Symmetry.** `ToggleToRigMode`'s audio step is already `_audioController.SetDefault(settings.RigAudioDeviceId!)` — a configured-target call, not a restore. If Normal mode's monitor step becomes configured-target too, leaving only audio's Normal-mode step on the old restore mechanism produces a genuinely asymmetric design (monitor: configured both directions; audio: configured one direction, restored the other) that's harder to reason about and harder to explain in the Settings UI ("why does the Normal-mode monitor grid represent my target state, but the Normal-mode audio dropdown is just a label that's actually ignored at toggle-time?" — which is literally true today).
-3. **`PROJECT.md`'s own milestone framing** states plainly: "Normal mode moves from snapshot-restore to an explicitly configured target state, matching how Rig mode already works" — worded in terms of "Normal mode" broadly (the Core Value being revised references both monitor *and* audio), not scoped to "Normal mode's monitor step."
-
-**If adopted:** `ToggleToNormalMode`'s Audio step becomes `_audioController.SetDefault(settings.NormalAudioDeviceId!)` (skipped/`NotAttempted` when null, mirroring the Rig-mode audio step's new optional-skip behavior from feature 2), replacing `_audioController.Restore(snapshot.Audio)` entirely. This makes `AudioState`/`AudioRoleState`-as-restore-payload, `IAudioController.Restore`, `IAudioController.CaptureState`, and `WindowsAudioController.Restore`/`CaptureState` **fully dead**, and `StateSnapshot`/`ISnapshotStore` (fully, not just the monitor half) become dead-code-turned-mode-marker as described above — the cleanest possible outcome, and the one that makes the cleanup pass (feature 7) maximally effective.
-
-One real behavior change this implies, worth surfacing explicitly rather than burying: today's audio restore is **per-role-precise** (independently restores whatever was actually default for Console/Multimedia/Communications before the toggle, which might differ from each other on a machine with unusual audio routing). Once Normal mode uses `SetDefault(NormalAudioDeviceId)`, it — like Rig mode already does — applies **one configured device to all three roles uniformly**, losing that per-role precision. This is a deliberate, in-scope consequence of the milestone's own stated Core Value revision, not an accidental regression, but it should be a conscious call during planning, not something that's discovered mid-implementation.
-
-**If not adopted** (the conservative reading — only the monitor step changes): `ToggleToNormalMode` still needs *some* snapshot capture before mutation, since audio restore still needs `AudioState` — meaning `ToggleToRigMode` would keep calling `_snapshotStore.Save(new StateSnapshot(monitorState, audioState))`, but `MonitorState` inside that payload would be write-only (captured, persisted, never read). Mode tracking still cannot use "does a snapshot exist" as the mode proxy either way, for the same reason described above — even in the conservative reading, mode-tracking needs the `IModeStore` redesign, because a snapshot could legitimately exist (for audio-restore purposes) independent of which mode is actually configured/active. **This is the one part of the mode-tracking redesign that is not optional under either interpretation of the audio question.**
-
-## Manual Monitor Panel: Placement and Concurrency
-
-### Where it lives
-
-**Recommendation: a new non-modal `MonitorPanelForm` in `RigToggle.App`, opened via a new button on `MainForm`** (e.g. "Monitors…", alongside the existing "Settings" button), not a panel embedded directly in `MainForm` and not a section inside `SettingsForm`.
-
-- **Not inside `SettingsForm`:** `SettingsForm` is a modal dialog whose entire existing model is "edit a working copy of `AppSettings`, then Save or Discard" (`_settings` field, `ValidateSettingsForm`, `btnSaveSettings`/`btnDiscardChanges`). A live, immediate-effect "click this row to actually disable that monitor right now" action does not fit that deferred-edit model at all — mixing "configure what Rig/Normal mode will do next time" with "mutate my display topology right now" in the same modal risks a user accidentally live-toggling a monitor while they think they're just editing a checkbox, and complicates `SettingsForm`'s own Save/Discard semantics for no benefit.
-- **Not embedded directly in `MainForm`:** `MainForm`'s existing responsibilities (mode indicator, Toggle button, tray/hotkey dispatch, `InitializeTrayState`'s carefully-sequenced `--tray`-safe startup path) are already dense and well-documented; bolting a multi-row monitor grid with per-row action buttons and status icons onto that same form's layout is a larger, riskier surface-area change than a new, focused form. A separate form also lets the panel stay open (non-modal) while the user alt-tabs into a game to check monitor state mid-session, which a modal `SettingsForm`-style dialog cannot do.
-- **Non-modal, not modeless-blocking:** `ShowDialog()` (as `SettingsForm` uses) would block `MainForm`, defeating "independent of the Rig/Normal toggle" — use `Show()` (non-modal) instead, with `MainForm` holding a nullable reference and reusing/activating the existing instance on repeat clicks (mirrors the existing `NotifyIcon_MouseClick`'s `Show(); WindowState = Normal; Activate();` restore idiom already in `MainForm.cs`).
-- Constructed via the same composition-root factory pattern as `SettingsForm` (`Program.cs`'s `SettingsFormFactory` local function) — a `MonitorPanelForm` factory or lazy singleton constructed in `Program.cs`, injected with `IMonitorController`, the new `ManualMonitorService`, and `IThemeProvider` (for consistency with the live-theme-follow work already applied to every other form in this app).
-
-### Concurrency: one shared guard, not two independent ones
-
-The milestone context explicitly flags that the panel "isn't gated by `ToggleOrchestrator`'s toggle-specific reentrancy flow" but "needs its own safe-concurrency story if a toggle is in progress at the same time." Two genuinely independent `Interlocked`-based busy-flags (one inside `ToggleOrchestrator`, a separate new one inside a hypothetical standalone panel service) would each correctly prevent *same-source* reentrancy but **cannot prevent a cross-source race**: the toggle could see "panel idle" and the panel could see "toggle idle" at the same instant, and both proceed to mutate the same CCD display topology concurrently — likely producing exactly the kind of "verify-and-throw" failures `WindowsMonitorController` is full of, or worse, a genuinely inconsistent topology neither side expected.
-
-**Recommendation:** extract `ToggleOrchestrator`'s existing `Interlocked.CompareExchange`-based busy-flag (currently private state inside `ToggleOrchestrator`, `ToggleOrchestrator.cs` lines 39/58-76) into a small standalone `SingleFlightGuard` class in `RigToggle.Core`, constructed **once** in `Program.cs`, and inject the **same instance** into both `ToggleOrchestrator` and the new `ManualMonitorService`. `ToggleOrchestrator`'s existing public shape, tests, and D-01/D-02 documented semantics (non-blocking, immediate rejection, no queueing, one shared flag across both toggle directions) are fully preserved — this is a pure internal delegation refactor, verifiable by the fact that all 4 existing `ToggleOrchestratorTests` reentrancy tests should pass unchanged against the refactored version. `ManualMonitorService.Activate`/`Deactivate` wrap their `IMonitorController` calls in the same guard, throwing the same (or a sibling) `*InProgressException` the panel's UI catches and surfaces (e.g., disable the row's buttons briefly, or a small inline message) — no new concurrency primitive, no new failure mode to design from scratch.
-
-This satisfies the milestone's "own safe-concurrency story" requirement while still guaranteeing mutual exclusion with the toggle pipeline — which is the actually load-bearing requirement, since both paths mutate the same non-transactional OS resource (CCD display topology) with no OS-level locking of their own.
-
-### Safety constraint (feature 5): already solved, reuse don't rebuild
-
-`WindowsMonitorController.DeactivateMonitors()` **already** throws `InvalidOperationException("Cannot disable all configured monitors — at least one active display must remain...")` whenever the survivor set (currently-active paths minus the requested disable targets) would be empty (see the `survivors.Length == 0` guard, `WindowsMonitorController.cs` lines 295-309). Because both the toggle path (`ToggleService` → `IMonitorController.DeactivateMonitors`) and the recommended manual-panel path (`ManualMonitorService.Deactivate` → the same `IMonitorController.DeactivateMonitors`) route through this exact method with the live, currently-active topology as the baseline, **the safety constraint is already enforced from a single shared validation point with zero new code**, provided the panel's Disable action is implemented as a call to `IMonitorController.DeactivateMonitors(new HashSet<string> { devicePath })` and not as a new, separate P/Invoke or CCD call. This is the cleanest possible resolution of the quality gate's "ideally from one shared validation point, not duplicated logic" requirement — the shared point already exists; the job is to route the new caller through it, not to build a new one.
+| Component | Responsibility | New / Modified / Unchanged |
+|-----------|----------------|------------------------|
+| `MainForm` | Mode indicator, Rig/Normal toggle, **and now** the monitor-tile dashboard (enumeration, per-tile disable/enable, hotplug refresh, Identify) | **Modified** — absorbs `MonitorPanelForm`'s body |
+| `MonitorTile` | Renders one monitor's icon/number/name/status; raises a click event; owns no controller reference | **New** — `UserControl`, presentation-only |
+| `ToggleSwitch` | Custom-drawn on/off control replacing `btnToggle`; theme- and accent-aware paint | **New** — `Control`/`UserControl` with `OnPaint` |
+| `MonitorConfirmDialog` | DISPLAY-07 informed-consent dialog before any disable | **Unchanged** — same constructor, same call sites (just relocated into `MainForm`) |
+| `MonitorIdentifyOverlay` | Per-monitor numbered overlay | **Unchanged** internally — `Owner` retargeted from `MonitorPanelForm` to `MainForm` |
+| `ThemeApplier` | Static per-control recolor helpers | **Modified** — add `ThemeMonitorTile`/`ThemeToggleSwitch` (or the new controls self-theme via `IsDark`, see Patterns) |
+| `ToggleOrchestrator` | Reentrancy guard (`RunGuarded`) + `BeginExclusiveMonitorAccess()` lease, both on one shared `_busy` flag | **Unchanged** — reused as-is by `MainForm`'s new tile handlers |
+| `WindowsMonitorController` | CCD monitor enumerate/activate/deactivate; **sole** location of the "at least one monitor enabled" guard | **Unchanged** — must remain the only guard implementation |
+| `IThemeProvider` / `WindowsThemeProvider` | Live OS light/dark signal (THEME-01..06) | **Extended**, not replaced — add `AccentColor` + `AccentColorChanged`; existing `CurrentTheme`/`ThemeChanged` contract and behavior untouched |
+| `OverridableThemeProvider` | Resolves effective theme = override ?? OS signal | **New** — `RigToggle.Core`, wraps `IThemeProvider`, reads `ISettingsStore` |
+| `AppSettings` | Persisted user settings | **Extended** — add `ThemeOverride : AppTheme?` (nullable, `null` = follow system, consistent with every other "unset" field in this class) |
+| `Program.cs` (composition root) | Wires concrete adapters | **Modified** — construct `OverridableThemeProvider` around `WindowsThemeProvider`; drop `MonitorPanelFormFactory`/`Func<MonitorPanelForm>` from `MainForm`'s constructor |
 
 ## Recommended Project Structure
 
+No new projects or top-level folders are needed — this is additive within `RigToggle.App`, `RigToggle.Core`, and `RigToggle.Windows`:
+
 ```
 src/
-├── RigToggle.Core/
-│   ├── Abstractions/
-│   │   ├── IModeStore.cs                  # MODIFIED (renamed/reshaped from ISnapshotStore.cs)
-│   │   └── ... (IMonitorController, IAudioController, IAppController, ISettingsStore — UNCHANGED)
-│   ├── Models/
-│   │   ├── AppSettings.cs                 # MODIFIED — + NormalMonitorsToDisable/NormalMonitorsToEnable
-│   │   ├── MonitorState.cs                # UNCHANGED shape; usage narrows (see Data Model section)
-│   │   ├── StateSnapshot.cs               # DEAD (delete) once IModeStore fully replaces it
-│   │   └── AudioState.cs / AudioRoleState.cs   # DEAD if audio redesign adopted, else UNCHANGED
-│   ├── Persistence/
-│   │   ├── JsonModeStore.cs               # MODIFIED (renamed/reshaped from JsonSnapshotStore.cs)
-│   │   └── JsonSettingsStore.cs           # MODIFIED — new migration-guard branch, no-op-safe for null NormalMonitors*
-│   ├── SingleFlightGuard.cs               # NEW — extracted busy-flag primitive
-│   ├── ManualMonitorService.cs            # NEW — thin guarded wrapper over IMonitorController.Activate/DeactivateMonitors
-│   ├── ToggleOrchestrator.cs              # MODIFIED — delegates to injected SingleFlightGuard
-│   └── ToggleService.cs                   # MODIFIED — symmetric Normal-mode Monitor step, optional-skip Audio/App steps, IModeStore flips
-│
-├── RigToggle.Windows/
-│   ├── WindowsMonitorController.cs        # MODIFIED — Restore()/RestoreViaReconstruction() deleted (dead); ActivateMonitors/DeactivateMonitors UNCHANGED
-│   └── WindowsAudioController.cs          # MODIFIED (Restore/CaptureState deleted) or UNCHANGED, per Audio section above
-│
 ├── RigToggle.App/
-│   ├── Program.cs                         # MODIFIED — construct SingleFlightGuard once, inject into ToggleOrchestrator + ManualMonitorService; construct MonitorPanelForm factory
-│   ├── MainForm.cs                        # MODIFIED (additive) — new "Monitors…" button, lazy MonitorPanelForm show/activate
-│   ├── MonitorPanelForm.cs (+.Designer.cs)# NEW — non-modal live per-monitor enable/disable panel
-│   └── SettingsForm.cs (+.Designer.cs)    # MODIFIED — second Normal-mode monitor-target section; relaxed validation for optional App/Audio fields
-│
+│   ├── MainForm.cs / .Designer.cs        # MODIFIED — absorbs monitor-tile logic
+│   ├── MonitorTile.cs / .Designer.cs     # NEW — reusable per-monitor UserControl
+│   ├── ToggleSwitch.cs                   # NEW — custom-drawn control (THEME-08)
+│   ├── SettingsForm.cs / .Designer.cs    # MODIFIED — layout pass + Theme Override group
+│   ├── MonitorConfirmDialog.cs           # unchanged
+│   ├── MonitorIdentifyOverlay.cs         # unchanged (Owner retarget only, in MainForm)
+│   ├── ThemeApplier.cs                   # MODIFIED — new helper(s) for the two new controls
+│   ├── Program.cs                        # MODIFIED — composition root wiring
+│   └── (MonitorPanelForm.cs/.Designer.cs DELETED)
+├── RigToggle.Core/
+│   ├── Abstractions/IThemeProvider.cs    # MODIFIED — + AccentColor, + AccentColorChanged
+│   ├── OverridableThemeProvider.cs       # NEW — decorator, no Windows APIs
+│   └── Models/AppSettings.cs             # MODIFIED — + ThemeOverride
+├── RigToggle.Windows/
+│   ├── WindowsThemeProvider.cs           # MODIFIED — accent-color read/diff added to existing SystemEvents handler
+│   └── NativeMethods.cs                  # MODIFIED — + DwmGetColorizationColor P/Invoke
 └── RigToggle.Tests/
-    ├── Doubles/
-    │   ├── InMemoryStores.cs              # MODIFIED — InMemorySnapshotStore → InMemoryModeStore (drop payload)
-    │   └── FakeControllers.cs             # MODIFIED — FakeMonitorController.Restore/FakeAudioController.Restore removed if dead
-    └── (new tests) SingleFlightGuardTests.cs, ManualMonitorServiceTests.cs,
-        extended ToggleServiceTests.cs (Normal-mode symmetric-set assertions, optional-skip assertions)
+    └── (new unit tests for OverridableThemeProvider's override-resolution logic — pure logic, no Windows APIs, fits the existing Core test pattern)
 ```
+
+### Structure Rationale
+
+- `MonitorTile` and `ToggleSwitch` live in `RigToggle.App` (not `RigToggle.Core`) because they are WinForms `Control`/`UserControl` subclasses — same placement rule the codebase already follows for every other Form/dialog.
+- `OverridableThemeProvider` belongs in `RigToggle.Core`, **not** `RigToggle.Windows`, because it contains zero Windows API calls — it is pure decision logic over an injected `IThemeProvider` + `ISettingsStore` (both already `Core` abstractions). This also makes it trivially unit-testable without a Windows CI runner, matching `RigToggle.Tests`' existing scope (Core-only, no Windows APIs) versus `RigToggle.Windows.Tests` (real adapters).
+- `DwmGetColorizationColor` is a genuine Win32 API call, so it belongs in `RigToggle.Windows/NativeMethods.cs` alongside the existing `DwmSetWindowAttribute` P/Invoke, consumed through `WindowsThemeProvider` exactly as `DwmTitleBar` already consumes `NativeMethods` for the title-bar attribute.
 
 ## Architectural Patterns
 
-### Pattern 1: Symmetric per-mode target application (extends an existing pattern, does not introduce a new one)
+### Pattern 1: Dumb presentational tile, owner performs the mutation
 
-**What:** Both `ToggleToRigMode` and `ToggleToNormalMode`'s Monitor step become the identical two-call shape — `ActivateMonitors(enableSet); DeactivateMonitors(disableSet);` — differing only in which `AppSettings` fields supply the sets. Audio, if the redesign above is adopted, becomes the same symmetric shape for `SetDefault`.
-**When to use:** Any future third "mode" (unlikely here, but this is the generalizable shape) would slot in the same way — configured-target application is now the ONE pattern for both directions, not two different mechanisms.
-**Trade-offs:** Gains simplicity and testability (one code shape asserted twice in tests instead of two different shapes) at the cost of the per-role audio restore precision noted above, and at the cost of losing "restores exactly what was there before" for any monitor arrangement the user didn't explicitly configure (an accepted, milestone-stated trade-off).
+**What:** `MonitorTile` never calls `IMonitorController` itself. It exposes read-only setters (`FriendlyName`, `IsActive`, `IsPrimary`, `DevicePath`) and a single `event EventHandler? ActionRequested` fired on click. `MainForm` is the only caller of `_monitorController.ActivateMonitors`/`DeactivateMonitors`, exactly as `MonitorPanelForm` was the only caller before.
+
+**When to use:** Any time a reusable child control needs to represent domain state without becoming a second place that can drift out of sync with the safety-guard logic.
+
+**Trade-offs:** Slightly more plumbing (event + handler in `MainForm`) versus letting the tile "just call the controller" — but this is the load-bearing reason DISPLAY-12 stays a single implementation. Do not shortcut this by injecting `IMonitorController` into `MonitorTile`.
 
 **Example:**
 ```csharp
-// ToggleService.ToggleToNormalMode's new Monitor step — literally mirrors
-// ToggleToRigMode's existing Monitor step shape (same ordering rule applies:
-// ActivateMonitors before DeactivateMonitors, per the existing Pitfall-2 CCD
-// persistence-database ordering constraint, unchanged from today).
-var normalDisableSet = (settings.NormalMonitorsToDisable ?? new List<string>()).ToHashSet();
-var normalEnableSet = (settings.NormalMonitorsToEnable ?? new List<string>()).ToHashSet();
-
-TryExecuteStep("Monitor", () =>
+public partial class MonitorTile : UserControl
 {
-    _monitorController.ActivateMonitors(normalEnableSet);
-    _monitorController.DeactivateMonitors(normalDisableSet);
-}, steps);
+    public string? DevicePath { get; private set; }
+    public event EventHandler? ActionRequested;
+
+    public void SetState(MonitorInfo monitor)
+    {
+        DevicePath = monitor.DevicePath;
+        // ... update labels/paint fields ...
+        Invalidate();
+    }
+
+    private void Tile_Click(object? sender, EventArgs e) => ActionRequested?.Invoke(this, EventArgs.Empty);
+}
+
+// MainForm:
+tile.ActionRequested += (s, e) => OnTileAction((MonitorTile)s!);
+private void OnTileAction(MonitorTile tile)
+{
+    var lease = TryAcquireMonitorAccess(); // ToggleOrchestrator.BeginExclusiveMonitorAccess()
+    if (lease is null) return;
+    using (lease)
+    {
+        // ... confirm dialog if disabling, then:
+        _monitorController.DeactivateMonitors(new HashSet<string> { tile.DevicePath! });
+        // or ActivateMonitors — same two calls MonitorPanelForm used, unchanged
+    }
+}
 ```
 
-### Pattern 2: Repurposed persistence primitive for a narrower payload (mode marker, not full snapshot)
+### Pattern 2: Decorator for theme override (Decorator over IThemeProvider)
 
-**What:** Reuse `JsonSnapshotStore`'s atomic temp-file-then-`File.Move` write mechanism for a much smaller payload (or none at all — presence alone can still be the signal). See Mode Tracking section above.
-**When to use:** Whenever an existing persistence adapter's *mechanism* (atomic write, crash-safety) is still needed but its *payload* is being retired — cheaper and lower-risk than writing a new persistence class from scratch, and keeps one atomic-write idiom in the codebase instead of two slightly different ones.
-**Trade-offs:** The renamed type (`IModeStore` vs. `ISnapshotStore`) changes call-site vocabulary everywhere it's referenced — a mechanical but real diff across `Program.cs`, `ToggleService.cs`, and every test double. Worth doing as an explicit, reviewable rename rather than leaving `ISnapshotStore`'s name in place while its meaning quietly changes underneath it (which would actively mislead the next reader).
+**What:** `OverridableThemeProvider : IThemeProvider` wraps the real `WindowsThemeProvider`. `CurrentTheme => settingsStore.Load().ThemeOverride ?? inner.CurrentTheme` (read fresh every call, matching the codebase's existing "never cache `IsDark`" convention in `MainForm`/`SettingsForm`/`MonitorPanelForm`). It re-raises its own `ThemeChanged` whenever the inner provider's `ThemeChanged` fires **and** the effective (post-override) theme actually changed, plus exposes a `RefreshOverride()` method that `SettingsForm` calls immediately after `Save()` — the same "explicit live-apply callback" idiom already used for `ApplyTrayVisibility()`.
 
-### Pattern 3: Shared single-flight guard across two independent entry points
+**When to use:** Any time you need to intercept/override a live OS signal without touching the class that owns that signal's subscription lifecycle.
 
-**What:** One `SingleFlightGuard` instance, constructed once in the composition root, injected into both `ToggleOrchestrator` and `ManualMonitorService`. See Manual Monitor Panel section above for the full rationale.
-**When to use:** Any time two independent UI-triggerable code paths mutate the same non-transactional, externally-observable OS resource (here: CCD display topology) and neither path can tolerate the other running concurrently.
-**Trade-offs:** Slightly reduces panel responsiveness during an in-flight toggle (the panel's actions are rejected, not queued — same non-blocking philosophy as the existing toggle guard, D-01) — acceptable and consistent with this codebase's established "reject immediately, never silently queue or block" stance.
+**Trade-offs:** One extra indirection layer, but it is the only design that gets THEME-09 "for free" everywhere `IThemeProvider` is already injected (`MainForm`, `SettingsForm`, `MonitorConfirmDialog`) with **zero changes** to `WindowsThemeProvider` — this is what keeps THEME-01..06 regression risk near zero. `AccentColor`/`AccentColorChanged` deliberately pass through unmodified (the milestone scopes THEME-09 to light/dark only, not accent).
+
+**Example:**
+```csharp
+public sealed class OverridableThemeProvider : IThemeProvider
+{
+    private readonly IThemeProvider _inner;
+    private readonly ISettingsStore _settingsStore;
+    public event EventHandler? ThemeChanged;
+    public event EventHandler? AccentColorChanged { add => _inner.AccentColorChanged += value; remove => _inner.AccentColorChanged -= value; }
+
+    public OverridableThemeProvider(IThemeProvider inner, ISettingsStore settingsStore)
+    {
+        _inner = inner; _settingsStore = settingsStore;
+        _inner.ThemeChanged += (_, _) => ThemeChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public AppTheme CurrentTheme => ReadOverride() ?? _inner.CurrentTheme;
+    public Color AccentColor => _inner.AccentColor;
+
+    private AppTheme? ReadOverride()
+    {
+        try { return _settingsStore.Load().ThemeOverride; } catch { return null; }
+    }
+
+    // Called by SettingsForm right after _settingsStore.Save(), mirroring ApplyTrayVisibility().
+    public void RefreshOverride() => ThemeChanged?.Invoke(this, EventArgs.Empty);
+}
+```
+Note: this simplified sketch always re-raises on `RefreshOverride()`; a stricter version would diff old-vs-new effective theme first, matching `WindowsThemeProvider.OnUserPreferenceChanged`'s "only fire on genuine flip" discipline — recommended for the real implementation.
+
+### Pattern 3: One shared SystemEvents subscription, multiple diffed signals
+
+**What:** `WindowsThemeProvider` already subscribes once to `SystemEvents.UserPreferenceChanged` and diffs the registry-read theme against its last-known value before raising `ThemeChanged`. THEME-07 should **extend this same handler**, not add a second `UserPreferenceChanged` subscription, to read + independently diff the accent color (via `DwmGetColorizationColor`, confirmed as the standard, message/registry-consistent way to read the live DWM colorization color — see Sources) and raise `AccentColorChanged` only when it actually changed.
+
+**When to use:** Whenever a second live signal shares the same OS notification channel as an existing one.
+
+**Trade-offs:** Slightly larger single handler, but avoids two independent `SystemEvents` registrations racing each other and avoids a second `Dispose()`/unsubscribe path to keep in sync.
 
 ## Data Flow
 
-### `ToggleToRigMode`, v2.0 (Monitor step unchanged in shape; App/Audio steps gain optional-skip)
+### Monitor tile action flow (folded from MonitorPanelForm)
 
 ```
-BtnToggle_Click / TrayToggleMenuItem_Click / HandleHotkeyToggle
-    │
-    ▼
-ToggleOrchestrator.ToggleToRigMode()  ── guarded by SingleFlightGuard (shared with ManualMonitorService)
-    │
-    ▼
-ToggleService.ToggleToRigMode()
-    │
-    ├─ preflight: IsFullyConfigured() — now requires only the fields actually
-    │   being used (monitor disable/enable-set requirement unchanged; App path
-    │   and per-mode audio device requirements become conditional, not absolute)
-    │
-    ├─ Monitor step (unchanged shape): ActivateMonitors(enableSet); DeactivateMonitors(disableSet);
-    │       └─ on success: IModeStore.SetRigMode()  (NEW — replaces the old
-    │                        pre-mutation _snapshotStore.Save(...) call entirely;
-    │                        no capture-before-mutate step remains for monitor)
-    │
-    ├─ Audio step (MODIFIED): if settings.RigAudioDeviceId is null → step recorded
-    │       NotAttempted, skipped entirely (feature 2). Otherwise unchanged
-    │       SetDefault(settings.RigAudioDeviceId) call.
-    │
-    └─ App step (MODIFIED): if settings.CompanionAppPath is null → step recorded
-            NotAttempted, skipped entirely (feature 1). Otherwise unchanged
-            LaunchOrFocus(settings.CompanionAppPath) call.
+User clicks a MonitorTile
+    ↓
+MonitorTile.ActionRequested event
+    ↓
+MainForm.OnTileAction(tile)
+    ↓
+ToggleOrchestrator.BeginExclusiveMonitorAccess()  ← same _busy flag as Rig/Normal toggle
+    ↓ (if disabling) MonitorConfirmDialog.ShowDialog()  — SkipMonitorConfirmation gate, unchanged
+    ↓
+IMonitorController.DeactivateMonitors / ActivateMonitors  ← DISPLAY-12 guard lives ONLY here
+    ↓
+RefreshMonitorTiles() (re-enumerate GetAllMonitors(), update each MonitorTile.SetState)
+    ↓
+lease.Dispose() (releases _busy)
 ```
 
-### `ToggleToNormalMode`, v2.0 (Monitor+Audio steps rewritten to configured-target; App step gains optional-skip; isolate-and-continue policy unchanged)
+### Hotplug refresh flow
 
 ```
-ToggleService.ToggleToNormalMode()
-    │
-    ├─ Monitor step (REWRITTEN): ActivateMonitors(normalEnableSet); DeactivateMonitors(normalDisableSet);
-    │       (was: _monitorController.Restore(snapshot.Monitor) + a separate
-    │        unconditional DeactivateMonitors(enableSet) call for D-02's old asymmetry —
-    │        that asymmetry disappears entirely: both directions now use the identical
-    │        two-call shape, D-02's special-case comment in ToggleService.cs can be deleted)
-    │       └─ isolate-and-continue unchanged: failure recorded, subsequent steps
-    │            still attempted per existing D-05 policy — EXCEPT the mode flag
-    │            is NOT flipped to Normal if this step failed (mirrors today's
-    │            "snapshot survives a failed monitor restore" invariant)
-    │
-    ├─ Audio step (REWRITTEN if audio redesign adopted): SetDefault(settings.NormalAudioDeviceId),
-    │       skipped/NotAttempted when null (feature 2's Normal-mode half)
-    │       (was: _audioController.Restore(snapshot.Audio))
-    │
-    ├─ App step (MODIFIED): MinimizeIfRunning skipped/NotAttempted when
-    │       settings.CompanionAppPath is null (feature 1) — same
-    │       isolate-and-continue try/catch wrapper as today otherwise
-    │
-    └─ IModeStore.SetNormalMode()  (NEW — replaces _snapshotStore.Clear(),
-         same "only if Monitor step didn't fail" gating as today's Clear() call)
+Microsoft.Win32.SystemEvents.DisplaySettingsChanged (may fire off UI thread)
+    ↓
+MainForm.OnDisplaySettingsChanged  — IsDisposed check, InvokeRequired/BeginInvoke marshal
+    ↓
+RefreshMonitorTiles()
 ```
+Subscribed once in `MainForm`'s constructor (no unsubscribe needed — `MainForm` is an app-lifetime object that is only ever `Hide()`'d, never disposed, until process exit; this mirrors `MainForm`'s existing un-unsubscribed `_themeProvider.ThemeChanged += OnThemeChanged` wiring already in the constructor today).
 
-### Manual panel flow (independent entry point, shares the mutation guard)
+### Theme resolution flow (with override)
 
 ```
-MonitorPanelForm row action (Enable/Disable click)
-    │
-    ▼
-ManualMonitorService.Activate(devicePath) / Deactivate(devicePath)
-    │  guarded by the SAME SingleFlightGuard instance ToggleOrchestrator uses
-    │
-    ├─ if a toggle is currently in flight → immediate rejection (same
-    │    non-blocking, no-queue semantics as ToggleOrchestrator's existing
-    │    ToggleInProgressException) → panel surfaces a brief inline message
-    │
-    └─ otherwise → IMonitorController.ActivateMonitors/DeactivateMonitors
-         (UNCHANGED methods — same "at least one active display must remain"
-          guard fires here exactly as it does for the toggle path)
-         │
-         ▼
-       MonitorPanelForm refreshes its row's status icon from the call's
-       success/failure — no broadcast/event needed since this is a
-       synchronous, single-row, user-initiated action
+SystemEvents.UserPreferenceChanged (OS theme OR accent flip)
+    ↓
+WindowsThemeProvider: re-read registry, diff, raise ThemeChanged / AccentColorChanged
+    ↓
+OverridableThemeProvider: re-raise ThemeChanged (passes through AccentColorChanged unmodified)
+    ↓
+MainForm/SettingsForm/MonitorConfirmDialog.OnThemeChanged (existing handlers, UNCHANGED)
+    ↓
+IsDark => _themeProvider.CurrentTheme == AppTheme.Dark   ← now resolves override transparently
+
+SettingsForm Save() (user changed the override radio group)
+    ↓
+_settingsStore.Save(settingsToSave)   ← includes new ThemeOverride field
+    ↓
+_applyThemeOverride()  (new callback, called right after Save — same slot as _applyTrayVisibility())
+    ↓
+OverridableThemeProvider.RefreshOverride() → ThemeChanged fires → every open Form re-themes live
 ```
+
+### Key Data Flows
+
+1. **Tile mutation never bypasses the shared guard:** every path that ends in `ActivateMonitors`/`DeactivateMonitors` — Rig toggle, Normal toggle, and now the tile click — funnels through `WindowsMonitorController`'s single implementation. Folding the panel into `MainForm` does not create a second call site with its own pre-check; it reuses the exact two method calls.
+2. **Theme override never touches the OS-signal path:** `WindowsThemeProvider` keeps reading the registry and raising events exactly as it does today; the override is purely a read-time (`CurrentTheme` getter) and event-relay (constructor subscription) addition in a wrapping class that every consumer already treats as "the `IThemeProvider`" via DI.
+
+## Scaling Considerations
+
+This is a single-user desktop utility — there is no traditional user-scale axis. The only "scale" variable is **monitor count**:
+
+| Monitor count | Architecture Adjustments |
+|-------|--------------------------|
+| 1-4 (typical desk + rig) | `FlowLayoutPanel`/`TableLayoutPanel` of `MonitorTile` instances fits comfortably in a fixed-size `MainForm` |
+| 5-8 (unusual but plausible multi-monitor desk) | `FlowLayoutPanel` wraps to multiple rows automatically if `MainForm` isn't resized to fit — verify tile sizing keeps the window at a reasonable default height, or make the tile strip area scrollable (`AutoScroll = true` on the host panel) rather than growing `MainForm` unboundedly |
+| 9+ | Out of scope for a personal-rig tool; no special handling needed beyond the scroll fallback above |
+
+### Scaling Priorities
+
+1. **First (and only realistic) concern:** tile-strip layout at higher monitor counts than the 2-monitor rig this app is built for — mitigate with `AutoScroll` on the tile container, not a redesign.
+2. No second-order concern exists at this project's scale (single user, local-only state, no network/database).
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Two independent `Interlocked` busy-flags (one per entry point) instead of one shared guard
+### Anti-Pattern 1: Giving `MonitorTile` its own `IMonitorController` reference
 
-**What people do:** Build `ManualMonitorService` with its own private `_busy` field, reasoning "the panel needs its own concurrency story" literally as "its own flag."
-**Why it's wrong:** Cannot prevent a genuine cross-path race (toggle and panel both observe "the other side is idle" and proceed concurrently against the same CCD topology) — see Manual Monitor Panel / Concurrency section above.
-**Instead:** One `SingleFlightGuard` instance, constructed once in `Program.cs`, injected into both `ToggleOrchestrator` and `ManualMonitorService`.
+**What people do:** Inject `IMonitorController` into the tile control "for convenience" so it can call `Activate/DeactivateMonitors` directly on click, mirroring how `MonitorPanelForm` itself held the controller.
+**Why it's wrong:** Creates a second call site for monitor mutation outside `MainForm`, which is exactly the kind of duplication DISPLAY-12's "single shared implementation" was designed to prevent (the guard itself is still centralized in `WindowsMonitorController`, but a second caller doubles the surface area for the exclusive-access lease and confirm-dialog logic to drift out of sync).
+**Do this instead:** `MonitorTile` raises an event; `MainForm` (the sole owner of `_monitorController` and `_orchestrator`) performs the mutation, exactly as documented in Pattern 1 above.
 
-### Anti-Pattern 2: Trying to auto-derive `NormalMonitorsToDisable`/`NormalMonitorsToEnable` from the retired snapshot mechanism at migration time
+### Anti-Pattern 2: A second `SystemEvents.UserPreferenceChanged` or `DisplaySettingsChanged` subscription
 
-**What people do:** On first load of a pre-v2.0 `settings.json`, attempt to seed the new Normal-mode fields from whatever `state.json` snapshot happens to exist at that moment (if the user happens to be mid-rig-session during the upgrade), to avoid forcing a re-configuration step.
-**Why it's wrong:** A snapshot's presence/content at migration time is incidental (depends entirely on whether the user happened to be in Rig mode at the moment they upgraded) — it is not a reliable source for "what the user wants Normal mode to look like going forward," and building migration logic that depends on it re-couples the new design to the exact mechanism being retired, undermining the whole point of the redesign. It also cannot handle the common case (user upgrades while in Normal mode, when no snapshot exists at all).
-**Instead:** Leave `NormalMonitorsToDisable`/`NormalMonitorsToEnable` null after migration (matches the existing null-means-unconfigured convention) and let `IsFullyConfigured()` correctly block Rig-mode toggling until the user configures Normal-mode targets once via the new `SettingsForm` section — the same "fail closed, not silently wrong" posture `IsFullyConfigured` already takes for every other required field (WR-01's existing rationale, `ToggleService.cs` lines 60-68).
+**What people do:** Add a fresh `SystemEvents` subscription inside the new `ToggleSwitch`/`MonitorTile` controls (or a new standalone accent-color class) instead of extending the existing `WindowsThemeProvider` handler / `MainForm` constructor subscription.
+**Why it's wrong:** Multiple independent subscribers to the same OS notification each do their own registry read and diff, multiplying redundant work and risking inconsistent "did it actually change" conclusions between subscribers (e.g., one fires, the other doesn't, for the same OS event).
+**Do this instead:** One `WindowsThemeProvider` instance remains the single owner of `SystemEvents.UserPreferenceChanged`; one `MainForm` instance remains the single owner of `SystemEvents.DisplaySettingsChanged`. Every UI control reacts via events/property reads, never via its own OS subscription.
 
-### Anti-Pattern 3: Skipping a step by silently omitting it from `ToggleResult.Steps` instead of recording `NotAttempted`
+### Anti-Pattern 3: Caching `IThemeProvider.CurrentTheme` in a field
 
-**What people do:** When `settings.CompanionAppPath`/`settings.RigAudioDeviceId`/`settings.NormalAudioDeviceId` is null, simply don't add anything to the `steps` list for that step name, reasoning "nothing happened, so nothing to report."
-**Why it's wrong:** `ToggleResultFormatter.FormatChecklist` and every UI consumer of `ToggleResult` already assume a consistent, predictable step shape (the existing D-04 stop-on-first-failure path already explicitly appends `NotAttempted` entries for this exact reason — see `ToggleService.cs` lines 108-109, 142). Silently omitting a step produces an inconsistent checklist shape depending on configuration, and loses the (useful, intentional) distinction between "this step ran and failed" / "this step never got a chance to run because an earlier step failed" / "this step was never configured, by design" — three genuinely different states a user benefits from being able to tell apart.
-**Instead:** Always append a `ToggleStepResult` with `ToggleStepOutcome.NotAttempted` and a `null` reason when a step is skipped due to being unconfigured — same pattern already used for the stop-on-first-failure NotAttempted entries, just triggered by a different condition (unconfigured vs. blocked-by-an-earlier-failure).
+**What people do:** Read `_themeProvider.CurrentTheme` once at construction and store it in a `bool _isDark` field for reuse in `OnPaint`.
+**Why it's wrong:** Breaks live theme-follow (THEME-01..06) — the codebase's existing convention (`MainForm.IsDark`, `SettingsForm.IsDarkTheme`, `MonitorPanelForm.IsDarkTheme`, all fresh-read properties) exists specifically to keep every re-theme correct across a live OS flip or a manual override flip. `ToggleSwitch.OnPaint` and `MonitorTile.OnPaint` must call the fresh property every paint, not a cached field.
+**Do this instead:** Keep a `bool IsDark => _themeProvider.CurrentTheme == AppTheme.Dark` property pattern, read at paint time, identical to every existing Form in this codebase.
 
-### Anti-Pattern 4: Putting live CCD/P-Invoke calls in `MonitorPanelForm`'s code-behind
+### Anti-Pattern 4: Wiring the manual override directly into `WindowsThemeProvider`
 
-**What people do:** Since the panel is "just a live list with buttons," reach directly for `WindowsMonitorController` (or worse, raw `WindowsDisplayAPI` calls) inside the new form, reasoning it's simpler than threading another interface through.
-**Why it's wrong:** Breaks the one architectural invariant this codebase enforces without exception across every existing form (`Program.cs`'s own doc comment: "MainForm/SettingsForm never `new` a concrete adapter or store themselves") and — more concretely for this feature — bypasses the shared `SingleFlightGuard`, reintroducing the exact cross-path race Anti-Pattern 1 describes.
-**Instead:** `MonitorPanelForm` depends only on `IMonitorController` (for `GetAllMonitors()`/status display) and `ManualMonitorService` (for the guarded Activate/Deactivate actions), both injected via the composition root, exactly like every other form in this app.
+**What people do:** Add an `if (settings.ThemeOverride is not null) return settings.ThemeOverride.Value;` branch inside `WindowsThemeProvider.CurrentTheme`'s getter (or its constructor), since "it's right there."
+**Why it's wrong:** Couples the pure OS-signal reader to `ISettingsStore` and to Settings-Save timing, increasing the regression surface for THEME-01..06 (which are already rig-verified against the current, override-free `WindowsThemeProvider` behavior) and makes `WindowsThemeProvider` harder to unit-test in isolation (`RigToggle.Windows.Tests` currently has no settings-store dependency for this class).
+**Do this instead:** The Decorator in Pattern 2 — `WindowsThemeProvider` stays exactly as it is today; `OverridableThemeProvider` is the only new/modified consumer of `ISettingsStore` for this feature.
 
 ## Integration Points
 
-### External Services (OS-level)
+### External Services
 
-| Service | Integration Pattern | Notes |
+N/A — no network/cloud services in this project. The only "external" surfaces are Win32/COM APIs, already covered by existing `RigToggle.Windows` adapters (`WindowsDisplayAPI`/CCD, `IPolicyConfig` COM, `NAudio`, DWM P/Invoke) — v2.1 adds exactly one new Win32 surface, `DwmGetColorizationColor` (dwmapi.dll), for THEME-07.
+
+| API | Integration Pattern | Notes |
 |---------|---------------------|-------|
-| Windows CCD API (`SetDisplayConfig` via `WindowsDisplayAPI`) | `IMonitorController.ActivateMonitors`/`DeactivateMonitors` — **unchanged**, reused as-is by both `ToggleService` and the new `ManualMonitorService` | No new CCD interaction pattern introduced by v2.0 — the redesign is entirely about which caller invokes these two already-proven methods and with which device-path set, not about the CCD mechanism itself. |
-| `IPolicyConfig` COM interop (default audio device) | `IAudioController.SetDefault` — unchanged if the audio redesign is adopted; `.Restore`/`.CaptureState` become dead in that case | No new audio interaction pattern either way. |
-| `%LocalAppData%\RigToggle\state.json` (or renamed `mode.json`) | Repurposed from full `StateSnapshot` payload to a minimal mode marker, same atomic-write mechanism | See Mode Tracking section. Consider renaming the file itself (`state.json` → `mode.json`) for clarity, since its contents no longer represent "state" in the old sense — a naming-only decision, not an architectural one, but worth doing deliberately rather than leaving a stale filename. |
+| `DwmGetColorizationColor` (dwmapi.dll) | `[DllImport]` in `NativeMethods.cs`, called from `WindowsThemeProvider`'s existing `OnUserPreferenceChanged` handler | Returns `0xAARRGGBB`; also confirm-verify live on the rig that `SystemEvents.UserPreferenceChanged` actually fires for an accent-color-only change (WebSearch-sourced, MEDIUM confidence — community sources confirm accent changes are reported through the same `UserPreferenceChanged`/color-category channel used for theme, but this project's own established practice is to rig-verify every theming assumption before shipping, per the Phase 12 gap-closure precedent where two "should work" bets were rig-disproven) |
 
 ### Internal Boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| `RigToggle.Core` ↔ `RigToggle.Windows` | `IMonitorController`/`IAudioController`/`IAppController` — **no interface signature changes** | The entire v2.0 redesign is achievable without touching any Core-interface method signature — confirmed directly against the current interfaces (`ActivateMonitors`/`DeactivateMonitors` already take arbitrary sets; `SetDefault` already takes an arbitrary device id). This significantly de-risks the milestone: the highest-uncertainty layer (real CCD/COM interop, rig-hardware-dependent) is untouched. |
-| `ToggleOrchestrator` ↔ `ManualMonitorService` | Shared `SingleFlightGuard` instance, injected by the composition root — **new boundary** | The only genuinely new cross-component coordination this milestone introduces; everything else is either additive (optional-skip guards) or a like-for-like swap (Restore call → configured-target call). |
-| `RigToggle.App`'s composition root ↔ `MonitorPanelForm` | Constructor injection (`IMonitorController`, `ManualMonitorService`, `IThemeProvider`), same pattern as every existing form | No precedent break — follows `SettingsForm`'s/`MonitorConfirmDialog`'s existing injection pattern exactly. |
-| Exe-size reduction (feature 6) ↔ everything else in this document | **None** — publish/MSBuild configuration only | Explicitly out of scope for this architecture research per the milestone's own framing ("light touch here, main coverage is in Stack research"); it has no dependency on, or interaction with, any component described above. Safe to schedule independently of the other four features. |
+| `MonitorTile` ↔ `MainForm` | Event (`ActionRequested`) + method calls (`SetState`) | Tile is presentation-only; `MainForm` owns all controller/orchestrator calls (Pattern 1) |
+| `ToggleSwitch` ↔ `MainForm` | Standard WinForms event (`CheckedChanged`/`Click`), replaces `btnToggle.Click` | Drop-in replacement; `BtnToggle_Click` body is otherwise unchanged |
+| `MainForm`/`SettingsForm`/`MonitorConfirmDialog` ↔ `IThemeProvider` | Property read (`CurrentTheme`) + event (`ThemeChanged`) | Unchanged interface usage; the injected instance becomes `OverridableThemeProvider` instead of `WindowsThemeProvider` directly, but callers cannot tell the difference |
+| `SettingsForm` ↔ composition root | Constructor-injected callback delegates (`tryRegisterConfiguredHotkey`, `applyTrayVisibility`, **+ new** `applyThemeOverride`) | Follow the exact existing pattern — do not invent a new mechanism (e.g., an event on `AppSettings`) for THEME-09's live-apply |
+| `MainForm` ↔ `ToggleOrchestrator` | `BeginExclusiveMonitorAccess()` lease (tile actions) + `ToggleToRigMode()`/`ToggleToNormalMode()` (switch) | Both now originate from the same class/thread; no new concurrency behavior — WinForms' single UI-thread message pump plus the pre-existing "acquire lease before `ShowDialog()`'s nested loop" discipline (ported verbatim from `MonitorPanelForm`) is sufficient, unchanged from today |
 
-## Suggested Build Order
+## Recommended Build Order
 
-1. **Optional targets first** (feature 1, and the Rig-mode half of feature 2 — `RigAudioDeviceId`/`CompanionAppPath` becoming skippable in `ToggleToRigMode`). This is the lowest-risk, most self-contained slice: it only adds null-guards around two already-existing steps in `ToggleToRigMode`, requires no data-model additions, no mode-tracking change, and is fully covered by extending the existing `ToggleServiceTests` pattern (hand-written fakes, no new test infrastructure). Shipping this first also immediately delivers real user value (a user with no companion app, or no distinct rig audio device, can already use the tool) independent of everything else.
-2. **Monitor-set + mode-store redesign** (feature 3, plus the Normal-mode half of feature 2 if the audio recommendation above is adopted). This is the core, highest-risk, most novel piece: new `AppSettings` fields, the `ISnapshotStore`→`IModeStore` repurposing, `ToggleService.ToggleToNormalMode` rewritten, `SettingsForm` UI extended with a second monitor-target section, the migration-guard decision (Anti-Pattern 2), and (if adopted) the audio-symmetry change. Sequence this **before** the manual panel and the cleanup pass, since both depend on decisions made here (the shared-guard extraction point, and the final shape of what's dead).
-3. **Shared concurrency guard extraction + manual live panel** (features 4 + 5). Technically, `ManualMonitorService` could be built against `IMonitorController` directly without waiting for step 2 (the interface doesn't change) — but the `SingleFlightGuard` extraction is far more natural to do as a companion refactor to `ToggleOrchestrator` while that class is already being touched for the `IModeStore` wiring in step 2, rather than extracting it once for the panel and re-touching `ToggleOrchestrator` again later. Building the panel after step 2 also means `MonitorPanelForm`'s status icons can reflect the final, redesigned notion of monitor state without a second UI pass.
-4. **Cleanup pass + exe-size reduction last** (features 7 + 6). The cleanup pass should run after step 2 has retired the snapshot/restore subsystem, so it can remove `WindowsMonitorController.Restore()`/`RestoreViaReconstruction()` (~260 LOC), `StateSnapshot`, and (if the audio recommendation is adopted) `AudioState`/`AudioRoleState`-as-restore-payload and `WindowsAudioController.Restore()`/`CaptureState()` in one pass, rather than incrementally. It should also revisit the two already-known, already-documented dead internal methods flagged in `WindowsMonitorController.cs` itself (`CopyOutputTechnology`, `AssignSource` — both explicitly marked "NOT currently called by production code" in their own doc comments, kept only as documented fallback knowledge) and make an explicit keep-or-delete call now that the surrounding method they were extracted from (`Restore`) is itself being deleted. Exe-size reduction (publish/MSBuild config) has no ordering dependency on anything else and can land any time — batching it with the cleanup pass at the end is a scheduling convenience, not an architectural requirement.
+1. **Build `MonitorTile` as a standalone UserControl first, unwired.** Public surface: `DevicePath`, `SetState(MonitorInfo)`, `event ActionRequested`. No `IMonitorController` reference (Pattern 1/Anti-Pattern 1). This validates the custom-drawn visuals and theming hooks in isolation, with zero risk to the currently-working toggle/panel logic.
+2. **Add a tile-strip container to `MainForm`'s Designer and populate it read-only** from `_monitorController.GetAllMonitors()` — no click wiring yet. Validates enumeration + layout (including the `AutoScroll` fallback from Scaling Considerations) without any mutation risk.
+3. **Port the mutation logic verbatim from `MonitorPanelForm` into `MainForm`**: `BeginExclusiveMonitorAccess()` lease acquired before `MonitorConfirmDialog.ShowDialog()`, the WR-03 devicePath re-validation after the dialog's nested message loop, `DeactivateMonitors`/`ActivateMonitors` called directly (never re-implement the guard), `SkipMonitorConfirmation` gate reused as-is. Copy-and-adapt, not a rewrite — this is the step where DISPLAY-12/lease-semantics regressions would be introduced if done carelessly.
+4. **Port hotplug refresh (`SystemEvents.DisplaySettingsChanged`) and the Identify action**, retargeting `MonitorIdentifyOverlay`'s `Owner` from the old panel to `MainForm`.
+5. **Delete `MonitorPanelForm.cs`/`.Designer.cs` and its two entry points (`btnMonitors`, `trayMonitorsMenuItem`) last**, only once steps 3-4 are proven working — deleting the reference implementation before porting its logic risks silently dropping a Phase-17 fix (e.g., the WR-03 re-validation, or "Identify enumerates in display order, not state.Paths order").
+6. **THEME-07 (`IThemeProvider`/`WindowsThemeProvider` accent-color extension)** can be built any time — it has no dependency on the monitor-tile work. Do it before step 7 if `ToggleSwitch`'s "on" fill is meant to be accent-colored.
+7. **THEME-08 (`ToggleSwitch`)**: build as its own standalone control (same isolation principle as step 1), swap it in for `btnToggle` last, after the monitor-tile folding is stable, to avoid compounding two risky UI changes in one uncommitted diff.
+8. **THEME-09 (`OverridableThemeProvider` + Settings UI + composition-root wiring)** last among the theme work — it decorates whatever `IThemeProvider` looks like after step 6, and per the milestone's own scoping ("a manual **light/dark** override... independent of live Windows theme-follow") it overrides `CurrentTheme` only, passing `AccentColor`/`AccentColorChanged` through untouched — so it has no ordering dependency on step 6 beyond "the interface exists."
 
 ## Sources
 
-- Direct source-tree reads (HIGH confidence — the actual current codebase, not documentation): `src/RigToggle.Core/ToggleService.cs`, `ToggleOrchestrator.cs`, `Abstractions/IMonitorController.cs`, `Abstractions/ISnapshotStore.cs`, `Abstractions/IAudioController.cs`, `Abstractions/IAppController.cs`, `Abstractions/ISettingsStore.cs`, `Models/AppSettings.cs`, `Models/AudioState.cs`, `Models/AudioRoleState.cs`, `Models/MonitorState.cs`, `Models/MonitorPathSnapshot.cs`, `Models/StateSnapshot.cs`, `Models/MonitorInfo.cs`, `Models/ToggleResult.cs`, `Models/ToggleStepResult.cs`, `Persistence/JsonSettingsStore.cs`, `Persistence/JsonSnapshotStore.cs`; `src/RigToggle.Windows/WindowsMonitorController.cs`, `WindowsAudioController.cs`, `WindowsAppController.cs`; `src/RigToggle.App/MainForm.cs`, `Program.cs`, `SettingsForm.cs` (partial); `src/RigToggle.Tests/Doubles/FakeControllers.cs`, `Doubles/InMemoryStores.cs`
-- `.planning/PROJECT.md` — milestone framing, target features list, Key Decisions table (D-14 mode-derivation, D-02 monitor-restore asymmetry, D-04/D-05 stop-on-first-failure vs. isolate-and-continue policies, CORE-06 reentrancy guard rationale)
-- Grep verification across the full `src/` tree confirming `NormalAudioDeviceId` has exactly two runtime call sites (`SettingsForm.cs` binding/save, `ToggleService.IsFullyConfigured` validation) and zero toggle-execution call sites — the direct evidence underpinning the audio-redesign recommendation
+- Direct reading of current implementation (HIGH confidence, this repository): `src/RigToggle.App/MonitorPanelForm.cs`, `MainForm.cs`, `ThemeApplier.cs`, `MonitorIdentifyOverlay.cs`, `MonitorConfirmDialog.cs`, `SettingsForm.cs` (Save handler + constructor), `Program.cs`; `src/RigToggle.Core/ToggleOrchestrator.cs`, `Abstractions/IThemeProvider.cs`, `Abstractions/IMonitorController.cs`, `Models/AppSettings.cs`, `Models/AppTheme.cs`; `src/RigToggle.Windows/WindowsThemeProvider.cs`, `DwmTitleBar.cs`
+- `.planning/PROJECT.md` — Key Decisions table, specifically: `ToggleOrchestrator.BeginExclusiveMonitorAccess()` lease sharing `_busy` (Phase 17), Manual Monitor Panel mutating through the exact same `IMonitorController` calls the toggle uses (Phase 17, DISPLAY-12 single-shared-implementation), explicit-color `FlatStyle.Flat` theming and manual `DWMWA_USE_IMMERSIVE_DARK_MODE` (Phase 12)
+- [WM_DWMCOLORIZATIONCOLORCHANGED message — Microsoft Learn](https://learn.microsoft.com/en-us/windows/win32/dwm/wm-dwmcolorizationcolorchanged) — MEDIUM-HIGH confidence, official docs, confirms message constant and 0xAARRGGBB format
+- [DwmGetColorizationColor function — Microsoft Learn](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/nf-dwmapi-dwmgetcolorizationcolor) — MEDIUM-HIGH confidence, official docs, confirms the API this project should P/Invoke for THEME-07
+- Community sources on `SystemEvents.UserPreferenceChanged` firing for accent-color changes and the `HKCU\Software\Microsoft\Windows\DWM\AccentColor` registry location — MEDIUM confidence (forum/blog sources, not official docs); flagged in Integration Points above as needing the same rig-verification discipline this project already applies to theming bets (Phase 12 precedent: two "should just work" assumptions about `Application.SetColorMode` were rig-disproven)
 
 ---
-*Architecture research for: RigToggle v2.0 (Configurable Monitors, Optional Targets & Cleanup) — integration of the five target features into the existing Core/Windows/App/Tests solution*
-*Researched: 2026-08-04*
+*Architecture research for: Windows WinForms desktop utility — v2.1 UI redesign*
+*Researched: 2026-08-09*
