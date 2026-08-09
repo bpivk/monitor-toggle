@@ -15,7 +15,7 @@ namespace RigToggle.Tests.Doubles;
 /// DeactivateMonitors signals <see cref="_enteredGuardedRegion"/> to tell the test "the
 /// first call has genuinely entered the guarded region," then blocks on
 /// <see cref="_releaseFirstCall"/> until the test explicitly releases it. The other
-/// five IMonitorController members return the same minimal fixture values
+/// four IMonitorController members return the same minimal fixture values
 /// FakeMonitorController uses.
 /// </summary>
 public sealed class BlockingMonitorController : IMonitorController
@@ -58,10 +58,5 @@ public sealed class BlockingMonitorController : IMonitorController
         {
             throw new TimeoutException("BlockingMonitorController.DeactivateMonitors was never released by the test.");
         }
-    }
-
-    public void Restore(MonitorState previousState)
-    {
-        // No-op — not exercised by the reentrancy test.
     }
 }

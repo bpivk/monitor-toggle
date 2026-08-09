@@ -47,7 +47,6 @@ public class ToggleServiceTests : IDisposable
 
     private (ToggleService Service, List<string> CallLog, InMemoryModeStore ModeStore) CreateService(
         AppSettings? settings = null,
-        bool audioThrowsOnRestore = false,
         bool monitorThrowsOnDisable = false,
         bool monitorMutatesBeforeThrowingOnDisable = false,
         bool appThrowsOnMinimize = false,
@@ -60,7 +59,7 @@ public class ToggleServiceTests : IDisposable
             callLog,
             throwOnDisable: monitorThrowsOnDisable,
             mutatesBeforeThrowingOnDisable: monitorMutatesBeforeThrowingOnDisable);
-        var audioController = new FakeAudioController(callLog, throwOnRestore: audioThrowsOnRestore, deviceExists: !audioDeviceMissing);
+        var audioController = new FakeAudioController(callLog, deviceExists: !audioDeviceMissing);
         var appController = new FakeAppController(callLog, throwOnMinimize: appThrowsOnMinimize);
 
         var service = new ToggleService(settingsStore, modeStore, monitorController, audioController, appController);
@@ -127,11 +126,10 @@ public class ToggleServiceTests : IDisposable
     }
 
     [Fact]
-    public void ToggleToNormalMode_AppliesNormalAudioDeviceViaSetDefault_AndAppliesExplicitMonitorSet_NeverRestore()
+    public void ToggleToNormalMode_AppliesNormalAudioDeviceViaSetDefault_AndAppliesExplicitMonitorSet()
     {
         // AUDIO-04/DISPLAY-10: Normal-mode audio applies via SetDefault(NormalAudioDeviceId),
-        // and Normal-mode Monitor applies its own explicit set via Activate/Deactivate —
-        // neither subsystem calls a snapshot-based Restore any more.
+        // and Normal-mode Monitor applies its own explicit set via Activate-then-Deactivate.
         var (service, callLog, _) = CreateService();
         service.ToggleToRigMode();
         callLog.Clear();
@@ -139,8 +137,6 @@ public class ToggleServiceTests : IDisposable
         service.ToggleToNormalMode();
 
         Assert.Contains(callLog, entry => entry == $"audio.SetDefault:{ConfiguredSettings.NormalAudioDeviceId}");
-        Assert.DoesNotContain(callLog, entry => entry.StartsWith("audio.Restore"));
-        Assert.DoesNotContain(callLog, entry => entry.StartsWith("monitor.Restore"));
         Assert.Contains(callLog, entry => entry.StartsWith("monitor.ActivateMonitors"));
         Assert.Contains(callLog, entry => entry.StartsWith("monitor.DeactivateMonitors"));
     }
@@ -526,7 +522,6 @@ public class ToggleServiceTests : IDisposable
         var audioStep = result.Steps.Single(s => s.StepName == "Audio");
         Assert.Equal(ToggleStepOutcome.Skipped, audioStep.Outcome);
         Assert.DoesNotContain(callLog, entry => entry.StartsWith("audio.SetDefault"));
-        Assert.DoesNotContain(callLog, entry => entry.StartsWith("audio.Restore"));
         Assert.Equal(ToggleMode.Normal, modeStore.TryLoad());
     }
 

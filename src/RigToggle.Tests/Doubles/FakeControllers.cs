@@ -7,7 +7,8 @@ namespace RigToggle.Tests.Doubles;
 /// Hand-written recording fakes for the three mutation-adapter interfaces (no mocking
 /// framework — matches the project's no-unnecessary-dependency posture). Each call
 /// appends a label to a shared call-log so tests can assert both call order (e.g.
-/// snapshot Save must precede any mutation) and the values passed through from settings.
+/// the enable-set ActivateMonitors call must precede the disable-set DeactivateMonitors
+/// call) and the values passed through from settings.
 /// </summary>
 public sealed class FakeMonitorController : IMonitorController
 {
@@ -73,29 +74,21 @@ public sealed class FakeMonitorController : IMonitorController
             throw new InvalidOperationException("Fake monitor disable failure (simulated CCD/topology failure).");
         }
     }
-
-    public void Restore(MonitorState previousState)
-    {
-        _callLog.Add($"monitor.Restore:{previousState.TargetDevicePath}");
-    }
 }
 
 public sealed class FakeAudioController : IAudioController
 {
     private readonly List<string> _callLog;
     private readonly string? _capturedDefaultDeviceId;
-    private readonly bool _throwOnRestore;
     private readonly bool _deviceExists;
 
     public FakeAudioController(
         List<string> callLog,
         string? capturedDefaultDeviceId = "fake-normal-device",
-        bool throwOnRestore = false,
         bool deviceExists = true)
     {
         _callLog = callLog;
         _capturedDefaultDeviceId = capturedDefaultDeviceId;
-        _throwOnRestore = throwOnRestore;
         _deviceExists = deviceExists;
     }
 
@@ -115,19 +108,6 @@ public sealed class FakeAudioController : IAudioController
     public void SetDefault(string deviceId)
     {
         _callLog.Add($"audio.SetDefault:{deviceId}");
-    }
-
-    public void Restore(AudioState previousState)
-    {
-        _callLog.Add($"audio.Restore:{previousState.Multimedia.DeviceId}");
-
-        if (_throwOnRestore)
-        {
-            // Gap-closure 03-04: simulates a role whose captured device is gone,
-            // surfacing as an uncaught InvalidOperationException from Restore — proves
-            // ToggleToNormalMode still minimizes + clears even when this throws.
-            throw new InvalidOperationException("Fake audio restore failure (simulated stale/missing device).");
-        }
     }
 
     public AudioDeviceInfo? TryResolveDevice(string? deviceId)
