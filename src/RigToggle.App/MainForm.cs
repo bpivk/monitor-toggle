@@ -677,9 +677,137 @@ namespace RigToggle.App
             return tile;
         }
 
-        // Implemented in Plan 19-03 (TILE-02/TILE-03).
+        /// <summary>
+        /// 19-RESEARCH.md Pitfall 3: acquires the shared ToggleOrchestrator lease
+        /// BEFORE MonitorConfirmDialog.ShowDialog() opens, because ShowDialog() runs
+        /// a nested message loop that dispatches WM_HOTKEY -- without this, a
+        /// hotkey-triggered toggle could start underneath a half-finished tile
+        /// action. This is NOT redundant with BtnToggle_Click's reliance on
+        /// ToggleOrchestrator's internal _busy guard, even though both now live in
+        /// MainForm: the lease exists specifically to block a concurrent toggle from
+        /// starting WHILE this method's nested dialog loop is pumping messages,
+        /// which has nothing to do with which class hosts the code. A future editor
+        /// must not merge or delete either guard.
+        /// </summary>
+        private IDisposable? TryAcquireMonitorAccess()
+        {
+            try
+            {
+                return _orchestrator.BeginExclusiveMonitorAccess();
+            }
+            catch (ToggleInProgressException ex)
+            {
+                // Information (not Warning) matches how BtnToggle_Click already
+                // classifies a busy rejection: an expected condition, not an error.
+                MessageBox.Show(this, ex.Message, "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// TILE-02/TILE-03: port of MonitorPanelForm.DisableMonitor/EnableMonitor
+        /// with zero simplification -- the only intentional changes are the entry
+        /// point (a tile instead of a grid cell) and the refresh target
+        /// (RefreshMonitorTiles() instead of PopulateMonitorGrid()). DISPLAY-12's
+        /// zero-survivors guard is deliberately NOT duplicated here -- this method
+        /// calls the same WindowsMonitorController.DeactivateMonitors both toggle
+        /// directions already call, so the guard living solely in that adapter
+        /// applies unchanged.
+        /// </summary>
         private void OnTileAction(MonitorTile tile)
         {
+            if (tile.DevicePath is not string devicePath) return;
+
+            // DevicePath is the tile's only identity -- never its index in _tiles,
+            // never its friendly name (the stable-identity rule the retired grid's
+            // row Tag followed).
+            MonitorInfo? monitor = _lastKnownMonitors.FirstOrDefault(m => m.DevicePath == devicePath);
+            if (monitor is null) return;
+
+            IDisposable? lease = TryAcquireMonitorAccess();
+            if (lease is null) return;
+
+            using (lease)
+            {
+                // The tile is presentational -- the active/inactive branch belongs
+                // here, not inside MonitorTile (19-RESEARCH.md Pattern 1).
+                if (monitor.IsActive)
+                {
+                    var settings = _settingsStore.Load();
+                    if (!settings.SkipMonitorConfirmation)
+                    {
+                        // enableNames is always empty here -- TILE-03 gates Disable
+                        // only; enabling can never trigger the zero-survivors
+                        // failure mode, matching the retired panel exactly.
+                        using var confirmDialog = new MonitorConfirmDialog(
+                            new[] { monitor.FriendlyName },
+                            Array.Empty<string>(),
+                            _themeProvider);
+                        if (confirmDialog.ShowDialog(this) != DialogResult.OK) return;
+                        if (confirmDialog.DontAskAgain)
+                        {
+                            settings.SkipMonitorConfirmation = true;
+                            _settingsStore.Save(settings);
+                        }
+
+                        // WR-03: ShowDialog()'s nested message loop dispatches
+                        // queued messages including a hotplug-triggered
+                        // OnDisplaySettingsChanged -> RefreshMonitorTiles(), which
+                        // can have replaced _lastKnownMonitors while the dialog was
+                        // open -- re-validate the pre-dialog snapshot before a
+                        // possibly-unplugged device path reaches DeactivateMonitors.
+                        if (!_lastKnownMonitors.Any(m => m.DevicePath == devicePath))
+                        {
+                            MessageBox.Show(this, "This monitor is no longer connected.", "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            RefreshMonitorTiles();
+                            return;
+                        }
+                    }
+
+                    try
+                    {
+                        // The same method ToggleService.ToggleToRigMode and
+                        // ToggleService.ToggleToNormalMode both call -- no
+                        // monitor-count pre-check is written here; the
+                        // zero-survivors guard lives solely in
+                        // WindowsMonitorController.DeactivateMonitors (DISPLAY-12).
+                        _monitorController.DeactivateMonitors(new HashSet<string> { devicePath });
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        // One shared codepath, one shared message -- ex.Message
+                        // reused verbatim, never reworded for tile context.
+                        MessageBox.Show(this, ex.Message, "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(this, $"{ex.GetType().Name}: {ex.Message}", "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    finally
+                    {
+                        RefreshMonitorTiles();
+                    }
+                }
+                else
+                {
+                    try
+                    {
+                        _monitorController.ActivateMonitors(new HashSet<string> { devicePath });
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        MessageBox.Show(this, ex.Message, "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(this, $"{ex.GetType().Name}: {ex.Message}", "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    finally
+                    {
+                        RefreshMonitorTiles();
+                    }
+                }
+            }
         }
 
         // Implemented in Plan 19-03 (TILE-04).
