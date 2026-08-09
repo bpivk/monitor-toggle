@@ -30,6 +30,15 @@ namespace RigToggle.App
                 // form (which the provider otherwise long outlives) does not leak a
                 // handler reference.
                 _themeProvider.ThemeChanged -= OnThemeChanged;
+
+                // TILE-06/19-RESEARCH.md Pitfall 2: REAL-PROCESS-EXIT backstop only,
+                // mirroring the theme unsubscribe above. The DisplaySettingsChanged
+                // subscription itself (MainForm.cs constructor) is held for the whole
+                // app lifetime and must NEVER be gated on Hide()/Show()/visibility --
+                // MainForm is hidden-not-closed during tray-resident operation, unlike
+                // the closable MonitorPanelForm, whose subscribe-in-ctor /
+                // unsubscribe-when-the-window-closes pattern must not be copied here.
+                Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             }
             base.Dispose(disposing);
         }
@@ -52,7 +61,10 @@ namespace RigToggle.App
             this.lblMode = new System.Windows.Forms.Label();
             this.btnToggle = new System.Windows.Forms.Button();
             this.btnSettings = new System.Windows.Forms.Button();
-            this.btnMonitors = new System.Windows.Forms.Button();
+            this.tileStrip = new System.Windows.Forms.FlowLayoutPanel();
+            this.lblNoMonitors = new System.Windows.Forms.Label();
+            this.btnIdentify = new System.Windows.Forms.Button();
+            this.tileToolTip = new System.Windows.Forms.ToolTip(this.components);
             this.notifyIcon = new System.Windows.Forms.NotifyIcon(this.components);
             this.trayContextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.trayToggleMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -93,27 +105,79 @@ namespace RigToggle.App
             //
             // btnSettings
             //
-            this.btnSettings.Text = "Settings…";
-            this.btnSettings.Location = new System.Drawing.Point(16, 108);
-            this.btnSettings.Size = new System.Drawing.Size(288, 32);
+            // MAIN-02/D-10: icon-only, de-emphasized gear button. The instance, field,
+            // and Click wiring stay identical to the pre-19-02 form -- only its visual
+            // identity (no visible Text, small square size, bottom-right position)
+            // changes here. The visible label and its "…" ellipsis are deliberately
+            // dropped rather than shrunk (no longer competing with the toggle/tiles for
+            // attention); AccessibleName + tileToolTip-style tooltip carry the meaning
+            // instead. Location below is a PLACEHOLDER -- LayoutDashboard() (MainForm.cs)
+            // recomputes it on every population/hotplug from a font-derived scale
+            // factor; do not "fix" these Designer coordinates.
+            this.btnSettings.Text = string.Empty;
+            this.btnSettings.Location = new System.Drawing.Point(272, 252);
+            this.btnSettings.Size = new System.Drawing.Size(32, 32);
             this.btnSettings.Name = "btnSettings";
             this.btnSettings.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnSettings.AccessibleName = "Settings";
+            this.btnSettings.TabStop = true;
             this.btnSettings.Click += new System.EventHandler(this.BtnSettings_Click);
+            this.btnSettings.Paint += new System.Windows.Forms.PaintEventHandler(this.BtnSettings_Paint);
+            this.tileToolTip.SetToolTip(this.btnSettings, "Settings");
 
             //
-            // btnMonitors
+            // tileStrip
             //
-            // 17-03/PANEL-01: 8px gap below btnSettings (which ends at y=140), pixel-
-            // matching the existing btnToggle -> btnSettings gap (100 -> 108). Checked
-            // against ClientSize (320, 200) -- btnMonitors ends at y=180, leaving a 20px
-            // bottom margin, which already exceeds the form's 16px margin rhythm, so
-            // ClientSize is deliberately left unchanged by this plan.
-            this.btnMonitors.Text = "Monitors…";
-            this.btnMonitors.Location = new System.Drawing.Point(16, 148);
-            this.btnMonitors.Size = new System.Drawing.Size(288, 32);
-            this.btnMonitors.Name = "btnMonitors";
-            this.btnMonitors.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnMonitors.Click += new System.EventHandler(this.BtnMonitors_Click);
+            // TILE-01: hosts one MonitorTile per detected monitor (MainForm.cs
+            // RefreshMonitorTiles). AutoSize is deliberately FALSE -- LayoutDashboard()
+            // computes this panel's exact Size arithmetically from tile count and a
+            // font-derived scale factor instead of relying on
+            // FlowLayoutPanel.AutoSize/Form.AutoSize, because 19-RESEARCH.md Open
+            // Question 2 flags that no form in this codebase has ever used AutoSize and
+            // its layout-pass timing under the --tray hidden-start path (where
+            // InitializeTrayState(), not OnLoad/OnShown, does the population work) is
+            // unproven on this runtime. WrapContents still does the row-wrapping within
+            // that computed width. Do not "simplify" this back to AutoSize = true.
+            // Location/Size below are PLACEHOLDER defaults -- LayoutDashboard()
+            // overwrites both on every population and hotplug.
+            this.tileStrip.Name = "tileStrip";
+            this.tileStrip.AutoSize = false;
+            this.tileStrip.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.tileStrip.WrapContents = true;
+            this.tileStrip.FlowDirection = System.Windows.Forms.FlowDirection.LeftToRight;
+            this.tileStrip.Padding = new System.Windows.Forms.Padding(0);
+            this.tileStrip.Margin = new System.Windows.Forms.Padding(0);
+            this.tileStrip.Location = new System.Drawing.Point(16, 44);
+            this.tileStrip.Size = new System.Drawing.Size(288, 88);
+
+            //
+            // lblNoMonitors
+            //
+            // Defensive empty state (GetAllMonitors() returning zero rows is expected
+            // unreachable under normal Windows operation) -- occupies the tile strip's
+            // rectangle and is shown in its place. Location/Size are PLACEHOLDER
+            // defaults -- LayoutDashboard() overwrites both.
+            this.lblNoMonitors.Name = "lblNoMonitors";
+            this.lblNoMonitors.Text = "No monitors detected.";
+            this.lblNoMonitors.AutoSize = false;
+            this.lblNoMonitors.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.lblNoMonitors.Visible = false;
+            this.lblNoMonitors.Location = new System.Drawing.Point(16, 44);
+            this.lblNoMonitors.Size = new System.Drawing.Size(288, 40);
+
+            //
+            // btnIdentify
+            //
+            // TILE-04: single shared Identify action, ported from
+            // MonitorPanelForm.BtnIdentify_Click with Owner retargeted to MainForm
+            // (MainForm.cs). Location/Size below are PLACEHOLDER defaults --
+            // LayoutDashboard() overwrites both on every population/hotplug.
+            this.btnIdentify.Name = "btnIdentify";
+            this.btnIdentify.Text = "Identify";
+            this.btnIdentify.Size = new System.Drawing.Size(100, 32);
+            this.btnIdentify.Location = new System.Drawing.Point(16, 148);
+            this.btnIdentify.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnIdentify.Click += new System.EventHandler(this.BtnIdentify_Click);
 
             //
             // trayToggleMenuItem
@@ -191,7 +255,11 @@ namespace RigToggle.App
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(320, 200);
+            // D-04/D-06: this is only the pre-layout default for the designer/first
+            // construction -- LayoutDashboard() (MainForm.cs) overwrites ClientSize on
+            // every population and hotplug, so this is NOT the real window size and
+            // must not be treated as one.
+            this.ClientSize = new System.Drawing.Size(320, 300);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = true;
@@ -201,10 +269,16 @@ namespace RigToggle.App
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
             this.Resize += new System.EventHandler(this.MainForm_Resize);
 
+            // D-09 reading order: tile row first, then Identify, then the Rig/Normal
+            // toggle, then the de-emphasized Settings gear last. lblMode stays above
+            // the tile row (see LayoutDashboard()'s own comment) so it is still first
+            // in this Controls.Add sequence.
             this.Controls.Add(this.lblMode);
+            this.Controls.Add(this.tileStrip);
+            this.Controls.Add(this.lblNoMonitors);
+            this.Controls.Add(this.btnIdentify);
             this.Controls.Add(this.btnToggle);
             this.Controls.Add(this.btnSettings);
-            this.Controls.Add(this.btnMonitors);
 
             this.ResumeLayout(false);
         }
@@ -214,7 +288,10 @@ namespace RigToggle.App
         private System.Windows.Forms.Label lblMode;
         private System.Windows.Forms.Button btnToggle;
         private System.Windows.Forms.Button btnSettings;
-        private System.Windows.Forms.Button btnMonitors;
+        private System.Windows.Forms.FlowLayoutPanel tileStrip;
+        private System.Windows.Forms.Label lblNoMonitors;
+        private System.Windows.Forms.Button btnIdentify;
+        private System.Windows.Forms.ToolTip tileToolTip;
         private System.Windows.Forms.NotifyIcon notifyIcon;
         private System.Windows.Forms.ContextMenuStrip trayContextMenu;
         private System.Windows.Forms.ToolStripMenuItem trayToggleMenuItem;

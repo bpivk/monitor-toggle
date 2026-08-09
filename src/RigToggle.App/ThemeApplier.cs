@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Windows.Forms;
+using RigToggle.App.Controls;
 
 namespace RigToggle.App
 {
@@ -152,6 +153,42 @@ namespace RigToggle.App
                 combo.FlatStyle = FlatStyle.Flat;
                 combo.BackColor = dark ? Color.FromArgb(45, 45, 48) : SystemColors.Window;
                 combo.ForeColor = dark ? Color.FromArgb(240, 240, 240) : SystemColors.WindowText;
+            }
+            catch
+            {
+                // Cosmetic-only — leave the control unchanged on failure.
+            }
+        }
+
+        /// <summary>
+        /// TILE-01/19-UI-SPEC.md Color table: the tile half of 19-RESEARCH.md Pitfall 1's
+        /// two-call-site rule — both MainForm.OnThemeChanged AND
+        /// MainForm.InitializeTrayState() must reach every live MonitorTile through this
+        /// method (via MainForm.ApplyDashboardTheming), or a tile themed only at startup
+        /// freezes at whatever theme Windows was in while its neighbours keep flipping —
+        /// this codebase already shipped that exact bug twice in Phase 12.
+        ///
+        /// AccentColor is deliberately confined to the tile's ON-state icon fill and its
+        /// keyboard-focus ring (19-UI-SPEC.md "Accent reserved for" rule) — it must never
+        /// be spread to the Identify button, the Settings gear, or the tile's hover tint,
+        /// all of which stay on the existing gray-scale ThemeButton palette.
+        ///
+        /// The primary-monitor badge color is deliberately NOT set here — it is a locked
+        /// theme-independent literal owned by MonitorIconGeometry.DrawPrimaryBadge,
+        /// exactly like MonitorPanelForm.CreateStatusDot's status-dot literals — a future
+        /// editor should not thread `dark` into it.
+        /// </summary>
+        public static void ThemeMonitorTile(MonitorTile tile, bool dark)
+        {
+            try
+            {
+                tile.BackColor = dark ? Color.FromArgb(32, 32, 32) : SystemColors.Control;
+                tile.ForeColor = dark ? Color.FromArgb(240, 240, 240) : SystemColors.ControlText;
+                tile.AccentColor = dark ? Color.FromArgb(0, 90, 158) : SystemColors.Highlight;
+                tile.FocusRingColor = dark ? Color.FromArgb(0, 90, 158) : SystemColors.Highlight;
+                tile.IconOffColor = dark ? Color.FromArgb(160, 160, 160) : SystemColors.GrayText;
+                tile.HoverBackColor = dark ? Color.FromArgb(45, 45, 48) : SystemColors.ControlLight;
+                tile.Invalidate();
             }
             catch
             {

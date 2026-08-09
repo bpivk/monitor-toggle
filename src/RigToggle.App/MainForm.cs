@@ -1,4 +1,6 @@
+using System.Drawing;
 using System.Linq;
+using RigToggle.App.Controls;
 using RigToggle.Core;
 using RigToggle.Core.Abstractions;
 using RigToggle.Core.Models;
@@ -25,6 +27,12 @@ namespace RigToggle.App
     /// Phase 17 (PANEL-01/02/03): the Monitors entry (button + tray item) opens a
     /// non-modal MonitorPanelForm via the shared OpenMonitorPanel() helper -- see that
     /// method's doc comment for the four deliberate divergences from OpenSettingsDialog.
+    /// The Monitors BUTTON has since been replaced by the inline tile dashboard below
+    /// (TILE-01/MAIN-01/MAIN-02, Plan 19-02) -- the tray Monitors entry is retired
+    /// separately in Plan 19-04, so it stays reachable as a side-by-side reference
+    /// until the tile dashboard is proven. MainForm is now also the sole
+    /// SystemEvents.DisplaySettingsChanged subscriber for the tile row (see the
+    /// constructor and Dispose(bool)).
     /// </summary>
     public partial class MainForm : Form
     {
@@ -34,6 +42,36 @@ namespace RigToggle.App
         private readonly Func<SettingsForm> _settingsFormFactory;
         private readonly Func<MonitorPanelForm> _monitorPanelFormFactory;
         private readonly IThemeProvider _themeProvider;
+
+        // TILE-01: live tile instances, reconciled (not rebuilt) against monitor count
+        // on every RefreshMonitorTiles() call -- see that method's own comment.
+        private readonly List<MonitorTile> _tiles = new();
+
+        // D-08/Pitfall 6: the ONE canonical DevicePath-ordered monitor list. Tile
+        // position, tile number, AND (Plan 19-03) the Identify overlay numbers all
+        // derive from this single field -- never re-derive an independent order
+        // anywhere else.
+        private IReadOnlyList<MonitorInfo> _lastKnownMonitors = Array.Empty<MonitorInfo>();
+
+        // 19-UI-SPEC.md Tile & Layout Geometry Contract values, expressed at 100%
+        // scale -- every use passes through Scaled(). TileMarginPx = 6 on all four
+        // sides yields the spec's 12px tile-to-tile gap (6 + 6); the wrap cap is
+        // therefore (TileWidthPx + 2 * TileMarginPx) * MaxTilesPerRow.
+        private const int MarginPx = 16;
+        private const int GapSmPx = 8;
+        private const int GapMdPx = 16;
+        private const int GapLgPx = 24;
+        private const int ModeLabelHeightPx = 20;
+        private const int TileWidthPx = 72;
+        private const int TileHeightPx = 88;
+        private const int TileMarginPx = 6;
+        private const int MaxTilesPerRow = 4;
+        private const int ContentWidthFloorPx = 288;
+        private const int IdentifyWidthPx = 100;
+        private const int IdentifyHeightPx = 32;
+        private const int TogglePx = 40;
+        private const int GearSizePx = 32;
+        private const int EmptyStateHeightPx = 40;
 
         // 17-03/PANEL-03: cached non-modal panel instance -- a closed non-modal Form
         // disposes itself, so OpenMonitorPanel() re-creates only when this is null or
@@ -73,7 +111,30 @@ namespace RigToggle.App
             // 12-02/D-05: live theme-follow -- WindowsThemeProvider raises this whenever
             // the OS AppsUseLightTheme value genuinely flips while this form is alive.
             _themeProvider.ThemeChanged += OnThemeChanged;
+
+            // TILE-06/19-RESEARCH.md Pitfall 2: subscribed ONCE, app-lifetime, and
+            // deliberately NEVER unsubscribed on Hide()/Show()/FormClosed. MainForm is
+            // hidden-not-closed for most of its runtime (tray-resident operation);
+            // gating this subscription on visibility would silently kill hotplug
+            // refresh during exactly that state. TILE-06 only requires refresh while
+            // visible -- an always-on subscription satisfies that as a strict
+            // superset. Dispose(bool)'s unsubscribe (MainForm.Designer.cs) is a
+            // real-process-exit backstop only. Do NOT copy MonitorPanelForm's
+            // subscribe-in-ctor / unsubscribe-on-close pattern here -- that pattern is
+            // correct for a closable-and-reopenable form and wrong for this one.
+            Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         }
+
+        /// <summary>
+        /// AutoScaleMode.Font rescales control Bounds that WinForms itself lays out,
+        /// but has zero effect on positions/sizes assigned programmatically -- exactly
+        /// what LayoutDashboard() does below. Every layout-path literal passes through
+        /// here. The divisor 15f is MainForm's own AutoScaleDimensions height (new
+        /// SizeF(7F, 15F) in the Designer), i.e. the design-time font height this
+        /// layout was authored against. Do not replace this with DeviceDpi / 96f --
+        /// the form scales by font, not by raw DPI.
+        /// </summary>
+        private int Scaled(int value) => (int)Math.Round(value * (Font.Height / 15f));
 
         /// <summary>
         /// 12-02/D-05: live theme-flip handler. WindowsThemeProvider's ThemeChanged
@@ -96,7 +157,10 @@ namespace RigToggle.App
                 DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDark);
                 ThemeApplier.ThemeButton(btnToggle, IsDark);
                 ThemeApplier.ThemeButton(btnSettings, IsDark);
-                ThemeApplier.ThemeButton(btnMonitors, IsDark);
+                // 19-RESEARCH.md Pitfall 1: this call site and InitializeTrayState()
+                // below must stay in lockstep -- adding a new control to only one of
+                // them is the Phase 12 bug this codebase already shipped twice.
+                ApplyDashboardTheming();
                 Refresh();
             }
             catch
@@ -181,7 +245,17 @@ namespace RigToggle.App
             // on both startup paths, unlike OnLoad/OnShown.
             ThemeApplier.ThemeButton(btnToggle, IsDark);
             ThemeApplier.ThemeButton(btnSettings, IsDark);
-            ThemeApplier.ThemeButton(btnMonitors, IsDark);
+
+            // TILE-01/06: populate/theme/layout the dashboard at this same --tray-safe
+            // timing point, exactly like ApplyDwmChrome above -- InitializeTrayState()
+            // runs unconditionally on both startup paths, unlike OnLoad/OnShown, which
+            // never fire under a --tray hidden start.
+            RefreshMonitorTiles();
+
+            // 19-RESEARCH.md Pitfall 1: this call site and OnThemeChanged above must
+            // stay in lockstep -- adding a new control to only one of them is the
+            // Phase 12 bug this codebase already shipped twice.
+            ApplyDashboardTheming();
         }
 
         /// <summary>
@@ -472,8 +546,6 @@ namespace RigToggle.App
             RefreshUi();
         }
 
-        private void BtnMonitors_Click(object? sender, EventArgs e) => OpenMonitorPanel();
-
         private void TrayMonitorsMenuItem_Click(object? sender, EventArgs e) => OpenMonitorPanel();
 
         /// <summary>
@@ -511,6 +583,260 @@ namespace RigToggle.App
             }
 
             _monitorPanelForm.Activate();
+        }
+
+        /// <summary>
+        /// TILE-01/D-08: (re)populates the tile row from the ONE canonical
+        /// DevicePath-ordered monitor list. GetAllMonitors()'s raw order is active
+        /// monitors first then newly-discovered inactive targets appended, which can
+        /// reshuffle across hotplug events -- sorting by DevicePath ordinally makes
+        /// tile identity and numbering stable between refreshes. This sort is the
+        /// single source of truth for tile position, tile number, AND (Plan 19-03)
+        /// the Identify overlay numbers -- never re-derive an order anywhere else
+        /// (19-RESEARCH.md Pitfall 6).
+        /// </summary>
+        private void RefreshMonitorTiles()
+        {
+            try
+            {
+                _lastKnownMonitors = _monitorController.GetAllMonitors()
+                    .OrderBy(m => m.DevicePath, StringComparer.Ordinal)
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                // Defensive: enumeration must never crash the form -- degrade to the
+                // empty state and leave a diagnostic trail (WR-02 convention).
+                System.Diagnostics.Trace.WriteLine($"MainForm.RefreshMonitorTiles: GetAllMonitors failed: {ex}");
+                _lastKnownMonitors = Array.Empty<MonitorInfo>();
+            }
+
+            if (_lastKnownMonitors.Count == 0)
+            {
+                foreach (MonitorTile tile in _tiles)
+                {
+                    tileStrip.Controls.Remove(tile);
+                    tile.Dispose();
+                }
+                _tiles.Clear();
+
+                tileStrip.Visible = false;
+                lblNoMonitors.Visible = true;
+                btnIdentify.Enabled = false;
+
+                LayoutDashboard();
+                return;
+            }
+
+            tileStrip.Visible = true;
+            lblNoMonitors.Visible = false;
+            btnIdentify.Enabled = true;
+
+            // Reconcile tile controls to the monitor count rather than clearing and
+            // rebuilding every refresh -- hotplug can fire repeatedly, and reusing
+            // control instances avoids per-refresh handle churn over a long
+            // tray-resident session (T-19-05).
+            while (_tiles.Count < _lastKnownMonitors.Count)
+            {
+                MonitorTile tile = CreateTile();
+                _tiles.Add(tile);
+                tileStrip.Controls.Add(tile);
+            }
+
+            while (_tiles.Count > _lastKnownMonitors.Count)
+            {
+                MonitorTile surplus = _tiles[^1];
+                tileStrip.Controls.Remove(surplus);
+                _tiles.RemoveAt(_tiles.Count - 1);
+                surplus.Dispose();
+            }
+
+            for (int i = 0; i < _lastKnownMonitors.Count; i++)
+            {
+                _tiles[i].SetState(_lastKnownMonitors[i], i + 1);
+                tileToolTip.SetToolTip(_tiles[i], _tiles[i].AccessibleName);
+            }
+
+            ApplyDashboardTheming();
+            LayoutDashboard();
+        }
+
+        /// <summary>
+        /// TILE-01: constructs one MonitorTile sized/margined per the 19-UI-SPEC.md
+        /// Tile & Layout Geometry Contract. ActionRequested is wired once at creation
+        /// -- Plan 19-03 implements OnTileAction's mutation logic.
+        /// </summary>
+        private MonitorTile CreateTile()
+        {
+            var tile = new MonitorTile
+            {
+                Size = new Size(Scaled(TileWidthPx), Scaled(TileHeightPx)),
+                Margin = new Padding(Scaled(TileMarginPx)),
+            };
+            tile.ActionRequested += (s, e) => OnTileAction((MonitorTile)s!);
+            return tile;
+        }
+
+        // Implemented in Plan 19-03 (TILE-02/TILE-03).
+        private void OnTileAction(MonitorTile tile)
+        {
+        }
+
+        // Implemented in Plan 19-03 (TILE-04).
+        private void BtnIdentify_Click(object? sender, EventArgs e)
+        {
+        }
+
+        /// <summary>
+        /// D-04/D-06/D-09: computes every dashboard position and the form's own
+        /// ClientSize arithmetically from tile count and the font-derived Scaled()
+        /// factor -- no dependence on a WinForms layout pass having run. This must
+        /// produce the correct window size on the FIRST Show() after a --tray hidden
+        /// start, where InitializeTrayState() -- not OnLoad/OnShown -- does the
+        /// population work, and 19-RESEARCH.md Open Question 2 flags
+        /// Form.AutoSize/FlowLayoutPanel.AutoSize timing on that path as unproven on
+        /// this runtime.
+        /// </summary>
+        private void LayoutDashboard()
+        {
+            try
+            {
+                SuspendLayout();
+
+                int margin = Scaled(MarginPx);
+
+                int count = _tiles.Count;
+                int perRow = Math.Min(Math.Max(count, 1), MaxTilesPerRow);
+                int rows = count == 0 ? 0 : (int)Math.Ceiling(count / (double)MaxTilesPerRow);
+                int cellW = Scaled(TileWidthPx + 2 * TileMarginPx);
+                int cellH = Scaled(TileHeightPx + 2 * TileMarginPx);
+                int stripW = perRow * cellW;
+                int stripH = rows * cellH;
+
+                // 19-UI-SPEC.md content-width floor: keeps the window from shrinking
+                // narrower than the existing toggle-button width at one or two
+                // monitors.
+                int contentWidth = Math.Max(Scaled(ContentWidthFloorPx), tileStrip.Visible ? stripW : Scaled(ContentWidthFloorPx));
+
+                // lblMode is deliberately KEPT above the tile row: D-09 fixes the
+                // relative order of the tile row, Identify, toggle, and Settings, and
+                // says nothing about the mode indicator; it is a non-focusable Label,
+                // so the tile row is still first in tab order, and removing it would
+                // drop the "Mode: Unknown" state RefreshUi() depends on (T-16-09).
+                lblMode.Location = new Point(margin, margin);
+                lblMode.Size = new Size(contentWidth, Scaled(ModeLabelHeightPx));
+
+                int stripTop = margin + Scaled(ModeLabelHeightPx) + Scaled(GapSmPx);
+
+                tileStrip.Size = new Size(stripW, stripH);
+                tileStrip.Location = new Point(margin + (contentWidth - stripW) / 2, stripTop);
+
+                lblNoMonitors.Location = new Point(margin, stripTop);
+                lblNoMonitors.Size = new Size(contentWidth, Scaled(EmptyStateHeightPx));
+
+                int contentBottom = stripTop + (tileStrip.Visible ? stripH : Scaled(EmptyStateHeightPx));
+
+                btnIdentify.Size = new Size(Scaled(IdentifyWidthPx), Scaled(IdentifyHeightPx));
+                btnIdentify.Location = new Point(margin + (contentWidth - btnIdentify.Width) / 2, contentBottom + Scaled(GapMdPx));
+
+                btnToggle.Size = new Size(contentWidth, Scaled(TogglePx));
+                btnToggle.Location = new Point(margin, btnIdentify.Bottom + Scaled(GapSmPx));
+
+                // MAIN-02's spacing cue: the deliberately larger GapLgPx gap above the
+                // gear must read as separated from the toggle, not as the next item in
+                // the same stack.
+                btnSettings.Size = new Size(Scaled(GearSizePx), Scaled(GearSizePx));
+                btnSettings.Location = new Point(margin + contentWidth - btnSettings.Width, btnToggle.Bottom + Scaled(GapLgPx));
+
+                ClientSize = new Size(contentWidth + 2 * margin, btnSettings.Bottom + margin);
+
+                ResumeLayout(true);
+            }
+            catch (Exception ex)
+            {
+                // A layout failure must never crash the toggle flow.
+                System.Diagnostics.Trace.WriteLine($"MainForm.LayoutDashboard failed: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// 19-RESEARCH.md Pitfall 1: the single helper both theming call sites
+        /// (OnThemeChanged, InitializeTrayState()) invoke for every dashboard control,
+        /// so the two-call-site rule cannot drift.
+        /// </summary>
+        private void ApplyDashboardTheming()
+        {
+            foreach (MonitorTile tile in _tiles)
+            {
+                ThemeApplier.ThemeMonitorTile(tile, IsDark);
+            }
+
+            ThemeApplier.ThemeButton(btnIdentify, IsDark);
+            ThemeApplier.ThemeButton(btnSettings, IsDark);
+            // The gear glyph is painted from btnSettings.ForeColor, which
+            // ThemeButton just changed -- force a repaint so it doesn't wait for the
+            // next incidental invalidation.
+            btnSettings.Invalidate();
+
+            lblNoMonitors.ForeColor = IsDark ? Color.FromArgb(160, 160, 160) : SystemColors.GrayText;
+        }
+
+        /// <summary>
+        /// TILE-06/T-19-04: hotplug refresh handler, ported from
+        /// MonitorPanelForm.OnDisplaySettingsChanged's exact IsDisposed ->
+        /// InvokeRequired -> BeginInvoke -> try/catch marshalling shape. Unlike the
+        /// panel's version, this handler's IsDisposed guard covers real process exit
+        /// rather than a close-while-event-in-flight race, because MainForm is never
+        /// closed during normal tray-resident operation.
+        /// </summary>
+        private void OnDisplaySettingsChanged(object? sender, EventArgs e)
+        {
+            if (IsDisposed) return;
+
+            if (InvokeRequired)
+            {
+                try
+                {
+                    BeginInvoke(new Action(() => OnDisplaySettingsChanged(sender, e)));
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+                return;
+            }
+
+            try
+            {
+                RefreshMonitorTiles();
+            }
+            catch
+            {
+                // A hotplug notification must never crash the form.
+            }
+        }
+
+        /// <summary>
+        /// MAIN-02/D-10: paints the procedural gear glyph for the icon-only Settings
+        /// button -- the same never-crash-on-paint rule the tile follows.
+        /// </summary>
+        private void BtnSettings_Paint(object? sender, PaintEventArgs e)
+        {
+            try
+            {
+                Rectangle bounds = btnSettings.ClientRectangle;
+                float inset = Math.Min(bounds.Width, bounds.Height) * 0.2f;
+                var glyphBounds = new RectangleF(
+                    bounds.X + inset,
+                    bounds.Y + inset,
+                    bounds.Width - 2 * inset,
+                    bounds.Height - 2 * inset);
+
+                MonitorIconGeometry.DrawGearIcon(e.Graphics, glyphBounds, btnSettings.ForeColor);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"MainForm.BtnSettings_Paint failed: {ex}");
+            }
         }
 
         /// <summary>
