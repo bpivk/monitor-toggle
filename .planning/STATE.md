@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Configurable Monitors, Optional Targets & Cleanup
 status: executing
-stopped_at: Phase 17 complete (verification passed)
-last_updated: "2026-08-09T08:24:59.418Z"
-last_activity: 2026-08-09 -- Phase 18 execution started
+stopped_at: Phase 18 complete (verification passed) — v2.0 milestone all phases done
+last_updated: "2026-08-09T09:05:00.000Z"
+last_activity: 2026-08-09 -- Phase 18 execution, code review, and verification complete
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 19
-  completed_plans: 13
-  percent: 68
+  completed_plans: 19
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-04)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably restores everything to exactly how it was before. (Note: v2.0 revises the "restores exactly how it was before" framing for Normal mode — see DISPLAY-10/AUDIO-04 and ROADMAP.md Phase 16.)
-**Current focus:** Phase 18 — cleanup-pass-exe-size-reduction
+**Current focus:** v2.0 milestone complete — all 4 phases (15, 16, 17, 18) done. Ready for milestone close.
 
 ## Current Position
 
-Phase: 18 (cleanup-pass-exe-size-reduction) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 18
-Last activity: 2026-08-09 -- Phase 18 execution started
+Phase: 18 (cleanup-pass-exe-size-reduction) — COMPLETE
+Plan: 6 of 6
+Status: All plans executed, code-reviewed (1 warning + 2 info, all resolved), and verified. 18-VERIFICATION.md status is passed (4/4 must-haves — snapshot-restore removed with rig knowledge preserved, 751 net lines removed, exe 57.79% smaller, cold-boot + toggle round trip confirmed on real rig hardware).
+Last activity: 2026-08-09 -- Phase 18 execution, code review, and verification complete
 
-Progress: [██████████] 100% — phase-goal verification: passed
+Progress: [██████████] 100% — phase-goal verification: passed (v2.0 milestone: 4/4 phases complete)
 
 ## Performance Metrics
 
@@ -135,10 +135,10 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-08T19:20:00.000Z
-Stopped at: Phase 17 complete (verification passed)
-Resume file: .planning/phases/17-manual-monitor-panel-shared-safety-guard/17-VERIFICATION.md
+Last session: 2026-08-09T09:05:00.000Z
+Stopped at: Phase 18 complete (verification passed) — v2.0 milestone all phases done
+Resume file: .planning/phases/18-cleanup-pass-exe-size-reduction/18-VERIFICATION.md
 
 ## Operator Next Steps
 
-- `/gsd:plan-phase 18` — plan Phase 18: Cleanup Pass & Exe-Size Reduction (final phase of v2.0 milestone)
+- `/gsd:complete-milestone` — all 4 v2.0 phases (15/16/17/18) are complete and verified; close out the v2.0 milestone and prepare for the next one
