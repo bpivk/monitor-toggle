@@ -18,8 +18,10 @@ public static class ToggleResultFormatter
 {
     /// <summary>
     /// Maps a ToggleResult's per-step outcomes to a human-readable checklist, one line
-    /// per step in step order. Byte-identical to MainForm's current wording (relocated
-    /// verbatim, not reworded).
+    /// per step in step order. Byte-identical to MainForm's original wording (relocated
+    /// verbatim, not reworded) with one exception: the Skipped arm's leading capital was
+    /// lowercased per 15-REVIEW.md IN-02, to match the sibling NotAttempted arm's
+    /// lowercase "not attempted" wording shown in the same checklist.
     /// </summary>
     public static string FormatChecklist(ToggleResult result)
     {
@@ -30,7 +32,7 @@ public static class ToggleResultFormatter
                 ToggleStepOutcome.Succeeded => $"{step.StepName}: OK",
                 ToggleStepOutcome.Failed => $"{step.StepName}: FAILED ({step.Reason})",
                 ToggleStepOutcome.NotAttempted => $"{step.StepName}: not attempted",
-                ToggleStepOutcome.Skipped => $"{step.StepName}: Skipped (not configured)",
+                ToggleStepOutcome.Skipped => $"{step.StepName}: skipped (not configured)",
                 _ => $"{step.StepName}: unknown",
             }));
     }

@@ -706,48 +706,33 @@ namespace RigToggle.App
 
             combo.SelectedIndexChanged -= OnPickerChanged;
 
-            // 15-03/D-02: items always contains at least the "(None...)" sentinel now
-            // (PopulateAudioPickers prepends it unconditionally), so this branch is no
-            // longer reachable in practice -- left in place defensively in case a future
-            // caller passes an empty list directly.
-            if (items.Count == 0)
-            {
-                combo.DataSource = null;
-                combo.Items.Clear();
-                combo.Items.Add("No audio devices detected.");
-                combo.SelectedIndex = -1;
-                combo.Enabled = false;
-            }
-            else
-            {
-                combo.Enabled = true;
-                // Fresh List instance per combo (items.ToList()) — binding the exact same
-                // list object to two ComboBoxes would share a CurrencyManager position.
-                combo.DataSource = items.ToList();
-                combo.DisplayMember = nameof(PickerItem.DisplayLabel);
-                combo.ValueMember = nameof(PickerItem.Id);
-                combo.SelectedIndex = -1;
+            combo.Enabled = true;
+            // Fresh List instance per combo (items.ToList()) — binding the exact same
+            // list object to two ComboBoxes would share a CurrencyManager position.
+            combo.DataSource = items.ToList();
+            combo.DisplayMember = nameof(PickerItem.DisplayLabel);
+            combo.ValueMember = nameof(PickerItem.Id);
+            combo.SelectedIndex = -1;
 
-                if (savedId is not null)
+            if (savedId is not null)
+            {
+                var match = items.FirstOrDefault(i => i.Id == savedId);
+                if (match is not null)
                 {
-                    var match = items.FirstOrDefault(i => i.Id == savedId);
-                    if (match is not null)
-                    {
-                        combo.SelectedItem = match;
-                    }
-                    else
-                    {
-                        ShowStaleWarning(errProvider, combo, warningLabel, "audio device");
-                    }
+                    combo.SelectedItem = match;
                 }
                 else
                 {
-                    // 15-03/D-02: explicitly select the sentinel rather than leaving
-                    // SelectedIndex = -1 -- an intentional "None" choice reads as a
-                    // deliberate selection, not an unfinished form (the exact bug D-02
-                    // exists to remove: a blank combo previously blocked Save).
-                    combo.SelectedItem = items.First(i => i.Id is null);
+                    ShowStaleWarning(errProvider, combo, warningLabel, "audio device");
                 }
+            }
+            else
+            {
+                // 15-03/D-02: explicitly select the sentinel rather than leaving
+                // SelectedIndex = -1 -- an intentional "None" choice reads as a
+                // deliberate selection, not an unfinished form (the exact bug D-02
+                // exists to remove: a blank combo previously blocked Save).
+                combo.SelectedItem = items.First(i => i.Id is null);
             }
 
             combo.SelectedIndexChanged += OnPickerChanged;
@@ -1087,9 +1072,14 @@ namespace RigToggle.App
                 NormalMonitorsToDisable = mergedDisableNormal.ToList(),
                 NormalMonitorsToEnable = mergedEnableNormal.ToList(),
                 NormalAudioDeviceId = audioNormalItem.Id,
-                NormalAudioDeviceName = audioNormalItem.DisplayLabel,
+                // 15-REVIEW.md IN-03: the sentinel's DisplayLabel is UI copy
+                // ("(None — don't switch audio)"), not a device name — persist null
+                // instead of that sentence when the sentinel is selected, so a future
+                // reader of settings.json (diagnostics dump, support script, migration)
+                // sees a real device name or null, never dialog wording.
+                NormalAudioDeviceName = audioNormalItem.Id is null ? null : audioNormalItem.DisplayLabel,
                 RigAudioDeviceId = audioRigItem.Id,
-                RigAudioDeviceName = audioRigItem.DisplayLabel,
+                RigAudioDeviceName = audioRigItem.Id is null ? null : audioRigItem.DisplayLabel,
                 // 15-03/T-15-04: persist from the dedicated _pendingAppPath field, never
                 // from txtAppPath.Text (whose "No app shortcut..." placeholder value
                 // would otherwise round-trip into AppSettings as a bogus path).
