@@ -106,6 +106,13 @@ src/RigToggle.Windows/WindowsAudioController.cs:0
 
 None — plan executed exactly as written. One acceptance-criteria grep in Task 2 (`grep -n "public AudioDeviceInfo? TryResolveDevice" src/RigToggle.Core/Abstractions/IAudioController.cs ...`) does not match because C# interface members carry no `public` access modifier — this is the interface's pre-existing declaration style (line 24, `AudioDeviceInfo? TryResolveDevice(string? deviceId);`), which the plan explicitly instructed not to touch ("Do not touch the `TryResolveDevice` declaration or its own XML doc block"). Not a code defect; the plan's own grep pattern was imprecise for interface syntax. `WindowsAudioController.cs`'s concrete implementation does carry `public` and matches the pattern as written.
 
-## Self-Check
+## Self-Check: PASSED
 
-Verified all claimed file states and commits below.
+- CONFIRMED GONE: src/RigToggle.Core/Abstractions/ISnapshotStore.cs
+- CONFIRMED GONE: src/RigToggle.Core/Models/StateSnapshot.cs
+- CONFIRMED GONE: src/RigToggle.Core/Persistence/JsonSnapshotStore.cs
+- FOUND: .planning/phases/18-cleanup-pass-exe-size-reduction/18-01-SUMMARY.md
+- FOUND commit: 61b88d5 (Task 1)
+- FOUND commit: 3a93bf8 (Task 2)
+- FOUND commit: 4e76f15 (Task 3)
+- FOUND commit: 0a77806 (docs: summary)
