@@ -71,7 +71,7 @@ Full phase details: `.planning/milestones/v2.0-ROADMAP.md`
 
 **Milestone Goal:** Replace both windows' bolted-on-feature layout with an intentional, modern design — MainForm becomes a monitor-tile dashboard leading into the mode toggle, SettingsForm gets a real layout pass, and the deferred theme backlog (accent color, custom toggle switch, manual override) closes out. Pure UI/UX redesign — no change to Core Value, no change to monitor/audio/process-control logic.
 
-- [ ] **Phase 19: Monitor-Tile Dashboard & MonitorPanelForm Retirement** - MainForm becomes a monitor-tile dashboard absorbing the standalone Monitors panel's capability; toggle repositioned below the tiles, Settings de-emphasized
+- [x] **Phase 19: Monitor-Tile Dashboard & MonitorPanelForm Retirement** - MainForm becomes a monitor-tile dashboard absorbing the standalone Monitors panel's capability; toggle repositioned below the tiles, Settings de-emphasized (completed 2026-08-10)
 - [ ] **Phase 20: Custom Toggle-Switch Control** - The Rig/Normal toggle becomes a custom-drawn track+thumb switch (THEME-08)
 - [ ] **Phase 21: Accent-Color Reading & Live Update** - Interactive elements pick up the live Windows accent color (THEME-07)
 - [ ] **Phase 22: Manual Light/Dark Override** - A System/Light/Dark setting overrides live theme-follow (THEME-09)
@@ -109,7 +109,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 19-05-PLAN.md — Full-solution regression gate, four static audits, and rig verification of all five success criteria
+- [x] 19-05-PLAN.md — Full-solution regression gate, four static audits, and rig verification of all five success criteria
 
 **UI hint**: yes
 
@@ -178,7 +178,7 @@ Plans:
 | 16. Normal-Mode Explicit Monitor Config & Mode-Store Redesign | v2.0 | 5/5 | Complete   | 2026-08-08 |
 | 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 4/4 | Complete   | 2026-08-08 |
 | 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 6/6 | Complete   | 2026-08-09 |
-| 19. Monitor-Tile Dashboard & MonitorPanelForm Retirement | v2.1 | 4/5 | In Progress|  |
+| 19. Monitor-Tile Dashboard & MonitorPanelForm Retirement | v2.1 | 5/5 | Complete   | 2026-08-10 |
 | 20. Custom Toggle-Switch Control | v2.1 | 0/TBD | Not started | - |
 | 21. Accent-Color Reading & Live Update | v2.1 | 0/TBD | Not started | - |
 | 22. Manual Light/Dark Override | v2.1 | 0/TBD | Not started | - |
