@@ -4,8 +4,8 @@ milestone: v2.1
 milestone_name: Modern UI Redesign & Theme Backlog
 status: executing
 stopped_at: Phase 20 UI-SPEC approved
-last_updated: "2026-08-10T12:27:24.784Z"
-last_activity: 2026-08-10 -- Phase 20 planning complete
+last_updated: "2026-08-10T12:35:48.496Z"
+last_activity: 2026-08-10 -- Phase 20 execution started
 progress:
   total_phases: 5
   completed_phases: 1
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-09)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably applies Normal mode's own explicitly configured monitor/audio state on toggle-back (revised at v2.0 — see DISPLAY-10/AUDIO-04).
-**Current focus:** Phase 19 — Monitor-Tile Dashboard & MonitorPanelForm Retirement
+**Current focus:** Phase 20 — custom-toggle-switch-control
 
 ## Current Position
 
-Phase: 19 (Monitor-Tile Dashboard & MonitorPanelForm Retirement) — EXECUTING
-Plan: 5 of 5
-Status: Ready to execute
-Last activity: 2026-08-10 -- Phase 20 planning complete
+Phase: 20 (custom-toggle-switch-control) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 20
+Last activity: 2026-08-10 -- Phase 20 execution started
 
 Progress: [░░░░░░░░░░] 0%
 

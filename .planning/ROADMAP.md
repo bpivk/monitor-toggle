@@ -179,7 +179,7 @@ Plans:
 | 17. Manual Monitor Panel & Shared Safety Guard | v2.0 | 4/4 | Complete   | 2026-08-08 |
 | 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 6/6 | Complete   | 2026-08-09 |
 | 19. Monitor-Tile Dashboard & MonitorPanelForm Retirement | v2.1 | 5/5 | Complete   | 2026-08-10 |
-| 20. Custom Toggle-Switch Control | v2.1 | 0/TBD | Not started | - |
+| 20. Custom Toggle-Switch Control | v2.1 | 1/3 | In Progress|  |
 | 21. Accent-Color Reading & Live Update | v2.1 | 0/TBD | Not started | - |
 | 22. Manual Light/Dark Override | v2.1 | 0/TBD | Not started | - |
 | 23. SettingsForm Layout Pass | v2.1 | 0/TBD | Not started | - |
