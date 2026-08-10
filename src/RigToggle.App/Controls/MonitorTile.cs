@@ -234,7 +234,15 @@ namespace RigToggle.App.Controls
 
                 if (_isPrimary)
                 {
-                    var badgeCenter = new PointF(iconRect.Right, iconRect.Top);
+                    // 2026-08-10 rig report: centering the badge exactly on
+                    // iconRect.Top clipped its top edge, since iconY (the icon's own
+                    // top inset) is smaller than the badge's radius at this tile
+                    // size -- the badge's top half fell outside the control's own
+                    // paint bounds (Y < 0) and never rendered. Clamping the center's
+                    // Y to at least one radius down keeps the whole badge inside
+                    // ClientSize regardless of tile size.
+                    float badgeRadius = w * BadgeDiameterFraction / 2f;
+                    var badgeCenter = new PointF(iconRect.Right, Math.Max(iconRect.Top, badgeRadius));
                     MonitorIconGeometry.DrawPrimaryBadge(g, badgeCenter, w * BadgeDiameterFraction);
                 }
 

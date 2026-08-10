@@ -44,6 +44,19 @@ namespace RigToggle.App
         // on every RefreshMonitorTiles() call -- see that method's own comment.
         private readonly List<MonitorTile> _tiles = new();
 
+        // 2026-08-10 rig report: FlatAppearance.MouseOverBackColor/MouseDownBackColor
+        // (ThemeApplier.ThemeButton) still showed no visible hover/press feedback on
+        // real hardware even after widening the color deltas -- consistent with this
+        // codebase's own documented dotnet/winforms#13897 (FlatAppearance colors
+        // unreliable once dark mode is active). btnIdentify/btnSettings now track
+        // hover/press state locally and paint their own background manually (the
+        // same reliable owner-draw pattern MonitorTile already uses), bypassing
+        // FlatAppearance for these two buttons entirely.
+        private bool _identifyHovered;
+        private bool _identifyPressed;
+        private bool _settingsHovered;
+        private bool _settingsPressed;
+
         // D-08/Pitfall 6: the ONE canonical DevicePath-ordered monitor list. Tile
         // position, tile number, AND (Plan 19-03) the Identify overlay numbers all
         // derive from this single field -- never re-derive an independent order
@@ -975,13 +988,83 @@ namespace RigToggle.App
         }
 
         /// <summary>
-        /// MAIN-02/D-10: paints the procedural gear glyph for the icon-only Settings
-        /// button -- the same never-crash-on-paint rule the tile follows.
+        /// Manual hover/press fill for btnIdentify/btnSettings, bypassing
+        /// FlatAppearance.MouseOverBackColor/MouseDownBackColor entirely (rig-proven
+        /// unreliable, see the field comments above). Reads the three colors
+        /// ThemeApplier.ThemeButton already stored on the button (BackColor plus its
+        /// two FlatAppearance backing colors) so the palette stays defined in exactly
+        /// one place.
+        /// </summary>
+        private static Color ManualButtonFill(Button button, bool hovered, bool pressed)
+        {
+            if (pressed) return button.FlatAppearance.MouseDownBackColor;
+            if (hovered) return button.FlatAppearance.MouseOverBackColor;
+            return button.BackColor;
+        }
+
+        /// <summary>
+        /// TILE-04/D-11: paints btnIdentify's background (hover/press-aware, see
+        /// ManualButtonFill) and its text manually -- the same never-crash-on-paint
+        /// rule the tile follows.
+        /// </summary>
+        private void BtnIdentify_Paint(object? sender, PaintEventArgs e)
+        {
+            try
+            {
+                using var fillBrush = new SolidBrush(ManualButtonFill(btnIdentify, _identifyHovered, _identifyPressed));
+                e.Graphics.FillRectangle(fillBrush, btnIdentify.ClientRectangle);
+
+                TextRenderer.DrawText(
+                    e.Graphics,
+                    btnIdentify.Text,
+                    btnIdentify.Font,
+                    btnIdentify.ClientRectangle,
+                    btnIdentify.ForeColor,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"MainForm.BtnIdentify_Paint failed: {ex}");
+            }
+        }
+
+        private void BtnIdentify_MouseEnter(object? sender, EventArgs e)
+        {
+            _identifyHovered = true;
+            btnIdentify.Invalidate();
+        }
+
+        private void BtnIdentify_MouseLeave(object? sender, EventArgs e)
+        {
+            _identifyHovered = false;
+            _identifyPressed = false;
+            btnIdentify.Invalidate();
+        }
+
+        private void BtnIdentify_MouseDown(object? sender, MouseEventArgs e)
+        {
+            _identifyPressed = true;
+            btnIdentify.Invalidate();
+        }
+
+        private void BtnIdentify_MouseUp(object? sender, MouseEventArgs e)
+        {
+            _identifyPressed = false;
+            btnIdentify.Invalidate();
+        }
+
+        /// <summary>
+        /// MAIN-02/D-10: paints btnSettings's background (hover/press-aware, see
+        /// ManualButtonFill) then the procedural gear glyph on top -- the same
+        /// never-crash-on-paint rule the tile follows.
         /// </summary>
         private void BtnSettings_Paint(object? sender, PaintEventArgs e)
         {
             try
             {
+                using var fillBrush = new SolidBrush(ManualButtonFill(btnSettings, _settingsHovered, _settingsPressed));
+                e.Graphics.FillRectangle(fillBrush, btnSettings.ClientRectangle);
+
                 Rectangle bounds = btnSettings.ClientRectangle;
                 float inset = Math.Min(bounds.Width, bounds.Height) * 0.2f;
                 var glyphBounds = new RectangleF(
@@ -996,6 +1079,31 @@ namespace RigToggle.App
             {
                 System.Diagnostics.Trace.WriteLine($"MainForm.BtnSettings_Paint failed: {ex}");
             }
+        }
+
+        private void BtnSettings_MouseEnter(object? sender, EventArgs e)
+        {
+            _settingsHovered = true;
+            btnSettings.Invalidate();
+        }
+
+        private void BtnSettings_MouseLeave(object? sender, EventArgs e)
+        {
+            _settingsHovered = false;
+            _settingsPressed = false;
+            btnSettings.Invalidate();
+        }
+
+        private void BtnSettings_MouseDown(object? sender, MouseEventArgs e)
+        {
+            _settingsPressed = true;
+            btnSettings.Invalidate();
+        }
+
+        private void BtnSettings_MouseUp(object? sender, MouseEventArgs e)
+        {
+            _settingsPressed = false;
+            btnSettings.Invalidate();
         }
 
         /// <summary>

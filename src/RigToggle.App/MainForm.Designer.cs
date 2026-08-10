@@ -122,6 +122,10 @@ namespace RigToggle.App
             this.btnSettings.TabStop = true;
             this.btnSettings.Click += new System.EventHandler(this.BtnSettings_Click);
             this.btnSettings.Paint += new System.Windows.Forms.PaintEventHandler(this.BtnSettings_Paint);
+            this.btnSettings.MouseEnter += new System.EventHandler(this.BtnSettings_MouseEnter);
+            this.btnSettings.MouseLeave += new System.EventHandler(this.BtnSettings_MouseLeave);
+            this.btnSettings.MouseDown += new System.Windows.Forms.MouseEventHandler(this.BtnSettings_MouseDown);
+            this.btnSettings.MouseUp += new System.Windows.Forms.MouseEventHandler(this.BtnSettings_MouseUp);
             this.tileToolTip.SetToolTip(this.btnSettings, "Settings");
 
             //
@@ -177,6 +181,11 @@ namespace RigToggle.App
             this.btnIdentify.Location = new System.Drawing.Point(16, 148);
             this.btnIdentify.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnIdentify.Click += new System.EventHandler(this.BtnIdentify_Click);
+            this.btnIdentify.Paint += new System.Windows.Forms.PaintEventHandler(this.BtnIdentify_Paint);
+            this.btnIdentify.MouseEnter += new System.EventHandler(this.BtnIdentify_MouseEnter);
+            this.btnIdentify.MouseLeave += new System.EventHandler(this.BtnIdentify_MouseLeave);
+            this.btnIdentify.MouseDown += new System.Windows.Forms.MouseEventHandler(this.BtnIdentify_MouseDown);
+            this.btnIdentify.MouseUp += new System.Windows.Forms.MouseEventHandler(this.BtnIdentify_MouseUp);
 
             //
             // trayToggleMenuItem
