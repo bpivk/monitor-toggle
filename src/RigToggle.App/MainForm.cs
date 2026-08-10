@@ -896,6 +896,23 @@ namespace RigToggle.App
 
                 ClientSize = new Size(contentWidth + 2 * margin, btnSettings.Bottom + margin);
 
+                // T-19-DIAG (temporary, gated behind EnableDebugLogging): 2026-08-10
+                // rig report of an overlapping/oversized dashboard at 100% DPI that
+                // the LayoutDashboard() arithmetic does not predict from static
+                // reading alone. Logs the exact runtime geometry so the next rig
+                // round-trip carries real evidence instead of another blind fix
+                // attempt (project convention: PROJECT.md's evidence-before-fix
+                // discipline). Remove once the root cause is confirmed and fixed.
+                System.Diagnostics.Trace.WriteLine(
+                    $"MainForm.LayoutDashboard: Font={Font.Name} {Font.Size}pt Height={Font.Height} " +
+                    $"DeviceDpi={DeviceDpi} margin={margin} count={count} perRow={perRow} rows={rows} " +
+                    $"cellW={cellW} cellH={cellH} stripW={stripW} stripH={stripH} contentWidth={contentWidth} " +
+                    $"stripTop={stripTop} contentBottom={contentBottom} | " +
+                    $"tileStrip={tileStrip.Bounds} lblNoMonitors={lblNoMonitors.Bounds} " +
+                    $"btnIdentify={btnIdentify.Bounds} btnToggle={btnToggle.Bounds} " +
+                    $"btnSettings={btnSettings.Bounds} ClientSize={ClientSize} | " +
+                    string.Join(", ", _tiles.Select((t, i) => $"tile[{i}]={t.Bounds}")));
+
                 ResumeLayout(true);
             }
             catch (Exception ex)

@@ -130,8 +130,14 @@ namespace RigToggle.App
                 button.FlatAppearance.BorderSize = 0;
                 button.BackColor = dark ? Color.FromArgb(45, 45, 48) : SystemColors.Control;
                 button.ForeColor = dark ? Color.FromArgb(240, 240, 240) : SystemColors.ControlText;
-                button.FlatAppearance.MouseOverBackColor = dark ? Color.FromArgb(62, 62, 66) : SystemColors.ControlLight;
-                button.FlatAppearance.MouseDownBackColor = dark ? Color.FromArgb(28, 28, 30) : SystemColors.ControlDark;
+                // 2026-08-10 rig report: BorderSize=0 plus the original hover/press
+                // deltas (dark 45,45,48 -> 62,62,66 / 28,28,30) read as "no button
+                // feedback at all, like a hyperlink." Widened both deltas so hover
+                // and press are unmistakable at a glance without reintroducing
+                // FlatAppearance.BorderColor (the #13897 dark-mode bug this method
+                // exists to avoid).
+                button.FlatAppearance.MouseOverBackColor = dark ? Color.FromArgb(80, 80, 86) : SystemColors.ControlLight;
+                button.FlatAppearance.MouseDownBackColor = dark ? Color.FromArgb(18, 18, 20) : SystemColors.ControlDarkDark;
             }
             catch
             {
