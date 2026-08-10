@@ -1,7 +1,8 @@
 ---
 phase: 20
 slug: custom-toggle-switch-control
-status: draft
+status: approved
+reviewed_at: 2026-08-10
 shadcn_initialized: false
 preset: none
 created: 2026-08-10
@@ -167,6 +168,8 @@ Accent reserved for (full, updated list this phase produces): **the tile dashboa
 
 Resulting vertical order (unchanged relative sequence, D-09): tile row (now flush with top margin) → Identify button → toggle switch row (replaces `btnToggle`'s old slot, same `GapSmPx` gap above it) → Settings gear (same `GapLgPx` gap above it, unchanged).
 
+**Visual hierarchy cross-reference (checker recommendation):** the tile row remains MainForm's primary visual anchor per `19-UI-SPEC.md`; this phase's toggle row is deliberately secondary/Settings-style (D-01 — "not a big primary-action button"), consistent with that inherited hierarchy rather than competing with it.
+
 ---
 
 ## Component Behavior Contract
@@ -195,11 +198,11 @@ Not applicable. This is a native .NET/WinForms desktop project — there is no s
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS (non-blocking recommendation applied — see cross-reference above)
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-08-10
