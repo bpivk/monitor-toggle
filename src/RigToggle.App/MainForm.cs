@@ -68,7 +68,6 @@ namespace RigToggle.App
         // sides yields the spec's 12px tile-to-tile gap (6 + 6); the wrap cap is
         // therefore (TileWidthPx + 2 * TileMarginPx) * MaxTilesPerRow.
         private const int MarginPx = 16;
-        private const int GapSmPx = 8;
         private const int GapMdPx = 16;
         private const int GapLgPx = 24;
         private const int TileWidthPx = 72;
@@ -918,26 +917,37 @@ namespace RigToggle.App
 
                 int contentBottom = stripTop + (hasMonitors ? stripH : Scaled(EmptyStateHeightPx));
 
-                btnIdentify.Size = new Size(Scaled(IdentifyWidthPx), Scaled(IdentifyHeightPx));
-                btnIdentify.Location = new Point(margin + (contentWidth - btnIdentify.Width) / 2, contentBottom + Scaled(GapMdPx));
+                // 2026-08-10 rig fix round 2 (user feedback, post-check-11): Identify
+                // and the toggle row used to stack vertically (Identify centered,
+                // toggle right-aligned below it), which read as visually loose --
+                // two unrelated-looking rows with a lot of dead horizontal space on
+                // Identify's row. They now share ONE action row -- Identify in the
+                // left corner, the switch in the right corner -- since both are the
+                // same Scaled(32) height, so no separate vertical-centering math is
+                // needed within the row. Tab order (tiles -> Identify -> toggle ->
+                // Settings, TILE-05/success criterion 3a) is unaffected: it comes
+                // from Controls.Add order, not Location.
+                int actionRowY = contentBottom + Scaled(GapMdPx);
 
-                // 2026-08-10 rig fix round 1 (check 11): the switch used to
-                // stretch to the full contentWidth (label pinned left, track
-                // pinned right), which read as an oversized gap between the
-                // two and clipped the track's focus ring against the row's
-                // right edge. It is now sized to its own measured content
-                // (ToggleSwitch.GetPreferredSize) and right-aligned to the
-                // same right edge as btnSettings/tiles/Identify below.
+                btnIdentify.Size = new Size(Scaled(IdentifyWidthPx), Scaled(IdentifyHeightPx));
+                btnIdentify.Location = new Point(margin, actionRowY);
+
+                // Sized to its own measured content (ToggleSwitch.GetPreferredSize,
+                // rig fix round 1) and right-aligned to the same right edge as
+                // btnSettings/tiles below -- now sharing btnIdentify's row instead of
+                // sitting on its own row underneath it.
                 int toggleRowHeight = Scaled(ToggleRowHeightPx);
                 int toggleRowWidth = toggleSwitch.GetPreferredSize(new Size(0, toggleRowHeight)).Width;
                 toggleSwitch.Size = new Size(toggleRowWidth, toggleRowHeight);
-                toggleSwitch.Location = new Point(margin + contentWidth - toggleRowWidth, btnIdentify.Bottom + Scaled(GapSmPx));
+                toggleSwitch.Location = new Point(margin + contentWidth - toggleRowWidth, actionRowY);
+
+                int actionRowBottom = Math.Max(btnIdentify.Bottom, toggleSwitch.Bottom);
 
                 // MAIN-02's spacing cue: the deliberately larger GapLgPx gap above the
-                // gear must read as separated from the toggle, not as the next item in
-                // the same stack.
+                // gear must read as separated from the action row, not as the next
+                // item in the same stack.
                 btnSettings.Size = new Size(Scaled(GearSizePx), Scaled(GearSizePx));
-                btnSettings.Location = new Point(margin + contentWidth - btnSettings.Width, toggleSwitch.Bottom + Scaled(GapLgPx));
+                btnSettings.Location = new Point(margin + contentWidth - btnSettings.Width, actionRowBottom + Scaled(GapLgPx));
 
                 ClientSize = new Size(contentWidth + 2 * margin, btnSettings.Bottom + margin);
 
