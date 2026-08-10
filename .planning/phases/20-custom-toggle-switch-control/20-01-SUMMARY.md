@@ -116,3 +116,9 @@ git status --porcelain src/
 ---
 *Phase: 20-custom-toggle-switch-control*
 *Completed: 2026-08-10*
+
+## Self-Check: PASSED
+
+- FOUND: `src/RigToggle.App/Controls/ToggleSwitch.cs`
+- FOUND: commit `9368b23` (Task 1)
+- FOUND: commit `d3eb7c2` (Task 2)
