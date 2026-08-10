@@ -113,9 +113,12 @@ namespace RigToggle.App.Controls
             // (the old plain-button toggle got them for free).
             TabStop = true;
 
-            // D-04: the entire row is the click target, not just the small
-            // track, which is why this control spans the full content width
-            // rather than only the pill.
+            // D-04: the entire row (label + track) is one clickable/focusable
+            // surface, not just the small track. This control is sized to
+            // its own measured content (GetPreferredSize below), not
+            // stretched to MainForm's full dashboard content width -- D-04
+            // only requires the label+switch pair to share one click target,
+            // not that the row span the whole window.
             Cursor = Cursors.Hand;
 
             // MainForm.LayoutDashboard() sizes this row explicitly from a
@@ -290,6 +293,30 @@ namespace RigToggle.App.Controls
             Invalidate();
         }
 
+        /// <summary>
+        /// 2026-08-10 rig fix round 1 (check 11): this control used to be
+        /// stretched by MainForm to the full 288px dashboard content width,
+        /// which (a) pinned the "Rig Mode" label far away from the
+        /// right-aligned track and (b) left the track flush against the
+        /// control's own right edge with no room for the focus ring's
+        /// outward inflation, clipping it. GetPreferredSize measures this
+        /// control's actual content (label + gap + track + ring margin,
+        /// mirroring OnPaint's geometry) so MainForm can size+right-align it
+        /// to just its content instead of the full row width.
+        /// </summary>
+        public override Size GetPreferredSize(Size proposedSize)
+        {
+            float h = proposedSize.Height > 0 ? proposedSize.Height : Font.Height * 2f;
+            float trackH = h * TrackHeightFraction;
+            float trackW = trackH * TrackAspectRatio;
+            float ringMargin = h * FocusRingWidthFraction / 2f;
+
+            Size labelSize = TextRenderer.MeasureText("Rig Mode", Font);
+            float contentWidth = labelSize.Width + h * LabelGapFraction + trackW + ringMargin;
+
+            return new Size((int)Math.Ceiling(contentWidth), (int)h);
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             // An escaping paint exception is process-fatal -- this
@@ -308,9 +335,17 @@ namespace RigToggle.App.Controls
                 float trackH = h * TrackHeightFraction;
                 float trackW = trackH * TrackAspectRatio;
 
-                // Right-aligned -- MainForm supplies the outer margin, so the
-                // track sits flush with the row's right edge.
-                float trackX = w - trackW;
+                // 2026-08-10 rig fix round 1 (check 11): reserve room on the
+                // right for the focus ring's outward inflation (see below --
+                // the ring is drawn OUTSIDE the track by penWidth/2 on every
+                // side). Without this margin the ring -- and at some DPI
+                // factors the track's own anti-aliased edge -- clipped
+                // against the control's ClientSize boundary. This control is
+                // now sized to its own content (GetPreferredSize above), so
+                // this margin is the control's true right edge, not an
+                // arbitrary gap before MainForm's window edge.
+                float ringMargin = h * FocusRingWidthFraction / 2f;
+                float trackX = w - trackW - ringMargin;
                 float trackY = (h - trackH) / 2f;
 
                 // A radius of half the height makes the rounded rect a true

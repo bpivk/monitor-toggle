@@ -215,7 +215,7 @@ public class ToggleOrchestratorTests : IDisposable
     [Fact]
     public void ToggleInProgressException_IsAssignableToInvalidOperationException()
     {
-        // D-05: this is what makes MainForm.BtnToggle_Click's existing
+        // D-05: this is what makes MainForm.ToggleSwitch_ActionRequested's existing
         // catch (Exception ex) block surface a busy-rejection with zero UI changes.
         var exception = new ToggleInProgressException("A toggle is already in progress.");
 
