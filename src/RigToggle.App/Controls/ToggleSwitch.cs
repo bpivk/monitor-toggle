@@ -22,7 +22,7 @@ namespace RigToggle.App.Controls
 
     /// <summary>
     /// THEME-08: a presentational-only, owner-drawn toggle switch replacing
-    /// btnToggle. This control NEVER calls ToggleOrchestrator,
+    /// the old plain-button toggle. This control NEVER calls ToggleOrchestrator,
     /// IMonitorController, or ISettingsStore, and it never reads
     /// IThemeProvider -- it only raises ActionRequested and MainForm owns
     /// every gate (unknown-mode gate, WR-01 configured gate, confirmation
@@ -110,7 +110,7 @@ namespace RigToggle.App.Controls
             // A UserControl inherits none of Button's free focus/keyboard
             // affordances -- every one of them is opted into explicitly
             // here. This is exactly what this control is replacing
-            // (btnToggle got them for free).
+            // (the old plain-button toggle got them for free).
             TabStop = true;
 
             // D-04: the entire row is the click target, not just the small
