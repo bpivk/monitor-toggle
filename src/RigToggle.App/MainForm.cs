@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using RigToggle.App.Controls;
 using RigToggle.Core;
@@ -1060,6 +1061,43 @@ namespace RigToggle.App
         }
 
         /// <summary>
+        /// 2026-08-10 rig round 2 (user feedback): with the toggle switch's pill
+        /// shape and the tiles' rounded corners as its row/column neighbours,
+        /// btnIdentify's sharp-cornered FillRectangle/DrawButtonFocusRing read as
+        /// visually out of place -- "the only square thing". Gives Identify the
+        /// same subtle corner rounding as MonitorTile (4px at 100% scale, height-
+        /// derived to avoid a bare pixel literal, Pitfall 9) rather than the
+        /// switch's full pill curve, since Identify sits in the tile-language
+        /// register, not the switch's. btnSettings is left untouched (explicit
+        /// user sign-off: "everything else looks good now").
+        /// </summary>
+        private static GraphicsPath BuildRoundedRect(RectangleF rect, float radius)
+        {
+            var path = new GraphicsPath();
+            float diameter = radius * 2f;
+
+            if (diameter <= 0f)
+            {
+                path.AddRectangle(rect);
+                return path;
+            }
+
+            var arc = new RectangleF(rect.X, rect.Y, diameter, diameter);
+
+            path.StartFigure();
+            path.AddArc(arc, 180, 90);
+            arc.X = rect.Right - diameter;
+            path.AddArc(arc, 270, 90);
+            arc.Y = rect.Bottom - diameter;
+            path.AddArc(arc, 0, 90);
+            arc.X = rect.X;
+            path.AddArc(arc, 90, 90);
+            path.CloseFigure();
+
+            return path;
+        }
+
+        /// <summary>
         /// TILE-04/D-11: paints btnIdentify's background (hover/press-aware, see
         /// ManualButtonFill), its text, and a focus ring when Tab-focused --
         /// the same never-crash-on-paint rule the tile follows.
@@ -1068,8 +1106,14 @@ namespace RigToggle.App
         {
             try
             {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+                RectangleF bounds = btnIdentify.ClientRectangle;
+                float cornerRadius = bounds.Height * (4f / 32f);
+
+                using var fillPath = BuildRoundedRect(bounds, cornerRadius);
                 using var fillBrush = new SolidBrush(ManualButtonFill(btnIdentify, _identifyHovered, _identifyPressed));
-                e.Graphics.FillRectangle(fillBrush, btnIdentify.ClientRectangle);
+                e.Graphics.FillPath(fillBrush, fillPath);
 
                 TextRenderer.DrawText(
                     e.Graphics,
@@ -1081,7 +1125,13 @@ namespace RigToggle.App
 
                 if (btnIdentify.Focused)
                 {
-                    DrawButtonFocusRing(e.Graphics, btnIdentify.ClientRectangle, AccentColor);
+                    float penWidth = Math.Max(1f, bounds.Height * (2f / 32f));
+                    var ringRect = new RectangleF(
+                        penWidth / 2f, penWidth / 2f,
+                        bounds.Width - penWidth, bounds.Height - penWidth);
+                    using var ringPath = BuildRoundedRect(ringRect, Math.Max(0f, cornerRadius - penWidth / 2f));
+                    using var ringPen = new Pen(AccentColor, penWidth);
+                    e.Graphics.DrawPath(ringPen, ringPath);
                 }
             }
             catch (Exception ex)
