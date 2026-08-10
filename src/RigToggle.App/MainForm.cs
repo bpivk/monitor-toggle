@@ -859,10 +859,23 @@ namespace RigToggle.App
                 int stripW = perRow * cellW;
                 int stripH = rows * cellH;
 
+                // 2026-08-10 rig fix: branch on `count > 0`, never on
+                // `tileStrip.Visible`. Control.Visible is not a simple local flag
+                // -- the getter cascades through the whole ancestor chain, so it
+                // reads false whenever an ancestor (here, MainForm itself before
+                // Form.Show() has ever run) isn't visible yet, even though we set
+                // tileStrip.Visible = true moments earlier in RefreshMonitorTiles().
+                // InitializeTrayState() calls RefreshMonitorTiles() before the form
+                // is ever shown on every startup path, so this branch was silently
+                // always false on first layout, undersizing contentBottom by the
+                // full tile-strip height and overlapping every control below it
+                // with the tile row (rig-confirmed via the diagnostic trace below).
+                bool hasMonitors = count > 0;
+
                 // 19-UI-SPEC.md content-width floor: keeps the window from shrinking
                 // narrower than the existing toggle-button width at one or two
                 // monitors.
-                int contentWidth = Math.Max(Scaled(ContentWidthFloorPx), tileStrip.Visible ? stripW : Scaled(ContentWidthFloorPx));
+                int contentWidth = Math.Max(Scaled(ContentWidthFloorPx), hasMonitors ? stripW : Scaled(ContentWidthFloorPx));
 
                 // lblMode is deliberately KEPT above the tile row: D-09 fixes the
                 // relative order of the tile row, Identify, toggle, and Settings, and
@@ -880,7 +893,7 @@ namespace RigToggle.App
                 lblNoMonitors.Location = new Point(margin, stripTop);
                 lblNoMonitors.Size = new Size(contentWidth, Scaled(EmptyStateHeightPx));
 
-                int contentBottom = stripTop + (tileStrip.Visible ? stripH : Scaled(EmptyStateHeightPx));
+                int contentBottom = stripTop + (hasMonitors ? stripH : Scaled(EmptyStateHeightPx));
 
                 btnIdentify.Size = new Size(Scaled(IdentifyWidthPx), Scaled(IdentifyHeightPx));
                 btnIdentify.Location = new Point(margin + (contentWidth - btnIdentify.Width) / 2, contentBottom + Scaled(GapMdPx));
@@ -895,23 +908,6 @@ namespace RigToggle.App
                 btnSettings.Location = new Point(margin + contentWidth - btnSettings.Width, btnToggle.Bottom + Scaled(GapLgPx));
 
                 ClientSize = new Size(contentWidth + 2 * margin, btnSettings.Bottom + margin);
-
-                // T-19-DIAG (temporary, gated behind EnableDebugLogging): 2026-08-10
-                // rig report of an overlapping/oversized dashboard at 100% DPI that
-                // the LayoutDashboard() arithmetic does not predict from static
-                // reading alone. Logs the exact runtime geometry so the next rig
-                // round-trip carries real evidence instead of another blind fix
-                // attempt (project convention: PROJECT.md's evidence-before-fix
-                // discipline). Remove once the root cause is confirmed and fixed.
-                System.Diagnostics.Trace.WriteLine(
-                    $"MainForm.LayoutDashboard: Font={Font.Name} {Font.Size}pt Height={Font.Height} " +
-                    $"DeviceDpi={DeviceDpi} margin={margin} count={count} perRow={perRow} rows={rows} " +
-                    $"cellW={cellW} cellH={cellH} stripW={stripW} stripH={stripH} contentWidth={contentWidth} " +
-                    $"stripTop={stripTop} contentBottom={contentBottom} | " +
-                    $"tileStrip={tileStrip.Bounds} lblNoMonitors={lblNoMonitors.Bounds} " +
-                    $"btnIdentify={btnIdentify.Bounds} btnToggle={btnToggle.Bounds} " +
-                    $"btnSettings={btnSettings.Bounds} ClientSize={ClientSize} | " +
-                    string.Join(", ", _tiles.Select((t, i) => $"tile[{i}]={t.Bounds}")));
 
                 ResumeLayout(true);
             }
