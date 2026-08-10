@@ -71,7 +71,6 @@ namespace RigToggle.App
         private const int GapSmPx = 8;
         private const int GapMdPx = 16;
         private const int GapLgPx = 24;
-        private const int ModeLabelHeightPx = 20;
         private const int TileWidthPx = 72;
         private const int TileHeightPx = 88;
         private const int TileMarginPx = 6;
@@ -79,7 +78,11 @@ namespace RigToggle.App
         private const int ContentWidthFloorPx = 288;
         private const int IdentifyWidthPx = 100;
         private const int IdentifyHeightPx = 32;
-        private const int TogglePx = 40;
+        // 20-UI-SPEC.md Geometry Contract -- the toggle row is 288x32 (was a
+        // 288x40 button); it is shorter because it is now a Settings-style row
+        // rather than a big primary-action button (D-01), and the switch's own
+        // track/thumb geometry is derived inside the control from this row height.
+        private const int ToggleRowHeightPx = 32;
         private const int GearSizePx = 32;
         private const int EmptyStateHeightPx = 40;
 
@@ -157,7 +160,6 @@ namespace RigToggle.App
             {
                 System.Windows.Forms.Application.SetColorMode(System.Windows.Forms.SystemColorMode.System);
                 DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDark);
-                ThemeApplier.ThemeButton(btnToggle, IsDark);
                 ThemeApplier.ThemeButton(btnSettings, IsDark);
                 // 19-RESEARCH.md Pitfall 1: this call site and InitializeTrayState()
                 // below must stay in lockstep -- adding a new control to only one of
@@ -247,10 +249,10 @@ namespace RigToggle.App
             // ApplyDwmChrome's own doc comment for the full --tray-safe-timing rationale.
             ApplyDwmChrome();
 
-            // 12-05/CR-02: theme both buttons at load time too, same --tray-safe timing
-            // rationale as ApplyDwmChrome above -- InitializeTrayState() runs unconditionally
-            // on both startup paths, unlike OnLoad/OnShown.
-            ThemeApplier.ThemeButton(btnToggle, IsDark);
+            // 12-05/CR-02: theme the gear button at load time too, same --tray-safe
+            // timing rationale as ApplyDwmChrome above -- InitializeTrayState() runs
+            // unconditionally on both startup paths, unlike OnLoad/OnShown. The toggle
+            // switch is themed below instead, via the shared dashboard-theming helper.
             ThemeApplier.ThemeButton(btnSettings, IsDark);
 
             // TILE-01/06: populate/theme/layout the dashboard at this same --tray-safe
@@ -357,19 +359,22 @@ namespace RigToggle.App
             // never default to either Rig or Normal wording — the IsInRigMode() branch
             // below is only meaningful once the mode is actually known. The notify
             // icon is deliberately left at its current safe default rather than picked
-            // here (there is no "unknown" icon glyph this phase).
+            // here (there is no "unknown" icon glyph this phase). The old mode-text
+            // label is gone (D-06), so the switch's Indeterminate position — mid-track,
+            // filled gray, distinct from both real states — is now the sole carrier of
+            // the "never default to either Rig or Normal wording" rule.
             if (!_orchestrator.IsModeKnown())
             {
-                lblMode.Text = "Mode: Unknown";
-                btnToggle.Text = "Toggle";
+                toggleSwitch.SetState(ToggleSwitchState.Indeterminate);
                 trayToggleMenuItem.Text = "Toggle";
                 notifyIcon.Text = "Rig Toggle — Mode Unknown";
                 return;
             }
 
             bool isInRigMode = _orchestrator.IsInRigMode();
-            lblMode.Text = isInRigMode ? "Mode: Rig" : "Mode: Normal";
-            btnToggle.Text = isInRigMode ? "Switch to Normal Mode" : "Switch to Rig Mode";
+            // D-08: Rig = on/right/filled, Normal = the app's baseline everywhere else
+            // and therefore the neutral off/left position.
+            toggleSwitch.SetState(isInRigMode ? ToggleSwitchState.On : ToggleSwitchState.Off);
 
             // TRAY-04/D-01: tray icon + tooltip must always reflect the current mode,
             // correct on first paint even under --tray startup. Guarded on the icons
@@ -380,10 +385,12 @@ namespace RigToggle.App
                 notifyIcon.Icon = isInRigMode ? _rigIcon : _normalIcon;
             }
             notifyIcon.Text = isInRigMode ? "Rig Toggle — Rig Mode" : "Rig Toggle — Normal Mode";
-            trayToggleMenuItem.Text = btnToggle.Text; // D-04: one shared source of truth
+            // D-04: one shared source of truth -- computed alongside the switch's
+            // SetState() call above rather than read off a deleted control's Text.
+            trayToggleMenuItem.Text = isInRigMode ? "Switch to Normal Mode" : "Switch to Rig Mode";
         }
 
-        private void BtnToggle_Click(object? sender, EventArgs e)
+        private void ToggleSwitch_ActionRequested(object? sender, EventArgs e)
         {
             ToggleResult? result = null;
 
@@ -650,7 +657,7 @@ namespace RigToggle.App
         /// BEFORE MonitorConfirmDialog.ShowDialog() opens, because ShowDialog() runs
         /// a nested message loop that dispatches WM_HOTKEY -- without this, a
         /// hotkey-triggered toggle could start underneath a half-finished tile
-        /// action. This is NOT redundant with BtnToggle_Click's reliance on
+        /// action. This is NOT redundant with ToggleSwitch_ActionRequested's reliance on
         /// ToggleOrchestrator's internal _busy guard, even though both now live in
         /// MainForm: the lease exists specifically to block a concurrent toggle from
         /// starting WHILE this method's nested dialog loop is pumping messages,
@@ -665,8 +672,8 @@ namespace RigToggle.App
             }
             catch (ToggleInProgressException ex)
             {
-                // Information (not Warning) matches how BtnToggle_Click already
-                // classifies a busy rejection: an expected condition, not an error.
+                // Information (not Warning) matches how ToggleSwitch_ActionRequested
+                // already classifies a busy rejection: an expected condition, not an error.
                 MessageBox.Show(this, ex.Message, "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return null;
             }
@@ -895,15 +902,13 @@ namespace RigToggle.App
                 // monitors.
                 int contentWidth = Math.Max(Scaled(ContentWidthFloorPx), hasMonitors ? stripW : Scaled(ContentWidthFloorPx));
 
-                // lblMode is deliberately KEPT above the tile row: D-09 fixes the
-                // relative order of the tile row, Identify, toggle, and Settings, and
-                // says nothing about the mode indicator; it is a non-focusable Label,
-                // so the tile row is still first in tab order, and removing it would
-                // drop the "Mode: Unknown" state RefreshUi() depends on (T-16-09).
-                lblMode.Location = new Point(margin, margin);
-                lblMode.Size = new Size(contentWidth, Scaled(ModeLabelHeightPx));
-
-                int stripTop = margin + Scaled(ModeLabelHeightPx) + Scaled(GapSmPx);
+                // 20-UI-SPEC.md Layout Integration (D-06 resolved): the ~28px of
+                // vertical space the old mode-text label's removal frees is COLLAPSED,
+                // not preserved as breathing room -- once the switch row is the sole
+                // mode readout (D-06), an empty gap there would read as an unexplained
+                // layout hole, so the tile strip now starts flush with the top margin
+                // and the window stays exactly as tall as its content needs.
+                int stripTop = margin;
 
                 tileStrip.Size = new Size(stripW, stripH);
                 tileStrip.Location = new Point(margin + (contentWidth - stripW) / 2, stripTop);
@@ -916,14 +921,14 @@ namespace RigToggle.App
                 btnIdentify.Size = new Size(Scaled(IdentifyWidthPx), Scaled(IdentifyHeightPx));
                 btnIdentify.Location = new Point(margin + (contentWidth - btnIdentify.Width) / 2, contentBottom + Scaled(GapMdPx));
 
-                btnToggle.Size = new Size(contentWidth, Scaled(TogglePx));
-                btnToggle.Location = new Point(margin, btnIdentify.Bottom + Scaled(GapSmPx));
+                toggleSwitch.Size = new Size(contentWidth, Scaled(ToggleRowHeightPx));
+                toggleSwitch.Location = new Point(margin, btnIdentify.Bottom + Scaled(GapSmPx));
 
                 // MAIN-02's spacing cue: the deliberately larger GapLgPx gap above the
                 // gear must read as separated from the toggle, not as the next item in
                 // the same stack.
                 btnSettings.Size = new Size(Scaled(GearSizePx), Scaled(GearSizePx));
-                btnSettings.Location = new Point(margin + contentWidth - btnSettings.Width, btnToggle.Bottom + Scaled(GapLgPx));
+                btnSettings.Location = new Point(margin + contentWidth - btnSettings.Width, toggleSwitch.Bottom + Scaled(GapLgPx));
 
                 ClientSize = new Size(contentWidth + 2 * margin, btnSettings.Bottom + margin);
 
@@ -939,7 +944,11 @@ namespace RigToggle.App
         /// <summary>
         /// 19-RESEARCH.md Pitfall 1: the single helper both theming call sites
         /// (OnThemeChanged, InitializeTrayState()) invoke for every dashboard control,
-        /// so the two-call-site rule cannot drift.
+        /// so the two-call-site rule cannot drift. Hard constraint 3/20-UI-SPEC.md
+        /// Pitfall 1: the toggle switch is themed from here too -- routing it through
+        /// this single helper, rather than adding two direct calls in OnThemeChanged
+        /// and InitializeTrayState(), is what makes the two call sites structurally
+        /// unable to drift (the bug class this codebase shipped twice in Phase 12).
         /// </summary>
         private void ApplyDashboardTheming()
         {
@@ -950,6 +959,7 @@ namespace RigToggle.App
 
             ThemeApplier.ThemeButton(btnIdentify, IsDark);
             ThemeApplier.ThemeButton(btnSettings, IsDark);
+            ThemeApplier.ThemeToggleSwitch(toggleSwitch, IsDark);
             // The gear glyph is painted from btnSettings.ForeColor, which
             // ThemeButton just changed -- force a repaint so it doesn't wait for the
             // next incidental invalidation.
@@ -1009,15 +1019,16 @@ namespace RigToggle.App
 
         /// <summary>
         /// 2026-08-10 rig report: Tab-focusing btnIdentify/btnSettings showed no
-        /// focus indicator at all, unlike btnToggle (still native FlatAppearance
-        /// rendering, unaffected). Root cause: ManualButtonFill's FillRectangle
+        /// focus indicator at all. Root cause: ManualButtonFill's FillRectangle
         /// covers the button's entire ClientRectangle, painting over WinForms'
         /// native dotted focus-cue rectangle that would otherwise have been drawn
         /// as part of the button's own base painting, before our Paint handler
         /// runs. Draws an explicit accent-colored ring instead -- the same visual
         /// language and color source (ThemeApplier.ThemeMonitorTile's AccentColor)
         /// MonitorTile's own focus ring already uses, so keyboard users get one
-        /// consistent focus cue across tiles and buttons.
+        /// consistent focus cue across tiles and buttons. The toggle switch draws
+        /// its own pill-shaped focus ring inside ToggleSwitch.OnPaint instead of
+        /// reusing this helper, because a rectangle is the wrong shape for a pill.
         /// </summary>
         private static void DrawButtonFocusRing(Graphics g, Rectangle bounds, Color accentColor)
         {
@@ -1028,34 +1039,6 @@ namespace RigToggle.App
             using var ringPen = new Pen(accentColor, penWidth);
             g.DrawRectangle(ringPen, ringRect.X, ringRect.Y, ringRect.Width, ringRect.Height);
         }
-
-        /// <summary>
-        /// 2026-08-10 rig report: btnToggle's native FlatStyle.Flat focus rectangle
-        /// renders in a different color than the accent ring now used by the tiles
-        /// and by Identify/Settings, reading as visually inconsistent. Draws the
-        /// same accent ring on top -- background/hover/press rendering is left
-        /// untouched (Phase 20/THEME-08 replaces this button with a fully
-        /// custom-drawn toggle switch, so no further investment here beyond the
-        /// one visible inconsistency actually reported).
-        /// </summary>
-        private void BtnToggle_Paint(object? sender, PaintEventArgs e)
-        {
-            try
-            {
-                if (btnToggle.Focused)
-                {
-                    DrawButtonFocusRing(e.Graphics, btnToggle.ClientRectangle, AccentColor);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine($"MainForm.BtnToggle_Paint failed: {ex}");
-            }
-        }
-
-        private void BtnToggle_Enter(object? sender, EventArgs e) => btnToggle.Invalidate();
-
-        private void BtnToggle_Leave(object? sender, EventArgs e) => btnToggle.Invalidate();
 
         /// <summary>
         /// TILE-04/D-11: paints btnIdentify's background (hover/press-aware, see
