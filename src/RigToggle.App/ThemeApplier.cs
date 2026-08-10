@@ -201,5 +201,65 @@ namespace RigToggle.App
                 // Cosmetic-only — leave the control unchanged on failure.
             }
         }
+
+        /// <summary>
+        /// THEME-08/20-UI-SPEC.md Color table: the switch half of Pitfall 1's
+        /// two-call-site rule — MainForm.OnThemeChanged AND
+        /// MainForm.InitializeTrayState() must both reach it (Plan 02 wires
+        /// it through ApplyDashboardTheming() so the two cannot drift), or a
+        /// switch themed only at startup freezes at whatever theme Windows
+        /// was in while every neighbouring control keeps flipping — the
+        /// exact bug this codebase already shipped twice in Phase 12.
+        ///
+        /// AccentColor is confined to the switch's ON-state track fill and
+        /// its focus ring — it must never spread to the "Rig Mode" label,
+        /// the Off/Indeterminate fills, or the thumb.
+        /// </summary>
+        public static void ThemeToggleSwitch(ToggleSwitch toggleSwitch, bool dark)
+        {
+            try
+            {
+                // Pitfall 3 Mica-safe background, same literal as tile.BackColor.
+                toggleSwitch.BackColor = dark ? Color.FromArgb(32, 32, 32) : SystemColors.Control;
+
+                // D-09: same literal as tile.AccentColor. Phase 21/THEME-07
+                // replaces this pair with a live-read Windows accent color —
+                // this is the single line that changes then.
+                toggleSwitch.OnColor = dark ? Color.FromArgb(0, 90, 158) : SystemColors.Highlight;
+
+                // Same as tile.FocusRingColor.
+                toggleSwitch.FocusRingColor = dark ? Color.FromArgb(0, 90, 158) : SystemColors.Highlight;
+
+                // D-10: same as tile.IconOffColor — one shared "off" visual language app-wide.
+                toggleSwitch.OffOutlineColor = dark ? Color.FromArgb(160, 160, 160) : SystemColors.GrayText;
+
+                // D-12: same literal as ThemeButton's MouseOverBackColor.
+                toggleSwitch.OffHoverFillColor = dark ? Color.FromArgb(80, 80, 86) : SystemColors.ControlLight;
+
+                // D-12: same literal as ThemeButton's MouseDownBackColor.
+                toggleSwitch.OffPressFillColor = dark ? Color.FromArgb(18, 18, 20) : SystemColors.ControlDarkDark;
+
+                // D-07: the ONE new literal this phase introduces, deliberately isolated to DISPLAY-11's unknown-mode state.
+                toggleSwitch.IndeterminateColor = dark ? Color.FromArgb(90, 90, 90) : Color.FromArgb(200, 200, 200);
+
+                // D-11: theme-independent by design — deliberately takes no dark
+                // branch, the same treatment MonitorIconGeometry's primary-badge
+                // literal already carries; a future editor should not thread
+                // dark into it.
+                toggleSwitch.ThumbColor = Color.White;
+
+                // Keeps the white thumb legible against a light-mode row background or hover fill.
+                toggleSwitch.ThumbOutlineColor = dark ? Color.FromArgb(160, 160, 160) : SystemColors.ControlDark;
+
+                // Plain theme text color, matching every other label in this codebase.
+                toggleSwitch.LabelColor = dark ? Color.FromArgb(240, 240, 240) : SystemColors.ControlText;
+
+                toggleSwitch.Invalidate();
+            }
+            catch
+            {
+                // Cosmetic-only — leave the control unchanged on failure.
+            }
+        }
     }
 }
