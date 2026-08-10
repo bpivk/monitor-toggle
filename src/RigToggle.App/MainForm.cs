@@ -921,8 +921,17 @@ namespace RigToggle.App
                 btnIdentify.Size = new Size(Scaled(IdentifyWidthPx), Scaled(IdentifyHeightPx));
                 btnIdentify.Location = new Point(margin + (contentWidth - btnIdentify.Width) / 2, contentBottom + Scaled(GapMdPx));
 
-                toggleSwitch.Size = new Size(contentWidth, Scaled(ToggleRowHeightPx));
-                toggleSwitch.Location = new Point(margin, btnIdentify.Bottom + Scaled(GapSmPx));
+                // 2026-08-10 rig fix round 1 (check 11): the switch used to
+                // stretch to the full contentWidth (label pinned left, track
+                // pinned right), which read as an oversized gap between the
+                // two and clipped the track's focus ring against the row's
+                // right edge. It is now sized to its own measured content
+                // (ToggleSwitch.GetPreferredSize) and right-aligned to the
+                // same right edge as btnSettings/tiles/Identify below.
+                int toggleRowHeight = Scaled(ToggleRowHeightPx);
+                int toggleRowWidth = toggleSwitch.GetPreferredSize(new Size(0, toggleRowHeight)).Width;
+                toggleSwitch.Size = new Size(toggleRowWidth, toggleRowHeight);
+                toggleSwitch.Location = new Point(margin + contentWidth - toggleRowWidth, btnIdentify.Bottom + Scaled(GapSmPx));
 
                 // MAIN-02's spacing cue: the deliberately larger GapLgPx gap above the
                 // gear must read as separated from the toggle, not as the next item in
