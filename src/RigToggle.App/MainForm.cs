@@ -1030,6 +1030,34 @@ namespace RigToggle.App
         }
 
         /// <summary>
+        /// 2026-08-10 rig report: btnToggle's native FlatStyle.Flat focus rectangle
+        /// renders in a different color than the accent ring now used by the tiles
+        /// and by Identify/Settings, reading as visually inconsistent. Draws the
+        /// same accent ring on top -- background/hover/press rendering is left
+        /// untouched (Phase 20/THEME-08 replaces this button with a fully
+        /// custom-drawn toggle switch, so no further investment here beyond the
+        /// one visible inconsistency actually reported).
+        /// </summary>
+        private void BtnToggle_Paint(object? sender, PaintEventArgs e)
+        {
+            try
+            {
+                if (btnToggle.Focused)
+                {
+                    DrawButtonFocusRing(e.Graphics, btnToggle.ClientRectangle, AccentColor);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"MainForm.BtnToggle_Paint failed: {ex}");
+            }
+        }
+
+        private void BtnToggle_Enter(object? sender, EventArgs e) => btnToggle.Invalidate();
+
+        private void BtnToggle_Leave(object? sender, EventArgs e) => btnToggle.Invalidate();
+
+        /// <summary>
         /// TILE-04/D-11: paints btnIdentify's background (hover/press-aware, see
         /// ManualButtonFill), its text, and a focus ring when Tab-focused --
         /// the same never-crash-on-paint rule the tile follows.

@@ -100,6 +100,9 @@ namespace RigToggle.App
             // is the declarative default; the runtime call is belt-and-suspenders.
             this.btnToggle.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnToggle.Click += new System.EventHandler(this.BtnToggle_Click);
+            this.btnToggle.Paint += new System.Windows.Forms.PaintEventHandler(this.BtnToggle_Paint);
+            this.btnToggle.Enter += new System.EventHandler(this.BtnToggle_Enter);
+            this.btnToggle.Leave += new System.EventHandler(this.BtnToggle_Leave);
 
             //
             // btnSettings
