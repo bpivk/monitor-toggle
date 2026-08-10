@@ -10,23 +10,34 @@ requires:
 provides:
   - Full-solution regression gate confirming no build/test regression across Phase 19
   - Four static audits proving DISPLAY-12 single-implementation, canonical-ordering single-source, theming two-call-site lockstep, and TILE-07/DPI completeness
-  - Rig-hardware verification verdict for the five properties this Linux build environment cannot observe (Task 2 checkpoint — pending real user verification)
-affects: []
+  - Rig-hardware verification: APPROVED after 4 real-hardware rounds, 6 defects found and fixed (layout overlap, badge clipping, FlatAppearance hover/press unreliability, missing focus indicator, non-uniform focus ring color)
+affects:
+  - src/RigToggle.App/MainForm.cs
+  - src/RigToggle.App/MainForm.Designer.cs
+  - src/RigToggle.App/Controls/MonitorTile.cs
+  - src/RigToggle.App/ThemeApplier.cs
 
 tech-stack:
   added: []
-  patterns: []
+  patterns: [owner-drawn hover/press state (bypassing FlatAppearance), accent-colored manual focus ring]
 
 key-files:
   created: []
-  modified: []
+  modified:
+    - src/RigToggle.App/MainForm.cs
+    - src/RigToggle.App/MainForm.Designer.cs
+    - src/RigToggle.App/Controls/MonitorTile.cs
+    - src/RigToggle.App/ThemeApplier.cs
 
-decisions: []
+decisions:
+  - "Branch layout math on a locally-computed hasMonitors flag, never on Control.Visible (ancestor-cascading, unreliable before Form.Show())"
+  - "Own-paint hover/press background for Identify/Settings instead of FlatAppearance, matching MonitorTile's already-proven pattern"
+  - "Give btnToggle only a matching focus-ring Paint handler, not a full owner-draw conversion, since Phase 20/THEME-08 replaces it with a custom switch shortly"
 
-requirements-completed: []
+requirements-completed: [TILE-01, TILE-02, TILE-03, TILE-04, TILE-05, TILE-06, TILE-07, MAIN-01, MAIN-02]
 
-duration: pending (Task 1 only; Task 2 rig checkpoint outstanding)
-completed: 2026-08-09
+duration: ~4 hours (Task 1) + 4 rig round-trips (Task 2)
+completed: 2026-08-10
 ---
 
 # Phase 19 Plan 05: Regression Gate, Static Audits & Rig Verification Summary
@@ -238,12 +249,59 @@ All five criteria have their statically-provable half machine-verified in this p
 
 ## Task 2: Rig-Hardware Verification
 
-**Status: NOT YET RUN.** This is a blocking `checkpoint:human-verify` gate requiring real Windows display hardware, a live Windows theme, and DPI scaling — none of which exist in this Linux build environment. Per this plan's own hard constraint 3, this checkpoint must not be auto-approved or fabricated.
+**Status: APPROVED**, after four real-hardware rounds that found and fixed genuine defects — none fabricated, all rig-confirmed before commit, matching this project's evidence-before-fix discipline.
 
-The ten rig checks (TILE-01 tile row correctness, TILE-02/03 click-to-toggle with the confirmation gate, TILE-05 keyboard, TILE-04 Identify numbering, TILE-06 hotplug including while hidden, MAIN-01/02/TILE-07 layout and retirement, window auto-size, Pitfall 1 theming at both call sites including `--tray` hidden start, Pitfall 3 hotkey-during-dialog race, and Pitfall 5 DPI at 125%/150%) are all documented in `19-05-PLAN.md` Task 2 and await the real user's verdict. This summary will be appended with the rig verdict, the completed requirement-mapping table, and a final duration once Task 2 resolves.
+### Round 1 (initial checkpoint)
 
-## Self-Check: PASSED (Task 1 only)
+User reported: window too small/squished, a control hidden behind the tile icon (later identified as Identify), Rig/Normal toggle partially covered, Settings button read as a static label with no interaction feedback.
+
+**Root cause 1 — layout overlap (`30482c1`, `6919d31`):** Added a diagnostic `Trace.WriteLine` to `LayoutDashboard()` gated behind the existing `EnableDebugLogging` setting, then asked the user to reproduce with logging on. The captured trace (`contentBottom=90` while the tile strip's real bottom was `154`) proved `LayoutDashboard()` was branching on `tileStrip.Visible` to decide whether to size around the real tile strip or the empty-state placeholder — but `Control.Visible` cascades through the whole ancestor chain, and `InitializeTrayState()` calls `RefreshMonitorTiles()` before `Form.Show()` has ever run on every startup path, so the getter always read `false` regardless of the local flag just having been set `true`. Fixed by branching on a locally-computed `hasMonitors = count > 0` instead, which has no ancestor-visibility timing dependency. Manually re-verified the full arithmetic against the rig's logged `Font.Height=16` before shipping. Removed the diagnostic once the root cause was confirmed.
+
+**Root cause 2 — button feedback (`30482c1`):** First attempt widened `FlatAppearance.MouseOverBackColor`/`MouseDownBackColor` contrast. Rig-confirmed insufficient in Round 2 (see below).
+
+### Round 2
+
+User reported: layout fixed, but the primary-monitor badge was still clipped at the top, and buttons still showed zero hover/press feedback.
+
+**Root cause 3 — badge clipping (`44a9796`):** The badge's center was placed exactly at the icon's top-right corner (`iconRect.Top`), but the badge's radius exceeds the icon's own top inset at this tile size, so the top half of the circle fell outside the tile's own paint bounds (`Y < 0`) and was silently clipped by the graphics context. Fixed by clamping the center's Y to at least one badge-radius down.
+
+**Root cause 4 — FlatAppearance unreliable in dark mode (`44a9796`):** Widening the color values (Round 1) made no visible difference at all — consistent with this codebase's own already-documented `dotnet/winforms#13897` (FlatAppearance hover/press colors unreliable once dark mode is active), the exact bug `ThemeApplier.ThemeButton`'s `BorderSize=0` choice was originally written to dodge, but apparently not fully. Converted `btnIdentify`/`btnSettings` to track hover/press state locally (`MouseEnter`/`Leave`/`Down`/`Up`) and paint their own background manually via a new `ManualButtonFill` helper — the same reliable owner-draw pattern `MonitorTile` already uses — bypassing `FlatAppearance` for these two buttons entirely.
+
+### Round 3
+
+User reported: badge and hover/press now correct, but Tab-focusing Identify or Settings showed no focus indicator at all (Toggle, unaffected, still showed one).
+
+**Root cause 5 (`fe4168c`):** The Round 2 fix's `ManualButtonFill` background fill covers the button's entire `ClientRectangle`, which paints over WinForms' native dotted focus rectangle — normally drawn as part of the button's own base paint, before the `Paint` event fires. Added an explicit accent-colored focus ring (`DrawButtonFocusRing`), drawn only when `Focused`, reusing the same color source (`ThemeApplier.ThemeMonitorTile`'s `AccentColor` values) the tiles' own focus ring already uses.
+
+### Round 4
+
+User reported: focus ring present on Identify/Settings but a different color than Toggle's still-native focus rectangle — asked for uniform color across all three.
+
+**Root cause 6 (`8de03b8`):** Toggle was intentionally left on native rendering (Phase 20/THEME-08 replaces it with a fully custom-drawn switch shortly, so no further investment was made there beyond what was actually reported). Added a `Paint` handler that draws only the same accent focus ring on top when focused — background/hover/press rendering deliberately untouched.
+
+### Final rig confirmation
+
+All ten checks from `19-05-PLAN.md` Task 2 approved: tile row correctness (icon, number, status, primary badge fully visible), click-to-toggle with the confirmation gate, keyboard Tab/Space/Enter with a uniform accent focus ring across tiles and all three buttons, Identify numbering matching tiles 1:1, live hotplug (visible and hidden-to-tray), layout order and `MonitorPanelForm`/entry-point retirement, live theme flip and `--tray` hidden-start theming, the hotkey-during-confirm-dialog race, and DPI scaling. Hover/press feedback on Identify and Settings confirmed visible and unmistakable — the original complaint that prompted Round 1.
+
+**Total: 4 rig round-trips, 6 real defects found and fixed, 0 fabricated approvals.**
+
+## Requirement ID → Verification Mapping (final)
+
+| Requirement | Task 1 static evidence | Task 2 rig verdict |
+|---|---|---|
+| TILE-01 | Audit 2 (canonical ordering single source) | Approved — tile row correct, badge visible (Round 2 fix) |
+| TILE-02 | Audit 1 (DISPLAY-12 single implementation, three-way reach) | Approved — click-to-toggle confirmed on real CCD hardware |
+| TILE-03 | Audit 1 | Approved — confirmation gate confirmed |
+| TILE-04 | Audit 2 (shared ordering with Identify) | Approved — overlay numbering matches tiles 1:1 |
+| TILE-05 | — (no static audit possible for keyboard input) | Approved — Tab/Space/Enter confirmed, uniform focus ring (Round 3/4 fixes) |
+| TILE-06 | — (no static audit possible for live hotplug) | Approved — hotplug confirmed visible and hidden-to-tray |
+| TILE-07 | Audit 4 (zero `MonitorPanelForm` references, both entry points gone) | Approved — no survivors on real install |
+| MAIN-01 | Audit 4 (layout order) | Approved — overlap fixed (Round 1), final order confirmed |
+| MAIN-02 | Audit 4 (layout order, gear presence) | Approved — hover/press feedback confirmed (Round 2/3 fixes) |
+
+## Self-Check: PASSED
 
 - FOUND: .planning/phases/19-monitor-tile-dashboard-monitorpanelform-retirement/19-05-SUMMARY.md
-- Build and test commands re-verified against the recorded output above (0 Errors, 81/81 passing).
-- `git status --porcelain src/` re-confirmed empty at time of writing.
+- Build and test commands re-verified after all Round 1-4 fixes: `dotnet build RigToggle.sln` — 0 errors, 4 pre-existing warnings (unchanged baseline); `dotnet test` — 81/81 passing, matches baseline exactly.
+- All 9 phase requirements (TILE-01..07, MAIN-01, MAIN-02) now carry both a Task 1 static-evidence citation and a Task 2 rig verdict.
+- Phase 19 goal achieved: MainForm is a monitor-tile dashboard, `MonitorPanelForm` and both entry points are fully retired, confirmed on real hardware after four rig-informed fix rounds.
