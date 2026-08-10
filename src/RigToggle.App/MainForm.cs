@@ -466,16 +466,43 @@ namespace RigToggle.App
                         var disableNames = disablePaths.Select(ResolveName).ToList();
                         var enableNames = enablePaths.Select(ResolveName).ToList();
 
-                        using var confirmDialog = new MonitorConfirmDialog(disableNames, enableNames, _themeProvider);
-                        if (confirmDialog.ShowDialog(this) != DialogResult.OK)
+                        // CR-01 (code review): acquire the same exclusive-access lease
+                        // OnTileAction already acquires before ITS confirm dialog, and
+                        // for the identical reason (19-RESEARCH.md Pitfall 3) —
+                        // ShowDialog() below runs a nested message loop that dispatches
+                        // WM_HOTKEY, and ToggleOrchestrator's _busy guard does not
+                        // engage until ToggleToRigMode() is actually called, further
+                        // down, after the dialog closes. Without this lease, a
+                        // concurrent hotkey/tray toggle (PerformBackgroundToggle, which
+                        // calls the orchestrator directly with no dialog of its own)
+                        // could mutate monitor/audio state while this dialog is still
+                        // open. The lease is released BEFORE ToggleToRigMode() is
+                        // called below — NOT held across it — because
+                        // BeginExclusiveMonitorAccess() and ToggleToRigMode()'s
+                        // RunGuarded() share the exact same _busy flag (by design, see
+                        // ToggleOrchestrator.BeginExclusiveMonitorAccess's own doc
+                        // comment); holding the lease into that call would make
+                        // RunGuarded's own CompareExchange see busy=1 and immediately
+                        // self-reject every Rig-mode toggle as "already in progress".
+                        IDisposable? lease = TryAcquireMonitorAccess();
+                        if (lease is null) return;
+
+                        bool confirmed;
+                        using (lease)
                         {
-                            return; // user cancelled — nothing mutated
+                            using var confirmDialog = new MonitorConfirmDialog(disableNames, enableNames, _themeProvider);
+                            confirmed = confirmDialog.ShowDialog(this) == DialogResult.OK;
+
+                            if (confirmed && confirmDialog.DontAskAgain)
+                            {
+                                settings.SkipMonitorConfirmation = true;
+                                _settingsStore.Save(settings);
+                            }
                         }
 
-                        if (confirmDialog.DontAskAgain)
+                        if (!confirmed)
                         {
-                            settings.SkipMonitorConfirmation = true;
-                            _settingsStore.Save(settings);
+                            return; // user cancelled — nothing mutated
                         }
                     }
 
@@ -657,12 +684,17 @@ namespace RigToggle.App
         /// BEFORE MonitorConfirmDialog.ShowDialog() opens, because ShowDialog() runs
         /// a nested message loop that dispatches WM_HOTKEY -- without this, a
         /// hotkey-triggered toggle could start underneath a half-finished tile
-        /// action. This is NOT redundant with ToggleSwitch_ActionRequested's reliance on
-        /// ToggleOrchestrator's internal _busy guard, even though both now live in
-        /// MainForm: the lease exists specifically to block a concurrent toggle from
-        /// starting WHILE this method's nested dialog loop is pumping messages,
-        /// which has nothing to do with which class hosts the code. A future editor
-        /// must not merge or delete either guard.
+        /// action. ToggleSwitch_ActionRequested (CR-01, code review) uses this same
+        /// helper around ITS confirm dialog for the identical reason -- but releases
+        /// the lease before calling ToggleToRigMode()/ToggleToNormalMode(), since
+        /// those go through ToggleOrchestrator.RunGuarded(), which claims the exact
+        /// same _busy flag this lease does; holding both at once would make every
+        /// guarded toggle self-reject as "already in progress". OnTileAction never
+        /// has this constraint because it mutates via
+        /// WindowsMonitorController.DeactivateMonitors directly, bypassing
+        /// RunGuarded entirely, so it can hold the lease across its whole action. A
+        /// future editor must not merge or delete either guard, and must not widen
+        /// ToggleSwitch_ActionRequested's lease scope to cover its RunGuarded call.
         /// </summary>
         private IDisposable? TryAcquireMonitorAccess()
         {
@@ -709,7 +741,21 @@ namespace RigToggle.App
                 // here, not inside MonitorTile (19-RESEARCH.md Pattern 1).
                 if (monitor.IsActive)
                 {
-                    var settings = _settingsStore.Load();
+                    // WR-03 (code review): degrade to defaults rather than let an
+                    // I/O hiccup (AV lock, concurrent Settings-Save) propagate
+                    // unhandled out of a MonitorTile.ActionRequested event handler --
+                    // matches ApplyTrayVisibility/MainForm_FormClosing/MainForm_Resize's
+                    // existing defensive Load() pattern.
+                    AppSettings settings;
+                    try
+                    {
+                        settings = _settingsStore.Load();
+                    }
+                    catch
+                    {
+                        settings = new AppSettings();
+                    }
+
                     if (!settings.SkipMonitorConfirmation)
                     {
                         // enableNames is always empty here -- TILE-03 gates Disable
@@ -1464,7 +1510,22 @@ namespace RigToggle.App
             GlobalHotkey.Unregister(Handle, GlobalHotkeyId);
             _hotkeyRegistered = false;
 
-            var settings = _settingsStore.Load();
+            // WR-03 (code review): OpenSettingsDialog calls this unguarded after every
+            // Settings-dialog close (a very common, everyday interaction) -- degrade to
+            // "nothing configured" defaults rather than let a settings.json read
+            // failure propagate out, matching this file's established defensive
+            // Load() pattern. RegisterHotkeyAtStartup's own try/catch around its call
+            // to this method remains as a second, harmless layer of the same guard.
+            AppSettings settings;
+            try
+            {
+                settings = _settingsStore.Load();
+            }
+            catch
+            {
+                settings = new AppSettings();
+            }
+
             if (settings.HotkeyModifiers is not int modifiers || settings.HotkeyKey is not int key)
             {
                 return true; // nothing configured -- nothing to register, not a failure

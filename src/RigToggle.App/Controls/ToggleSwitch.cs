@@ -96,6 +96,7 @@ namespace RigToggle.App.Controls
         private ToggleSwitchState _state = ToggleSwitchState.Off;
         private bool _isHovered;
         private bool _isPressed;
+        private bool _actionKeyDown;
 
         public ToggleSwitch()
         {
@@ -240,13 +241,38 @@ namespace RigToggle.App.Controls
         {
             // Space/Enter must be indistinguishable from a click. Returning
             // true stops the key reaching the form's default button.
+            //
+            // WR-02 (code review): Windows resends WM_KEYDOWN via OS
+            // autorepeat for as long as the key is held, and ProcessCmdKey is
+            // invoked for every one of those -- unlike a native Button, which
+            // fires its click on key-UP specifically so one held keypress
+            // never fires more than once. _actionKeyDown gates this to fire
+            // exactly once per physical press; OnKeyUp below clears it on
+            // release, and OnLeave clears it defensively in case focus moves
+            // away mid-hold without a key-up ever reaching this control
+            // (e.g. Alt-Tab while holding Space).
             if (Focused && (keyData == Keys.Space || keyData == Keys.Return))
             {
-                ActionRequested?.Invoke(this, EventArgs.Empty);
+                if (!_actionKeyDown)
+                {
+                    _actionKeyDown = true;
+                    ActionRequested?.Invoke(this, EventArgs.Empty);
+                }
+
                 return true;
             }
 
             return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        protected override void OnKeyUp(KeyEventArgs e)
+        {
+            base.OnKeyUp(e);
+
+            if (e.KeyCode == Keys.Space || e.KeyCode == Keys.Return)
+            {
+                _actionKeyDown = false;
+            }
         }
 
         protected override void OnEnter(EventArgs e)
@@ -258,6 +284,9 @@ namespace RigToggle.App.Controls
         protected override void OnLeave(EventArgs e)
         {
             base.OnLeave(e);
+
+            // Defensive reset -- see the ProcessCmdKey comment above.
+            _actionKeyDown = false;
             Invalidate();
         }
 
@@ -309,7 +338,14 @@ namespace RigToggle.App.Controls
             float h = proposedSize.Height > 0 ? proposedSize.Height : Font.Height * 2f;
             float trackH = h * TrackHeightFraction;
             float trackW = trackH * TrackAspectRatio;
-            float ringMargin = h * FocusRingWidthFraction / 2f;
+
+            // WR-01 (code review): a full FocusRingWidthFraction, not half. The ring
+            // rect is inflated outward by penWidth/2 from the track, then stroked
+            // with a Center-aligned pen of that same penWidth -- the pen itself
+            // straddles the path by another penWidth/2 outward. Total outward bleed
+            // from the track's own right edge is therefore the full penWidth, not
+            // penWidth/2 -- see the matching comment in OnPaint below.
+            float ringMargin = h * FocusRingWidthFraction;
 
             Size labelSize = TextRenderer.MeasureText("Rig Mode", Font);
             float contentWidth = labelSize.Width + h * LabelGapFraction + trackW + ringMargin;
@@ -335,16 +371,19 @@ namespace RigToggle.App.Controls
                 float trackH = h * TrackHeightFraction;
                 float trackW = trackH * TrackAspectRatio;
 
-                // 2026-08-10 rig fix round 1 (check 11): reserve room on the
-                // right for the focus ring's outward inflation (see below --
-                // the ring is drawn OUTSIDE the track by penWidth/2 on every
-                // side). Without this margin the ring -- and at some DPI
-                // factors the track's own anti-aliased edge -- clipped
-                // against the control's ClientSize boundary. This control is
-                // now sized to its own content (GetPreferredSize above), so
-                // this margin is the control's true right edge, not an
-                // arbitrary gap before MainForm's window edge.
-                float ringMargin = h * FocusRingWidthFraction / 2f;
+                // 2026-08-10 rig fix round 1 (check 11) + WR-01 (code review):
+                // reserve room on the right for the focus ring's outward
+                // inflation (see below). The ring rect is inflated outward by
+                // penWidth/2 from the track, then stroked with a
+                // Center-aligned pen of that same penWidth -- the pen itself
+                // straddles the path by another penWidth/2 outward, so the
+                // ring's total outward bleed past the track's own right edge
+                // is the FULL penWidth, not penWidth/2 (the original round-1
+                // fix reserved only half, so the ring still clipped). This
+                // control is now sized to its own content (GetPreferredSize
+                // above), so this margin is the control's true right edge,
+                // not an arbitrary gap before MainForm's window edge.
+                float ringMargin = h * FocusRingWidthFraction;
                 float trackX = w - trackW - ringMargin;
                 float trackY = (h - trackH) / 2f;
 
