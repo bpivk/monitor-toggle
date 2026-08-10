@@ -58,8 +58,7 @@ namespace RigToggle.App
             // the explicit notifyIcon.Visible = false calls in FormClosing/Exit below.
             this.components = new System.ComponentModel.Container();
 
-            this.lblMode = new System.Windows.Forms.Label();
-            this.btnToggle = new System.Windows.Forms.Button();
+            this.toggleSwitch = new RigToggle.App.Controls.ToggleSwitch();
             this.btnSettings = new System.Windows.Forms.Button();
             this.tileStrip = new System.Windows.Forms.FlowLayoutPanel();
             this.lblNoMonitors = new System.Windows.Forms.Label();
@@ -75,34 +74,22 @@ namespace RigToggle.App
             this.SuspendLayout();
 
             //
-            // lblMode
+            // toggleSwitch
             //
-            this.lblMode.Text = "Mode: Normal";
-            this.lblMode.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            this.lblMode.Location = new System.Drawing.Point(16, 16);
-            this.lblMode.Size = new System.Drawing.Size(288, 20);
-            this.lblMode.AutoSize = false;
-            this.lblMode.Name = "lblMode";
-
-            //
-            // btnToggle
-            //
-            this.btnToggle.Text = "Switch to Rig Mode";
-            this.btnToggle.Location = new System.Drawing.Point(16, 60);
-            this.btnToggle.Size = new System.Drawing.Size(288, 40);
-            this.btnToggle.Name = "btnToggle";
-            // 12-05/THEME-05 (12-REVIEW.md CR-02): FlatStyle.Flat, not .System -- the
-            // Windows 11 rig proved FlatStyle.System buttons do NOT pick up dark-mode
-            // coloring on this runtime. ThemeApplier.ThemeButton (called at load and on
-            // every live flip) re-asserts Flat + explicit palette colors, working around
-            // dotnet/winforms#13897's unreliable FlatAppearance auto-apply pipeline via
-            // BorderSize=0 + explicit hover/pressed overrides. This Designer assignment
-            // is the declarative default; the runtime call is belt-and-suspenders.
-            this.btnToggle.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnToggle.Click += new System.EventHandler(this.BtnToggle_Click);
-            this.btnToggle.Paint += new System.Windows.Forms.PaintEventHandler(this.BtnToggle_Paint);
-            this.btnToggle.Enter += new System.EventHandler(this.BtnToggle_Enter);
-            this.btnToggle.Leave += new System.EventHandler(this.BtnToggle_Leave);
+            // THEME-08/D-01 -- this replaces the former 288x40 stock-Button toggle
+            // control with a compact Settings-style toggle row (label left, pill
+            // switch right); the control is owner-drawn and code-only
+            // (Controls/ToggleSwitch.cs), so unlike the button it replaces it needs no
+            // FlatStyle/FlatAppearance workaround -- the dotnet/winforms#13897
+            // rationale that used to live here now applies only to the remaining stock
+            // Buttons and is documented on ThemeApplier.ThemeButton. Location/Size
+            // below are PLACEHOLDER defaults -- LayoutDashboard() (MainForm.cs)
+            // overwrites both on every population and hotplug, same as
+            // btnIdentify/tileStrip above; do not "fix" these Designer coordinates.
+            this.toggleSwitch.Name = "toggleSwitch";
+            this.toggleSwitch.Size = new System.Drawing.Size(288, 32);
+            this.toggleSwitch.Location = new System.Drawing.Point(16, 148);
+            this.toggleSwitch.ActionRequested += new System.EventHandler(this.ToggleSwitch_ActionRequested);
 
             //
             // btnSettings
@@ -197,8 +184,10 @@ namespace RigToggle.App
             //
             // trayToggleMenuItem
             //
-            // Text left at a safe default; RefreshUi() overrides it every call with
-            // btnToggle.Text so the tray menu and the GUI button never drift (D-04).
+            // Text left at a safe default; RefreshUi() computes this text directly from
+            // the same isInRigMode branch that sets the switch's state, so the tray
+            // menu and the switch can never drift (D-04) -- the old toggle button no
+            // longer exists.
             this.trayToggleMenuItem.Text = "Switch to Rig Mode";
             this.trayToggleMenuItem.Name = "trayToggleMenuItem";
             this.trayToggleMenuItem.Click += new System.EventHandler(this.TrayToggleMenuItem_Click);
@@ -280,14 +269,13 @@ namespace RigToggle.App
             this.Resize += new System.EventHandler(this.MainForm_Resize);
 
             // D-09 reading order: tile row first, then Identify, then the Rig/Normal
-            // toggle, then the de-emphasized Settings gear last. lblMode stays above
-            // the tile row (see LayoutDashboard()'s own comment) so it is still first
-            // in this Controls.Add sequence.
-            this.Controls.Add(this.lblMode);
+            // toggle, then the de-emphasized Settings gear last. The old mode-text
+            // label is deleted this phase (D-06) -- the toggle row is now MainForm's
+            // sole mode readout, so the tile row starts this Controls.Add sequence.
             this.Controls.Add(this.tileStrip);
             this.Controls.Add(this.lblNoMonitors);
             this.Controls.Add(this.btnIdentify);
-            this.Controls.Add(this.btnToggle);
+            this.Controls.Add(this.toggleSwitch);
             this.Controls.Add(this.btnSettings);
 
             this.ResumeLayout(false);
@@ -295,8 +283,7 @@ namespace RigToggle.App
 
         #endregion
 
-        private System.Windows.Forms.Label lblMode;
-        private System.Windows.Forms.Button btnToggle;
+        private RigToggle.App.Controls.ToggleSwitch toggleSwitch;
         private System.Windows.Forms.Button btnSettings;
         private System.Windows.Forms.FlowLayoutPanel tileStrip;
         private System.Windows.Forms.Label lblNoMonitors;

@@ -73,10 +73,10 @@ namespace RigToggle.App
             this.btnContinue.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnContinue.Name = "btnContinue";
             // 12-05/THEME-05 (12-REVIEW.md CR-02): FlatStyle.Flat, not .System -- see
-            // MainForm.Designer.cs's btnToggle comment for the full rig-finding + #13897
-            // rationale. ThemeApplier.ThemeButton (called from the ctor and OnThemeChanged)
-            // re-asserts this at runtime; this Designer assignment is the declarative
-            // default.
+            // ThemeApplier.ThemeButton's own doc comment for the full rig-finding +
+            // #13897 rationale. ThemeApplier.ThemeButton (called from the ctor and
+            // OnThemeChanged) re-asserts this at runtime; this Designer assignment is
+            // the declarative default.
             this.btnContinue.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
 
             //
