@@ -14,9 +14,9 @@ requires:
     provides: "MainForm hosting ToggleSwitch in btnToggle's former slot, ToggleSwitch_ActionRequested verbatim-ported gate handler"
 provides:
   - "Full regression gate evidence (build 0 errors, 81/81 tests) for the finished Phase 20 diff"
-  - "Four recorded static audits: retirement completeness (1 finding), theming two-call-site lockstep (clean), gate preservation (clean), DPI/seam/accent discipline (1 finding, pre-existing/out-of-scope)"
-  - "Task 2 rig-hardware checkpoint opened and awaiting real Windows hardware verification"
-affects: [20-GAP-CLOSURE (if opened), phase-20-close]
+  - "Four recorded static audits: retirement completeness (1 finding, fixed), theming two-call-site lockstep (clean), gate preservation (clean), DPI/seam/accent discipline (1 finding, pre-existing/out-of-scope)"
+  - "Task 2 rig-hardware checkpoint Round 1: 4 checks PASS, 1 FAIL (test methodology, not a defect), 1 FAIL (real layout defect, fixed same round), 6 deferred to Round 2"
+affects: [phase-20-close]
 
 # Tech tracking
 tech-stack:
@@ -26,7 +26,11 @@ tech-stack:
 key-files:
   created:
     - .planning/phases/20-custom-toggle-switch-control/20-03-SUMMARY.md
-  modified: []
+  modified:
+    - src/RigToggle.Core/ToggleInProgressException.cs (stale btnToggle doc-comment fix, Audit 1 finding)
+    - src/RigToggle.Tests/ToggleOrchestratorTests.cs (stale btnToggle doc-comment fix, Audit 1 finding)
+    - src/RigToggle.App/Controls/ToggleSwitch.cs (Round 1 rig fix: GetPreferredSize, focus-ring margin)
+    - src/RigToggle.App/MainForm.cs (Round 1 rig fix: content-sized, right-aligned toggle row)
 
 key-decisions:
   - "Audit 1 found 2 stale MainForm.BtnToggle_Click doc-comment references outside Plan 02's file scope (RigToggle.Core/ToggleInProgressException.cs, RigToggle.Tests/ToggleOrchestratorTests.cs). Per this plan's hard_constraint 1 ('no source changes... remediation is a gap-closure plan, not an edit smuggled into a verification plan'), this was recorded, NOT auto-fixed, despite being a textbook Rule-1 stale-reference bug in any other plan."
@@ -332,11 +336,38 @@ $ git status --porcelain src/
 # Confirmed zero source files modified by this plan -- PASS (hard_constraint 1 satisfied)
 ```
 
-## CHECKPOINT: Task 2 — Rig-Hardware Verification (NOT STARTED)
+## Task 2: Rig-Hardware Verification
 
-Task 2 is `type="checkpoint:human-verify" gate="blocking"`. It requires publishing and running the app on real Windows rig hardware and manually working through 11 numbered checks (screenshots, DPI scale changes at 125%/150%, live theme flips on both startup paths, keyboard-only operation, zoomed seam inspection, mode-file corruption test). This build environment has no Windows GUI, no display scaling, and no real monitors -- every item is structurally unobservable here, exactly as the plan's hard_constraint 3 states. Per this execution's explicit instructions, Task 2 was not attempted, simulated, or auto-approved.
+### Round 1 (initial checkpoint)
 
-**Awaiting:** the user to publish the app (`PATH="$HOME/.dotnet:$PATH" dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true`, or reuse whichever published-artifact workflow Phase 19 used), run it on the real rig, and report each of the 11 numbered checks from the plan's Task 2 as PASS/FAIL with notes -- see `.planning/phases/20-custom-toggle-switch-control/20-03-PLAN.md` Task 2 for the full checklist.
+Published and run on the real Windows rig by the user. Results:
+
+| Check | Verdict | Note |
+|---|---|---|
+| 1. Reads as a switch, not a button | PASS | |
+| 2. State readable without color | PASS | |
+| 3. Unknown state (mode.json missing/corrupted) | FAIL (test-methodology issue, not a defect) | User renamed `mode.json` away to simulate corruption. Traced root cause: `Program.cs:102-104` deliberately re-seeds `mode.json` with a default value whenever the file is *missing* at startup (pre-existing Phase 16 migration behavior — "seed mode.json from legacy snapshot presence exactly once, when it does not yet exist"). A missing file is therefore treated as first-run migration, not corruption — the app recreates it with a default rather than entering the Indeterminate state. `JsonModeStore.TryLoad()` only returns null (→ Unknown/Indeterminate) for a file that *exists but is invalid* (`JsonException`, or a defined-but-out-of-range enum value via the `Enum.IsDefined` check). This is Phase 16 behavior, unmodified by Phase 20 — not a regression. Re-verification in Round 2 will use file-content corruption (e.g. `{"Mode":99}`) instead of file removal. |
+| 4. Keyboard operation | PASS | |
+| 5. Live theme flip, normal start | NOT TESTED | Deferred to Round 2 (see below) |
+| 6. Live theme flip, `--tray` start | NOT TESTED | Deferred to Round 2 |
+| 7. Seam artifacts | NOT TESTED | Deferred to Round 2 |
+| 8. Flicker/Mica blend | NOT TESTED | Deferred to Round 2 |
+| 9. DPI 125%/150% | NOT TESTED | Deferred to Round 2 |
+| 10. Gates and tray parity | NOT TESTED | Deferred to Round 2 |
+| 11. Layout after lblMode removal | FAIL (real defect) | User: "Rig mode and the toggle are too far apart and the button is a bit cut off on the right." Root-caused: `ToggleSwitch.OnPaint` sets `trackX = w - trackW`, flushing the track to the control's absolute right edge with zero margin — the focus ring (drawn *outside* the track via outward inflation) has nowhere to render but off the clipped edge. Separately, `toggleSwitch`'s row spans the full 288px content width (same as the tile row), with the "Rig Mode" label drawn at the far left of that space (`TextFormatFlags.Left`) — leaving a large dead gap between the label and the right-pinned switch. |
+
+**Decision:** user chose to fix the layout defect (check 11) before continuing checks 5-10, rather than test theming/DPI against a layout about to change. Chosen fix direction: shrink the label+switch row to fit its content (label width + gap + track width, no longer full 288px), and right-align that compact row so the switch lines up under the Settings gear.
+
+### Round 1 fix
+
+Applied directly (not a separate gap-closure plan, matching Phase 19's rig-fix-round precedent):
+- `ToggleSwitch.cs`: reserved right-side margin in `OnPaint` (`trackX = w - trackW - ringMargin`, `ringMargin` derived from `FocusRingWidthFraction`) for the focus ring's outward inflation so the track/ring no longer clips against the control's edge.
+- `ToggleSwitch.cs`: added `GetPreferredSize(Size proposedSize)`, measuring "Rig Mode" via `TextRenderer.MeasureText` plus the label gap, track, and ring-margin fractions — mirrors `OnPaint`'s geometry so the control can report its true content width instead of stretching to fill an externally-supplied width. Also corrected the constructor's D-04 comment, which had misattributed "full content width" to the click-target decision.
+- `MainForm.cs` `LayoutDashboard()`: `toggleSwitch` is now sized via `GetPreferredSize` and right-aligned (`margin + contentWidth - toggleRowWidth`) so its right edge matches `btnSettings`'/`btnIdentify`'s right edge (under the Settings gear), instead of spanning the full content width from the left margin.
+
+Commit `69c7e7c` (`fix(20): size toggle row to content and reserve focus-ring margin`). Build: 0 errors. Tests: 81/81 passing after the fix.
+
+**Awaiting Round 2:** republish and re-run the full 11-check verification from scratch against the fixed layout (per user's chosen path — full retest, not just checks 5-11).
 
 ---
 *Phase: 20-custom-toggle-switch-control*
