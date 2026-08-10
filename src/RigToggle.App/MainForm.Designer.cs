@@ -126,6 +126,8 @@ namespace RigToggle.App
             this.btnSettings.MouseLeave += new System.EventHandler(this.BtnSettings_MouseLeave);
             this.btnSettings.MouseDown += new System.Windows.Forms.MouseEventHandler(this.BtnSettings_MouseDown);
             this.btnSettings.MouseUp += new System.Windows.Forms.MouseEventHandler(this.BtnSettings_MouseUp);
+            this.btnSettings.Enter += new System.EventHandler(this.BtnSettings_Enter);
+            this.btnSettings.Leave += new System.EventHandler(this.BtnSettings_Leave);
             this.tileToolTip.SetToolTip(this.btnSettings, "Settings");
 
             //
@@ -186,6 +188,8 @@ namespace RigToggle.App
             this.btnIdentify.MouseLeave += new System.EventHandler(this.BtnIdentify_MouseLeave);
             this.btnIdentify.MouseDown += new System.Windows.Forms.MouseEventHandler(this.BtnIdentify_MouseDown);
             this.btnIdentify.MouseUp += new System.Windows.Forms.MouseEventHandler(this.BtnIdentify_MouseUp);
+            this.btnIdentify.Enter += new System.EventHandler(this.BtnIdentify_Enter);
+            this.btnIdentify.Leave += new System.EventHandler(this.BtnIdentify_Leave);
 
             //
             // trayToggleMenuItem

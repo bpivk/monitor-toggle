@@ -176,6 +176,11 @@ namespace RigToggle.App
         // correct across live flips -- mirrors SettingsForm.IsDarkTheme.
         private bool IsDark => _themeProvider.CurrentTheme == AppTheme.Dark;
 
+        // Same source/values as ThemeApplier.ThemeMonitorTile's AccentColor -- kept
+        // here too so btnIdentify/btnSettings's manually-painted focus ring uses the
+        // identical color a tile's own focus ring does.
+        private Color AccentColor => IsDark ? Color.FromArgb(0, 90, 158) : SystemColors.Highlight;
+
         /// <summary>
         /// 12-02/D-08/THEME-06: requests Windows-11 rounded corners + Mica for this
         /// window (silent no-op on Windows 10, D-07). Called from InitializeTrayState()
@@ -1003,9 +1008,31 @@ namespace RigToggle.App
         }
 
         /// <summary>
+        /// 2026-08-10 rig report: Tab-focusing btnIdentify/btnSettings showed no
+        /// focus indicator at all, unlike btnToggle (still native FlatAppearance
+        /// rendering, unaffected). Root cause: ManualButtonFill's FillRectangle
+        /// covers the button's entire ClientRectangle, painting over WinForms'
+        /// native dotted focus-cue rectangle that would otherwise have been drawn
+        /// as part of the button's own base painting, before our Paint handler
+        /// runs. Draws an explicit accent-colored ring instead -- the same visual
+        /// language and color source (ThemeApplier.ThemeMonitorTile's AccentColor)
+        /// MonitorTile's own focus ring already uses, so keyboard users get one
+        /// consistent focus cue across tiles and buttons.
+        /// </summary>
+        private static void DrawButtonFocusRing(Graphics g, Rectangle bounds, Color accentColor)
+        {
+            float penWidth = Math.Max(1f, bounds.Height * (2f / 32f));
+            var ringRect = new RectangleF(
+                penWidth / 2f, penWidth / 2f,
+                bounds.Width - penWidth, bounds.Height - penWidth);
+            using var ringPen = new Pen(accentColor, penWidth);
+            g.DrawRectangle(ringPen, ringRect.X, ringRect.Y, ringRect.Width, ringRect.Height);
+        }
+
+        /// <summary>
         /// TILE-04/D-11: paints btnIdentify's background (hover/press-aware, see
-        /// ManualButtonFill) and its text manually -- the same never-crash-on-paint
-        /// rule the tile follows.
+        /// ManualButtonFill), its text, and a focus ring when Tab-focused --
+        /// the same never-crash-on-paint rule the tile follows.
         /// </summary>
         private void BtnIdentify_Paint(object? sender, PaintEventArgs e)
         {
@@ -1021,12 +1048,21 @@ namespace RigToggle.App
                     btnIdentify.ClientRectangle,
                     btnIdentify.ForeColor,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+
+                if (btnIdentify.Focused)
+                {
+                    DrawButtonFocusRing(e.Graphics, btnIdentify.ClientRectangle, AccentColor);
+                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Trace.WriteLine($"MainForm.BtnIdentify_Paint failed: {ex}");
             }
         }
+
+        private void BtnIdentify_Enter(object? sender, EventArgs e) => btnIdentify.Invalidate();
+
+        private void BtnIdentify_Leave(object? sender, EventArgs e) => btnIdentify.Invalidate();
 
         private void BtnIdentify_MouseEnter(object? sender, EventArgs e)
         {
@@ -1074,12 +1110,21 @@ namespace RigToggle.App
                     bounds.Height - 2 * inset);
 
                 MonitorIconGeometry.DrawGearIcon(e.Graphics, glyphBounds, btnSettings.ForeColor);
+
+                if (btnSettings.Focused)
+                {
+                    DrawButtonFocusRing(e.Graphics, btnSettings.ClientRectangle, AccentColor);
+                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Trace.WriteLine($"MainForm.BtnSettings_Paint failed: {ex}");
             }
         }
+
+        private void BtnSettings_Enter(object? sender, EventArgs e) => btnSettings.Invalidate();
+
+        private void BtnSettings_Leave(object? sender, EventArgs e) => btnSettings.Invalidate();
 
         private void BtnSettings_MouseEnter(object? sender, EventArgs e)
         {
