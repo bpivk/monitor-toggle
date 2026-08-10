@@ -118,9 +118,13 @@ All eight target features shipped as scoped; no scope was dropped or added mid-m
 - [x] Self-contained exe measurably smaller via `EnableCompressionInSingleFile`, `SatelliteResourceLanguages=en`, `InvariantGlobalization=true`, and the NAudio meta-package split, without IL trimming (PERF-01) — Validated in Phase 18: 116,946,229 → 49,356,430 bytes (57.79% reduction)
 - [x] A full toggle round trip and cold autostart boot verified working on real rig hardware after the exe-size changes (PERF-02) — Validated in Phase 18, rig-confirmed
 
+### Validated (v2.1)
+
+- [x] The Rig/Normal toggle is a custom-drawn toggle-switch control (track + thumb), distinguishable by shape/position alone, not color (THEME-08) — Validated in Phase 20: Custom Toggle-Switch Control. Rig-verified after 2 fix rounds (row sizing/focus-ring clipping, then an action-row merge with Identify + Identify's corner rounding for visual consistency); a post-rig code review then found and fixed a real concurrency race (the confirm dialog's nested message loop wasn't holding the same exclusive-access lease `OnTileAction` already uses, letting a hotkey/tray toggle mutate state while the dialog was open) plus three lower-severity findings (focus-ring margin math, keyboard-autorepeat re-firing, two unguarded settings loads).
+
 ### Active
 
-Defining v2.1 requirements (MainForm/SettingsForm redesign, monitor-panel retirement, THEME-07/08/09) — see `.planning/REQUIREMENTS.md`.
+Continuing v2.1 requirements (SettingsForm layout pass, THEME-07/09) — see `.planning/REQUIREMENTS.md`.
 
 ### Out of Scope
 
@@ -192,6 +196,7 @@ Defining v2.1 requirements (MainForm/SettingsForm redesign, monitor-panel retire
 | Manual Monitor Panel mutates monitors through the exact same `IMonitorController.DeactivateMonitors`/`ActivateMonitors` calls the toggle already uses | Gives DISPLAY-12's "at least one monitor enabled" guard a single shared implementation across all three mutation paths, with zero new guard code to keep in sync | Validated Phase 17, static audit + rig-confirmed |
 | Snapshot-restore subsystem (`Restore`/`RestoreViaReconstruction`, related models) fully deleted, not deprecated-in-place | Confirmed genuinely dead once Phase 16's explicit-config rewrite shipped; rig-specific CCD knowledge it encoded was extracted to `.planning/debug/knowledge-base.md` first | Validated Phase 18, rig-confirmed no behavior change |
 | Exe-size reduction via four MSBuild-only levers (compression, satellite-language trim, invariant globalization, NAudio meta-package split), `PublishTrimmed` left explicitly false | IL trimming's static analysis was already documented as unsafe for this codebase's COM/P-Invoke-heavy surface; MSBuild config alone still delivered a 57.79% size cut | Validated Phase 18, rig-confirmed cold boot + toggle round trip |
+| `ToggleSwitch_ActionRequested`'s exclusive-access lease is released before calling `ToggleToRigMode()`/`ToggleToNormalMode()`, never held across it | `BeginExclusiveMonitorAccess()` and the guarded toggle methods' `RunGuarded()` share the same `_busy` flag (Phase 17 decision, above) — holding the lease into the guarded call would make every toggle self-reject as "already in progress"; the lease only needs to span the confirm dialog's nested message loop, not the toggle itself | Validated Phase 20, code-review-found (CR-01) and fixed before close |
 
 ## Evolution
 
@@ -211,4 +216,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-09 — v2.0 milestone shipped (Phases 15-18), all requirements validated.*
+*Last updated: 2026-08-10 — Phase 20 (Custom Toggle-Switch Control, THEME-08) shipped, rig-verified.*
