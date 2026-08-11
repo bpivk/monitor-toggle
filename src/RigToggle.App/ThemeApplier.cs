@@ -111,23 +111,49 @@ namespace RigToggle.App
         /// explicit FlatStyle.Flat + palette colors -- the same explicit-override approach
         /// already working for the grid and hotkey box.
         ///
-        /// Why BorderSize=0 + explicit MouseOverBackColor/MouseDownBackColor rather than
-        /// relying on FlatStyle.Flat's normal auto-apply pipeline: dotnet/winforms#13897
-        /// (open) documents that FlatAppearance border/hover/pressed colors don't reliably
-        /// apply once dark mode is active when FlatStyle.Flat is used, producing visually
-        /// broken buttons (a stock light-colored flash on hover/press even though the rest
-        /// of the button is themed dark). Setting BorderSize=0 (NOT 1) sidesteps the
-        /// unreliable border-color application entirely, and pinning MouseOverBackColor/
-        /// MouseDownBackColor explicitly (rather than leaving them to auto-derive from
-        /// BackColor) keeps hover/pressed states dark-themed instead of hitting the #13897
-        /// bug -- this is 12-REVIEW.md CR-02 "Fix Option 2".
+        /// Why BorderSize=0 (dark mode only) + explicit MouseOverBackColor/MouseDownBackColor
+        /// rather than relying on FlatStyle.Flat's normal auto-apply pipeline:
+        /// dotnet/winforms#13897 (open) documents that FlatAppearance border/hover/pressed
+        /// colors don't reliably apply once dark mode is active when FlatStyle.Flat is used,
+        /// producing visually broken buttons (a stock light-colored flash on hover/press even
+        /// though the rest of the button is themed dark). Setting BorderSize=0 (NOT 1) in dark
+        /// mode sidesteps the unreliable border-color application entirely, and pinning
+        /// MouseOverBackColor/MouseDownBackColor explicitly (rather than leaving them to
+        /// auto-derive from BackColor) keeps hover/pressed states dark-themed instead of
+        /// hitting the #13897 bug -- this is 12-REVIEW.md CR-02 "Fix Option 2".
+        ///
+        /// light-mode-buttons-blend-into (debug, 2026-08-11): #13897 is dark-mode-only, so a
+        /// light-mode border is safe and necessary here -- the app's Mica window backdrop
+        /// (DwmTitleBar.ApplyRoundedCornersAndMica, DWMSBT_MAINWINDOW) renders near-white in
+        /// light mode, visually indistinguishable from SystemColors.Control, the fill color
+        /// this method uses. With BorderSize=0 in light mode too, text-only flat buttons
+        /// (Identify, Discard Changes, Browse, Clear) had no boundary at all and blended into
+        /// the window background; only btnSettings' dense gear-icon glyph happened to survive
+        /// on visual mass alone. BorderSize=1 + BorderColor=ControlDark in light mode restores
+        /// a visible edge for every flat button without touching the dark-mode path at all.
+        ///
+        /// light-mode-buttons-blend-into round 2 (rig screenshot 2.png): WinForms' own
+        /// ButtonFlatAdapter draws a native "default button" indicator ring around any
+        /// Control.IsDefault button (set via Form.AcceptButton = button ->
+        /// Button.NotifyDefault(true)) regardless of FlatAppearance.BorderSize -- confirmed
+        /// both by ButtonFlatAdapter's source (inflates the paint rect by -1,-1 when
+        /// IsDefault) and by this session's own evidence: btnSaveSettings already read as
+        /// visually distinct from its siblings BEFORE this method ever set BorderSize>0,
+        /// back when BorderSize was unconditionally 0 for every button. Adding our own
+        /// explicit light-mode border on top of that always-present native ring produced a
+        /// visible double ring on btnSaveSettings (SettingsForm) and would do the same on
+        /// btnContinue (MonitorConfirmDialog, same AcceptButton + ThemeButton pattern) --
+        /// suppressed below for whichever button currently is its form's AcceptButton, since
+        /// the native ring alone already gives it sufficient definition.
         /// </summary>
         public static void ThemeButton(Button button, bool dark)
         {
             try
             {
                 button.FlatStyle = FlatStyle.Flat;
-                button.FlatAppearance.BorderSize = 0;
+                bool isFormDefaultButton = ReferenceEquals(button.FindForm()?.AcceptButton, button);
+                button.FlatAppearance.BorderSize = (dark || isFormDefaultButton) ? 0 : 1;
+                button.FlatAppearance.BorderColor = SystemColors.ControlDark;
                 button.BackColor = dark ? Color.FromArgb(45, 45, 48) : SystemColors.Control;
                 button.ForeColor = dark ? Color.FromArgb(240, 240, 240) : SystemColors.ControlText;
                 // 2026-08-10 rig report: BorderSize=0 plus the original hover/press

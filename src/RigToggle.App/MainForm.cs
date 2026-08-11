@@ -78,6 +78,17 @@ namespace RigToggle.App
         private const int ContentWidthFloorPx = 288;
         private const int IdentifyWidthPx = 100;
         private const int IdentifyHeightPx = 32;
+        // light-mode-buttons-blend-into (debug, round 5): Identify's owner-drawn border
+        // (BtnIdentify_Paint) uses this explicit 2px inset instead of the literal
+        // FlatAppearance.BorderSize (1px). At 1px, GDI+'s AntiAlias fill-edge blend region
+        // (~1px wide) consumed nearly the entire visible border regardless of stroke-vs-fill
+        // technique (rounds 1-4, see debug session for full history) -- widening to 2px
+        // leaves roughly half the margin visibly solid. Deliberately NOT the same value as
+        // FlatAppearance.BorderSize, which stays at 1 in ThemeApplier.cs and is shared with
+        // the natively-rendered SettingsForm buttons (Discard Changes/Browse/Clear/Save
+        // Settings) -- those must not change. Scoped to Identify's own owner-drawn rendering
+        // only.
+        private const float IdentifyOwnerDrawnBorderInsetPx = 2f;
         // 20-UI-SPEC.md Geometry Contract -- the toggle row is 288x32 (was a
         // 288x40 button); it is shorter because it is now a Settings-style row
         // rather than a big primary-action button (D-01), and the switch's own
@@ -1036,6 +1047,19 @@ namespace RigToggle.App
             }
 
             ThemeApplier.ThemeButton(btnIdentify, IsDark);
+            // light-mode-buttons-blend-into (debug, round 6): btnIdentify is a stock
+            // Button, not a UserPaint-suppressed owner-drawn control -- WinForms renders
+            // ButtonFlatAdapter's NATIVE, SQUARE FlatAppearance border (driven by the
+            // BorderSize ThemeButton just set) before the Paint event fires. Because
+            // BtnIdentify_Paint's hand-drawn fill/border is deliberately ROUNDED, it does
+            // not fully cover that native square border's corners, producing two visible,
+            // differently-shaped borders simultaneously (rig screenshot 6.png: "double
+            // lines... a rounded corner as well as a rectangular one"). Force the native
+            // border off for this control specifically -- BorderColor is left untouched,
+            // still read by BtnIdentify_Paint's own hand-drawn border below. btnSettings is
+            // unaffected (its square FillRectangle fully masks a square native border, so
+            // it was never symptomatic despite sharing the same ThemeButton call).
+            btnIdentify.FlatAppearance.BorderSize = 0;
             ThemeApplier.ThemeButton(btnSettings, IsDark);
             ThemeApplier.ThemeToggleSwitch(toggleSwitch, IsDark, AccentColor);
             // The gear glyph is painted from btnSettings.ForeColor, which
@@ -1169,9 +1193,105 @@ namespace RigToggle.App
                 RectangleF bounds = btnIdentify.ClientRectangle;
                 float cornerRadius = bounds.Height * (4f / 32f);
 
-                using var fillPath = BuildRoundedRect(bounds, cornerRadius);
-                using var fillBrush = new SolidBrush(ManualButtonFill(btnIdentify, _identifyHovered, _identifyPressed));
-                e.Graphics.FillPath(fillBrush, fillPath);
+                // light-mode-buttons-blend-into (debug, 2026-08-11): this Paint handler
+                // fills the full ClientRectangle every frame, which erases any native
+                // FlatAppearance border WinForms would otherwise have drawn before this
+                // handler ran -- so ThemeApplier.ThemeButton's light-mode
+                // FlatAppearance.BorderSize/BorderColor (needed because the button's fill,
+                // SystemColors.Control, is visually indistinguishable from this window's
+                // Mica backdrop in light mode) must be re-drawn explicitly here, reading the
+                // same values ThemeButton stored on the button -- one source of truth, same
+                // pattern ManualButtonFill already follows for the fill colors.
+                //
+                // round 2 (rig screenshot 1.png, "looks like it's pressed down"): pinned the
+                // border pen width to the literal FlatAppearance.BorderSize instead of a
+                // height-derived float -- proved a no-op at IdentifyHeightPx=32 (round 3
+                // investigation), both formulas evaluate to 1.0 at 100% DPI.
+                //
+                // round 3 (pixel-sampled rig screenshots): a Pen+DrawPath stroke with
+                // SmoothingMode.AntiAlias spreads the border's opacity unevenly across 2
+                // pixel rows/columns on two edges and 1 lighter pixel on the other two --
+                // the classic Windows sunken/pressed 3D bevel shading pattern, explaining
+                // "looks like it's pressed down". Disabling AntiAlias for just the stroke
+                // fixed the straight edges (confirmed solid/opaque on rig screenshot 5.png)
+                // but broke BuildRoundedRect's curved corner arcs -- GDI+'s aliased
+                // rasterizer stair-steps/notches curves instead of smoothing them, since the
+                // same DrawPath call strokes both the straight segments and the corner arcs
+                // and SmoothingMode can't be selectively applied within one call.
+                //
+                // round 4: replaces the stroke-based border (Pen + DrawPath) entirely with a
+                // FILL-based border -- no Pen involved at all, so there is no thin-stroke AA
+                // softness for GDI+ to blend and nothing to alias-toggle. Fill a rounded rect
+                // at the full bounds with BorderColor first (this becomes the visible border
+                // ring), then fill a smaller inset rounded rect with the actual button fill
+                // color on top, using a proportionally reduced corner radius so the two
+                // rounded rects stay concentric. SmoothingMode stays AntiAlias throughout --
+                // the same ordinary anti-aliased FillPath technique MonitorTile's tile fill
+                // and ToggleSwitch's track fill already use cleanly elsewhere in this
+                // codebase, so corners render smoothly with no stroke to soften or alias.
+                //
+                // round 4 rig result: still read as "pressed down" -- identical to rounds
+                // 1-2. Root cause narrowed to WIDTH, not stroke-vs-fill technique: at 1px
+                // total border width, GDI+'s AntiAlias blend region (~1px) consumes nearly
+                // the entire visible border regardless of rendering method.
+                //
+                // round 5: widen the inset to IdentifyOwnerDrawnBorderInsetPx (2px) instead
+                // of the literal FlatAppearance.BorderSize (1px, unchanged in ThemeApplier
+                // and still used natively by the confirmed-correct SettingsForm buttons).
+                // The fill-based technique itself is unchanged from round 4 -- only the
+                // margin width increases, so roughly half the margin should remain visibly
+                // solid instead of nearly all of it being consumed by the AA blend.
+                //
+                // round 6: ApplyDashboardTheming now force-sets
+                // btnIdentify.FlatAppearance.BorderSize = 0 immediately after ThemeButton,
+                // to suppress a previously-unnoticed NATIVE square border that was rendering
+                // underneath/around this hand-drawn rounded one the whole time (rig
+                // screenshot 6.png: double lines, mismatched rounded/square corners).
+                // FlatAppearance.BorderSize is therefore always 0 now -- this condition must
+                // no longer read it. Use the equivalent light-mode-only check (!IsDark)
+                // instead, preserving the exact same presence behavior. BorderColor is
+                // unaffected by the round-6 BorderSize=0 change and is still read below.
+                //
+                // round 7 (rig screenshot 6.png follow-up): with the double-border defect
+                // resolved, a subtler asymmetry remained -- the top/left border edges read
+                // visibly thicker than bottom/right, even though the outer/inner rect geometry
+                // above is mathematically symmetric (equal borderInset margin on all sides).
+                // GDI+'s AntiAlias FillPath rasterizer has a documented top-left-vs-bottom-right
+                // coverage bias for rectangle-like paths under the default PixelOffsetMode --
+                // shifting to PixelOffsetMode.Half changes the pixel-center sampling convention
+                // and is the standard remedy for this exact class of asymmetric fill bias.
+                // Scoped narrowly to these two border fills only (restored to Default
+                // immediately after) so it cannot affect TextRenderer.DrawText (GDI-based,
+                // ignores this property regardless) or the focus-ring DrawPath below.
+                if (!IsDark)
+                {
+                    float borderInset = IdentifyOwnerDrawnBorderInsetPx;
+                    e.Graphics.PixelOffsetMode = PixelOffsetMode.Half;
+                    try
+                    {
+                        using var outerPath = BuildRoundedRect(bounds, cornerRadius);
+                        using var outerBrush = new SolidBrush(btnIdentify.FlatAppearance.BorderColor);
+                        e.Graphics.FillPath(outerBrush, outerPath);
+
+                        var innerBounds = new RectangleF(
+                            bounds.X + borderInset, bounds.Y + borderInset,
+                            bounds.Width - (borderInset * 2f), bounds.Height - (borderInset * 2f));
+                        float innerCornerRadius = Math.Max(0f, cornerRadius - borderInset);
+                        using var innerPath = BuildRoundedRect(innerBounds, innerCornerRadius);
+                        using var innerBrush = new SolidBrush(ManualButtonFill(btnIdentify, _identifyHovered, _identifyPressed));
+                        e.Graphics.FillPath(innerBrush, innerPath);
+                    }
+                    finally
+                    {
+                        e.Graphics.PixelOffsetMode = PixelOffsetMode.Default;
+                    }
+                }
+                else
+                {
+                    using var fillPath = BuildRoundedRect(bounds, cornerRadius);
+                    using var fillBrush = new SolidBrush(ManualButtonFill(btnIdentify, _identifyHovered, _identifyPressed));
+                    e.Graphics.FillPath(fillBrush, fillPath);
+                }
 
                 TextRenderer.DrawText(
                     e.Graphics,
