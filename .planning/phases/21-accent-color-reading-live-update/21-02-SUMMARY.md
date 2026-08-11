@@ -240,3 +240,7 @@ None - no external service configuration required.
 ---
 *Phase: 21-accent-color-reading-live-update*
 *Completed: 2026-08-11*
+
+## Self-Check: PASSED
+
+Both modified source files (`src/RigToggle.App/MainForm.cs`, `src/RigToggle.App/ThemeApplier.cs`) and this SUMMARY.md confirmed present on disk. All 3 commits (`d715b34`, `a93e457`, `641e2cb`) confirmed present in `git log`.
