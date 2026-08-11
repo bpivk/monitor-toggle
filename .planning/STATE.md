@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Modern UI Redesign & Theme Backlog
 status: ready_to_plan
-stopped_at: Phase 21 complete (3/3) — ready to discuss Phase 22
+stopped_at: Phase 21 complete (3/3) — ready to discuss Phase 22 (reordered: SettingsForm Layout Pass now precedes Manual Light/Dark Override)
 last_updated: 2026-08-11T09:00:56.373Z
 last_activity: 2026-08-11 -- Phase 21 execution started
 progress:
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-09)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably applies Normal mode's own explicitly configured monitor/audio state on toggle-back (revised at v2.0 — see DISPLAY-10/AUDIO-04).
-**Current focus:** Phase 22 — manual light/dark override
+**Current focus:** Phase 22 — SettingsForm layout pass (reordered ahead of manual light/dark override at user request 2026-08-11)
 
 ## Current Position
 
@@ -93,7 +93,7 @@ None.
 
 ### Blockers/Concerns
 
-None open. Research flags Phase 21 (accent color) and Phase 22 (manual override) as needing deeper research during planning — see `.planning/research/SUMMARY.md` "Research Flags" — no official Microsoft documentation confirms which registry key/API is "the" accent color, and the manual-override/live-theme-follow composition needs careful sequencing relative to the `IsDark` property consolidation.
+None open. Research flags Phase 21 (accent color, since completed) and the manual-override phase (now Phase 23, was Phase 22 before the 2026-08-11 reorder) as needing deeper research during planning — see `.planning/research/SUMMARY.md` "Research Flags" — no official Microsoft documentation confirms which registry key/API is "the" accent color, and the manual-override/live-theme-follow composition needs careful sequencing relative to the `IsDark` property consolidation.
 
 ### Quick Tasks Completed
 
@@ -112,7 +112,7 @@ Items acknowledged and carried forward from previous milestone close:
 | dropped | LOG-01 (toggle history/log) | Dropped, not carried forward | Deferred at v1.0, v1.1, v1.2, and v2.0 scoping; explicitly dropped by user at v2.1 scoping 2026-08-09 — will not resurface as a backlog candidate |
 | v2.1 | THEME-07 (accent-color-aware highlight) | Scoped into v2.1 Phase 21 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 roadmap 2026-08-09 |
 | v2.1 | THEME-08 (custom-drawn toggle-switch control) | Scoped into v2.1 Phase 20 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 roadmap 2026-08-09 |
-| v2.1 | THEME-09 (manual theme override) | Scoped into v2.1 Phase 22 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 roadmap 2026-08-09 |
+| v2.1 | THEME-09 (manual theme override) | Scoped into v2.1 Phase 23 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 roadmap 2026-08-09; reordered from Phase 22 to Phase 23 (behind SettingsForm layout pass) at user request 2026-08-11 |
 
 Permanently out of scope (not v2 candidates):
 

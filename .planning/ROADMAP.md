@@ -74,8 +74,8 @@ Full phase details: `.planning/milestones/v2.0-ROADMAP.md`
 - [x] **Phase 19: Monitor-Tile Dashboard & MonitorPanelForm Retirement** - MainForm becomes a monitor-tile dashboard absorbing the standalone Monitors panel's capability; toggle repositioned below the tiles, Settings de-emphasized (completed 2026-08-10)
 - [x] **Phase 20: Custom Toggle-Switch Control** - The Rig/Normal toggle becomes a custom-drawn track+thumb switch (THEME-08) (completed 2026-08-10)
 - [x] **Phase 21: Accent-Color Reading & Live Update** - Interactive elements pick up the live Windows accent color (THEME-07) (completed 2026-08-11)
-- [ ] **Phase 22: Manual Light/Dark Override** - A System/Light/Dark setting overrides live theme-follow (THEME-09)
-- [ ] **Phase 23: SettingsForm Layout Pass** - SettingsForm's controls are regrouped and respaced, no overlap at default size
+- [ ] **Phase 22: SettingsForm Layout Pass** - SettingsForm's controls are regrouped and respaced, no overlap at default size
+- [ ] **Phase 23: Manual Light/Dark Override** - A System/Light/Dark setting overrides live theme-follow (THEME-09)
 
 ## Phase Details
 
@@ -148,24 +148,24 @@ Plans:
 
 **UI hint**: yes
 
-### Phase 22: Manual Light/Dark Override
+### Phase 22: SettingsForm Layout Pass
+**Goal**: SettingsForm reads as an intentionally laid-out screen instead of a crowded, organically-grown one.
+**Depends on**: Nothing (independent of every other v2.1 phase; reordered ahead of Phase 23 at user request 2026-08-11 — layout fix judged more important than the remaining theme-backlog item, and this phase was always schedulable anywhere in the sequence)
+**Requirements**: SETTINGS-01, SETTINGS-02
+**Success Criteria** (what must be TRUE):
+  1. SettingsForm has no overlapping or crowded controls at its default window size
+  2. Each mode's monitor grid, the audio device pickers, the app path control, and the hotkey capture box are visually grouped and consistently spaced
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 23: Manual Light/Dark Override
 **Goal**: Users can lock the app's theme to Light or Dark independent of live Windows theme-follow, or keep today's live-follow behavior.
-**Depends on**: Phase 21 (decorates the theme interface Phase 21 extends with accent color)
+**Depends on**: Phase 21 (decorates the theme interface Phase 21 extends with accent color) — reordered behind Phase 22 at user request 2026-08-11
 **Requirements**: THEME-09
 **Success Criteria** (what must be TRUE):
   1. Settings offers a System/Light/Dark choice, defaulting to System
   2. Selecting Light or Dark immediately locks the app's theme and applies without restarting the app
   3. Once locked to Light or Dark, a live OS theme flip does not silently override the app's theme; selecting System restores today's live-follow behavior
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 23: SettingsForm Layout Pass
-**Goal**: SettingsForm reads as an intentionally laid-out screen instead of a crowded, organically-grown one.
-**Depends on**: Nothing (independent of Phases 19-22; can execute any time in the sequence)
-**Requirements**: SETTINGS-01, SETTINGS-02
-**Success Criteria** (what must be TRUE):
-  1. SettingsForm has no overlapping or crowded controls at its default window size
-  2. Each mode's monitor grid, the audio device pickers, the app path control, and the hotkey capture box are visually grouped and consistently spaced
 **Plans**: TBD
 **UI hint**: yes
 
@@ -194,12 +194,12 @@ Plans:
 | 19. Monitor-Tile Dashboard & MonitorPanelForm Retirement | v2.1 | 5/5 | Complete   | 2026-08-10 |
 | 20. Custom Toggle-Switch Control | v2.1 | 3/3 | Complete    | 2026-08-10 |
 | 21. Accent-Color Reading & Live Update | v2.1 | 3/3 | Complete    | 2026-08-11 |
-| 22. Manual Light/Dark Override | v2.1 | 0/TBD | Not started | - |
-| 23. SettingsForm Layout Pass | v2.1 | 0/TBD | Not started | - |
+| 22. SettingsForm Layout Pass | v2.1 | 0/TBD | Not started | - |
+| 23. Manual Light/Dark Override | v2.1 | 0/TBD | Not started | - |
 
 ## Backlog
 
-Requirements not yet scoped into a milestone. LOG-01 (toggle history/log) was deferred at v1.0, v1.1, v1.2, and v2.0 scoping, then explicitly dropped by the user at v2.1 scoping — no longer tracked as a backlog candidate. CLI trigger/TRIG-02/TRIG-03 was reviewed at v1.1 close and decided permanently out of scope. THEME-07/08/09 (accent-color highlight, custom toggle-switch control, manual theme override), deferred since v1.2, are scoped into v2.1 Phases 20-22.
+Requirements not yet scoped into a milestone. LOG-01 (toggle history/log) was deferred at v1.0, v1.1, v1.2, and v2.0 scoping, then explicitly dropped by the user at v2.1 scoping — no longer tracked as a backlog candidate. CLI trigger/TRIG-02/TRIG-03 was reviewed at v1.1 close and decided permanently out of scope. THEME-07/08/09 (accent-color highlight, custom toggle-switch control, manual theme override), deferred since v1.2, are scoped into v2.1 Phases 20, 21, and 23 (THEME-09/Phase 23 reordered behind Phase 22 on 2026-08-11).
 
 ---
-*Next: `/gsd:execute-phase 21`*
+*Next: `/gsd:discuss-phase 22`*
