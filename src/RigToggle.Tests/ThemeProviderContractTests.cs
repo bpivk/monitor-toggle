@@ -1,3 +1,4 @@
+using System.Drawing;
 using RigToggle.Core.Models;
 using RigToggle.Tests.Doubles;
 using Xunit;
@@ -5,10 +6,12 @@ using Xunit;
 namespace RigToggle.Tests;
 
 /// <summary>
-/// Proves the IThemeProvider contract's two documented behaviors via FakeThemeProvider
-/// (THEME-01/THEME-02): ThemeChanged fires exactly once per RaiseThemeChanged call, and
-/// CurrentTheme reflects the new value at invocation time. RED-first (TDD): written
-/// before FakeThemeProvider.cs's behavior is exercised anywhere else.
+/// Proves the IThemeProvider contract's three documented behaviors via FakeThemeProvider
+/// (THEME-01/THEME-02/THEME-07): ThemeChanged fires exactly once per RaiseThemeChanged
+/// call with CurrentTheme reflecting the new value at invocation time; AccentColorChanged
+/// fires exactly once per RaiseAccentColorChanged call with AccentColor reflecting the new
+/// value at invocation time. RED-first (TDD): written before FakeThemeProvider.cs's
+/// behavior is exercised anywhere else.
 /// </summary>
 public class ThemeProviderContractTests
 {
@@ -40,5 +43,25 @@ public class ThemeProviderContractTests
         Assert.Equal(2, members.Length);
         Assert.Contains(AppTheme.Light, members);
         Assert.Contains(AppTheme.Dark, members);
+    }
+
+    [Fact]
+    public void RaiseAccentColorChanged_InvokesSubscriberExactlyOnce_WithUpdatedAccentColor()
+    {
+        var provider = new FakeThemeProvider { AccentColor = Color.FromArgb(0, 90, 158) };
+        int invocationCount = 0;
+        Color observedAccent = default;
+
+        provider.AccentColorChanged += (_, _) =>
+        {
+            invocationCount++;
+            observedAccent = provider.AccentColor;
+        };
+
+        provider.RaiseAccentColorChanged(Color.FromArgb(255, 0, 0));
+
+        Assert.Equal(1, invocationCount);
+        Assert.Equal(Color.FromArgb(255, 0, 0), observedAccent);
+        Assert.Equal(Color.FromArgb(255, 0, 0), provider.AccentColor);
     }
 }
