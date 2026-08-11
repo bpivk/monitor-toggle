@@ -254,3 +254,7 @@ None - no external service configuration required.
 ---
 *Phase: 21-accent-color-reading-live-update*
 *Completed: 2026-08-11*
+
+## Self-Check: PASSED
+
+All 5 modified source files and the SUMMARY.md itself confirmed present on disk. All 3 commits (`ed3b5a6`, `bfe9650`, `bedef12`) confirmed present in `git log`.
