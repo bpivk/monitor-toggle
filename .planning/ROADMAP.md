@@ -132,7 +132,20 @@ Plans:
   1. The toggle switch's "on" state (and any other designated interactive element) visibly uses the current Windows accent color
   2. Changing the Windows accent color while the app is running updates the app's accent-tinted elements live, without restarting the app
   3. The accent color shown in the app matches what Settings > Colors displays, including for a custom (non-default) accent color
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+**Wave 1**
+
+- [ ] 21-01-PLAN.md — Extend IThemeProvider with AccentColor/AccentColorChanged; WindowsThemeProvider reads the accent registry-first with a DwmGetColorizationColor fallback and diffs it in the one existing UserPreferenceChanged handler
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 21-02-PLAN.md — Repoint all five D-04 accent consumers from the fixed placeholder to the live value: MainForm subscription + pass-through, ThemeApplier accentColor parameter
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 21-03-PLAN.md — Full-solution regression gate, five static audits, and blocking rig verification of all three success criteria (D-05, includes the numeric byte-order resolution)
+
 **UI hint**: yes
 
 ### Phase 22: Manual Light/Dark Override
@@ -180,7 +193,7 @@ Plans:
 | 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 6/6 | Complete   | 2026-08-09 |
 | 19. Monitor-Tile Dashboard & MonitorPanelForm Retirement | v2.1 | 5/5 | Complete   | 2026-08-10 |
 | 20. Custom Toggle-Switch Control | v2.1 | 3/3 | Complete    | 2026-08-10 |
-| 21. Accent-Color Reading & Live Update | v2.1 | 0/TBD | Not started | - |
+| 21. Accent-Color Reading & Live Update | v2.1 | 0/3 | Planned | - |
 | 22. Manual Light/Dark Override | v2.1 | 0/TBD | Not started | - |
 | 23. SettingsForm Layout Pass | v2.1 | 0/TBD | Not started | - |
 
@@ -189,4 +202,4 @@ Plans:
 Requirements not yet scoped into a milestone. LOG-01 (toggle history/log) was deferred at v1.0, v1.1, v1.2, and v2.0 scoping, then explicitly dropped by the user at v2.1 scoping — no longer tracked as a backlog candidate. CLI trigger/TRIG-02/TRIG-03 was reviewed at v1.1 close and decided permanently out of scope. THEME-07/08/09 (accent-color highlight, custom toggle-switch control, manual theme override), deferred since v1.2, are scoped into v2.1 Phases 20-22.
 
 ---
-*Next: `/gsd:plan-phase 19`*
+*Next: `/gsd:execute-phase 21`*
