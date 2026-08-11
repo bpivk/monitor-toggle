@@ -5,15 +5,16 @@ namespace RigToggle.Windows;
 
 /// <summary>
 /// Hand-rolled user32.dll P/Invoke signatures used by FindBestMainWindow/MinimizeIfRunning
-/// (APP-02/APP-03), plus a dwmapi.dll signature used by DwmTitleBar for Mica/rounded-corner
-/// theming (THEME-06). Deliberately does NOT include FindWindow/FindWindowEx (title-based
-/// lookup is forbidden — CLAUDE.md "What NOT to Use") and does NOT take a dependency on
-/// the PInvoke.User32 NuGet package (CLAUDE.md Alternatives Considered: hand-rolling is
-/// preferred for a surface this small). Stable, decades-unchanged Win32 API
-/// (learn.microsoft.com/windows/win32/api/winuser). LaunchOrFocus no longer touches any
-/// window at all (it unconditionally relaunches via ShellExecute instead) -- most of the
-/// user32.dll block below exists solely to support MinimizeIfRunning's window lookup and
-/// minimize call.
+/// (APP-02/APP-03), a dwmapi.dll signature used by DwmTitleBar for Mica/rounded-corner
+/// theming (THEME-06), and a second dwmapi.dll signature used by WindowsThemeProvider as
+/// THEME-07's accent-color fallback read. Deliberately does NOT include FindWindow/
+/// FindWindowEx (title-based lookup is forbidden — CLAUDE.md "What NOT to Use") and does
+/// NOT take a dependency on the PInvoke.User32 NuGet package (CLAUDE.md Alternatives
+/// Considered: hand-rolling is preferred for a surface this small). Stable,
+/// decades-unchanged Win32 API (learn.microsoft.com/windows/win32/api/winuser).
+/// LaunchOrFocus no longer touches any window at all (it unconditionally relaunches via
+/// ShellExecute instead) -- most of the user32.dll block below exists solely to support
+/// MinimizeIfRunning's window lookup and minimize call.
 /// </summary>
 internal static class NativeMethods
 {
@@ -137,4 +138,12 @@ internal static class NativeMethods
 
     [DllImport("dwmapi.dll")]
     internal static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
+
+    // THEME-07 accent-color fallback read, used by WindowsThemeProvider only when the
+    // primary HKCU\...\DWM\AccentColor registry value is absent or unreadable (D-01).
+    // Returns an HRESULT (0 == S_OK) rather than throwing, matching this class's existing
+    // DWM convention -- the caller treats a non-zero return as a failed read, not an
+    // exception.
+    [DllImport("dwmapi.dll")]
+    internal static extern int DwmGetColorizationColor(out uint pcrColorization, [MarshalAs(UnmanagedType.Bool)] out bool pfOpaqueBlend);
 }
