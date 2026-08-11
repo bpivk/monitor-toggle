@@ -179,19 +179,24 @@ namespace RigToggle.App
         /// be spread to the Identify button, the Settings gear, or the tile's hover tint,
         /// all of which stay on the existing gray-scale ThemeButton palette.
         ///
+        /// 21/THEME-07/D-04: <paramref name="accentColor"/> is the live Windows accent
+        /// color read from IThemeProvider.AccentColor and forwarded by
+        /// MainForm.ApplyDashboardTheming — theme-independent, so it does not branch on
+        /// <paramref name="dark"/> the way every other color here does.
+        ///
         /// The primary-monitor badge color is deliberately NOT set here — it is a locked
         /// theme-independent literal owned by MonitorIconGeometry.DrawPrimaryBadge,
         /// exactly like MonitorPanelForm.CreateStatusDot's status-dot literals — a future
         /// editor should not thread `dark` into it.
         /// </summary>
-        public static void ThemeMonitorTile(MonitorTile tile, bool dark)
+        public static void ThemeMonitorTile(MonitorTile tile, bool dark, Color accentColor)
         {
             try
             {
                 tile.BackColor = dark ? Color.FromArgb(32, 32, 32) : SystemColors.Control;
                 tile.ForeColor = dark ? Color.FromArgb(240, 240, 240) : SystemColors.ControlText;
-                tile.AccentColor = dark ? Color.FromArgb(0, 90, 158) : SystemColors.Highlight;
-                tile.FocusRingColor = dark ? Color.FromArgb(0, 90, 158) : SystemColors.Highlight;
+                tile.AccentColor = accentColor;
+                tile.FocusRingColor = accentColor;
                 tile.IconOffColor = dark ? Color.FromArgb(160, 160, 160) : SystemColors.GrayText;
                 tile.HoverBackColor = dark ? Color.FromArgb(45, 45, 48) : SystemColors.ControlLight;
                 tile.Invalidate();
@@ -214,21 +219,27 @@ namespace RigToggle.App
         /// AccentColor is confined to the switch's ON-state track fill and
         /// its focus ring — it must never spread to the "Rig Mode" label,
         /// the Off/Indeterminate fills, or the thumb.
+        ///
+        /// 21/THEME-07/D-04: <paramref name="accentColor"/> is the live Windows accent
+        /// color read from IThemeProvider.AccentColor and forwarded by
+        /// MainForm.ApplyDashboardTheming — the same value tile.AccentColor and both
+        /// button focus rings receive, and theme-independent so it does not branch on
+        /// <paramref name="dark"/>.
         /// </summary>
-        public static void ThemeToggleSwitch(ToggleSwitch toggleSwitch, bool dark)
+        public static void ThemeToggleSwitch(ToggleSwitch toggleSwitch, bool dark, Color accentColor)
         {
             try
             {
                 // Pitfall 3 Mica-safe background, same literal as tile.BackColor.
                 toggleSwitch.BackColor = dark ? Color.FromArgb(32, 32, 32) : SystemColors.Control;
 
-                // D-09: same literal as tile.AccentColor. Phase 21/THEME-07
-                // replaces this pair with a live-read Windows accent color —
-                // this is the single line that changes then.
-                toggleSwitch.OnColor = dark ? Color.FromArgb(0, 90, 158) : SystemColors.Highlight;
+                // D-09: same live accent value as tile.AccentColor — the ON-state
+                // track fill takes the live Windows accent color forwarded by
+                // MainForm.ApplyDashboardTheming from IThemeProvider.AccentColor.
+                toggleSwitch.OnColor = accentColor;
 
-                // Same as tile.FocusRingColor.
-                toggleSwitch.FocusRingColor = dark ? Color.FromArgb(0, 90, 158) : SystemColors.Highlight;
+                // Same as tile.FocusRingColor — identical live accent value.
+                toggleSwitch.FocusRingColor = accentColor;
 
                 // D-10: same as tile.IconOffColor — one shared "off" visual language app-wide.
                 toggleSwitch.OffOutlineColor = dark ? Color.FromArgb(160, 160, 160) : SystemColors.GrayText;
