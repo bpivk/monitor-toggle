@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Modern UI Redesign & Theme Backlog
-status: executing
-stopped_at: Phase 21 UI-SPEC approved
-last_updated: "2026-08-11T07:03:36.824Z"
+status: ready_to_plan
+stopped_at: Phase 21 complete (3/3) — ready to discuss Phase 22
+last_updated: 2026-08-11T09:00:56.373Z
 last_activity: 2026-08-11 -- Phase 21 execution started
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 11
-  completed_plans: 8
+  completed_plans: 11
   percent: 40
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-09)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably applies Normal mode's own explicitly configured monitor/audio state on toggle-back (revised at v2.0 — see DISPLAY-10/AUDIO-04).
-**Current focus:** Phase 21 — accent-color-reading-live-update
+**Current focus:** Phase 22 — manual light/dark override
 
 ## Current Position
 
-Phase: 21 (accent-color-reading-live-update) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 21
-Last activity: 2026-08-11 -- Phase 21 execution started
+Phase: 22
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-08-11
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -36,7 +36,7 @@ Progress: [░░░░░░░░░░] 0%
 
 **Velocity:**
 
-- Total plans completed: 57
+- Total plans completed: 60
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | 17 | 4 | - | - |
 | 18 | 6 | - | - |
 | 20 | 3 | - | - |
+| 21 | 3 | - | - |
 
 **Recent Trend:**
 
