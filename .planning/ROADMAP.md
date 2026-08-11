@@ -73,7 +73,7 @@ Full phase details: `.planning/milestones/v2.0-ROADMAP.md`
 
 - [x] **Phase 19: Monitor-Tile Dashboard & MonitorPanelForm Retirement** - MainForm becomes a monitor-tile dashboard absorbing the standalone Monitors panel's capability; toggle repositioned below the tiles, Settings de-emphasized (completed 2026-08-10)
 - [x] **Phase 20: Custom Toggle-Switch Control** - The Rig/Normal toggle becomes a custom-drawn track+thumb switch (THEME-08) (completed 2026-08-10)
-- [ ] **Phase 21: Accent-Color Reading & Live Update** - Interactive elements pick up the live Windows accent color (THEME-07)
+- [x] **Phase 21: Accent-Color Reading & Live Update** - Interactive elements pick up the live Windows accent color (THEME-07) (completed 2026-08-11)
 - [ ] **Phase 22: Manual Light/Dark Override** - A System/Light/Dark setting overrides live theme-follow (THEME-09)
 - [ ] **Phase 23: SettingsForm Layout Pass** - SettingsForm's controls are regrouped and respaced, no overlap at default size
 
@@ -144,7 +144,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 21-03-PLAN.md — Full-solution regression gate, five static audits, and blocking rig verification of all three success criteria (D-05, includes the numeric byte-order resolution)
+- [x] 21-03-PLAN.md — Full-solution regression gate, five static audits, and blocking rig verification of all three success criteria (D-05, includes the numeric byte-order resolution)
 
 **UI hint**: yes
 
@@ -193,7 +193,7 @@ Plans:
 | 18. Cleanup Pass & Exe-Size Reduction | v2.0 | 6/6 | Complete   | 2026-08-09 |
 | 19. Monitor-Tile Dashboard & MonitorPanelForm Retirement | v2.1 | 5/5 | Complete   | 2026-08-10 |
 | 20. Custom Toggle-Switch Control | v2.1 | 3/3 | Complete    | 2026-08-10 |
-| 21. Accent-Color Reading & Live Update | v2.1 | 2/3 | In Progress|  |
+| 21. Accent-Color Reading & Live Update | v2.1 | 3/3 | Complete   | 2026-08-11 |
 | 22. Manual Light/Dark Override | v2.1 | 0/TBD | Not started | - |
 | 23. SettingsForm Layout Pass | v2.1 | 0/TBD | Not started | - |
 
