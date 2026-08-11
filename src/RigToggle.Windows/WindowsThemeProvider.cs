@@ -145,17 +145,24 @@ public sealed class WindowsThemeProvider : IThemeProvider, IDisposable
                 return null;
             }
 
-            uint v = unchecked((uint)i);
-            byte r = (byte)(v & 0x000000FF);
-            byte g = (byte)((v >> 8) & 0x000000FF);
-            byte b = (byte)((v >> 16) & 0x000000FF);
-            return Color.FromArgb(r, g, b);
+            return FromAbgrRegistryDword(unchecked((uint)i));
         }
         catch
         {
             return null;
         }
     }
+
+    // WR-01: pure, side-effect-free bit-math extracted out of ReadAccentColorFromRegistry
+    // so it is directly unit-testable with a synthetic uint (no registry I/O needed) --
+    // see WindowsThemeProviderTests.cs, which pins the exact worked example cited above
+    // (0xffc77e35 -> #357EC7) so a future edit that flips a mask fails the build instead
+    // of waiting for the next manual rig pass.
+    internal static Color FromAbgrRegistryDword(uint v) =>
+        Color.FromArgb(
+            (byte)(v & 0x000000FF),
+            (byte)((v >> 8) & 0x000000FF),
+            (byte)((v >> 16) & 0x000000FF));
 
     // DWM fallback read for AccentColor, used only when the registry value above is
     // absent or unreadable (D-01). DwmGetColorizationColor is documented by Microsoft as
@@ -171,16 +178,22 @@ public sealed class WindowsThemeProvider : IThemeProvider, IDisposable
                 return SystemColors.Highlight;
             }
 
-            byte r = (byte)((colorization >> 16) & 0x000000FF);
-            byte g = (byte)((colorization >> 8) & 0x000000FF);
-            byte b = (byte)(colorization & 0x000000FF);
-            return Color.FromArgb(r, g, b);
+            return FromArgbDwmDword(colorization);
         }
         catch
         {
             return SystemColors.Highlight;
         }
     }
+
+    // WR-01: pure, side-effect-free bit-math extracted out of ReadAccentColorFromDwm so
+    // it is directly unit-testable with a synthetic uint (no live DWM call needed) --
+    // see WindowsThemeProviderTests.cs.
+    internal static Color FromArgbDwmDword(uint v) =>
+        Color.FromArgb(
+            (byte)((v >> 16) & 0x000000FF),
+            (byte)((v >> 8) & 0x000000FF),
+            (byte)(v & 0x000000FF));
 
     // Registry primary, DWM fallback only when the registry value is absent or
     // unreadable (D-01).
