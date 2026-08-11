@@ -117,6 +117,15 @@ namespace RigToggle.App
             // the OS AppsUseLightTheme value genuinely flips while this form is alive.
             _themeProvider.ThemeChanged += OnThemeChanged;
 
+            // 21/THEME-07/D-02: an accent-only change (no light/dark flip) must also
+            // repaint the five accent-tinted consumers, so it is wired into the same
+            // OnThemeChanged handler rather than a new one -- OnThemeChanged already
+            // marshals to the UI thread and already routes to ApplyDashboardTheming(),
+            // which already themes every accent consumer. Like its ThemeChanged
+            // neighbour above, this subscription is app-lifetime and deliberately
+            // never unsubscribed.
+            _themeProvider.AccentColorChanged += OnThemeChanged;
+
             // TILE-06/19-RESEARCH.md Pitfall 2: subscribed ONCE, app-lifetime, and
             // deliberately NEVER unsubscribed on Hide()/Show()/FormClosed. MainForm is
             // hidden-not-closed for most of its runtime (tray-resident operation);
@@ -178,10 +187,13 @@ namespace RigToggle.App
         // correct across live flips -- mirrors SettingsForm.IsDarkTheme.
         private bool IsDark => _themeProvider.CurrentTheme == AppTheme.Dark;
 
-        // Same source/values as ThemeApplier.ThemeMonitorTile's AccentColor -- kept
-        // here too so btnIdentify/btnSettings's manually-painted focus ring uses the
-        // identical color a tile's own focus ring does.
-        private Color AccentColor => IsDark ? Color.FromArgb(0, 90, 158) : SystemColors.Highlight;
+        // 21/THEME-07/D-04: sourced live from IThemeProvider.AccentColor
+        // (registry-primary, DWM-fallback). Unlike IsDark-derived colors, this does
+        // not branch on light/dark -- AccentColor is theme-independent. It is the
+        // same single value ThemeApplier receives for the tiles and the switch, so
+        // tile, switch, and button focus rings stay identical by construction rather
+        // than by copied literals.
+        private Color AccentColor => _themeProvider.AccentColor;
 
         /// <summary>
         /// 12-02/D-08/THEME-06: requests Windows-11 rounded corners + Mica for this
