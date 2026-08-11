@@ -13,7 +13,7 @@ requires:
 provides:
   - "Full-solution regression proof (build + 82-test suite) that Phase 21's two source plans introduced no defect"
   - "Five recorded static audits proving source-swap completeness, D-02 single-subscription/single-provider discipline, the repaint-funnel/two-call-site lockstep, the exact five-consumer D-04 set with no scope creep, and read-path safety/byte-order discipline"
-  - "Task 2 rig-verification checkpoint reached and awaiting the user's personally-run PASS/FAIL report (D-05) -- NOT YET RECORDED"
+  - "User-reported rig-verification PASS (D-05) on real Windows 11 hardware, closing the byte-order contradiction: the ABGR-primary registry extraction is confirmed correct, no code change needed"
 affects: []
 
 # Tech tracking
@@ -28,26 +28,27 @@ key-files:
 
 key-decisions:
   - "No source changes made or needed -- all five audits passed on the first pass with no defect found, consistent with hard constraint 1 (this plan makes no source changes)"
+  - "Rig verdict accepted as a verbal/summary-level report ('everything passes') rather than a check-by-check hex transcript, with one explicit exception: the user was specifically asked to confirm the byte-order test (check 3) and explicitly confirmed red rendered as red and blue rendered as blue, which is the one check this phase's hard constraints treat as decisive. Individual raw hex values for checks 2/3/4 were not transcribed by the user and are not fabricated here."
 
 patterns-established: []
 
-requirements-completed: []  # THEME-07 is NOT yet complete -- D-05's rig PASS (Task 2) is still outstanding. Do not mark complete until the checkpoint resolves.
+requirements-completed: [THEME-07]
 
 # Metrics
-duration: (Task 1 only; Task 2 checkpoint pending)
+duration: Task 1 + Task 2 (checkpoint round-trip)
 completed: 2026-08-11
 ---
 
-# Phase 21 Plan 03: Full Regression Gate & Static Audit Summary (Task 1 of 2 -- Task 2 rig checkpoint pending)
+# Phase 21 Plan 03: Full Regression Gate, Static Audit & Rig Verification Summary
 
-**Full-solution regression gate confirmed green at baseline (0 Errors, 4 pre-existing Warnings, 82/82 tests) and all five static audits of Phase 21's structural/safety properties passed with recorded command evidence; no source file was touched. The phase's three ROADMAP success criteria remain rig-pending per D-05 -- Task 2 (blocking human-verify checkpoint) has NOT been executed and this plan is NOT complete.**
+**Full-solution regression gate confirmed green at baseline (0 Errors, 4 pre-existing Warnings, 82/82 tests) and all five static audits of Phase 21's structural/safety properties passed with recorded command evidence; no source file was touched. The user personally ran the app on real Windows 11 hardware and reported a PASS, with explicit confirmation of the decisive byte-order check (pure red rendered as red, pure blue rendered as blue) -- closing the phase's one open technical contradiction. Both tasks are complete and Phase 21's three ROADMAP success criteria are now verified.**
 
 ## Performance
 
-- **Duration:** Task 1 only (build/test + 5 audits); Task 2 (rig checkpoint) duration not yet started
+- **Duration:** Task 1 (build/test + 5 audits) plus Task 2 checkpoint round-trip (rig-hardware verification, human-run)
 - **Started:** 2026-08-11 (worktree base commit `af8d10a`, after correcting a stale worktree base drift -- see Issues Encountered)
-- **Completed:** Task 1 complete; Task 2 pending
-- **Tasks:** 1 of 2 complete
+- **Completed:** Both tasks complete -- 2026-08-11
+- **Tasks:** 2 of 2 complete
 - **Files modified:** 0 (this SUMMARY.md is the only file this plan creates)
 
 ## Accomplishments
@@ -65,9 +66,8 @@ completed: 2026-08-11
 
 Each task was committed atomically:
 
-1. **Task 1: Full regression gate and five static audits** - (this SUMMARY.md commit; no source files changed, `docs(21-03)` type)
-
-Task 2 (rig-hardware verification, blocking checkpoint) has not started.
+1. **Task 1: Full regression gate and five static audits** - `ebf2935` "docs(21-03): full regression gate and five static audits pass, no source changes" (no source files changed)
+2. **Task 2: Rig-hardware verification of all three Phase 21 success criteria (D-05)** - this SUMMARY.md commit closing out the plan (no source files changed, `docs(21-03)` type); the checkpoint itself is a human-verify gate, not a code-producing task, so its "commit" is this recorded verdict
 
 ## Files Created/Modified
 
@@ -228,13 +228,13 @@ $ git status --porcelain src/
 
 ## Three Phase 21 Success Criteria — Verification Status
 
-| # | Success Criterion (ROADMAP.md Phase 21) | Machine-verified this task | Rig-pending (Task 2) |
+| # | Success Criterion (ROADMAP.md Phase 21) | Machine-verified (Task 1) | Rig-verified (Task 2) |
 |---|---|---|---|
-| 1 | The toggle switch's ON state (and other designated interactive elements) visibly uses the current Windows accent color | Structural prerequisite confirmed: Audit 1 proves the placeholder literal is gone from all five D-04 consumers; Audit 3 proves the funnel reaches both `ThemeMonitorTile`/`ThemeToggleSwitch` with `AccentColor` forwarded. **Visual confirmation on real hardware is NOT YET DONE.** | Task 2 checks 4, 9, 11 |
-| 2 | Changing the Windows accent color while running updates accent-tinted elements live, without restart | Structural prerequisite confirmed: Audit 2 proves exactly one `SystemEvents.UserPreferenceChanged` subscription with no timer/polling; Audit 3 proves `AccentColorChanged` has exactly one subscriber (`OnThemeChanged`) with the `InvokeRequired` marshalling guard intact. **Whether the OS event actually fires for an accent-only change (Assumption A3), and whether the repaint actually happens live, is NOT YET DONE.** | Task 2 checks 6, 7, 8 |
-| 3 | The accent color shown in the app matches Settings > Colors exactly, including for a custom accent | Audit 5 confirms the two extraction methods use deliberately different, individually-justified R/B masks and never throw. **The byte-order question itself (which extraction is numerically correct) is explicitly NOT resolvable by static analysis** -- Plan 01's own summary flags this as "a settled implementation call, not a verified-correct one yet," and this plan's hard constraints assign the numeric resolution to the rig pass alone. | Task 2 checks 2, 3, 4 (check 3 is the decisive one) |
+| 1 | The toggle switch's ON state (and other designated interactive elements) visibly uses the current Windows accent color | Structural prerequisite confirmed: Audit 1 proves the placeholder literal is gone from all five D-04 consumers; Audit 3 proves the funnel reaches both `ThemeMonitorTile`/`ThemeToggleSwitch` with `AccentColor` forwarded. | **PASS** -- user reported "everything passes" on real Windows 11 hardware, covering the rig checklist's visual-confirmation checks (4, 9, 11) |
+| 2 | Changing the Windows accent color while running updates accent-tinted elements live, without restart | Structural prerequisite confirmed: Audit 2 proves exactly one `SystemEvents.UserPreferenceChanged` subscription with no timer/polling; Audit 3 proves `AccentColorChanged` has exactly one subscriber (`OnThemeChanged`) with the `InvokeRequired` marshalling guard intact. | **PASS** -- user reported "everything passes," covering the live-update checklist items (checks 6, 7, 8: three consecutive flips, same-color no-op, `--tray` hidden-start path) |
+| 3 | The accent color shown in the app matches Settings > Colors exactly, including for a custom accent | Audit 5 confirms the two extraction methods use deliberately different, individually-justified R/B masks and never throw. The byte-order question itself was explicitly NOT resolvable by static analysis. | **PASS, with the decisive check explicitly confirmed** -- user set the accent to pure red then pure blue (rig check 3) and confirmed both rendered correctly (red as red, blue as blue), resolving the byte-order contradiction: the implemented ABGR-primary registry extraction (`r = v & 0xFF`, `b = (v >> 16) & 0xFF`) is correct as shipped, no swap needed, no code change required |
 
-**All three criteria remain rig-pending.** No criterion can be marked fully verified until Task 2's checkpoint returns a user-reported PASS per D-05.
+**All three criteria are now verified.** Task 2's checkpoint returned a user-reported PASS per D-05; see "Task 2 — Rig Verification Verdict" below for the full record of what was and was not individually transcribed.
 
 ## Reference Evidence for Task 2 (verbatim from source, per this plan's `<output>` instruction)
 
@@ -298,20 +298,36 @@ Log($"Constructed: initial theme resolved to {CurrentTheme}, accent resolved to 
 Log($"Accent color flip detected: {previousAccent} -> {resolvedAccent}");
 ```
 
+## Task 2 — Rig Verification Verdict (D-05)
+
+**Reported by:** The user, personally, running the app on real Windows 11 hardware, per the checkpoint's blocking `human-verify` gate (this checkpoint was not and could not be auto-approved -- the plan's hard constraint 3 forbids it, and it was in fact answered by the human, not skipped).
+
+**Overall verdict:** PASS. The user's report: *"Everything passes."*
+
+**Byte-order check (rig check 3) -- explicitly confirmed, not inferred:** The user was specifically asked to confirm this check on its own, separate from the blanket "everything passes" statement, because it is the phase's one decisive, previously-unresolved technical contradiction (see the plan's byte-order interfaces note and Audit 5). The user set the Windows accent color to pure red (#FF0000), then to pure blue (#0000FF), and confirmed: *"It worked correctly"* -- meaning the app rendered red as red and blue as blue in both cases, with no swap. This closes the open contradiction between `21-RESEARCH.md`'s Pattern 1 code (which matched the implementation) and its "IMPORTANT correction" paragraph plus `21-UI-SPEC.md`'s source-of-truth table (which both claimed the two extraction paths needed identical arithmetic). **Verdict: the implemented ABGR-primary registry extraction (`ReadAccentColorFromRegistry`: `r = v & 0xFF`, `g = (v >> 8) & 0xFF`, `b = (v >> 16) & 0xFF`) is numerically correct as shipped. No code change is needed.**
+
+**What was and was not individually transcribed -- recorded honestly, not padded:** The plan's Task 2 acceptance criteria call for all twelve numbered checks to be reported individually as PASS/FAIL with notes, and for checks 2, 3, and 4 specifically to include verbatim raw hex values (registry ground truth, the two saturated-primary hex readings, and the three sampled swatch-match hex values). The user's actual report was a verbal, summary-level "everything passes" plus one specific, explicit confirmation of the byte-order outcome (not the raw hex digits themselves) for check 3. No individual raw hex values for checks 2, 3, or 4 were provided by the user, and none are fabricated in this record. Per the resume instructions for this checkpoint continuation, this blanket PASS -- with the one specific reinforced confirmation on the byte-order check -- is accepted as satisfying D-05's requirement that "the user personally run the rig-verification pass and report a PASS/FAIL result back." The user did personally run it and did report PASS; the level of per-check evidentiary detail is less granular than the plan's acceptance criteria ideally wanted, and that gap is recorded here rather than concealed.
+
+**Per-check disposition (12 checks from `21-03-PLAN.md` Task 2):** All 12 are recorded as PASS under the user's blanket "everything passes" verdict. Check 3 (byte-order) carries an explicit, separately-elicited confirmation beyond the blanket statement, as detailed above. Checks 1, 2, and 4-12 rest on the blanket statement alone -- no per-check note, raw hex, or quoted `debug.log` line was individually provided for any of them.
+
+**Consequence for phase-level risk items:** `21-RESEARCH.md` Open Question 2 (is the registry `AccentColor` value present on the rig at all) and Assumption A3 (does `SystemEvents.UserPreferenceChanged` fire for an accent-only change) are both implicitly resolved favorably by the blanket "everything passes" verdict -- specifically, live-update checks 6/7/8 passing requires the event to have fired, and check 3's byte-order confirmation requires the registry read path to have been live. Neither was reported with its own raw evidence (registry hex, `debug.log` line) as the plan's acceptance criteria asked for.
+
+**Accent color restore:** Per the plan's hard constraint and T-21-13's mitigation, check 3 requires the user's real accent color to be restored to their normal custom blue after testing pure red/blue. This was not separately confirmed by the user in their reply; it is not verified in this record and is noted here as an open item outside this plan's remaining scope (verification-only, no source changes, checkpoint already closed).
+
 ## User Setup Required
 
-None for Task 1. **Task 2 requires the user to personally run the rig-verification checklist on real Windows 11 hardware** -- see Next Steps below. This execution environment is Linux and cannot run the Windows GUI, read the real Windows registry, call `DwmGetColorizationColor`, or sample real screen pixels, so Task 2 cannot be automated or inferred.
+None. Task 1 required no user setup; Task 2 required the user to personally run the app on real Windows 11 hardware, which is now complete.
 
 ## Next Phase Readiness
 
-**This plan is NOT complete.** Task 1 (regression gate + five static audits) is done and all evidence is recorded above with no defect found. Task 2 -- a blocking `checkpoint:human-verify` requiring the user to personally run all twelve numbered rig checks from `21-03-PLAN.md` on real Windows 11 hardware with a live accent color -- has not started. Per this plan's hard constraint 4 and D-05, **Phase 21 must not be marked done until the user reports a PASS/FAIL rig verdict.**
+**This plan is complete.** Task 1 (regression gate + five static audits) passed cleanly with no defect. Task 2 (blocking rig-hardware `human-verify` checkpoint, D-05) returned a user-reported PASS, with the phase's one open technical contradiction (registry byte order) explicitly and separately confirmed correct. Phase 21's three ROADMAP success criteria are now verified per the table above. THEME-07 is complete.
 
-No blockers to starting Task 2 -- the app is ready to publish and rig-test (`dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true`), and all reference evidence (extraction methods, log-line formats) Task 2 needs is recorded above.
+No blockers remain. No gap-closure plan is needed -- no defect was found by either the static audits or the rig pass. The one residual gap is evidentiary granularity (see "What was and was not individually transcribed" above), not a functional defect; it does not block phase completion because the user's PASS verdict, including the specifically-elicited byte-order confirmation, satisfies D-05 as written ("the user personally running the rig-verification pass and reporting a PASS/FAIL result back").
 
 ---
 *Phase: 21-accent-color-reading-live-update*
-*Completed: Task 1 only -- 2026-08-11. Task 2 (rig checkpoint) still pending.*
+*Completed: 2026-08-11. Both tasks done; plan complete.*
 
 ## Self-Check: PASSED
 
-This SUMMARY.md confirmed present on disk. `git status --porcelain src/` confirmed empty (no source file changed by Task 1). Build and test commands re-verified against the recorded output above.
+This SUMMARY.md confirmed present on disk. `git status --porcelain src/` confirmed empty (no source file changed by either task). Build and test commands re-verified against the recorded output above. Task 1's commit `ebf2935` confirmed present in `git log`. Task 2's rig verdict (PASS, all 12 checks, byte-order explicitly confirmed) is recorded above exactly as reported by the user, with no fabricated hex values. Both tasks of plan 21-03 are complete.
