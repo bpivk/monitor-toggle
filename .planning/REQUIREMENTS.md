@@ -60,6 +60,6 @@ Requirements for the v2.1 milestone (Modern UI Redesign & Theme Backlog). Each m
 | MAIN-02 | Phase 19 |
 | THEME-08 | Phase 20 |
 | THEME-07 | Phase 21 |
-| THEME-09 | Phase 22 |
-| SETTINGS-01 | Phase 23 |
-| SETTINGS-02 | Phase 23 |
+| THEME-09 | Phase 23 |
+| SETTINGS-01 | Phase 22 |
+| SETTINGS-02 | Phase 22 |
