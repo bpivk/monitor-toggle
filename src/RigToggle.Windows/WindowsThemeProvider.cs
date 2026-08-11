@@ -97,7 +97,16 @@ public sealed class WindowsThemeProvider : IThemeProvider, IDisposable
         bool accentChanged;
         lock (_accentLock)
         {
-            accentChanged = resolvedAccent != _accentColor;
+            // WR-02: compare by ARGB pixel value, not Color's full struct equality.
+            // ReadAccentColorFromDwm()'s failure paths return SystemColors.Highlight (a
+            // KnownColor-backed Color), while every successful read on both paths
+            // returns a plain Color.FromArgb(...) value. Color's == operator compares
+            // the full internal state (including KnownColor/state flags), so two colors
+            // with numerically identical R/G/B still compare != if one is a known-color
+            // and the other isn't -- ToArgb() only compares the 32-bit pixel value and
+            // is immune to that, matching this method's documented "only raise on a
+            // genuine flip" contract.
+            accentChanged = resolvedAccent.ToArgb() != _accentColor.ToArgb();
             previousAccent = _accentColor;
             if (accentChanged)
             {
