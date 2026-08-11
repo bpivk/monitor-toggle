@@ -336,17 +336,17 @@ internal static extern int DwmGetColorizationColor(out uint pcrColorization, [Ma
 
 **None of these were resolvable without a live Windows 11 rig** — all three are exactly the class of claim `21-CONTEXT.md` D-05 was written to gate, and this research does not attempt to shortcut that gate; it narrows what specifically needs checking and gives the planner concrete code to check it against.
 
-## Open Questions
+## Open Questions (RESOLVED — both have actionable recommendations implemented by the plans)
 
-1. **Does `SystemEvents.UserPreferenceChanged`'s `UserPreferenceCategory` argument (`e.Category`) ever narrow specifically to something accent-related, that the handler could branch on rather than unconditionally re-reading on every fire?**
+1. **(RESOLVED) Does `SystemEvents.UserPreferenceChanged`'s `UserPreferenceCategory` argument (`e.Category`) ever narrow specifically to something accent-related, that the handler could branch on rather than unconditionally re-reading on every fire?**
    - What we know: `WindowsThemeProvider`'s existing theme-diff block deliberately does NOT filter by category (comment: "deliberately left unfiltered by UserPreferenceCategory... the safer fallback per research") — it just re-reads and diffs on every fire, regardless of category, accepting the minor waste of a redundant registry read on unrelated preference changes.
    - What's unclear: Whether `UserPreferenceCategory.Color` (or similar) reliably correlates with accent-color changes specifically, which could make the new block slightly more efficient — but this would deviate from the codebase's existing "unfiltered, diff-based" convention for no clearly demonstrated benefit.
-   - Recommendation: Do not filter by category — follow the existing unfiltered-diff convention exactly, for consistency and because PITFALLS.md's own research found no reliable documentation on which category accent changes report under. This is a "don't add complexity without evidence" call, not an open blocker.
+   - Recommendation (implemented — 21-01-PLAN.md hard constraint 6): Do not filter by category — follow the existing unfiltered-diff convention exactly, for consistency and because PITFALLS.md's own research found no reliable documentation on which category accent changes report under. This is a "don't add complexity without evidence" call, not an open blocker.
 
-2. **Is the `AccentColor` registry value ever absent on a fully-updated Windows 11 install (making the fallback path a real, exercised branch rather than dead code)?**
+2. **(RESOLVED) Is the `AccentColor` registry value ever absent on a fully-updated Windows 11 install (making the fallback path a real, exercised branch rather than dead code)?**
    - What we know: Community sources treat it as generally present on modern Windows 10/11, but no official documentation confirms it's guaranteed to exist on every build/edition.
    - What's unclear: Whether the fallback path will ever actually execute on the user's rig, or whether it's purely a defensive branch that never fires in practice.
-   - Recommendation: Implement the fallback regardless (D-01 already requires it) but do not over-invest in testing the fallback path specifically if the rig's `AccentColor` key is confirmed present during D-05's verification pass — a quick registry check (`reg query "HKCU\Software\Microsoft\Windows\DWM" /v AccentColor`) during the rig session would confirm which path is actually live on this user's machine, worth including as a checklist step.
+   - Recommendation (implemented — D-01's mandatory fallback, checked live by 21-03's rig check 2): Implement the fallback regardless (D-01 already requires it) but do not over-invest in testing the fallback path specifically if the rig's `AccentColor` key is confirmed present during D-05's verification pass — a quick registry check (`reg query "HKCU\Software\Microsoft\Windows\DWM" /v AccentColor`) during the rig session would confirm which path is actually live on this user's machine, worth including as a checklist step.
 
 ## Rig-Verification Checklist (concrete steps for D-05)
 

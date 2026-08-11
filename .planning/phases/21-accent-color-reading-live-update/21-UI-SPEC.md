@@ -35,8 +35,10 @@ created: 2026-08-11
 
 | Priority | Source | Format | Notes |
 |----------|--------|--------|-------|
-| 1 (primary) | `HKCU\Software\Microsoft\Windows\DWM\AccentColor` registry value | packed DWORD, extracted as `(v>>16)&0xFF`=R, `(v>>8)&0xFF`=G, `v&0xFF`=B, alpha byte discarded | Read fresh on every diff cycle, never cached/persisted |
-| 2 (fallback, only if key absent) | `DwmGetColorizationColor` (dwmapi.dll) | `0xAARRGGBB`, same shift/mask arithmetic as above per `21-RESEARCH.md` Pattern 1 | Must never throw — safe default `SystemColors.Highlight` on any failure |
+| 1 (primary) | `HKCU\Software\Microsoft\Windows\DWM\AccentColor` registry value | packed DWORD, **ABGR** — extracted as `v&0xFF`=R, `(v>>8)&0xFF`=G, `(v>>16)&0xFF`=B, alpha byte discarded | Read fresh on every diff cycle, never cached/persisted |
+| 2 (fallback, only if key absent) | `DwmGetColorizationColor` (dwmapi.dll) | `0xAARRGGBB` — extracted as `(v>>16)&0xFF`=R, `(v>>8)&0xFF`=G, `v&0xFF`=B, alpha byte discarded | Must never throw — safe default `SystemColors.Highlight` on any failure |
+
+**Byte-order note:** the two sources use genuinely different formats (ABGR vs. AARRGGBB) despite similar-looking shift/mask arithmetic — R and B are swapped between them. `21-RESEARCH.md`'s "IMPORTANT correction" paragraph claimed identical arithmetic for both; that claim is wrong (disproven by its own worked example, `0xffc77e35` = Windows 10 default blue, which only resolves correctly as ABGR). `21-01-PLAN.md`'s interfaces block documents the resolution; this table reflects what's actually implemented, not the disproven correction.
 
 The resolved value is exposed as a single theme-independent `Color AccentColor` on `IThemeProvider` — **not** two per-theme literals. This is the one structural visual change every consumer below must reflect: the existing `dark ? Color.FromArgb(0, 90, 158) : SystemColors.Highlight` ternary is deleted at every call site and replaced by a direct pass-through of the live value. Accent no longer differs by light/dark theme; it differs only by what the user has actually set in Windows.
 
