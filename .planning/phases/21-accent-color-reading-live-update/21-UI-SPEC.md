@@ -110,6 +110,8 @@ This is the section this phase actually changes. Every other role below (dominan
 
 **Contrast note (non-blocking, flag for rig verification):** because the accent color is now fully user-controlled (any hue the user has picked in Windows, not a designer-chosen fixed blue), a pathologically light or low-contrast accent could in principle reduce the ON-state track fill's contrast against the white thumb, or the focus ring's visibility against the row background. No new contrast-safety mechanism is in scope for this phase (D-04 declines new consumers/logic beyond the live read) — this is called out only so the rig-verification pass (D-05) also does a quick visual sanity check with the user's actual accent, not a hue this project controls.
 
+**Focal point:** unchanged from `19-UI-SPEC.md` — the tile row remains MainForm's primary visual anchor. This phase does not alter layout, hierarchy, or which element draws the eye first; it only changes what color value the existing accent-tinted elements resolve to.
+
 ---
 
 ## Copywriting Contract
