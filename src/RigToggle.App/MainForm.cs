@@ -1032,12 +1032,12 @@ namespace RigToggle.App
         {
             foreach (MonitorTile tile in _tiles)
             {
-                ThemeApplier.ThemeMonitorTile(tile, IsDark);
+                ThemeApplier.ThemeMonitorTile(tile, IsDark, AccentColor);
             }
 
             ThemeApplier.ThemeButton(btnIdentify, IsDark);
             ThemeApplier.ThemeButton(btnSettings, IsDark);
-            ThemeApplier.ThemeToggleSwitch(toggleSwitch, IsDark);
+            ThemeApplier.ThemeToggleSwitch(toggleSwitch, IsDark, AccentColor);
             // The gear glyph is painted from btnSettings.ForeColor, which
             // ThemeButton just changed -- force a repaint so it doesn't wait for the
             // next incidental invalidation.
