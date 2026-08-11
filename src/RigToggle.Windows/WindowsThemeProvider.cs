@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Drawing;
 using Microsoft.Win32;
 using RigToggle.Core.Abstractions;
 using RigToggle.Core.Models;
@@ -6,28 +7,41 @@ using RigToggle.Core.Models;
 namespace RigToggle.Windows;
 
 /// <summary>
-/// Real HKCU app-theme reader + live-change notifier (THEME-01/THEME-02). Reads the
-/// AppsUseLightTheme value (D-06) -- this governs app/window chrome (this project's
-/// concern). A separate, differently-named taskbar/tray-coloring value exists in the
-/// same registry key and governs independently; conflating the two is a documented
-/// pitfall -- this class deliberately reads only AppsUseLightTheme. Registry-read failures
-/// (missing key/value, unexpected type) default to AppTheme.Light rather than throwing,
-/// matching this codebase's "never throw from a Load-time read" convention (same posture
-/// as WindowsAutostartConfigurator.IsEnabled()'s null-safe `?.` chain). ThemeChanged may
-/// fire off the UI thread -- SystemEvents.UserPreferenceChanged is not guaranteed to
-/// raise on the subscriber's thread -- so callers MUST marshal back to their own thread
-/// (e.g. WinForms InvokeRequired/BeginInvoke) before touching any control.
+/// Real HKCU app-theme reader + live-change notifier (THEME-01/THEME-02), plus the live
+/// Windows accent-color reader + notifier (THEME-07). Reads the AppsUseLightTheme value
+/// (D-06) -- this governs app/window chrome (this project's concern). A separate,
+/// differently-named taskbar/tray-coloring value exists in the same registry key and
+/// governs independently; conflating the two is a documented pitfall -- this class
+/// deliberately reads only AppsUseLightTheme. Registry-read failures (missing key/value,
+/// unexpected type) default to AppTheme.Light rather than throwing, matching this
+/// codebase's "never throw from a Load-time read" convention (same posture as
+/// WindowsAutostartConfigurator.IsEnabled()'s null-safe `?.` chain). ThemeChanged and
+/// AccentColorChanged may both fire off the UI thread -- SystemEvents.UserPreferenceChanged
+/// is not guaranteed to raise on the subscriber's thread -- so callers MUST marshal back
+/// to their own thread (e.g. WinForms InvokeRequired/BeginInvoke) before touching any
+/// control.
+///
+/// AccentColor resolves registry-first (HKCU\Software\Microsoft\Windows\DWM\AccentColor)
+/// with a DwmGetColorizationColor fallback (D-01), never throwing from either read.
 /// </summary>
 public sealed class WindowsThemeProvider : IThemeProvider, IDisposable
 {
     private const string KeyPath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
     private const string ValueName = "AppsUseLightTheme";
 
+    private const string AccentKeyPath = @"Software\Microsoft\Windows\DWM";
+    private const string AccentValueName = "AccentColor";
+
     // WR-02: guards the read-compare-write below and the CurrentTheme getter, per this
     // class's own documented "ThemeChanged may fire off the UI thread" contract -- two
     // rapid UserPreferenceChanged events could otherwise race the diff-and-assign.
     private readonly object _themeLock = new();
     private AppTheme _currentTheme;
+
+    // Separate lock from _themeLock -- accent reads must never serialize behind theme
+    // reads (and vice versa); the two values are independent (T-21-05).
+    private readonly object _accentLock = new();
+    private Color _accentColor;
 
     public AppTheme CurrentTheme
     {
@@ -37,17 +51,26 @@ public sealed class WindowsThemeProvider : IThemeProvider, IDisposable
 
     public event EventHandler? ThemeChanged;
 
+    public Color AccentColor
+    {
+        get { lock (_accentLock) { return _accentColor; } }
+    }
+
+    public event EventHandler? AccentColorChanged;
+
     public WindowsThemeProvider()
     {
         CurrentTheme = ReadThemeFromRegistry();
-        Log($"Constructed: initial theme resolved to {CurrentTheme}");
+        _accentColor = ReadAccentColor();
+        Log($"Constructed: initial theme resolved to {CurrentTheme}, accent resolved to {_accentColor}");
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
     }
 
     // UserPreferenceChanged fires for many unrelated preference categories (A1), not
     // just theme changes -- deliberately left unfiltered by UserPreferenceCategory
     // (the safer fallback per research) and instead diffed against the last-known
-    // theme so ThemeChanged only raises on a genuine Light<->Dark flip (T-12-02).
+    // value so ThemeChanged/AccentColorChanged only raise on a genuine flip (T-12-02).
+    // This same unfiltered-then-diffed treatment now covers two independent values.
     private void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e)
     {
         var resolved = ReadThemeFromRegistry();
@@ -68,6 +91,25 @@ public sealed class WindowsThemeProvider : IThemeProvider, IDisposable
             Log($"Theme flip detected: {previous} -> {resolved}");
             ThemeChanged?.Invoke(this, EventArgs.Empty);
         }
+
+        var resolvedAccent = ReadAccentColor();
+        Color previousAccent;
+        bool accentChanged;
+        lock (_accentLock)
+        {
+            accentChanged = resolvedAccent != _accentColor;
+            previousAccent = _accentColor;
+            if (accentChanged)
+            {
+                _accentColor = resolvedAccent;
+            }
+        }
+
+        if (accentChanged)
+        {
+            Log($"Accent color flip detected: {previousAccent} -> {resolvedAccent}");
+            AccentColorChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     private static AppTheme ReadThemeFromRegistry()
@@ -83,6 +125,66 @@ public sealed class WindowsThemeProvider : IThemeProvider, IDisposable
             return AppTheme.Light;
         }
     }
+
+    // Registry primary read for AccentColor (D-01). The stored DWORD is ABGR (R in the
+    // low byte), evidenced by 21-RESEARCH.md's own cited worked example: 0xffc77e35
+    // resolves to #357EC7 (a blue, matching the source's claim of Windows-10 default
+    // blue), not #C77E35 (an orange) -- the "IMPORTANT correction" paragraph in
+    // 21-RESEARCH.md and 21-UI-SPEC.md's source table row 1 both assert this uses the
+    // same arithmetic as the DWM path below, but that is contradicted by the same
+    // document's own worked example. Plan 03's rig checklist resolves this numerically
+    // against the live machine as the final decider.
+    private static Color? ReadAccentColorFromRegistry()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(AccentKeyPath, writable: false);
+            var raw = key?.GetValue(AccentValueName);
+            if (raw is not int i)
+            {
+                return null;
+            }
+
+            uint v = unchecked((uint)i);
+            byte r = (byte)(v & 0x000000FF);
+            byte g = (byte)((v >> 8) & 0x000000FF);
+            byte b = (byte)((v >> 16) & 0x000000FF);
+            return Color.FromArgb(r, g, b);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    // DWM fallback read for AccentColor, used only when the registry value above is
+    // absent or unreadable (D-01). DwmGetColorizationColor is documented by Microsoft as
+    // 0xAARRGGBB (R at bit 16) -- the opposite byte order from the registry read above.
+    // See ReadAccentColorFromRegistry's comment for the full byte-order justification.
+    private static Color ReadAccentColorFromDwm()
+    {
+        try
+        {
+            int hr = NativeMethods.DwmGetColorizationColor(out uint colorization, out _);
+            if (hr != 0)
+            {
+                return SystemColors.Highlight;
+            }
+
+            byte r = (byte)((colorization >> 16) & 0x000000FF);
+            byte g = (byte)((colorization >> 8) & 0x000000FF);
+            byte b = (byte)(colorization & 0x000000FF);
+            return Color.FromArgb(r, g, b);
+        }
+        catch
+        {
+            return SystemColors.Highlight;
+        }
+    }
+
+    // Registry primary, DWM fallback only when the registry value is absent or
+    // unreadable (D-01).
+    private static Color ReadAccentColor() => ReadAccentColorFromRegistry() ?? ReadAccentColorFromDwm();
 
     public void Dispose() => SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
 
