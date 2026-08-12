@@ -388,17 +388,19 @@ this.dgvMonitors.Dock = System.Windows.Forms.DockStyle.Fill;
 | A3 | `MinimizeBox` should stay `false` due to the `ShowDialog()` + `ShowInTaskbar=false` restore-ability bug | Pitfall 3 | MEDIUM confidence (WebSearch-sourced community reports of the exact failure mode, not an official Microsoft Learn statement of this specific interaction) — cross-checked against the general, well-documented `ShowInTaskbar` semantics but the specific "minimizing closes/strands a `ShowDialog()` window" claim is not from a primary Microsoft source; if wrong, worst case is a planner unnecessarily avoids enabling `MinimizeBox`, which has zero functional cost since `MinimizeBox=false` matches the pre-existing behavior anyway |
 | A4 | No `.Parent`-relative or container-structure-dependent logic exists in `SettingsForm.cs` beyond what a targeted grep can catch before the D-01 audio-picker split | Pitfall 4 | LOW risk — confirmed by direct read that `pnlAudioDevices` is referenced only in `Designer.cs` today, but the full 1176-line `SettingsForm.cs` was not read in its entirety during this research pass, only its first ~120 lines and targeted grep hits; a planner should re-grep before finalizing the split as a cheap final check |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should `dgvMonitors`/`dgvMonitorsNormal` switch to `Dock=Fill`, or keep fixed pixel bounds inside their now-flexible parent panels?**
+> Both questions below were resolved during UI design and planning. The binding resolutions live in `22-UI-SPEC.md` (Layout Structure Contract → Open Question resolutions) and are implemented in `22-01-PLAN.md` / `22-02-PLAN.md`. The original framing is kept below as the reasoning record.
+
+1. **RESOLVED (see 22-UI-SPEC.md Open Question 1 resolution; implemented in 22-01-PLAN.md Tasks 1-2) — grids switch to `Dock = Fill` with a `MinimumSize = new Size(0, 120)` height floor, and become the single most heavily rig-verified element (22-03-PLAN.md rig checks 2, 5, 10, 14).** Should `dgvMonitors`/`dgvMonitorsNormal` switch to `Dock=Fill`, or keep fixed pixel bounds inside their now-flexible parent panels?
    - What we know: The grids' own Fill-mode *column* math is already correct and documented; the question is only about the grid *control's own* bounds within its parent.
    - What's unclear: Whether keeping fixed pixel bounds (simpler diff, less new-behavior risk) or switching to `Dock=Fill` (more consistent with "the whole point of this migration is removing hardcoded pixel math," per D-03's spirit) is the better call for this phase specifically.
    - Recommendation: Lean toward `Dock=Fill` for consistency with D-03's intent, but treat this as a planning decision to make explicitly (not silently), and make it the single most heavily rig-verified layout element (Pitfall 1) given it's the most novel new-behavior surface this phase introduces.
 
-2. **Exact visual boundary of the "reserved" Phase 23 slot (D-04) — an empty `Panel` with a code comment, or a labeled placeholder control?**
+2. **RESOLVED (see 22-UI-SPEC.md Open Question 2 resolution; implemented in 22-02-PLAN.md Task 1 step 6) — a named, empty, zero-size `Panel` (`pnlThemeReserved`) plus a code comment naming Phase 23 and THEME-09; no visible placeholder control. Rig check 2 confirms it occupies zero visible space.** Exact visual boundary of the "reserved" Phase 23 slot (D-04) — an empty `Panel` with a code comment, or a labeled placeholder control?
    - What we know: D-04 requires the space to exist and be easy for Phase 23's planner to find; Phase 22 must not build the radio group itself.
    - What's unclear: Whether a bare reserved row (comment-only) is sufficient or whether a visible-but-inert placeholder (e.g., a disabled label reading "Theme: (Phase 23)") better serves SETTINGS-01's "no crowded controls" criterion by making the reserved space's purpose legible during this phase's own rig verification (so a reviewer doesn't mistake unexplained empty space for a layout bug).
-   - Recommendation: A code comment plus a named-but-empty `TableLayoutPanel` row/cell (e.g., `rowThemeReserved`) is sufficient and lower-risk — a visible placeholder control risks being mistaken for a real, half-finished feature. Leave this to planning discretion, consistent with CONTEXT.md's own framing.
+   - Recommendation: A code comment plus a named-but-empty `TableLayoutPanel` row/cell (built as `pnlThemeReserved`, an empty `Panel` in the `flpShared` stack) is sufficient and lower-risk — a visible placeholder control risks being mistaken for a real, half-finished feature. Leave this to planning discretion, consistent with CONTEXT.md's own framing.
 
 ## Environment Availability
 

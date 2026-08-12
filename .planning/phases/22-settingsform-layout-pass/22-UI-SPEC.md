@@ -125,7 +125,7 @@ SettingsForm (AutoSize=true, AutoSizeMode=GrowAndShrink, FormBorderStyle=Sizable
     │       ├── chkMinimizeToTray
     │       ├── chkStartWithWindows
     │       ├── lblAutostartWarning
-    │       └── rowThemeReserved  ← D-04: named, empty TableLayoutPanel row/cell + code
+    │       └── pnlThemeReserved  ← D-04: named, empty TableLayoutPanel row/cell + code
     │                                comment only. NO visible placeholder label/control
     │                                (Open Question 2 resolution — a visible-but-inert
     │                                placeholder risks reading as a half-finished feature;
@@ -175,7 +175,7 @@ This build environment cannot exercise Windows display scaling at all. Every cla
 | Empty state body | not applicable |
 | Error state | not applicable — this phase touches zero validation logic; `errMonitor`/`errAudioNormal`/`errAudioRig`/`errApp`/`errAutostart`/`errHotkey` `ErrorProvider` messages and the four `lbl*Warning` labels are all reused verbatim, unmodified, just relocated with their control |
 | Destructive confirmation | not applicable — no destructive action exists in `SettingsForm`; `btnDiscardChanges` ("Discard Changes") is a non-destructive cancel, unchanged |
-| Reserved Phase 23 slot | No visible copy — a named-but-empty `TableLayoutPanel` row (`rowThemeReserved`) plus a code comment marking it, not a placeholder label (see Layout Structure Contract, Open Question 2 resolution) |
+| Reserved Phase 23 slot | No visible copy — a named, empty, zero-size `Panel` (`pnlThemeReserved`) in the shared stack plus a code comment marking it, not a placeholder label (see Layout Structure Contract, Open Question 2 resolution) |
 
 ---
 
