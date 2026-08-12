@@ -43,6 +43,15 @@ namespace RigToggle.App
         {
             this.components = new System.ComponentModel.Container();
 
+            // 22-01/D-03: TableLayoutPanel scaffold for the new mode-based layout.
+            // tlpRoot is the form's single root child; tlpModeColumns hosts the
+            // Normal/Rig mode columns side by side; tlpNormalColumn/tlpAudioNormal
+            // are the Normal column's own table and its nested audio-picker row.
+            this.tlpRoot = new System.Windows.Forms.TableLayoutPanel();
+            this.tlpModeColumns = new System.Windows.Forms.TableLayoutPanel();
+            this.tlpNormalColumn = new System.Windows.Forms.TableLayoutPanel();
+            this.tlpAudioNormal = new System.Windows.Forms.TableLayoutPanel();
+
             this.pnlMonitor = new System.Windows.Forms.Panel();
             this.lblMonitorCaption = new System.Windows.Forms.Label();
             this.dgvMonitors = new System.Windows.Forms.DataGridView();
@@ -112,12 +121,19 @@ namespace RigToggle.App
             this.pnlMonitorNormal.SuspendLayout();
             this.pnlAudioDevices.SuspendLayout();
             this.pnlAppPath.SuspendLayout();
+            this.tlpAudioNormal.SuspendLayout();
+            this.tlpNormalColumn.SuspendLayout();
+            this.tlpModeColumns.SuspendLayout();
+            this.tlpRoot.SuspendLayout();
             this.SuspendLayout();
 
             //
             // pnlMonitor (THEME-05: flat bordered Panel replacing the grpMonitor GroupBox
             // bevel -- GroupBox has no flat variant, SetColorMode cannot recolor its 3D
-            // border. Same Location/Size as the original GroupBox, zero layout drift.)
+            // border. Same Location/Size as the original GroupBox, zero layout drift.
+            // 22-01: not yet reparented into tlpModeColumns -- that is Task 2's job; this
+            // panel keeps its absolute Location/Size for now, per hard constraint 7's
+            // accepted intermediate state.)
             //
             this.pnlMonitor.Location = new System.Drawing.Point(12, 12);
             this.pnlMonitor.Size = new System.Drawing.Size(396, 234);
@@ -202,25 +218,79 @@ namespace RigToggle.App
             this.lblMonitorWarning.Name = "lblMonitorWarning";
 
             //
-            // pnlMonitorNormal (16-02/D-04/D-05, re-flowed by rig feedback: second
-            // monitor grid, side by side with the Rig grid — same width/height, mirrors
-            // pnlMonitor's block exactly.)
+            // tlpModeColumns (22-01/D-01/D-03: new 50/50 Percent-split container
+            // hosting the Normal and Rig mode columns side by side. Normal = column
+            // 0 (left), Rig = column 1 (right) -- a deliberate swap from today's
+            // pnlMonitor-at-x=12/pnlMonitorNormal-at-x=420 order, per the user's own
+            // framing in 22-CONTEXT.md ("One side is for normal mode... second for
+            // rig mode"). pnlMonitor itself is not yet reparented into this
+            // container -- that is Task 2's job; the intermediate state where Rig's
+            // panel still floats at its old absolute Location is expected and
+            // acceptable (hard constraint 7).
             //
-            this.pnlMonitorNormal.Location = new System.Drawing.Point(420, 12);
-            this.pnlMonitorNormal.Size = new System.Drawing.Size(396, 234);
+            this.tlpModeColumns.ColumnCount = 2;
+            this.tlpModeColumns.RowCount = 1;
+            this.tlpModeColumns.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 50F));
+            this.tlpModeColumns.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 50F));
+            this.tlpModeColumns.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tlpModeColumns.AutoSize = true;
+            this.tlpModeColumns.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.tlpModeColumns.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tlpModeColumns.Margin = new System.Windows.Forms.Padding(0, 0, 0, 16);
+            this.tlpModeColumns.TabIndex = 0;
+            this.tlpModeColumns.Name = "tlpModeColumns";
+            this.tlpModeColumns.Controls.Add(this.pnlMonitorNormal, 0, 0);
+
+            //
+            // pnlMonitorNormal (THEME-05: flat bordered Panel, unchanged bevel
+            // treatment. 22-01/D-03: migrated off fixed Location/Size onto
+            // Dock=Fill inside tlpModeColumns; content Padding now derives its own
+            // inset instead of the old 60px top reservation, since the caption/
+            // explain stack is now a table row, not an absolutely positioned
+            // overlay -- 22-UI-SPEC.md Spacing exception 3.)
+            //
             this.pnlMonitorNormal.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.pnlMonitorNormal.Name = "pnlMonitorNormal";
-            this.pnlMonitorNormal.Controls.Add(this.lblMonitorNormalCaption);
-            this.pnlMonitorNormal.Controls.Add(this.lblMonitorNormalExplain);
-            this.pnlMonitorNormal.Controls.Add(this.dgvMonitorsNormal);
-            this.pnlMonitorNormal.Controls.Add(this.lblMonitorNormalWarning);
+            this.pnlMonitorNormal.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pnlMonitorNormal.Padding = new System.Windows.Forms.Padding(12);
+            this.pnlMonitorNormal.Margin = new System.Windows.Forms.Padding(0, 0, 12, 0);
+            this.pnlMonitorNormal.TabIndex = 0;
+            this.pnlMonitorNormal.Controls.Add(this.tlpNormalColumn);
+
+            //
+            // tlpNormalColumn (22-01/D-01: six-row table -- caption, explain, grid,
+            // warning, audio picker row, audio warning -- replacing pnlMonitorNormal's
+            // four absolutely positioned children plus the Normal audio picker moved
+            // in from the old shared pnlAudioDevices panel.)
+            //
+            this.tlpNormalColumn.ColumnCount = 1;
+            this.tlpNormalColumn.RowCount = 6;
+            this.tlpNormalColumn.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tlpNormalColumn.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpNormalColumn.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpNormalColumn.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tlpNormalColumn.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpNormalColumn.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpNormalColumn.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpNormalColumn.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tlpNormalColumn.AutoSize = true;
+            this.tlpNormalColumn.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.tlpNormalColumn.Margin = new System.Windows.Forms.Padding(0);
+            this.tlpNormalColumn.Name = "tlpNormalColumn";
+            this.tlpNormalColumn.Controls.Add(this.lblMonitorNormalCaption, 0, 0);
+            this.tlpNormalColumn.Controls.Add(this.lblMonitorNormalExplain, 0, 1);
+            this.tlpNormalColumn.Controls.Add(this.dgvMonitorsNormal, 0, 2);
+            this.tlpNormalColumn.Controls.Add(this.lblMonitorNormalWarning, 0, 3);
+            this.tlpNormalColumn.Controls.Add(this.tlpAudioNormal, 0, 4);
+            this.tlpNormalColumn.Controls.Add(this.lblAudioNormalWarning, 0, 5);
 
             //
             // lblMonitorNormalCaption
             //
             this.lblMonitorNormalCaption.Text = "Normal Mode";
-            this.lblMonitorNormalCaption.Location = new System.Drawing.Point(9, 9);
             this.lblMonitorNormalCaption.AutoSize = true;
+            this.lblMonitorNormalCaption.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.lblMonitorNormalCaption.Margin = new System.Windows.Forms.Padding(0, 0, 0, 4);
             this.lblMonitorNormalCaption.Name = "lblMonitorNormalCaption";
 
             //
@@ -235,8 +305,9 @@ namespace RigToggle.App
             this.dgvMonitorsNormal.MultiSelect = false;
             this.dgvMonitorsNormal.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             this.dgvMonitorsNormal.EditMode = System.Windows.Forms.DataGridViewEditMode.EditOnEnter;
-            this.dgvMonitorsNormal.Location = new System.Drawing.Point(12, 80);
-            this.dgvMonitorsNormal.Size = new System.Drawing.Size(372, 120);
+            this.dgvMonitorsNormal.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.dgvMonitorsNormal.MinimumSize = new System.Drawing.Size(0, 120);
+            this.dgvMonitorsNormal.Margin = new System.Windows.Forms.Padding(0, 0, 20, 8);
             this.dgvMonitorsNormal.Name = "dgvMonitorsNormal";
             this.dgvMonitorsNormal.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
             this.colMonitorNameNormal,
@@ -270,33 +341,80 @@ namespace RigToggle.App
             //
             // lblMonitorNormalExplain
             //
-            this.lblMonitorNormalExplain.Location = new System.Drawing.Point(12, 22);
-            this.lblMonitorNormalExplain.Size = new System.Drawing.Size(372, 50);
             this.lblMonitorNormalExplain.AutoSize = false;
+            this.lblMonitorNormalExplain.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.lblMonitorNormalExplain.MinimumSize = new System.Drawing.Size(0, 50);
+            this.lblMonitorNormalExplain.Margin = new System.Windows.Forms.Padding(0, 0, 0, 8);
             this.lblMonitorNormalExplain.Text = "Only controls what changes when switching TO Normal Mode. A monitor not listed here is left untouched.";
             this.lblMonitorNormalExplain.Name = "lblMonitorNormalExplain";
 
             //
             // lblMonitorNormalWarning
             //
-            this.lblMonitorNormalWarning.Location = new System.Drawing.Point(12, 206);
-            this.lblMonitorNormalWarning.Size = new System.Drawing.Size(372, 20);
             this.lblMonitorNormalWarning.AutoSize = false;
             this.lblMonitorNormalWarning.Visible = false;
+            this.lblMonitorNormalWarning.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.lblMonitorNormalWarning.MinimumSize = new System.Drawing.Size(0, 20);
+            this.lblMonitorNormalWarning.Margin = new System.Windows.Forms.Padding(0, 0, 0, 8);
             this.lblMonitorNormalWarning.Name = "lblMonitorNormalWarning";
 
             //
+            // tlpAudioNormal (22-01/D-01: Normal's audio picker, split out of the old
+            // shared pnlAudioDevices panel into its own mode column.)
+            //
+            this.tlpAudioNormal.ColumnCount = 2;
+            this.tlpAudioNormal.RowCount = 1;
+            this.tlpAudioNormal.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpAudioNormal.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tlpAudioNormal.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpAudioNormal.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tlpAudioNormal.AutoSize = true;
+            this.tlpAudioNormal.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.tlpAudioNormal.Margin = new System.Windows.Forms.Padding(0, 0, 0, 4);
+            this.tlpAudioNormal.Name = "tlpAudioNormal";
+            this.tlpAudioNormal.Controls.Add(this.lblAudioNormalCaption, 0, 0);
+            this.tlpAudioNormal.Controls.Add(this.cboAudioNormal, 1, 0);
+
+            //
+            // lblAudioNormalCaption
+            //
+            this.lblAudioNormalCaption.Text = "Normal:";
+            this.lblAudioNormalCaption.AutoSize = true;
+            this.lblAudioNormalCaption.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.lblAudioNormalCaption.Margin = new System.Windows.Forms.Padding(0, 0, 4, 0);
+            this.lblAudioNormalCaption.Name = "lblAudioNormalCaption";
+
+            //
+            // cboAudioNormal
+            //
+            this.cboAudioNormal.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cboAudioNormal.Anchor = System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+            this.cboAudioNormal.Margin = new System.Windows.Forms.Padding(0, 0, 20, 0);
+            this.cboAudioNormal.Name = "cboAudioNormal";
+
+            //
+            // lblAudioNormalWarning
+            //
+            this.lblAudioNormalWarning.AutoSize = false;
+            this.lblAudioNormalWarning.Visible = false;
+            this.lblAudioNormalWarning.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.lblAudioNormalWarning.MinimumSize = new System.Drawing.Size(0, 20);
+            this.lblAudioNormalWarning.Margin = new System.Windows.Forms.Padding(0);
+            this.lblAudioNormalWarning.Name = "lblAudioNormalWarning";
+
+            //
             // pnlAudioDevices (THEME-05: flat bordered Panel replacing the grpAudioDevices
-            // GroupBox bevel. Same Location/Size as the original GroupBox.)
+            // GroupBox bevel. Same Location/Size as the original GroupBox. 22-01/D-01:
+            // Normal's audio picker (lblAudioNormalCaption/cboAudioNormal/
+            // lblAudioNormalWarning) has moved into tlpAudioNormal inside
+            // pnlMonitorNormal -- only Rig's picker remains here until Task 2 dissolves
+            // this panel entirely.)
             //
             this.pnlAudioDevices.Location = new System.Drawing.Point(12, 258);
             this.pnlAudioDevices.Size = new System.Drawing.Size(396, 132);
             this.pnlAudioDevices.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.pnlAudioDevices.Name = "pnlAudioDevices";
             this.pnlAudioDevices.Controls.Add(this.lblAudioDevicesCaption);
-            this.pnlAudioDevices.Controls.Add(this.lblAudioNormalCaption);
-            this.pnlAudioDevices.Controls.Add(this.cboAudioNormal);
-            this.pnlAudioDevices.Controls.Add(this.lblAudioNormalWarning);
             this.pnlAudioDevices.Controls.Add(this.lblAudioRigCaption);
             this.pnlAudioDevices.Controls.Add(this.cboAudioRig);
             this.pnlAudioDevices.Controls.Add(this.lblAudioRigWarning);
@@ -308,31 +426,6 @@ namespace RigToggle.App
             this.lblAudioDevicesCaption.Location = new System.Drawing.Point(9, 9);
             this.lblAudioDevicesCaption.AutoSize = true;
             this.lblAudioDevicesCaption.Name = "lblAudioDevicesCaption";
-
-            //
-            // lblAudioNormalCaption
-            //
-            this.lblAudioNormalCaption.Text = "Normal:";
-            this.lblAudioNormalCaption.Location = new System.Drawing.Point(12, 25);
-            this.lblAudioNormalCaption.Size = new System.Drawing.Size(48, 20);
-            this.lblAudioNormalCaption.Name = "lblAudioNormalCaption";
-
-            //
-            // cboAudioNormal
-            //
-            this.cboAudioNormal.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cboAudioNormal.Location = new System.Drawing.Point(64, 22);
-            this.cboAudioNormal.Size = new System.Drawing.Size(320, 23);
-            this.cboAudioNormal.Name = "cboAudioNormal";
-
-            //
-            // lblAudioNormalWarning
-            //
-            this.lblAudioNormalWarning.Location = new System.Drawing.Point(64, 48);
-            this.lblAudioNormalWarning.Size = new System.Drawing.Size(320, 20);
-            this.lblAudioNormalWarning.AutoSize = false;
-            this.lblAudioNormalWarning.Visible = false;
-            this.lblAudioNormalWarning.Name = "lblAudioNormalWarning";
 
             //
             // lblAudioRigCaption
@@ -572,6 +665,31 @@ namespace RigToggle.App
             this.errHotkey.ContainerControl = this;
 
             //
+            // tlpRoot (22-01/D-03: the form's single root child container. Row 0
+            // (mode columns) is Percent 100F rather than AutoSize -- under D-06's
+            // eventual Sizable border (Plan 02), vertical space gained by dragging
+            // the bottom edge has to land somewhere, and the grids are the only
+            // element that benefits from growing; an all-AutoSize row set would
+            // leave an unexplained empty gap, which Plan 03's rig check 7(d) treats
+            // as a FAIL. Rows 1/2 (shared section, button row) stay AutoSize --
+            // Plan 02 fills them.)
+            //
+            this.tlpRoot.ColumnCount = 1;
+            this.tlpRoot.RowCount = 3;
+            this.tlpRoot.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tlpRoot.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tlpRoot.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpRoot.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpRoot.AutoSize = true;
+            this.tlpRoot.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.tlpRoot.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tlpRoot.Padding = new System.Windows.Forms.Padding(16);
+            this.tlpRoot.Margin = new System.Windows.Forms.Padding(0);
+            this.tlpRoot.TabIndex = 0;
+            this.tlpRoot.Name = "tlpRoot";
+            this.tlpRoot.Controls.Add(this.tlpModeColumns, 0, 0);
+
+            //
             // SettingsForm
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -585,6 +703,7 @@ namespace RigToggle.App
             this.Text = "Rig Toggle — Settings";
             this.Name = "SettingsForm";
 
+            this.Controls.Add(this.tlpRoot);
             this.Controls.Add(this.pnlMonitor);
             this.Controls.Add(this.pnlMonitorNormal);
             this.Controls.Add(this.pnlAudioDevices);
@@ -612,10 +731,23 @@ namespace RigToggle.App
             this.pnlMonitorNormal.ResumeLayout(false);
             this.pnlAudioDevices.ResumeLayout(false);
             this.pnlAppPath.ResumeLayout(false);
+            this.tlpAudioNormal.ResumeLayout(false);
+            this.tlpAudioNormal.PerformLayout();
+            this.tlpNormalColumn.ResumeLayout(false);
+            this.tlpNormalColumn.PerformLayout();
+            this.tlpModeColumns.ResumeLayout(false);
+            this.tlpModeColumns.PerformLayout();
+            this.tlpRoot.ResumeLayout(false);
+            this.tlpRoot.PerformLayout();
             this.ResumeLayout(false);
         }
 
         #endregion
+
+        private System.Windows.Forms.TableLayoutPanel tlpRoot;
+        private System.Windows.Forms.TableLayoutPanel tlpModeColumns;
+        private System.Windows.Forms.TableLayoutPanel tlpNormalColumn;
+        private System.Windows.Forms.TableLayoutPanel tlpAudioNormal;
 
         private System.Windows.Forms.Panel pnlMonitor;
         private System.Windows.Forms.Label lblMonitorCaption;
