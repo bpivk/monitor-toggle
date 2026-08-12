@@ -55,6 +55,19 @@ namespace RigToggle.App
             this.tlpRigColumn = new System.Windows.Forms.TableLayoutPanel();
             this.tlpAudioRig = new System.Windows.Forms.TableLayoutPanel();
 
+            // 22-02/D-02/D-04: shared full-width settings section, its two nested
+            // layout helpers (tlpAppPath, tlpHotkey), and the Phase 23 reserved slot.
+            this.pnlSharedSection = new System.Windows.Forms.Panel();
+            this.flpShared = new System.Windows.Forms.FlowLayoutPanel();
+            this.tlpAppPath = new System.Windows.Forms.TableLayoutPanel();
+            this.tlpHotkey = new System.Windows.Forms.TableLayoutPanel();
+            // pnlThemeReserved intentionally gets no Suspend/Resume pair below -- it has
+            // no children by design (hard constraint 6), so the bracket would be a no-op.
+            this.pnlThemeReserved = new System.Windows.Forms.Panel();
+
+            // 22-02/D-05/D-06: right-aligned Save/Discard button row.
+            this.flpButtons = new System.Windows.Forms.FlowLayoutPanel();
+
             this.pnlMonitor = new System.Windows.Forms.Panel();
             this.lblMonitorCaption = new System.Windows.Forms.Label();
             this.dgvMonitors = new System.Windows.Forms.DataGridView();
@@ -121,6 +134,11 @@ namespace RigToggle.App
             this.pnlMonitor.SuspendLayout();
             this.pnlMonitorNormal.SuspendLayout();
             this.pnlAppPath.SuspendLayout();
+            this.tlpAppPath.SuspendLayout();
+            this.tlpHotkey.SuspendLayout();
+            this.pnlSharedSection.SuspendLayout();
+            this.flpShared.SuspendLayout();
+            this.flpButtons.SuspendLayout();
             this.tlpAudioNormal.SuspendLayout();
             this.tlpNormalColumn.SuspendLayout();
             this.tlpAudioRig.SuspendLayout();
@@ -478,29 +496,63 @@ namespace RigToggle.App
 
             //
             // pnlAppPath (THEME-05: flat bordered Panel replacing the grpAppPath GroupBox
-            // bevel. Same Location/Size as the original GroupBox. CRITICAL: AllowDrop and
-            // the AppPath_DragEnter/AppPath_DragDrop wiring move here from the old
-            // GroupBox verbatim -- must not be dropped (T-12-07).)
+            // bevel. CRITICAL: AllowDrop plus the drag-enter/drag-drop wiring
+            // (AppPath_Drag(Enter|Drop)) stay on this panel verbatim -- must not be
+            // dropped (T-12-07). 22-02/D-02: migrated off fixed Location/Size onto
+            // AutoSize inside flpShared; its five flat children are replaced by a single
+            // nested tlpAppPath table.)
             //
-            this.pnlAppPath.Location = new System.Drawing.Point(12, 402);
-            this.pnlAppPath.Size = new System.Drawing.Size(396, 76);
             this.pnlAppPath.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.pnlAppPath.Name = "pnlAppPath";
             this.pnlAppPath.AllowDrop = true;
-            this.pnlAppPath.Controls.Add(this.lblAppPathCaption);
-            this.pnlAppPath.Controls.Add(this.txtAppPath);
-            this.pnlAppPath.Controls.Add(this.btnBrowse);
-            this.pnlAppPath.Controls.Add(this.btnClearAppPath);
-            this.pnlAppPath.Controls.Add(this.lblAppWarning);
+            this.pnlAppPath.AutoSize = true;
+            this.pnlAppPath.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.pnlAppPath.Padding = new System.Windows.Forms.Padding(12);
+            this.pnlAppPath.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+            this.pnlAppPath.Margin = new System.Windows.Forms.Padding(0, 0, 0, 8);
+            this.pnlAppPath.TabIndex = 0;
+            this.pnlAppPath.Controls.Add(this.tlpAppPath);
             this.pnlAppPath.DragEnter += new System.Windows.Forms.DragEventHandler(this.AppPath_DragEnter);
             this.pnlAppPath.DragDrop += new System.Windows.Forms.DragEventHandler(this.AppPath_DragDrop);
+
+            //
+            // tlpAppPath (22-02: internal layout for the target-app box, replacing
+            // pnlAppPath's five absolutely-positioned children. CRITICAL: this table now
+            // covers pnlAppPath's client area, so its own AllowDrop=true plus
+            // drag-enter/drag-drop subscriptions are required -- without them the
+            // panel-wide drop target (T-12-07) collapses to just the text box.)
+            //
+            this.tlpAppPath.ColumnCount = 3;
+            this.tlpAppPath.RowCount = 3;
+            this.tlpAppPath.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tlpAppPath.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpAppPath.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpAppPath.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpAppPath.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpAppPath.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpAppPath.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tlpAppPath.AutoSize = true;
+            this.tlpAppPath.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.tlpAppPath.Margin = new System.Windows.Forms.Padding(0);
+            this.tlpAppPath.Name = "tlpAppPath";
+            this.tlpAppPath.AllowDrop = true;
+            this.tlpAppPath.Controls.Add(this.lblAppPathCaption, 0, 0);
+            this.tlpAppPath.Controls.Add(this.txtAppPath, 0, 1);
+            this.tlpAppPath.Controls.Add(this.btnBrowse, 1, 1);
+            this.tlpAppPath.Controls.Add(this.btnClearAppPath, 2, 1);
+            this.tlpAppPath.Controls.Add(this.lblAppWarning, 0, 2);
+            this.tlpAppPath.SetColumnSpan(this.lblAppPathCaption, 3);
+            this.tlpAppPath.SetColumnSpan(this.lblAppWarning, 3);
+            this.tlpAppPath.DragEnter += new System.Windows.Forms.DragEventHandler(this.AppPath_DragEnter);
+            this.tlpAppPath.DragDrop += new System.Windows.Forms.DragEventHandler(this.AppPath_DragDrop);
 
             //
             // lblAppPathCaption
             //
             this.lblAppPathCaption.Text = "Target App";
-            this.lblAppPathCaption.Location = new System.Drawing.Point(9, 9);
             this.lblAppPathCaption.AutoSize = true;
+            this.lblAppPathCaption.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.lblAppPathCaption.Margin = new System.Windows.Forms.Padding(0, 0, 0, 4);
             this.lblAppPathCaption.Name = "lblAppPathCaption";
 
             //
@@ -508,14 +560,14 @@ namespace RigToggle.App
             //
             this.txtAppPath.ReadOnly = true;
             this.txtAppPath.Text = "No app shortcut or .exe selected";
-            this.txtAppPath.Location = new System.Drawing.Point(12, 22);
-            // 15-03/D-01: narrowed from 288 to 220 to make room for btnClearAppPath on
-            // the same row without touching panel height or downstream control Y
-            // positions -- txtAppPath's range (x=12..232) stays a strict subset of the
-            // original x=12..300 span, so it never overlaps either sibling button.
-            this.txtAppPath.Size = new System.Drawing.Size(220, 23);
+            // 22-02: tlpAppPath's column 0 is Percent 100F, so this field's width is now
+            // derived from the table instead of a hand-picked pixel value (supersedes the
+            // old 15-03/D-01 288->220 narrowing note, which described the deleted pixel
+            // math).
             this.txtAppPath.Name = "txtAppPath";
             this.txtAppPath.AllowDrop = true;
+            this.txtAppPath.Anchor = System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+            this.txtAppPath.Margin = new System.Windows.Forms.Padding(0, 0, 20, 0);
             this.txtAppPath.DragEnter += new System.Windows.Forms.DragEventHandler(this.AppPath_DragEnter);
             this.txtAppPath.DragDrop += new System.Windows.Forms.DragEventHandler(this.AppPath_DragDrop);
 
@@ -523,10 +575,11 @@ namespace RigToggle.App
             // btnBrowse
             //
             this.btnBrowse.Text = "Browse…";
-            // 15-03/D-01: narrowed and moved left (from x=306,width=78) to make room for
-            // btnClearAppPath at x=314..384 on the same row.
-            this.btnBrowse.Location = new System.Drawing.Point(238, 21);
-            this.btnBrowse.Size = new System.Drawing.Size(70, 25);
+            this.btnBrowse.AutoSize = true;
+            this.btnBrowse.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.btnBrowse.MinimumSize = new System.Drawing.Size(70, 25);
+            this.btnBrowse.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.btnBrowse.Margin = new System.Windows.Forms.Padding(0, 0, 4, 0);
             this.btnBrowse.Name = "btnBrowse";
             // 12-05/THEME-05 (12-REVIEW.md CR-02): FlatStyle.Flat, not .System -- the
             // Windows 11 rig proved FlatStyle.System buttons do NOT pick up dark-mode
@@ -543,12 +596,15 @@ namespace RigToggle.App
             // 15-03/D-01: explicit Clear affordance -- txtAppPath is ReadOnly (see below),
             // so there is no other way for the user to unset a previously-configured app
             // path. Enabled only when a path is currently set (toggled from
-            // PopulateAppPathField/BtnClearAppPath_Click/BtnBrowse_Click/AppPath_DragDrop
-            // in SettingsForm.cs); starts disabled here since the initial state is
-            // resolved on Load from persisted settings.
+            // PopulateAppPathField/BtnClearAppPath_Click/BtnBrowse_Click/the app-path
+            // drag-drop handler in SettingsForm.cs); starts disabled here since the
+            // initial state is resolved on Load from persisted settings.
             this.btnClearAppPath.Text = "Clear";
-            this.btnClearAppPath.Location = new System.Drawing.Point(314, 21);
-            this.btnClearAppPath.Size = new System.Drawing.Size(70, 25);
+            this.btnClearAppPath.AutoSize = true;
+            this.btnClearAppPath.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.btnClearAppPath.MinimumSize = new System.Drawing.Size(70, 25);
+            this.btnClearAppPath.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.btnClearAppPath.Margin = new System.Windows.Forms.Padding(0);
             this.btnClearAppPath.Name = "btnClearAppPath";
             this.btnClearAppPath.Enabled = false;
             // 12-05/THEME-05 (12-REVIEW.md CR-02): FlatStyle.Flat, not .System -- see
@@ -560,28 +616,39 @@ namespace RigToggle.App
             //
             // lblAppWarning
             //
-            this.lblAppWarning.Location = new System.Drawing.Point(12, 48);
-            this.lblAppWarning.Size = new System.Drawing.Size(372, 20);
             this.lblAppWarning.AutoSize = false;
             this.lblAppWarning.Visible = false;
+            this.lblAppWarning.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.lblAppWarning.MinimumSize = new System.Drawing.Size(0, 20);
+            this.lblAppWarning.Margin = new System.Windows.Forms.Padding(0, 4, 0, 0);
             this.lblAppWarning.Name = "lblAppWarning";
 
             //
-            // chkEnableDebugLogging
+            // tlpHotkey (22-02: hotkey caption + field row -- the one shared-section item
+            // that is not a single control. Two-column table: AutoSize caption, Percent
+            // 100F field column.)
             //
-            this.chkEnableDebugLogging.Text = "Enable debug logging (writes to %LOCALAPPDATA%\\RigToggle\\debug.log)";
-            this.chkEnableDebugLogging.Location = new System.Drawing.Point(12, 484);
-            this.chkEnableDebugLogging.Size = new System.Drawing.Size(396, 40);
-            this.chkEnableDebugLogging.AutoSize = false;
-            this.chkEnableDebugLogging.Name = "chkEnableDebugLogging";
+            this.tlpHotkey.ColumnCount = 2;
+            this.tlpHotkey.RowCount = 1;
+            this.tlpHotkey.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpHotkey.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tlpHotkey.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.tlpHotkey.AutoSize = true;
+            this.tlpHotkey.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.tlpHotkey.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+            this.tlpHotkey.Margin = new System.Windows.Forms.Padding(0, 0, 0, 8);
+            this.tlpHotkey.TabIndex = 1;
+            this.tlpHotkey.Name = "tlpHotkey";
+            this.tlpHotkey.Controls.Add(this.lblHotkeyCaption, 0, 0);
+            this.tlpHotkey.Controls.Add(this.txtHotkey, 1, 0);
 
             //
             // lblHotkeyCaption
             //
             this.lblHotkeyCaption.Text = "Hotkey:";
-            this.lblHotkeyCaption.Location = new System.Drawing.Point(12, 532);
-            this.lblHotkeyCaption.Size = new System.Drawing.Size(60, 20);
-            this.lblHotkeyCaption.AutoSize = false;
+            this.lblHotkeyCaption.AutoSize = true;
+            this.lblHotkeyCaption.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.lblHotkeyCaption.Margin = new System.Windows.Forms.Padding(0, 0, 4, 0);
             this.lblHotkeyCaption.Name = "lblHotkeyCaption";
 
             //
@@ -597,79 +664,188 @@ namespace RigToggle.App
             this.txtHotkey.ReadOnly = true;
             this.txtHotkey.TabStop = false;
             this.txtHotkey.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.txtHotkey.Location = new System.Drawing.Point(76, 529);
             this.txtHotkey.Size = new System.Drawing.Size(200, 23);
+            this.txtHotkey.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.txtHotkey.Margin = new System.Windows.Forms.Padding(0, 0, 20, 0);
             this.txtHotkey.Name = "txtHotkey";
 
             //
             // lblHotkeyWarning
             //
-            this.lblHotkeyWarning.Location = new System.Drawing.Point(12, 556);
-            this.lblHotkeyWarning.Size = new System.Drawing.Size(396, 36);
             this.lblHotkeyWarning.AutoSize = false;
             this.lblHotkeyWarning.Visible = false;
+            this.lblHotkeyWarning.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+            this.lblHotkeyWarning.MinimumSize = new System.Drawing.Size(0, 36);
+            this.lblHotkeyWarning.Margin = new System.Windows.Forms.Padding(0, 0, 0, 8);
+            this.lblHotkeyWarning.TabIndex = 2;
             this.lblHotkeyWarning.Name = "lblHotkeyWarning";
+
+            //
+            // chkEnableDebugLogging
+            //
+            this.chkEnableDebugLogging.Text = "Enable debug logging (writes to %LOCALAPPDATA%\\RigToggle\\debug.log)";
+            this.chkEnableDebugLogging.AutoSize = true;
+            this.chkEnableDebugLogging.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.chkEnableDebugLogging.Margin = new System.Windows.Forms.Padding(0, 0, 0, 8);
+            this.chkEnableDebugLogging.TabIndex = 3;
+            this.chkEnableDebugLogging.Name = "chkEnableDebugLogging";
 
             //
             // chkCloseMinimizesToTray
             //
             this.chkCloseMinimizesToTray.Text = "Closing the window (X) minimizes to tray";
-            this.chkCloseMinimizesToTray.Location = new System.Drawing.Point(12, 600);
-            this.chkCloseMinimizesToTray.Size = new System.Drawing.Size(396, 24);
-            this.chkCloseMinimizesToTray.AutoSize = false;
+            this.chkCloseMinimizesToTray.AutoSize = true;
+            this.chkCloseMinimizesToTray.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.chkCloseMinimizesToTray.Margin = new System.Windows.Forms.Padding(0, 0, 0, 8);
+            this.chkCloseMinimizesToTray.TabIndex = 4;
             this.chkCloseMinimizesToTray.Name = "chkCloseMinimizesToTray";
 
             //
             // chkMinimizeToTray
             //
             this.chkMinimizeToTray.Text = "Minimizing the window also sends it to tray";
-            this.chkMinimizeToTray.Location = new System.Drawing.Point(12, 632);
-            this.chkMinimizeToTray.Size = new System.Drawing.Size(396, 24);
-            this.chkMinimizeToTray.AutoSize = false;
+            this.chkMinimizeToTray.AutoSize = true;
+            this.chkMinimizeToTray.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.chkMinimizeToTray.Margin = new System.Windows.Forms.Padding(0, 0, 0, 8);
+            this.chkMinimizeToTray.TabIndex = 5;
             this.chkMinimizeToTray.Name = "chkMinimizeToTray";
 
             //
             // chkStartWithWindows
             //
             this.chkStartWithWindows.Text = "Start with Windows";
-            this.chkStartWithWindows.Location = new System.Drawing.Point(12, 664);
-            this.chkStartWithWindows.Size = new System.Drawing.Size(396, 24);
-            this.chkStartWithWindows.AutoSize = false;
+            this.chkStartWithWindows.AutoSize = true;
+            this.chkStartWithWindows.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            // 20px right Margin reserves room for errAutostart.SetError's icon (T-22-07).
+            this.chkStartWithWindows.Margin = new System.Windows.Forms.Padding(0, 0, 20, 8);
+            this.chkStartWithWindows.TabIndex = 6;
             this.chkStartWithWindows.Name = "chkStartWithWindows";
 
             //
             // lblAutostartWarning
             //
-            this.lblAutostartWarning.Location = new System.Drawing.Point(12, 688);
-            this.lblAutostartWarning.Size = new System.Drawing.Size(396, 20);
             this.lblAutostartWarning.AutoSize = false;
             this.lblAutostartWarning.Visible = false;
+            this.lblAutostartWarning.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+            this.lblAutostartWarning.MinimumSize = new System.Drawing.Size(0, 20);
+            this.lblAutostartWarning.Margin = new System.Windows.Forms.Padding(0, 0, 0, 8);
+            this.lblAutostartWarning.TabIndex = 7;
             this.lblAutostartWarning.Name = "lblAutostartWarning";
+
+            //
+            // pnlThemeReserved (D-04/THEME-09: named, empty, zero-size insertion point
+            // reserved for Phase 23's System/Light/Dark radio group. Phase 22 does NOT
+            // build that control -- no new AppSettings field, no visible child control,
+            // no BorderStyle, no Text. The plain Size = (0, 0) below is deliberate -- a
+            // bare Panel serializes a 200x100 default Size, and stating (0, 0) explicitly
+            // guarantees the slot is zero-size at construction rather than relying solely
+            // on the first AutoSize pass; this is one of only two permitted plain .Size =
+            // assignments left in this file (the other is txtHotkey's Size(200, 23)).
+            // Because it is AutoSize with no children it occupies zero space and is
+            // invisible today; Phase 23 adds its radio group as children and this row
+            // grows on its own with no reflow of anything above it. Deliberately NO
+            // Suspend/Resume pair -- it has no children to batch, see the field
+            // construction comment above.)
+            //
+            this.pnlThemeReserved.AutoSize = true;
+            this.pnlThemeReserved.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.pnlThemeReserved.Size = new System.Drawing.Size(0, 0);
+            this.pnlThemeReserved.Margin = new System.Windows.Forms.Padding(0);
+            this.pnlThemeReserved.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+            this.pnlThemeReserved.TabIndex = 8;
+            this.pnlThemeReserved.Name = "pnlThemeReserved";
+
+            //
+            // pnlSharedSection (D-02/THEME-05: full-width shared settings section --
+            // everything that is not mode-specific (target app path, hotkey capture,
+            // debug logging, and the three tray/autostart checkboxes) lives here as one
+            // flat, bordered stack below the two mode columns. Same THEME-05
+            // flat-bordered-Panel-as-GroupBox pattern as pnlMonitor/pnlMonitorNormal
+            // (Phase 12) -- ThemeApplier/SetColorMode cannot recolor a GroupBox bevel.)
+            //
+            this.pnlSharedSection.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.pnlSharedSection.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pnlSharedSection.AutoSize = true;
+            this.pnlSharedSection.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.pnlSharedSection.Padding = new System.Windows.Forms.Padding(12);
+            this.pnlSharedSection.Margin = new System.Windows.Forms.Padding(0, 0, 0, 16);
+            this.pnlSharedSection.TabIndex = 1;
+            this.pnlSharedSection.Name = "pnlSharedSection";
+            this.pnlSharedSection.Controls.Add(this.flpShared);
+
+            //
+            // flpShared (D-02: one flat top-down stack, no sub-grouping. Add order below
+            // is also the Tab order (Pitfall 5) -- keep add order and each child's
+            // TabIndex in sync. FlowLayoutPanel does not honour Dock on its children
+            // (22-RESEARCH.md Pattern 2) -- every child below uses Anchor, never Dock.)
+            //
+            this.flpShared.FlowDirection = System.Windows.Forms.FlowDirection.TopDown;
+            this.flpShared.WrapContents = false;
+            this.flpShared.AutoSize = true;
+            this.flpShared.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.flpShared.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.flpShared.Margin = new System.Windows.Forms.Padding(0);
+            this.flpShared.Padding = new System.Windows.Forms.Padding(0);
+            this.flpShared.TabIndex = 0;
+            this.flpShared.Name = "flpShared";
+            this.flpShared.Controls.Add(this.pnlAppPath);
+            this.flpShared.Controls.Add(this.tlpHotkey);
+            this.flpShared.Controls.Add(this.lblHotkeyWarning);
+            this.flpShared.Controls.Add(this.chkEnableDebugLogging);
+            this.flpShared.Controls.Add(this.chkCloseMinimizesToTray);
+            this.flpShared.Controls.Add(this.chkMinimizeToTray);
+            this.flpShared.Controls.Add(this.chkStartWithWindows);
+            this.flpShared.Controls.Add(this.lblAutostartWarning);
+            this.flpShared.Controls.Add(this.pnlThemeReserved);
+
+            //
+            // flpButtons (D-05: Save/Discard right-aligned in their own tlpRoot row.
+            // RightToLeft flow lands the first-added child rightmost, so
+            // btnDiscardChanges is added first, then btnSaveSettings -- reproducing
+            // today's left-to-right reading order of Save then Discard, x=180/x=298.)
+            //
+            this.flpButtons.FlowDirection = System.Windows.Forms.FlowDirection.RightToLeft;
+            this.flpButtons.WrapContents = false;
+            this.flpButtons.AutoSize = true;
+            this.flpButtons.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.flpButtons.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.flpButtons.Margin = new System.Windows.Forms.Padding(0);
+            this.flpButtons.Padding = new System.Windows.Forms.Padding(0);
+            this.flpButtons.TabIndex = 2;
+            this.flpButtons.Name = "flpButtons";
+            this.flpButtons.Controls.Add(this.btnDiscardChanges);
+            this.flpButtons.Controls.Add(this.btnSaveSettings);
+
+            //
+            // btnDiscardChanges
+            //
+            this.btnDiscardChanges.Text = "Discard Changes";
+            this.btnDiscardChanges.AutoSize = true;
+            this.btnDiscardChanges.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.btnDiscardChanges.MinimumSize = new System.Drawing.Size(110, 32);
+            this.btnDiscardChanges.Margin = new System.Windows.Forms.Padding(8, 0, 0, 0);
+            this.btnDiscardChanges.TabIndex = 1;
+            this.btnDiscardChanges.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            this.btnDiscardChanges.Name = "btnDiscardChanges";
+            // 12-05/THEME-05 (12-REVIEW.md CR-02): see btnBrowse's comment above for the
+            // full rig-finding + #13897 rationale.
+            this.btnDiscardChanges.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
 
             //
             // btnSaveSettings
             //
             this.btnSaveSettings.Text = "Save Settings";
-            this.btnSaveSettings.Location = new System.Drawing.Point(180, 720);
-            this.btnSaveSettings.Size = new System.Drawing.Size(110, 32);
+            this.btnSaveSettings.AutoSize = true;
+            this.btnSaveSettings.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.btnSaveSettings.MinimumSize = new System.Drawing.Size(110, 32);
+            this.btnSaveSettings.Margin = new System.Windows.Forms.Padding(0);
+            this.btnSaveSettings.TabIndex = 0;
             this.btnSaveSettings.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnSaveSettings.Name = "btnSaveSettings";
             // 12-05/THEME-05 (12-REVIEW.md CR-02): see btnBrowse's comment above for the
             // full rig-finding + #13897 rationale.
             this.btnSaveSettings.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnSaveSettings.Click += new System.EventHandler(this.BtnSaveSettings_Click);
-
-            //
-            // btnDiscardChanges
-            //
-            this.btnDiscardChanges.Text = "Discard Changes";
-            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 720);
-            this.btnDiscardChanges.Size = new System.Drawing.Size(110, 32);
-            this.btnDiscardChanges.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.btnDiscardChanges.Name = "btnDiscardChanges";
-            // 12-05/THEME-05 (12-REVIEW.md CR-02): see btnBrowse's comment above for the
-            // full rig-finding + #13897 rationale.
-            this.btnDiscardChanges.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
 
             //
             // dlgOpenExe
@@ -712,15 +888,28 @@ namespace RigToggle.App
             this.tlpRoot.TabIndex = 0;
             this.tlpRoot.Name = "tlpRoot";
             this.tlpRoot.Controls.Add(this.tlpModeColumns, 0, 0);
+            this.tlpRoot.Controls.Add(this.pnlSharedSection, 0, 1);
+            this.tlpRoot.Controls.Add(this.flpButtons, 0, 2);
 
             //
             // SettingsForm
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(828, 768);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+            // 22-02/D-05: AutoSize sets the initial content-driven size and re-runs when a
+            // child's size or visibility changes (e.g. a lbl*Warning becoming visible) --
+            // it does not fight a user-driven edge drag. GrowAndShrink is explicit because
+            // the default AutoSizeMode is GrowOnly. No Form-level MinimumSize/MaximumSize
+            // is added (Pitfall 2) -- those are the only two properties AutoSize still
+            // respects, and either would silently override this content-driven intent.
+            this.AutoSize = true;
+            this.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
             this.MaximizeBox = false;
+            // MinimizeBox stays false -- not a leftover default. This dialog is shown via
+            // ShowDialog() with ShowInTaskbar = false; minimizing that exact combination
+            // can leave the window unreachable (no taskbar entry to restore from) or close
+            // the dialog outright (22-RESEARCH.md Pitfall 3).
             this.MinimizeBox = false;
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
@@ -728,17 +917,6 @@ namespace RigToggle.App
             this.Name = "SettingsForm";
 
             this.Controls.Add(this.tlpRoot);
-            this.Controls.Add(this.pnlAppPath);
-            this.Controls.Add(this.chkEnableDebugLogging);
-            this.Controls.Add(this.lblHotkeyCaption);
-            this.Controls.Add(this.txtHotkey);
-            this.Controls.Add(this.lblHotkeyWarning);
-            this.Controls.Add(this.chkCloseMinimizesToTray);
-            this.Controls.Add(this.chkMinimizeToTray);
-            this.Controls.Add(this.chkStartWithWindows);
-            this.Controls.Add(this.lblAutostartWarning);
-            this.Controls.Add(this.btnSaveSettings);
-            this.Controls.Add(this.btnDiscardChanges);
 
             ((System.ComponentModel.ISupportInitialize)(this.errMonitor)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.errAudioNormal)).EndInit();
@@ -751,6 +929,17 @@ namespace RigToggle.App
             this.pnlMonitor.ResumeLayout(false);
             this.pnlMonitorNormal.ResumeLayout(false);
             this.pnlAppPath.ResumeLayout(false);
+            this.pnlAppPath.PerformLayout();
+            this.tlpAppPath.ResumeLayout(false);
+            this.tlpAppPath.PerformLayout();
+            this.tlpHotkey.ResumeLayout(false);
+            this.tlpHotkey.PerformLayout();
+            this.flpShared.ResumeLayout(false);
+            this.flpShared.PerformLayout();
+            this.pnlSharedSection.ResumeLayout(false);
+            this.pnlSharedSection.PerformLayout();
+            this.flpButtons.ResumeLayout(false);
+            this.flpButtons.PerformLayout();
             this.tlpAudioRig.ResumeLayout(false);
             this.tlpAudioRig.PerformLayout();
             this.tlpRigColumn.ResumeLayout(false);
@@ -774,6 +963,13 @@ namespace RigToggle.App
         private System.Windows.Forms.TableLayoutPanel tlpAudioNormal;
         private System.Windows.Forms.TableLayoutPanel tlpRigColumn;
         private System.Windows.Forms.TableLayoutPanel tlpAudioRig;
+
+        private System.Windows.Forms.Panel pnlSharedSection;
+        private System.Windows.Forms.FlowLayoutPanel flpShared;
+        private System.Windows.Forms.TableLayoutPanel tlpAppPath;
+        private System.Windows.Forms.TableLayoutPanel tlpHotkey;
+        private System.Windows.Forms.Panel pnlThemeReserved;
+        private System.Windows.Forms.FlowLayoutPanel flpButtons;
 
         private System.Windows.Forms.Panel pnlMonitor;
         private System.Windows.Forms.Label lblMonitorCaption;
