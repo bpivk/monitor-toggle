@@ -155,7 +155,20 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. SettingsForm has no overlapping or crowded controls at its default window size
   2. Each mode's monitor grid, the audio device pickers, the app path control, and the hotkey capture box are visually grouped and consistently spaced
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+**Wave 1**
+
+- [ ] 22-01-PLAN.md — Mode columns: tlpRoot/tlpModeColumns scaffold, both monitor panels rebuilt as TableLayoutPanels, D-01 audio-picker split, pnlAudioDevices dissolved
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 22-02-PLAN.md — Shared full-width section (app path, hotkey, checkboxes, Phase 23 reserved slot), right-aligned button row, content-driven Form.AutoSize + FormBorderStyle.Sizable
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 22-03-PLAN.md — Regression gate, five static audits, and a blocking 17-item rig DPI verification pass at 100%/125%/150% display scale
+
 **UI hint**: yes
 
 ### Phase 23: Manual Light/Dark Override
