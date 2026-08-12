@@ -65,6 +65,9 @@ namespace RigToggle.App
             // no children by design (hard constraint 6), so the bracket would be a no-op.
             this.pnlThemeReserved = new System.Windows.Forms.Panel();
 
+            // 22-02/D-05/D-06: right-aligned Save/Discard button row.
+            this.flpButtons = new System.Windows.Forms.FlowLayoutPanel();
+
             this.pnlMonitor = new System.Windows.Forms.Panel();
             this.lblMonitorCaption = new System.Windows.Forms.Label();
             this.dgvMonitors = new System.Windows.Forms.DataGridView();
@@ -135,6 +138,7 @@ namespace RigToggle.App
             this.tlpHotkey.SuspendLayout();
             this.pnlSharedSection.SuspendLayout();
             this.flpShared.SuspendLayout();
+            this.flpButtons.SuspendLayout();
             this.tlpAudioNormal.SuspendLayout();
             this.tlpNormalColumn.SuspendLayout();
             this.tlpAudioRig.SuspendLayout();
@@ -795,29 +799,53 @@ namespace RigToggle.App
             this.flpShared.Controls.Add(this.pnlThemeReserved);
 
             //
+            // flpButtons (D-05: Save/Discard right-aligned in their own tlpRoot row.
+            // RightToLeft flow lands the first-added child rightmost, so
+            // btnDiscardChanges is added first, then btnSaveSettings -- reproducing
+            // today's left-to-right reading order of Save then Discard, x=180/x=298.)
+            //
+            this.flpButtons.FlowDirection = System.Windows.Forms.FlowDirection.RightToLeft;
+            this.flpButtons.WrapContents = false;
+            this.flpButtons.AutoSize = true;
+            this.flpButtons.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.flpButtons.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.flpButtons.Margin = new System.Windows.Forms.Padding(0);
+            this.flpButtons.Padding = new System.Windows.Forms.Padding(0);
+            this.flpButtons.TabIndex = 2;
+            this.flpButtons.Name = "flpButtons";
+            this.flpButtons.Controls.Add(this.btnDiscardChanges);
+            this.flpButtons.Controls.Add(this.btnSaveSettings);
+
+            //
+            // btnDiscardChanges
+            //
+            this.btnDiscardChanges.Text = "Discard Changes";
+            this.btnDiscardChanges.AutoSize = true;
+            this.btnDiscardChanges.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.btnDiscardChanges.MinimumSize = new System.Drawing.Size(110, 32);
+            this.btnDiscardChanges.Margin = new System.Windows.Forms.Padding(8, 0, 0, 0);
+            this.btnDiscardChanges.TabIndex = 1;
+            this.btnDiscardChanges.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            this.btnDiscardChanges.Name = "btnDiscardChanges";
+            // 12-05/THEME-05 (12-REVIEW.md CR-02): see btnBrowse's comment above for the
+            // full rig-finding + #13897 rationale.
+            this.btnDiscardChanges.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            //
             // btnSaveSettings
             //
             this.btnSaveSettings.Text = "Save Settings";
-            this.btnSaveSettings.Location = new System.Drawing.Point(180, 720);
-            this.btnSaveSettings.Size = new System.Drawing.Size(110, 32);
+            this.btnSaveSettings.AutoSize = true;
+            this.btnSaveSettings.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.btnSaveSettings.MinimumSize = new System.Drawing.Size(110, 32);
+            this.btnSaveSettings.Margin = new System.Windows.Forms.Padding(0);
+            this.btnSaveSettings.TabIndex = 0;
             this.btnSaveSettings.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnSaveSettings.Name = "btnSaveSettings";
             // 12-05/THEME-05 (12-REVIEW.md CR-02): see btnBrowse's comment above for the
             // full rig-finding + #13897 rationale.
             this.btnSaveSettings.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnSaveSettings.Click += new System.EventHandler(this.BtnSaveSettings_Click);
-
-            //
-            // btnDiscardChanges
-            //
-            this.btnDiscardChanges.Text = "Discard Changes";
-            this.btnDiscardChanges.Location = new System.Drawing.Point(298, 720);
-            this.btnDiscardChanges.Size = new System.Drawing.Size(110, 32);
-            this.btnDiscardChanges.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.btnDiscardChanges.Name = "btnDiscardChanges";
-            // 12-05/THEME-05 (12-REVIEW.md CR-02): see btnBrowse's comment above for the
-            // full rig-finding + #13897 rationale.
-            this.btnDiscardChanges.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
 
             //
             // dlgOpenExe
@@ -861,15 +889,27 @@ namespace RigToggle.App
             this.tlpRoot.Name = "tlpRoot";
             this.tlpRoot.Controls.Add(this.tlpModeColumns, 0, 0);
             this.tlpRoot.Controls.Add(this.pnlSharedSection, 0, 1);
+            this.tlpRoot.Controls.Add(this.flpButtons, 0, 2);
 
             //
             // SettingsForm
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(828, 768);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+            // 22-02/D-05: AutoSize sets the initial content-driven size and re-runs when a
+            // child's size or visibility changes (e.g. a lbl*Warning becoming visible) --
+            // it does not fight a user-driven edge drag. GrowAndShrink is explicit because
+            // the default AutoSizeMode is GrowOnly. No Form-level MinimumSize/MaximumSize
+            // is added (Pitfall 2) -- those are the only two properties AutoSize still
+            // respects, and either would silently override this content-driven intent.
+            this.AutoSize = true;
+            this.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
             this.MaximizeBox = false;
+            // MinimizeBox stays false -- not a leftover default. This dialog is shown via
+            // ShowDialog() with ShowInTaskbar = false; minimizing that exact combination
+            // can leave the window unreachable (no taskbar entry to restore from) or close
+            // the dialog outright (22-RESEARCH.md Pitfall 3).
             this.MinimizeBox = false;
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
@@ -877,8 +917,6 @@ namespace RigToggle.App
             this.Name = "SettingsForm";
 
             this.Controls.Add(this.tlpRoot);
-            this.Controls.Add(this.btnSaveSettings);
-            this.Controls.Add(this.btnDiscardChanges);
 
             ((System.ComponentModel.ISupportInitialize)(this.errMonitor)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.errAudioNormal)).EndInit();
@@ -900,6 +938,8 @@ namespace RigToggle.App
             this.flpShared.PerformLayout();
             this.pnlSharedSection.ResumeLayout(false);
             this.pnlSharedSection.PerformLayout();
+            this.flpButtons.ResumeLayout(false);
+            this.flpButtons.PerformLayout();
             this.tlpAudioRig.ResumeLayout(false);
             this.tlpAudioRig.PerformLayout();
             this.tlpRigColumn.ResumeLayout(false);
@@ -929,6 +969,7 @@ namespace RigToggle.App
         private System.Windows.Forms.TableLayoutPanel tlpAppPath;
         private System.Windows.Forms.TableLayoutPanel tlpHotkey;
         private System.Windows.Forms.Panel pnlThemeReserved;
+        private System.Windows.Forms.FlowLayoutPanel flpButtons;
 
         private System.Windows.Forms.Panel pnlMonitor;
         private System.Windows.Forms.Label lblMonitorCaption;
