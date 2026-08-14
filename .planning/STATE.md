@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Modern UI Redesign & Theme Backlog
 status: executing
-stopped_at: Phase 22 UI-SPEC approved
-last_updated: "2026-08-12T06:50:25.154Z"
-last_activity: 2026-08-12 -- Phase 22 execution started
+stopped_at: Phase 22 Plan 03 Task 1 complete (regression gate + 5 static audits, green); Task 2 blocked on real Windows rig hardware
+last_updated: "2026-08-14T21:21:50.392Z"
+last_activity: 2026-08-14 -- Phase 22 Plan 03 Task 1 (regression gate + 5 static audits) complete; Task 2 blocked on real Windows rig hardware
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 14
-  completed_plans: 11
+  completed_plans: 13
   percent: 60
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-08-09)
 ## Current Position
 
 Phase: 22 (settingsform-layout-pass) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 22
-Last activity: 2026-08-12 -- Phase 22 execution started
+Plan: 3 of 3 (Task 1 complete; Task 2 blocked on real Windows rig hardware)
+Status: Executing Phase 22 — blocked, awaiting user rig verification
+Last activity: 2026-08-14 -- Phase 22 Plan 03 Task 1 (regression gate + 5 static audits) complete and committed (7c626f1); Task 2 rig checkpoint cannot be executed in this Linux sandbox
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████░░░░] 60%
 
 ## Performance Metrics
 
@@ -93,7 +93,8 @@ None.
 
 ### Blockers/Concerns
 
-None open. Research flags Phase 21 (accent color, since completed) and the manual-override phase (now Phase 23, was Phase 22 before the 2026-08-11 reorder) as needing deeper research during planning — see `.planning/research/SUMMARY.md` "Research Flags" — no official Microsoft documentation confirms which registry key/API is "the" accent color, and the manual-override/live-theme-follow composition needs careful sequencing relative to the `IsDark` property consolidation.
+- Phase 22 Plan 03 Task 2 (rig-hardware DPI verification at 100%/125%/150% display scale, 17 checks) requires real Windows 11 hardware and cannot be executed in this Linux sandbox. Task 1 (full regression gate + 5 static audits) completed and green (commit 7c626f1). Blocked awaiting the user's reported per-check PASS/FAIL rig results, to be appended to 22-03-SUMMARY.md before Phase 22 can close.
+- Research flags Phase 21 (accent color, since completed) and the manual-override phase (now Phase 23, was Phase 22 before the 2026-08-11 reorder) as needing deeper research during planning — see `.planning/research/SUMMARY.md` "Research Flags" — no official Microsoft documentation confirms which registry key/API is "the" accent color, and the manual-override/live-theme-follow composition needs careful sequencing relative to the `IsDark` property consolidation.
 
 ### Quick Tasks Completed
 
@@ -139,10 +140,11 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-12T06:19:23.266Z
-Stopped at: Phase 22 UI-SPEC approved
-Resume file: .planning/phases/22-settingsform-layout-pass/22-UI-SPEC.md
+Last session: 2026-08-14T21:21:50.373Z
+Stopped at: Phase 22 Plan 03 Task 1 complete (regression gate + 5 static audits, green); Task 2 blocked on real Windows rig hardware
+Resume file: .planning/phases/22-settingsform-layout-pass/22-03-PLAN.md
 
 ## Operator Next Steps
 
-- Run `/gsd:plan-phase 19` to plan the Monitor-Tile Dashboard & MonitorPanelForm Retirement phase
+- On real Windows 11 rig hardware: publish `src/RigToggle.App/RigToggle.App.csproj` (`dotnet publish ... -r win-x64 --self-contained true -p:PublishSingleFile=true`) and work through all 17 numbered checks in `.planning/phases/22-settingsform-layout-pass/22-03-PLAN.md` Task 2's `<how-to-verify>` block at 100%, 125%, and 150% Windows display scale, reporting each as PASS/FAIL
+- Report the per-check results back so `22-03-SUMMARY.md` can be appended with the rig verdict and Phase 22 can close
