@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Modern UI Redesign & Theme Backlog
 status: executing
-stopped_at: Phase 22 Plan 03 complete (both tasks); rig verification FAILED (Check 1 -- monitor grid/audio picker missing from both mode columns; Check 3 -- manual resize broken). Phase 22 requires a gap-closure plan before it can close.
-last_updated: "2026-08-15T19:02:37Z"
-last_activity: 2026-08-15 -- Phase 22 Plan 03 Task 2 rig-hardware result recorded: FAIL on Check 1 and Check 3, remaining 15 checks blocked/not attempted. SETTINGS-01 and SETTINGS-02 both FAIL. Phase 22 NOT complete; gap-closure plan needed.
+stopped_at: Phase 22 Plan 03 complete (both tasks); rig verification FAILED (Check 1 -- grid/audio picker missing; Check 3 -- resize broken). Phase 22 requires a gap-closure plan.
+last_updated: "2026-08-15T20:05:26.778Z"
+last_activity: 2026-08-15 -- Phase 22 planning complete
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 14
-  completed_plans: 13
+  total_plans: 16
+  completed_plans: 14
   percent: 60
 ---
 
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-08-09)
 
 Phase: 22 (settingsform-layout-pass) — RIG VERIFICATION FAILED, GAP CLOSURE NEEDED
 Plan: 3 of 3 (both tasks complete; overall plan result is a FAILED rig verification, not a pass)
-Status: Phase 22 blocked — SETTINGS-01 and SETTINGS-02 both FAIL on real hardware; needs a gap-closure plan (Bug A: manual resize broken; Bug B: monitor grid + audio picker not rendering in either mode column) followed by a fresh rig-verification pass before the phase can close
-Last activity: 2026-08-15 -- Phase 22 Plan 03 Task 1 (regression gate + 5 static audits) complete and committed (7c626f1); Task 2 rig-hardware result recorded (commit a40e173) — FAIL on Check 1 (grid/audio picker missing) and Check 3 (resize broken), remaining checks blocked/not attempted
+Status: Ready to execute
+Last activity: 2026-08-15 -- Phase 22 planning complete
 
 Progress: [██████░░░░] 60%
 
