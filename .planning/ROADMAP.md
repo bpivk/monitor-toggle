@@ -171,7 +171,7 @@ Plans:
 
 **Wave 4** *(gap closure — blocked on Wave 3's recorded failure)*
 
-- [ ] 22-04-PLAN.md — Fix Bug B (mode-column sizing chain: AutoSize on both mode Panels + MinimumSize floor on tlpModeColumns) and Bug A (Form.AutoSize off, replaced by a content-driven OnLoad sizing pass with a MinimumSize floor)
+- [x] 22-04-PLAN.md — Fix Bug B (mode-column sizing chain: AutoSize on both mode Panels + MinimumSize floor on tlpModeColumns) and Bug A (Form.AutoSize off, replaced by a content-driven OnLoad sizing pass with a MinimumSize floor)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -215,7 +215,7 @@ Plans:
 | 19. Monitor-Tile Dashboard & MonitorPanelForm Retirement | v2.1 | 5/5 | Complete   | 2026-08-10 |
 | 20. Custom Toggle-Switch Control | v2.1 | 3/3 | Complete    | 2026-08-10 |
 | 21. Accent-Color Reading & Live Update | v2.1 | 3/3 | Complete    | 2026-08-11 |
-| 22. SettingsForm Layout Pass | v2.1 | 3/3 | Blocked — rig verification FAILED, gap-closure required | - |
+| 22. SettingsForm Layout Pass | v2.1 | 4/5 | In Progress|  |
 | 23. Manual Light/Dark Override | v2.1 | 0/TBD | Not started | - |
 
 ## Backlog
