@@ -74,7 +74,7 @@ Full phase details: `.planning/milestones/v2.0-ROADMAP.md`
 - [x] **Phase 19: Monitor-Tile Dashboard & MonitorPanelForm Retirement** - MainForm becomes a monitor-tile dashboard absorbing the standalone Monitors panel's capability; toggle repositioned below the tiles, Settings de-emphasized (completed 2026-08-10)
 - [x] **Phase 20: Custom Toggle-Switch Control** - The Rig/Normal toggle becomes a custom-drawn track+thumb switch (THEME-08) (completed 2026-08-10)
 - [x] **Phase 21: Accent-Color Reading & Live Update** - Interactive elements pick up the live Windows accent color (THEME-07) (completed 2026-08-11)
-- [ ] **Phase 22: SettingsForm Layout Pass** - SettingsForm's controls are regrouped and respaced, no overlap at default size
+- [ ] **Phase 22: SettingsForm Layout Pass** - SettingsForm's controls are regrouped and respaced, no overlap at default size (BLOCKED — rig verification FAILED 2026-08-15, gap-closure plan required)
 - [ ] **Phase 23: Manual Light/Dark Override** - A System/Light/Dark setting overrides live theme-follow (THEME-09)
 
 ## Phase Details
@@ -167,7 +167,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 22-03-PLAN.md — Regression gate, five static audits, and a blocking 17-item rig DPI verification pass at 100%/125%/150% display scale
+- [x] 22-03-PLAN.md — Regression gate, five static audits, and a blocking 17-item rig DPI verification pass at 100%/125%/150% display scale
 
 **UI hint**: yes
 
@@ -207,7 +207,7 @@ Plans:
 | 19. Monitor-Tile Dashboard & MonitorPanelForm Retirement | v2.1 | 5/5 | Complete   | 2026-08-10 |
 | 20. Custom Toggle-Switch Control | v2.1 | 3/3 | Complete    | 2026-08-10 |
 | 21. Accent-Color Reading & Live Update | v2.1 | 3/3 | Complete    | 2026-08-11 |
-| 22. SettingsForm Layout Pass | v2.1 | 2/3 | In Progress|  |
+| 22. SettingsForm Layout Pass | v2.1 | 3/3 | Blocked — rig verification FAILED, gap-closure required | - |
 | 23. Manual Light/Dark Override | v2.1 | 0/TBD | Not started | - |
 
 ## Backlog

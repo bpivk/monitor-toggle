@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Modern UI Redesign & Theme Backlog
 status: executing
-stopped_at: Phase 22 Plan 03 Task 1 complete (regression gate + 5 static audits, green); Task 2 blocked on real Windows rig hardware
-last_updated: "2026-08-14T21:21:50.392Z"
-last_activity: 2026-08-14 -- Phase 22 Plan 03 Task 1 (regression gate + 5 static audits) complete; Task 2 blocked on real Windows rig hardware
+stopped_at: Phase 22 Plan 03 complete (both tasks); rig verification FAILED (Check 1 -- monitor grid/audio picker missing from both mode columns; Check 3 -- manual resize broken). Phase 22 requires a gap-closure plan before it can close.
+last_updated: "2026-08-15T19:02:37Z"
+last_activity: 2026-08-15 -- Phase 22 Plan 03 Task 2 rig-hardware result recorded: FAIL on Check 1 and Check 3, remaining 15 checks blocked/not attempted. SETTINGS-01 and SETTINGS-02 both FAIL. Phase 22 NOT complete; gap-closure plan needed.
 progress:
   total_phases: 5
   completed_phases: 3
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-08-09)
 
 ## Current Position
 
-Phase: 22 (settingsform-layout-pass) — EXECUTING
-Plan: 3 of 3 (Task 1 complete; Task 2 blocked on real Windows rig hardware)
-Status: Executing Phase 22 — blocked, awaiting user rig verification
-Last activity: 2026-08-14 -- Phase 22 Plan 03 Task 1 (regression gate + 5 static audits) complete and committed (7c626f1); Task 2 rig checkpoint cannot be executed in this Linux sandbox
+Phase: 22 (settingsform-layout-pass) — RIG VERIFICATION FAILED, GAP CLOSURE NEEDED
+Plan: 3 of 3 (both tasks complete; overall plan result is a FAILED rig verification, not a pass)
+Status: Phase 22 blocked — SETTINGS-01 and SETTINGS-02 both FAIL on real hardware; needs a gap-closure plan (Bug A: manual resize broken; Bug B: monitor grid + audio picker not rendering in either mode column) followed by a fresh rig-verification pass before the phase can close
+Last activity: 2026-08-15 -- Phase 22 Plan 03 Task 1 (regression gate + 5 static audits) complete and committed (7c626f1); Task 2 rig-hardware result recorded (commit a40e173) — FAIL on Check 1 (grid/audio picker missing) and Check 3 (resize broken), remaining checks blocked/not attempted
 
 Progress: [██████░░░░] 60%
 
@@ -93,7 +93,7 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 22 Plan 03 Task 2 (rig-hardware DPI verification at 100%/125%/150% display scale, 17 checks) requires real Windows 11 hardware and cannot be executed in this Linux sandbox. Task 1 (full regression gate + 5 static audits) completed and green (commit 7c626f1). Blocked awaiting the user's reported per-check PASS/FAIL rig results, to be appended to 22-03-SUMMARY.md before Phase 22 can close.
+- Phase 22 rig verification FAILED (2026-08-15, recorded in `22-03-SUMMARY.md`, commit a40e173). User tested the published binary on real Windows hardware and reported: Check 1 FAIL (both the monitor `DataGridView` and the audio device `ComboBox` are entirely absent from both the Normal and Rig mode columns — only captions/explain text render), and Check 3 FAIL (dragging the window's edge to resize shows a flickering preview but the window never actually resizes). Testing stopped there rather than continuing checks 2/4-17 against an already-broken 100%-scale layout. Both SETTINGS-01 and SETTINGS-02 are recorded FAIL. Two unconfirmed root-cause hypotheses are recorded in the SUMMARY for gap-closure research: (A) `Form.AutoSize=true` + `FormBorderStyle.Sizable` fighting the user's manual resize; (B, leading hypothesis) a `Percent 100F` `TableLayoutPanel` row (hosting the grid) nested inside an `AutoSize=true` container (`tlpNormalColumn`/`tlpRigColumn`, and the same pattern repeats at `tlpModeColumns` and `tlpRoot`) — a circular sizing dependency WinForms is known to resolve by collapsing the percent row to zero height. Neither hypothesis was fixed or applied — this verification plan made no source change (hard constraint 1). **Phase 22 needs a gap-closure plan** (fix both bugs, most likely in `SettingsForm.Designer.cs`) followed by a fresh rig-verification pass before it can close.
 - Research flags Phase 21 (accent color, since completed) and the manual-override phase (now Phase 23, was Phase 22 before the 2026-08-11 reorder) as needing deeper research during planning — see `.planning/research/SUMMARY.md` "Research Flags" — no official Microsoft documentation confirms which registry key/API is "the" accent color, and the manual-override/live-theme-follow composition needs careful sequencing relative to the `IsDark` property consolidation.
 
 ### Quick Tasks Completed
@@ -140,11 +140,11 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-14T21:21:50.373Z
-Stopped at: Phase 22 Plan 03 Task 1 complete (regression gate + 5 static audits, green); Task 2 blocked on real Windows rig hardware
-Resume file: .planning/phases/22-settingsform-layout-pass/22-03-PLAN.md
+Last session: 2026-08-15T19:02:37Z
+Stopped at: Phase 22 Plan 03 complete (both tasks); rig verification FAILED (Check 1 -- grid/audio picker missing; Check 3 -- resize broken). Phase 22 requires a gap-closure plan.
+Resume file: .planning/phases/22-settingsform-layout-pass/22-03-SUMMARY.md
 
 ## Operator Next Steps
 
-- On real Windows 11 rig hardware: publish `src/RigToggle.App/RigToggle.App.csproj` (`dotnet publish ... -r win-x64 --self-contained true -p:PublishSingleFile=true`) and work through all 17 numbered checks in `.planning/phases/22-settingsform-layout-pass/22-03-PLAN.md` Task 2's `<how-to-verify>` block at 100%, 125%, and 150% Windows display scale, reporting each as PASS/FAIL
-- Report the per-check results back so `22-03-SUMMARY.md` can be appended with the rig verdict and Phase 22 can close
+- Plan and execute a gap-closure plan for Phase 22 addressing two confirmed rig defects: (1) the monitor `DataGridView` and audio device `ComboBox` do not render in either the Normal or Rig mode column (leading hypothesis: `Percent 100F` row nested inside an `AutoSize=true` `TableLayoutPanel` collapses to zero height — see `22-03-SUMMARY.md` Hypothesis 2 for the three-level nesting detail), and (2) manual window resize does not work (leading hypothesis: `Form.AutoSize=true` fighting `FormBorderStyle.Sizable` — see `22-03-SUMMARY.md` Hypothesis 1). Both hypotheses are unconfirmed and need research/verification before a fix is committed.
+- After the gap-closure fix, publish a fresh rig binary and re-run the full 17-check list in `.planning/phases/22-settingsform-layout-pass/22-03-PLAN.md` Task 2's `<how-to-verify>` block at 100%, 125%, and 150% Windows display scale — this time starting from Check 1 again since nothing past Check 3 was actually exercised.
