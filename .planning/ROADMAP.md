@@ -74,7 +74,7 @@ Full phase details: `.planning/milestones/v2.0-ROADMAP.md`
 - [x] **Phase 19: Monitor-Tile Dashboard & MonitorPanelForm Retirement** - MainForm becomes a monitor-tile dashboard absorbing the standalone Monitors panel's capability; toggle repositioned below the tiles, Settings de-emphasized (completed 2026-08-10)
 - [x] **Phase 20: Custom Toggle-Switch Control** - The Rig/Normal toggle becomes a custom-drawn track+thumb switch (THEME-08) (completed 2026-08-10)
 - [x] **Phase 21: Accent-Color Reading & Live Update** - Interactive elements pick up the live Windows accent color (THEME-07) (completed 2026-08-11)
-- [ ] **Phase 22: SettingsForm Layout Pass** - SettingsForm's controls are regrouped and respaced, no overlap at default size (BLOCKED — rig verification FAILED 2026-08-15, gap-closure plan required)
+- [ ] **Phase 22: SettingsForm Layout Pass** - SettingsForm's controls are regrouped and respaced, no overlap at default size (gap-closure plans 22-04/22-05 planned 2026-08-15; awaiting fix + rig re-verification)
 - [ ] **Phase 23: Manual Light/Dark Override** - A System/Light/Dark setting overrides live theme-follow (THEME-09)
 
 ## Phase Details
@@ -155,7 +155,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. SettingsForm has no overlapping or crowded controls at its default window size
   2. Each mode's monitor grid, the audio device pickers, the app path control, and the hotkey capture box are visually grouped and consistently spaced
-**Plans**: 3 plans
+**Plans**: 5 plans (3 original + 2 gap-closure after the 2026-08-15 rig failure)
 Plans:
 **Wave 1**
 
@@ -167,7 +167,15 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [x] 22-03-PLAN.md — Regression gate, five static audits, and a blocking 17-item rig DPI verification pass at 100%/125%/150% display scale
+- [x] 22-03-PLAN.md — Regression gate, five static audits, and a blocking 17-item rig DPI verification pass at 100%/125%/150% display scale — rig result FAILED (Check 1 grid/audio picker missing, Check 3 resize dead)
+
+**Wave 4** *(gap closure — blocked on Wave 3's recorded failure)*
+
+- [ ] 22-04-PLAN.md — Fix Bug B (mode-column sizing chain: AutoSize on both mode Panels + MinimumSize floor on tlpModeColumns) and Bug A (Form.AutoSize off, replaced by a content-driven OnLoad sizing pass with a MinimumSize floor)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 22-05-PLAN.md — Blocking rig re-verification: Checks 1 and 3 first (the two recorded gaps), then the 14 checks never reached, at 100%/125%/150% display scale
 
 **UI hint**: yes
 
