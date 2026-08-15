@@ -122,6 +122,69 @@ namespace RigToggle.App
             txtHotkey.LostFocus += TxtHotkey_LostFocus;
         }
 
+        // 22-04 gap closure: Form.AutoSize was the mechanism producing D-05's
+        // content-driven initial size, but the rig's Check 3 showed AutoSize also
+        // fights a user-driven edge drag (resize preview flickers, then nothing
+        // resizes -- SettingsForm.Designer.cs's SettingsForm block has the full
+        // explanation). Disabling Form.AutoSize to fix that leaves the window at the
+        // 300x300 Form default unless something else sets it; the only Designer-side
+        // alternative is a hardcoded ClientSize, which D-05 forbids and which the
+        // 22-01/22-02 TableLayoutPanel migration deliberately deleted. This override
+        // is the sole reason SettingsForm.cs is touched by Phase 22 at all -- every
+        // prior plan in this phase held this file byte-identical to the phase base
+        // commit 0c1234f; that invariant is deliberately broken here per this plan's
+        // hard constraint 3.
+        //
+        // OnLoad, not OnShown: StartPosition.CenterParent is applied when the window
+        // becomes visible, which happens after OnLoad runs -- sizing here still lets
+        // CenterParent center the final size. Sizing in OnShown would leave the
+        // window visibly off-center (it would already have been centered at its
+        // stale pre-resize size).
+        //
+        // base.OnLoad(e) must run first: it raises the Load event that runs
+        // SettingsForm_Load, which populates both monitor grids and both audio
+        // pickers, and it is also the point at which AutoScaleMode.Font scaling has
+        // been applied. Measuring before it would measure empty grids at 100% scale.
+        protected override void OnLoad(System.EventArgs e)
+        {
+            base.OnLoad(e);
+
+            // Reflect the just-populated content rather than a stale layout cache.
+            tlpRoot.PerformLayout();
+
+            // tlpRoot.PreferredSize already includes tlpRoot's own 16px Padding, so
+            // it is exactly the ClientSize the window wants.
+            var preferredSize = tlpRoot.PreferredSize;
+
+            // Clamp to the working area so a content-driven size at 150% display
+            // scale cannot overshoot the screen (rig Check 15, threat T-22-16) --
+            // this is the one place a screen-derived bound is allowed to override
+            // the content-driven figure, since an unreachable window is worse than
+            // a clipped one the user can still resize.
+            var workingArea = Screen.FromControl(this).WorkingArea;
+            var targetWidth = System.Math.Min(preferredSize.Width, workingArea.Width);
+            var targetHeight = System.Math.Min(preferredSize.Height, workingArea.Height);
+            this.ClientSize = new System.Drawing.Size(targetWidth, targetHeight);
+
+            // Read Size (the outer window size including chrome) *after* setting
+            // ClientSize, so the floor is expressed in the same coordinate space the
+            // user drags in. Rig Check 3(c) requires that shrinking stops rather
+            // than clips; with Form.AutoSize gone, this MinimumSize is what enforces
+            // that. 22-RESEARCH.md Pitfall 2's warning about MinimumSize applied to
+            // the AutoSize-on case ("MinimumSize/MaximumSize are respected but Size
+            // is ignored") does not apply here: AutoSize is off, and this floor is
+            // derived from measured content rather than a hand-picked constant, so
+            // D-05's content-driven intent is preserved, not overridden.
+            //
+            // Known, accepted residual: because the window no longer grows itself
+            // after this point, a warning label becoming visible later (e.g. a
+            // validation error) adds content the fixed window must absorb -- the
+            // shared section's AutoSize rows grow and tlpRoot's Percent row 0 gives
+            // way, floored by the grids' own MinimumSize. Rig Checks 7 and 9 in Plan
+            // 05 are what test this; the user can always drag the window larger.
+            this.MinimumSize = this.Size;
+        }
+
         // 12-03/THEME-04: single source of truth for "is dark mode active right now,"
         // read fresh every call (never cached) so it's always correct across live flips
         // -- consumed by ThemeApplier calls at Load and inside OnThemeChanged.

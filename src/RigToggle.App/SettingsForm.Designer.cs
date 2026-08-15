@@ -153,11 +153,21 @@ namespace RigToggle.App
             // border. 22-01/D-03: migrated off fixed Location/Size onto Dock=Fill inside
             // tlpModeColumns, mirroring pnlMonitorNormal's Task 1 migration. Margin is
             // zero here -- the 12px inter-column gap is contributed entirely by
-            // pnlMonitorNormal's right Margin, not doubled up on this side.)
+            // pnlMonitorNormal's right Margin, not doubled up on this side.
+            // 22-04 gap closure: this was one of only two container Panels in this
+            // file that never set AutoSize (pnlSharedSection and pnlAppPath both do).
+            // Its sole child, tlpRigColumn, is Dock=Fill, which contributes nothing to
+            // a DefaultLayout container's own extent -- so without AutoSize this panel
+            // reported the default Panel size (200x100) to its tlpModeColumns cell
+            // instead of its measured content, matching the rig's Check 1 symptom
+            // exactly (caption and explain visible, everything from the grid row down
+            // clipped). AutoSize added so it measures its content instead.)
             //
             this.pnlMonitor.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.pnlMonitor.Name = "pnlMonitor";
             this.pnlMonitor.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pnlMonitor.AutoSize = true;
+            this.pnlMonitor.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.pnlMonitor.Padding = new System.Windows.Forms.Padding(12);
             this.pnlMonitor.Margin = new System.Windows.Forms.Padding(0);
             this.pnlMonitor.TabIndex = 1;
@@ -327,6 +337,28 @@ namespace RigToggle.App
             this.tlpModeColumns.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.tlpModeColumns.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tlpModeColumns.Margin = new System.Windows.Forms.Padding(0, 0, 0, 16);
+            // 22-04 gap closure: this MinimumSize is a deliberately mechanism-independent
+            // backstop for the rig's Check 1 collapse (both mode columns showed only
+            // caption + explain, with grid/warning/audio/audio-warning entirely absent).
+            // Control.GetPreferredSize clamps its result to MinimumSize on the way up the
+            // layout pass and Control.SetBoundsCore clamps to it on the way down, so this
+            // row gets a real height in both directions regardless of which mechanism
+            // caused the collapse -- whether it was the pnlMonitor*/pnlMonitorNormal
+            // AutoSize fix above, the Percent-100F grid row, or something neither of us
+            // identified.
+            // Height arithmetic at 100% scale, per mode column: caption ~19 + 4 margin =
+            // 23; explain 50 floor + 8 margin = 58; grid 120 floor + 8 margin = 128;
+            // monitor warning 0 (hidden); audio row ~23 combo + 4 margin = 27; audio
+            // warning 0 (hidden). Content ~236, plus the wrapper's 12px top/bottom
+            // padding (24) and 1px FixedSingle border top/bottom (2) ~262, rounded up to
+            // 280 for slack.
+            // Width is deliberately 0 -- no horizontal floor -- so the two Percent 50F
+            // columns stay free to split whatever width the window has.
+            // DPI-safe: Control.ScaleControl scales MinimumSize alongside Size under
+            // AutoScaleMode.Font, so this 100%-scale figure scales itself at 125%/150%.
+            // Satisfies 22-RESEARCH.md Pitfall 2's condition that any MinimumSize added
+            // to this form be documented with its reason.
+            this.tlpModeColumns.MinimumSize = new System.Drawing.Size(0, 280);
             this.tlpModeColumns.TabIndex = 0;
             this.tlpModeColumns.Name = "tlpModeColumns";
             this.tlpModeColumns.Controls.Add(this.pnlMonitorNormal, 0, 0);
@@ -338,11 +370,21 @@ namespace RigToggle.App
             // Dock=Fill inside tlpModeColumns; content Padding now derives its own
             // inset instead of the old 60px top reservation, since the caption/
             // explain stack is now a table row, not an absolutely positioned
-            // overlay -- 22-UI-SPEC.md Spacing exception 3.)
+            // overlay -- 22-UI-SPEC.md Spacing exception 3.
+            // 22-04 gap closure: this was one of only two container Panels in this
+            // file that never set AutoSize (pnlSharedSection and pnlAppPath both do).
+            // Its sole child, tlpNormalColumn, is Dock=Fill, which contributes nothing
+            // to a DefaultLayout container's own extent -- so without AutoSize this
+            // panel reported the default Panel size (200x100) to its tlpModeColumns
+            // cell instead of its measured content, matching the rig's Check 1 symptom
+            // exactly (caption and explain visible, everything from the grid row down
+            // clipped). AutoSize added so it measures its content instead.)
             //
             this.pnlMonitorNormal.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.pnlMonitorNormal.Name = "pnlMonitorNormal";
             this.pnlMonitorNormal.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pnlMonitorNormal.AutoSize = true;
+            this.pnlMonitorNormal.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.pnlMonitorNormal.Padding = new System.Windows.Forms.Padding(12);
             this.pnlMonitorNormal.Margin = new System.Windows.Forms.Padding(0, 0, 12, 0);
             this.pnlMonitorNormal.TabIndex = 0;
@@ -896,14 +938,22 @@ namespace RigToggle.App
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            // 22-02/D-05: AutoSize sets the initial content-driven size and re-runs when a
-            // child's size or visibility changes (e.g. a lbl*Warning becoming visible) --
-            // it does not fight a user-driven edge drag. GrowAndShrink is explicit because
-            // the default AutoSizeMode is GrowOnly. No Form-level MinimumSize/MaximumSize
-            // is added (Pitfall 2) -- those are the only two properties AutoSize still
-            // respects, and either would silently override this content-driven intent.
-            this.AutoSize = true;
-            this.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            // 22-02/D-05's original comment here claimed AutoSize "does not fight a
+            // user-driven edge drag." The rig's Check 3 disproved that: dragging the
+            // window's edge showed a flickering resize preview that then vanished, with
+            // no actual resize. A Form with AutoSize on rewrites its own bounds to its
+            // computed preferred size on every layout pass, and a user's edge drag
+            // (WM_SIZING/WM_SIZE) triggers exactly such a pass -- the drag is immediately
+            // overwritten. 22-04 gap closure disables AutoSize at the Form level only
+            // (this is the remedy 22-03-PLAN.md Task 2 pre-authorised: "disabling
+            // Form.AutoSize after first show, keeping the container AutoSize intact").
+            // tlpRoot and every container below it keep their own AutoSize/AutoSizeMode
+            // exactly as they were -- only this Form-level property is turned off.
+            // D-05's content-driven initial size is no longer produced by this property;
+            // it is now computed explicitly by SettingsForm.cs's OnLoad override, which
+            // reads tlpRoot.PreferredSize once at load time and applies it to the
+            // window's client area.
+            this.AutoSize = false;
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
             this.MaximizeBox = false;
             // MinimizeBox stays false -- not a leftover default. This dialog is shown via
