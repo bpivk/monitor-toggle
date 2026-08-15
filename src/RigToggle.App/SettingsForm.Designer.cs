@@ -938,14 +938,22 @@ namespace RigToggle.App
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            // 22-02/D-05: AutoSize sets the initial content-driven size and re-runs when a
-            // child's size or visibility changes (e.g. a lbl*Warning becoming visible) --
-            // it does not fight a user-driven edge drag. GrowAndShrink is explicit because
-            // the default AutoSizeMode is GrowOnly. No Form-level MinimumSize/MaximumSize
-            // is added (Pitfall 2) -- those are the only two properties AutoSize still
-            // respects, and either would silently override this content-driven intent.
-            this.AutoSize = true;
-            this.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            // 22-02/D-05's original comment here claimed AutoSize "does not fight a
+            // user-driven edge drag." The rig's Check 3 disproved that: dragging the
+            // window's edge showed a flickering resize preview that then vanished, with
+            // no actual resize. A Form with AutoSize on rewrites its own bounds to its
+            // computed preferred size on every layout pass, and a user's edge drag
+            // (WM_SIZING/WM_SIZE) triggers exactly such a pass -- the drag is immediately
+            // overwritten. 22-04 gap closure disables AutoSize at the Form level only
+            // (this is the remedy 22-03-PLAN.md Task 2 pre-authorised: "disabling
+            // Form.AutoSize after first show, keeping the container AutoSize intact").
+            // tlpRoot and every container below it keep their own AutoSize/AutoSizeMode
+            // exactly as they were -- only this Form-level property is turned off.
+            // D-05's content-driven initial size is no longer produced by this property;
+            // it is now computed explicitly by SettingsForm.cs's OnLoad override, which
+            // reads tlpRoot.PreferredSize once at load time and applies it to the
+            // window's client area.
+            this.AutoSize = false;
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
             this.MaximizeBox = false;
             // MinimizeBox stays false -- not a leftover default. This dialog is shown via
