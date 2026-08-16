@@ -26,8 +26,8 @@ Requirements for the v2.1 milestone (Modern UI Redesign & Theme Backlog). Each m
 
 ### Settings Layout
 
-- [ ] **SETTINGS-01**: SettingsForm has no overlapping or crowded controls at its default window size
-- [ ] **SETTINGS-02**: Related controls (each mode's monitor grid, audio device pickers, app path, hotkey capture) are visually grouped and consistently spaced
+- [x] **SETTINGS-01**: SettingsForm has no overlapping or crowded controls at its default window size
+- [x] **SETTINGS-02**: Related controls (each mode's monitor grid, audio device pickers, app path, hotkey capture) are visually grouped and consistently spaced
 
 ### Theme
 
