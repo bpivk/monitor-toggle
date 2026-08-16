@@ -228,7 +228,10 @@ namespace RigToggle.App
 
             try
             {
-                System.Windows.Forms.Application.SetColorMode(System.Windows.Forms.SystemColorMode.System);
+                // THEME-09/Task 2: derived from the effective theme rather than always
+                // following the OS, so a live Windows flip can't drag this dialog's
+                // native controls away from a locked override.
+                ThemeApplier.ApplyEffectiveColorMode(IsDarkTheme);
                 DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDarkTheme);
                 ThemeApplier.ThemeMonitorGrid(dgvMonitors, IsDarkTheme);
                 ThemeApplier.ThemeMonitorGrid(dgvMonitorsNormal, IsDarkTheme);
@@ -268,6 +271,10 @@ namespace RigToggle.App
         {
             // Re-enumerate on every open — no manual Refresh control exists (D-11).
             _settings = _settingsStore.Load();
+            // THEME-09/Task 2: applied first, before the grid theming below, so a
+            // dialog opened while an override is active starts in the right mode
+            // rather than waiting for a theme event.
+            ThemeApplier.ApplyEffectiveColorMode(IsDarkTheme);
             PopulateMonitorGrid();
             PopulateMonitorGridNormal();
             ThemeApplier.ThemeMonitorGrid(dgvMonitors, IsDarkTheme);

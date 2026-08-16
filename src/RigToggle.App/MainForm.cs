@@ -178,12 +178,15 @@ namespace RigToggle.App
 
             try
             {
-                System.Windows.Forms.Application.SetColorMode(System.Windows.Forms.SystemColorMode.System);
                 DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDark);
                 ThemeApplier.ThemeButton(btnSettings, IsDark);
                 // 19-RESEARCH.md Pitfall 1: this call site and InitializeTrayState()
                 // below must stay in lockstep -- adding a new control to only one of
                 // them is the Phase 12 bug this codebase already shipped twice.
+                // THEME-09/D-04: the application color mode itself is now applied from
+                // inside the shared dashboard-theming helper's first statement instead
+                // of here directly, so both this call site and InitializeTrayState()
+                // stay override-aware without a second, driftable call site.
                 ApplyDashboardTheming();
                 Refresh();
             }
@@ -1038,9 +1041,22 @@ namespace RigToggle.App
         /// this single helper, rather than adding two direct calls in OnThemeChanged
         /// and InitializeTrayState(), is what makes the two call sites structurally
         /// unable to drift (the bug class this codebase shipped twice in Phase 12).
+        ///
+        /// THEME-09/Task 2: the application color mode (ApplyEffectiveColorMode) and
+        /// this form's own surface color (ThemeFormSurface) are both applied as the
+        /// first statements here too, for the same reason -- routing them through this
+        /// one shared helper is what makes InitializeTrayState()'s `--tray` startup
+        /// path (which never runs OnThemeChanged) also correctly reflect a locked
+        /// override, not just live OS follow. MainForm is the only form themed this
+        /// way because it is the app's single long-lived window; SettingsForm and
+        /// MonitorConfirmDialog are constructed fresh per open and get correct native
+        /// coloring from the color mode already in force at construction time.
         /// </summary>
         private void ApplyDashboardTheming()
         {
+            ThemeApplier.ApplyEffectiveColorMode(IsDark);
+            ThemeApplier.ThemeFormSurface(this, IsDark);
+
             foreach (MonitorTile tile in _tiles)
             {
                 ThemeApplier.ThemeMonitorTile(tile, IsDark, AccentColor);

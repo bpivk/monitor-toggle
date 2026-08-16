@@ -45,6 +45,11 @@ namespace RigToggle.App
             _themeProvider.ThemeChanged += OnThemeChanged;
             this.FormClosed += (_, _) => _themeProvider.ThemeChanged -= OnThemeChanged;
 
+            // THEME-09/Task 2/D-05: this dialog reads the resolver fresh each time it
+            // opens, so the application color mode is pinned here too, immediately
+            // before the DWM chrome call below.
+            ThemeApplier.ApplyEffectiveColorMode(IsDark);
+
             // 12-02/THEME-06: this dialog is always shown immediately via ShowDialog
             // (never hidden-tray-started like MainForm), so no --tray-safe timing
             // concern applies -- applying DWM chrome right here, post-InitializeComponent
@@ -76,7 +81,7 @@ namespace RigToggle.App
 
             try
             {
-                System.Windows.Forms.Application.SetColorMode(System.Windows.Forms.SystemColorMode.System);
+                ThemeApplier.ApplyEffectiveColorMode(IsDark);
                 DwmTitleBar.ApplyRoundedCornersAndMica(Handle, IsDark);
                 ThemeApplier.ThemeButton(btnContinue, IsDark);
                 ThemeApplier.ThemeButton(btnCancel, IsDark);

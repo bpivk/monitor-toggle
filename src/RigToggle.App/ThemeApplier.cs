@@ -298,5 +298,53 @@ namespace RigToggle.App
                 // Cosmetic-only — leave the control unchanged on failure.
             }
         }
+
+        /// <summary>
+        /// THEME-09/Task 2: pins the process-wide application color mode to the
+        /// effective theme (preview ?? persisted override ?? live OS signal) instead
+        /// of leaving it to always track the OS. With the mode pinned, a live Windows
+        /// flip cannot drag native controls (form background, labels, checkboxes,
+        /// radio buttons) away from a locked override -- Pitfall 6's leak expressed
+        /// through a fourth resolution point the original research never enumerated
+        /// (Application.SetColorMode itself). OS-follow is preserved for the
+        /// no-override case: WindowsThemeProvider still raises on every genuine OS
+        /// flip, and every call site below re-invokes this helper with the freshly
+        /// resolved effective value, so an un-overridden app still follows Windows
+        /// exactly as it does today.
+        /// </summary>
+        public static void ApplyEffectiveColorMode(bool dark)
+        {
+            try
+            {
+                Application.SetColorMode(dark ? SystemColorMode.Dark : SystemColorMode.Classic);
+            }
+            catch
+            {
+                // Cosmetic-only — leave the process color mode unchanged on failure.
+            }
+        }
+
+        /// <summary>
+        /// THEME-09/Task 2: themes only <paramref name="form"/>'s own BackColor --
+        /// the same two literals ThemeMonitorTile/ThemeToggleSwitch already use for
+        /// their own backgrounds, so the form surface is guaranteed to match the
+        /// controls sitting on it. Deliberately does not set ForeColor and does not
+        /// walk the control tree (this class's own "not a recursive Controls-tree
+        /// walk" rule, see class doc comment) -- only MainForm calls this, since it
+        /// is the app's single long-lived window; SettingsForm/MonitorConfirmDialog
+        /// are constructed fresh per open and pick up correct native coloring from
+        /// the color mode already in force at construction time.
+        /// </summary>
+        public static void ThemeFormSurface(Form form, bool dark)
+        {
+            try
+            {
+                form.BackColor = dark ? Color.FromArgb(32, 32, 32) : SystemColors.Control;
+            }
+            catch
+            {
+                // Cosmetic-only — leave the form's surface color unchanged on failure.
+            }
+        }
     }
 }

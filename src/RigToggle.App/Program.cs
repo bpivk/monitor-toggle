@@ -133,6 +133,14 @@ namespace RigToggle.App
             // RefreshOverride as method-group arguments from this same local.
             var themeProvider = new OverridableThemeProvider(innerThemeProvider, settingsStore);
 
+            // THEME-09/Task 2: pins the process-wide application color mode to the
+            // effective theme immediately -- prevents a startup flash of OS-themed
+            // native controls when a Light or Dark override is persisted and Windows
+            // is currently on the other theme. Still safely before any Form or
+            // control is constructed (Pitfall 1's actual constraint) -- mainForm
+            // below is the first one.
+            ThemeApplier.ApplyEffectiveColorMode(themeProvider.CurrentTheme == AppTheme.Dark);
+
             var toggleService = new ToggleService(
                 settingsStore,
                 modeStore,
