@@ -1,7 +1,7 @@
 ---
 phase: 23
 slug: manual-light-dark-override
-status: draft
+status: verified
 shadcn_initialized: false
 preset: none
 created: 2026-08-16
@@ -30,6 +30,8 @@ than left blank, per the researcher's "be prescriptive, not exploratory" mandate
 | Component library | none — plain `System.Windows.Forms.RadioButton` instances, themed the same way every existing `CheckBox`/`Label` in `SettingsForm` already is (see Color) |
 | Icon library | not applicable — this phase introduces zero new icons/glyphs |
 | Font | Segoe UI, 9pt (inherited Form default; `AutoScaleMode.Font`, `AutoScaleDimensions(7F, 15F)` per `SettingsForm.Designer.cs` line 939). No `Font` property is set on any existing label/checkbox in `flpShared`, and this phase's new controls follow the same inherit-don't-override convention — confirmed by direct read of `SettingsForm.Designer.cs`. |
+
+**Visual hierarchy (checker D2 follow-up):** The "Theme:" caption + radio group carries **no special visual emphasis** relative to its sibling fields in `flpShared` (Target App path, Hotkey capture, debug-logging checkbox, tray/autostart checkboxes) — same flat unlabeled-stack treatment (Phase 22 D-02), no bold caption, no distinguishing border, no larger font. It is one more row in the shared section, not a focal point.
 
 ---
 
@@ -168,18 +170,28 @@ here as the concrete visual/interaction contract the executor implements against
 > long-text). Empty-state and error-state COPY live in `## Copywriting Contract` above.
 
 Element classified: `theme-override-radio-group` — "System/Light/Dark radio group filling
-Phase 22's reserved `pnlThemeReserved` slot" — kind: `interactive-control`.
+Phase 22's reserved `pnlThemeReserved` slot" — engine-detected kinds (compiled
+`ui-consideration-probe.cjs`, re-run at Step 9.5 against the authoritative engine rather than
+trusted from research-time authoring): **`form` + `static-content`** — the word "radio" trips
+the `form` cue (shared with genuine data-entry radio/checkbox fields) and "labels" trips
+`static-content`; both are surface-word matches, not a claim this is a submittable form.
+Confirmed via propose-then-confirm: no additional kind (e.g. `interactive-control`) changes
+which categories apply here, since `form ∪ static-content` is already the superset that would
+result from also including `interactive-control` (loading/error/long-text are covered by all
+three kinds' cue sets).
 
-Applicable categories for `interactive-control`: loading, error, long-text (per the
-compiled taxonomy; empty/populated/partial/overflow/zero-one-many do not apply — this is
-not a `form`, `list-collection`, `nav`, or `media` element).
+Applicable categories for `form ∪ static-content`: empty, loading, error, partial, overflow,
+long-text (per the compiled taxonomy; populated/zero-one-many do not apply to either kind).
 
-Applicable state considerations resolved: 3 covered, 0 backstop, 0 unresolved.
+Applicable state considerations resolved: 4 covered (explicit), 0 backstop, 2 dismissed, 0 unresolved.
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
+| empty | theme-override-radio-group | ✅ covered | "No override set" is not an unhandled empty/blank state — it IS the documented default (D-07): the radio group always renders with one option pre-selected (System when `ThemeOverride` is `null`). There is no rendered state where all three radio buttons are unselected. |
 | loading | theme-override-radio-group | ✅ covered | Population is a synchronous local read (`ISettingsStore.Load().ThemeOverride`) inside `SettingsForm_Load` — no network/async I/O exists on this path, so no loading state (spinner/skeleton) is ever needed or shown. |
 | error | theme-override-radio-group | ✅ covered | A 3-option radio group cannot hold an invalid selection. A corrupt/unreadable `ThemeOverride` value is caught by `OverridableThemeProvider.ReadOverride()` and silently degrades to System (`null` ?? live signal) — matches the fail-silent cosmetic-path convention already established in Phase 12/21; no error UI is shown for this control. |
+| partial | theme-override-radio-group | ⛔ dismissed | WinForms `RadioButton`s in one container group are mutually exclusive — exactly one is always selected. There is no state where the group is "partially filled"; the category doesn't map onto a single-select radio group. |
+| overflow | theme-override-radio-group | ⛔ dismissed | All 3 labels are short (≤15 chars), fixed, English-only literals locked by D-06/D-07 — never dynamic or user-supplied, so no container/text can ever overflow. Structurally the same guarantee as the long-text row below. |
 | long-text | theme-override-radio-group | ✅ covered | All 3 labels ("System (default)", "Light", "Dark") are fixed, short, English-only literal strings locked by D-06/D-07 — never dynamic, never user-supplied, never subject to truncation/wrap handling. |
 
 ---
@@ -194,11 +206,11 @@ Applicable state considerations resolved: 3 covered, 0 backstop, 0 unresolved.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: FLAG (non-blocking) — visual hierarchy note added above per checker recommendation
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** verified 2026-08-16
