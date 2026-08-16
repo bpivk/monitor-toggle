@@ -215,7 +215,7 @@ Plans:
 | 19. Monitor-Tile Dashboard & MonitorPanelForm Retirement | v2.1 | 5/5 | Complete   | 2026-08-10 |
 | 20. Custom Toggle-Switch Control | v2.1 | 3/3 | Complete    | 2026-08-10 |
 | 21. Accent-Color Reading & Live Update | v2.1 | 3/3 | Complete    | 2026-08-11 |
-| 22. SettingsForm Layout Pass | v2.1 | 5/5 | Complete   | 2026-08-16 |
+| 22. SettingsForm Layout Pass | v2.1 | 5/5 | Complete    | 2026-08-16 |
 | 23. Manual Light/Dark Override | v2.1 | 0/TBD | Not started | - |
 
 ## Backlog

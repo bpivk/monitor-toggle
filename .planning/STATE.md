@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Modern UI Redesign & Theme Backlog
-status: executing
-stopped_at: Phase 22 Plan 03 complete (both tasks); rig verification FAILED (Check 1 -- grid/audio picker missing; Check 3 -- resize broken). Phase 22 requires a gap-closure plan.
-last_updated: "2026-08-15T20:21:19.904Z"
+status: ready_to_plan
+stopped_at: Phase 22 complete (5/5) — ready to discuss Phase 23
+last_updated: 2026-08-16T11:09:53.055Z
 last_activity: 2026-08-15 -- Phase 22 execution started
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 16
-  completed_plans: 14
+  completed_plans: 16
   percent: 60
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-09)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably applies Normal mode's own explicitly configured monitor/audio state on toggle-back (revised at v2.0 — see DISPLAY-10/AUDIO-04).
-**Current focus:** Phase 22 — settingsform-layout-pass
+**Current focus:** Phase 23 — manual light/dark override
 
 ## Current Position
 
-Phase: 22 (settingsform-layout-pass) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 22
-Last activity: 2026-08-15 -- Phase 22 execution started
+Phase: 23
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-08-16
 
 Progress: [██████░░░░] 60%
 
@@ -36,7 +36,7 @@ Progress: [██████░░░░] 60%
 
 **Velocity:**
 
-- Total plans completed: 60
+- Total plans completed: 70
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -62,6 +62,7 @@ Progress: [██████░░░░] 60%
 | 18 | 6 | - | - |
 | 20 | 3 | - | - |
 | 21 | 3 | - | - |
+| 22 | 5 | - | - |
 
 **Recent Trend:**
 
