@@ -202,7 +202,7 @@ Plans:
   2. Selecting Light or Dark immediately locks the app's theme and applies without restarting the app
   3. Once locked to Light or Dark, a live OS theme flip does not silently override the app's theme; selecting System restores today's live-follow behavior
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 Plans:
 **Wave 1**
 
@@ -210,7 +210,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 23-02-PLAN.md — System/Light/Dark radio group in Phase 22's reserved slot, load/Save persistence, apply-on-click preview and revert on Discard/Esc/close
+- [x] 23-02-PLAN.md — System/Light/Dark radio group in Phase 22's reserved slot, load/Save persistence, apply-on-click preview and revert on Discard/Esc/close
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -244,7 +244,7 @@ Plans:
 | 20. Custom Toggle-Switch Control | v2.1 | 3/3 | Complete    | 2026-08-10 |
 | 21. Accent-Color Reading & Live Update | v2.1 | 3/3 | Complete    | 2026-08-11 |
 | 22. SettingsForm Layout Pass | v2.1 | 5/5 | Complete    | 2026-08-16 |
-| 23. Manual Light/Dark Override | v2.1 | 1/3 | In Progress|  |
+| 23. Manual Light/Dark Override | v2.1 | 2/3 | In Progress|  |
 
 ## Backlog
 

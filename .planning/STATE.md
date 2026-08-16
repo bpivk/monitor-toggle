@@ -5,15 +5,15 @@ milestone_name: Modern UI Redesign & Theme Backlog
 current_phase: 23
 current_phase_name: manual-light-dark-override
 status: executing
-stopped_at: Completed 23-01-PLAN.md
-last_updated: "2026-08-16T20:59:40.974Z"
+stopped_at: Completed 23-02-PLAN.md
+last_updated: "2026-08-16T21:09:01.953Z"
 last_activity: 2026-08-16
 last_activity_desc: Phase 23 planning complete
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 19
-  completed_plans: 17
+  completed_plans: 18
   percent: 80
 ---
 
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-08-09)
 ## Current Position
 
 Phase: 23 (manual-light-dark-override) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-08-16 — Phase 23 execution started
 
-Progress: [█████████░] 89%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -78,6 +78,7 @@ Progress: [█████████░] 89%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 23 P01 | 35min | 2 tasks | 9 files |
+| Phase 23 P02 | 25min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,8 @@ Full decision log lives in PROJECT.md's Key Decisions table. v2.0's decisions (o
 - [Phase ?]: OverridableThemeProvider decorator resolves preview ?? persisted ThemeOverride ?? live OS signal; composition-root swap alone gives all three IsDark/IsDarkTheme copies override awareness with zero per-form edits
 - [Phase ?]: ThemeChanged is re-raised unconditionally on every inner OS flip (not diffed against effective theme) — deliberate deviation from ARCHITECTURE.md's suggested refinement
 - [Phase ?]: Application color mode now derived from the effective theme at every theming call site plus one composition-root priming call, replacing the prior always-follow-OS SetColorMode(System) calls
+- [Phase ?]: Two constructor-injected callback delegates (previewThemeOverride, applyThemeOverride) mirror the existing _applyTrayVisibility idiom -- no AppSettings-level event was invented
+- [Phase ?]: FormClosed lambda calls _applyThemeOverride() unconditionally (not branched on DialogResult) -- correct for Discard/Esc/X/Save-then-close alike since a successful Save leaves it a no-op
 
 ### Pending Todos
 
@@ -153,8 +156,8 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-16T20:59:40.946Z
-Stopped at: Completed 23-01-PLAN.md
+Last session: 2026-08-16T21:09:01.921Z
+Stopped at: Completed 23-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
