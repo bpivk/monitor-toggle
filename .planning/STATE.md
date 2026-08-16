@@ -3,16 +3,17 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Modern UI Redesign & Theme Backlog
 current_phase: 23
-status: Phase 22 shipped — pushed directly to origin/master (f85332d), no PR (branching_strategy=none)
-stopped_at: Phase 23 UI-SPEC approved
-last_updated: "2026-08-16T20:47:55.261Z"
+current_phase_name: manual-light-dark-override
+status: executing
+stopped_at: Completed 23-01-PLAN.md
+last_updated: "2026-08-16T20:59:40.974Z"
 last_activity: 2026-08-16
 last_activity_desc: Phase 23 planning complete
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 19
-  completed_plans: 16
+  completed_plans: 17
   percent: 80
 ---
 
@@ -23,16 +24,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-09)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably applies Normal mode's own explicitly configured monitor/audio state on toggle-back (revised at v2.0 — see DISPLAY-10/AUDIO-04).
-**Current focus:** Phase 23 — manual light/dark override
+**Current focus:** Phase 23 — manual-light-dark-override
 
 ## Current Position
 
-Phase: 23
-Plan: Not started
-Status: Phase 22 shipped — pushed directly to origin/master (f85332d), no PR (branching_strategy=none)
-Last activity: 2026-08-16 — Phase 23 planning complete
+Phase: 23 (manual-light-dark-override) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-08-16 — Phase 23 execution started
 
-Progress: [██████░░░░] 60%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -72,6 +73,11 @@ Progress: [██████░░░░] 60%
 - Trend: -
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 23 P01 | 35min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -85,6 +91,10 @@ Progress: [██████░░░░] 60%
 ### Decisions
 
 Full decision log lives in PROJECT.md's Key Decisions table. v2.0's decisions (optional-target skip/fail semantics, `IModeStore`-backed mode tracking, explicit symmetric Normal-mode config replacing snapshot-restore, shared Manual Monitor Panel safety guard, MSBuild-only exe-size levers) are all implemented, rig-verified, and validated — see PROJECT.md for outcomes.
+
+- [Phase ?]: OverridableThemeProvider decorator resolves preview ?? persisted ThemeOverride ?? live OS signal; composition-root swap alone gives all three IsDark/IsDarkTheme copies override awareness with zero per-form edits
+- [Phase ?]: ThemeChanged is re-raised unconditionally on every inner OS flip (not diffed against effective theme) — deliberate deviation from ARCHITECTURE.md's suggested refinement
+- [Phase ?]: Application color mode now derived from the effective theme at every theming call site plus one composition-root priming call, replacing the prior always-follow-OS SetColorMode(System) calls
 
 ### Pending Todos
 
@@ -143,9 +153,9 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-16T20:15:45.418Z
-Stopped at: Phase 23 UI-SPEC approved
-Resume file: .planning/phases/23-manual-light-dark-override/23-UI-SPEC.md
+Last session: 2026-08-16T20:59:40.946Z
+Stopped at: Completed 23-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 

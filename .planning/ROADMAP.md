@@ -80,15 +80,18 @@ Full phase details: `.planning/milestones/v2.0-ROADMAP.md`
 ## Phase Details
 
 ### Phase 19: Monitor-Tile Dashboard & MonitorPanelForm Retirement
+
 **Goal**: MainForm becomes a monitor-tile dashboard — users manage per-monitor enable/disable directly from clickable tiles on the main window — and the standalone Monitors panel is fully retired.
 **Depends on**: Nothing (first phase of v2.1)
 **Requirements**: TILE-01, TILE-02, TILE-03, TILE-04, TILE-05, TILE-06, TILE-07, MAIN-01, MAIN-02
 **Success Criteria** (what must be TRUE):
+
   1. MainForm shows one tile per detected monitor, each with an icon, its number, and live on/off status conveyed via icon (not text)
   2. Clicking a tile immediately toggles that monitor's enabled/disabled state, gated by the existing `SkipMonitorConfirmation` setting when disabling
   3. User can Tab between tiles and press Space or Enter to toggle the currently focused tile
   4. An Identify action near the tiles briefly overlays a number on each physical screen
   5. The Rig/Normal toggle sits directly below the tile row and Settings is relocated to a secondary, de-emphasized position; the standalone `MonitorPanelForm` and both its entry points (MainForm button, tray menu item) no longer exist
+
 **Plans**: 5 plans
 Plans:
 **Wave 1**
@@ -114,24 +117,30 @@ Plans:
 **UI hint**: yes
 
 ### Phase 20: Custom Toggle-Switch Control
+
 **Goal**: The Rig/Normal mode action reads as a modern toggle switch instead of a plain button.
 **Depends on**: Phase 19 (repositions the same control this phase redraws)
 **Requirements**: THEME-08
 **Success Criteria** (what must be TRUE):
+
   1. The Rig/Normal toggle renders as a custom-drawn track+thumb switch, not a standard `Button`
   2. The switch's on/off state is distinguishable by track/thumb shape and position alone, without relying on color
   3. The switch remains keyboard-operable (Tab focus, Space/Enter activates) and renders correctly themed in both light and dark mode, including on tray-hidden startup
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 21: Accent-Color Reading & Live Update
+
 **Goal**: Key interactive elements reflect the user's actual live Windows accent color instead of a fixed palette.
 **Depends on**: Phase 20 (the toggle switch's "on" state is the primary accent-tinted element)
 **Requirements**: THEME-07
 **Success Criteria** (what must be TRUE):
+
   1. The toggle switch's "on" state (and any other designated interactive element) visibly uses the current Windows accent color
   2. Changing the Windows accent color while the app is running updates the app's accent-tinted elements live, without restarting the app
   3. The accent color shown in the app matches what Settings > Colors displays, including for a custom (non-default) accent color
+
 **Plans**: 3 plans
 Plans:
 **Wave 1**
@@ -149,12 +158,15 @@ Plans:
 **UI hint**: yes
 
 ### Phase 22: SettingsForm Layout Pass
+
 **Goal**: SettingsForm reads as an intentionally laid-out screen instead of a crowded, organically-grown one.
 **Depends on**: Nothing (independent of every other v2.1 phase; reordered ahead of Phase 23 at user request 2026-08-11 — layout fix judged more important than the remaining theme-backlog item, and this phase was always schedulable anywhere in the sequence)
 **Requirements**: SETTINGS-01, SETTINGS-02
 **Success Criteria** (what must be TRUE):
+
   1. SettingsForm has no overlapping or crowded controls at its default window size
   2. Each mode's monitor grid, the audio device pickers, the app path control, and the hotkey capture box are visually grouped and consistently spaced
+
 **Plans**: 5 plans (3 original + 2 gap-closure after the 2026-08-15 rig failure)
 Plans:
 **Wave 1**
@@ -180,18 +192,21 @@ Plans:
 **UI hint**: yes
 
 ### Phase 23: Manual Light/Dark Override
+
 **Goal**: Users can lock the app's theme to Light or Dark independent of live Windows theme-follow, or keep today's live-follow behavior.
 **Depends on**: Phase 21 (decorates the theme interface Phase 21 extends with accent color) — reordered behind Phase 22 at user request 2026-08-11
 **Requirements**: THEME-09
 **Success Criteria** (what must be TRUE):
+
   1. Settings offers a System/Light/Dark choice, defaulting to System
   2. Selecting Light or Dark immediately locks the app's theme and applies without restarting the app
   3. Once locked to Light or Dark, a live OS theme flip does not silently override the app's theme; selecting System restores today's live-follow behavior
-**Plans**: 3 plans
+
+**Plans**: 1/3 plans executed
 Plans:
 **Wave 1**
 
-- [ ] 23-01-PLAN.md — AppSettings.ThemeOverride, the OverridableThemeProvider resolver, composition-root wiring, and an effective-theme-derived application color mode (closes Pitfall 6's three-copy risk)
+- [x] 23-01-PLAN.md — AppSettings.ThemeOverride, the OverridableThemeProvider resolver, composition-root wiring, and an effective-theme-derived application color mode (closes Pitfall 6's three-copy risk)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -229,7 +244,7 @@ Plans:
 | 20. Custom Toggle-Switch Control | v2.1 | 3/3 | Complete    | 2026-08-10 |
 | 21. Accent-Color Reading & Live Update | v2.1 | 3/3 | Complete    | 2026-08-11 |
 | 22. SettingsForm Layout Pass | v2.1 | 5/5 | Complete    | 2026-08-16 |
-| 23. Manual Light/Dark Override | v2.1 | 0/TBD | Not started | - |
+| 23. Manual Light/Dark Override | v2.1 | 1/3 | In Progress|  |
 
 ## Backlog
 
