@@ -161,9 +161,28 @@ namespace RigToggle.App
             // this is the one place a screen-derived bound is allowed to override
             // the content-driven figure, since an unreachable window is worse than
             // a clipped one the user can still resize.
-            var workingArea = Screen.FromControl(this).WorkingArea;
-            var targetWidth = System.Math.Min(preferredSize.Width, workingArea.Width);
-            var targetHeight = System.Math.Min(preferredSize.Height, workingArea.Height);
+            //
+            // Screen.FromControl(this.Owner), not Screen.FromControl(this): at this
+            // point CenterParent has not yet repositioned the window (see comment
+            // above), so measuring "this" resolves against the primary display
+            // regardless of which monitor the dialog will actually be centered on.
+            // ShowDialog(owner) sets this.Owner before OnLoad runs, so the owner's
+            // current screen is the correct proxy for "the screen this dialog will
+            // appear on" -- important on this project's own two-monitor rig setup.
+            var workingArea = (this.Owner is not null
+                ? Screen.FromControl(this.Owner)
+                : Screen.FromPoint(System.Windows.Forms.Cursor.Position)).WorkingArea;
+
+            // ClientSize excludes non-client chrome (title bar + resizable border);
+            // workingArea is an outer-window bound. Subtract the chrome so the
+            // resulting outer Form.Size -- not just ClientSize -- actually fits,
+            // otherwise the clamp can still leave the window partially off-screen
+            // by the chrome amount when the branch actually binds.
+            var chrome = this.Size - this.ClientSize;
+            var maxClientWidth = System.Math.Max(0, workingArea.Width - chrome.Width);
+            var maxClientHeight = System.Math.Max(0, workingArea.Height - chrome.Height);
+            var targetWidth = System.Math.Min(preferredSize.Width, maxClientWidth);
+            var targetHeight = System.Math.Min(preferredSize.Height, maxClientHeight);
             this.ClientSize = new System.Drawing.Size(targetWidth, targetHeight);
 
             // Read Size (the outer window size including chrome) *after* setting
