@@ -15,6 +15,9 @@ namespace RigToggle.Core.Models;
 /// CloseMinimizesToTray true = window Close (X) hides to tray, false = Close exits the
 /// app (default-false on upgrade, D-02); MinimizeToTray true = the minimize button also
 /// hides to tray, false = standard OS minimize (default-false, D-05).
+/// ThemeOverride null = follow the live Windows theme (System, THEME-01..06 unchanged);
+/// AppTheme.Light/AppTheme.Dark locks the app's effective theme regardless of the live
+/// OS signal (THEME-09, D-04) -- resolved by RigToggle.Core.OverridableThemeProvider.
 /// </summary>
 public sealed class AppSettings
 {
@@ -35,4 +38,5 @@ public sealed class AppSettings
     public bool MinimizeToTray { get; set; }
     public int? HotkeyModifiers { get; set; }
     public int? HotkeyKey { get; set; }
+    public AppTheme? ThemeOverride { get; set; }
 }

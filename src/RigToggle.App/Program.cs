@@ -121,7 +121,17 @@ namespace RigToggle.App
             // -- this is the ONE and only place the theme provider adapter is
             // constructed anywhere in the solution. App-lifetime object; intentionally
             // never disposed before Application.Run.
-            var themeProvider = new WindowsThemeProvider();
+            var innerThemeProvider = new WindowsThemeProvider();
+
+            // THEME-09/D-04/Pitfall 6: wrapping the raw OS-signal provider in the
+            // decorator here -- and passing this single `themeProvider` local
+            // everywhere below -- is what gives all three of the codebase's
+            // independent IsDark/IsDarkTheme copies (MainForm, SettingsForm,
+            // MonitorConfirmDialog) override awareness with zero per-form edit.
+            // Declared via `var` (concrete OverridableThemeProvider), not
+            // IThemeProvider, since Plan 23-02 needs SetPreviewOverride/
+            // RefreshOverride as method-group arguments from this same local.
+            var themeProvider = new OverridableThemeProvider(innerThemeProvider, settingsStore);
 
             var toggleService = new ToggleService(
                 settingsStore,

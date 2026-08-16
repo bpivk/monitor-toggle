@@ -89,3 +89,20 @@ public sealed class ThrowingClearToggleInProgressStore : IToggleInProgressStore
 
     public void Clear() => throw new IOException("Simulated marker cleanup failure.");
 }
+
+/// <summary>
+/// Hand-written ISettingsStore double whose Load() always throws, simulating a
+/// settings-file I/O failure surfaced as an exception (AV lock, permissions) --
+/// distinct from JsonSettingsStore's own degrade-to-fresh-AppSettings path, which
+/// never throws. Used by OverridableThemeProviderTests to prove the resolver's
+/// fail-silent read helper degrades to System (null) rather than propagating.
+/// Save() also throws if invoked, since Plan 23-01 never calls ISettingsStore.Save
+/// (hard constraint 7) -- an accidental call should fail loudly, not silently
+/// succeed.
+/// </summary>
+public sealed class ThrowingSettingsStore : ISettingsStore
+{
+    public AppSettings Load() => throw new IOException("Simulated settings load failure.");
+
+    public void Save(AppSettings settings) => throw new IOException("Simulated settings save failure.");
+}
