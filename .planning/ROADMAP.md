@@ -74,7 +74,7 @@ Full phase details: `.planning/milestones/v2.0-ROADMAP.md`
 - [x] **Phase 19: Monitor-Tile Dashboard & MonitorPanelForm Retirement** - MainForm becomes a monitor-tile dashboard absorbing the standalone Monitors panel's capability; toggle repositioned below the tiles, Settings de-emphasized (completed 2026-08-10)
 - [x] **Phase 20: Custom Toggle-Switch Control** - The Rig/Normal toggle becomes a custom-drawn track+thumb switch (THEME-08) (completed 2026-08-10)
 - [x] **Phase 21: Accent-Color Reading & Live Update** - Interactive elements pick up the live Windows accent color (THEME-07) (completed 2026-08-11)
-- [ ] **Phase 22: SettingsForm Layout Pass** - SettingsForm's controls are regrouped and respaced, no overlap at default size (gap-closure plans 22-04/22-05 planned 2026-08-15; awaiting fix + rig re-verification)
+- [x] **Phase 22: SettingsForm Layout Pass** - SettingsForm's controls are regrouped and respaced, no overlap at default size (rig-verified 2026-08-16 after gap-closure plans 22-04/22-05)
 - [ ] **Phase 23: Manual Light/Dark Override** - A System/Light/Dark setting overrides live theme-follow (THEME-09)
 
 ## Phase Details
@@ -175,7 +175,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 22-05-PLAN.md — Blocking rig re-verification: Checks 1 and 3 first (the two recorded gaps), then the 14 checks never reached, at 100%/125%/150% display scale
+- [x] 22-05-PLAN.md — Blocking rig re-verification: Checks 1 and 3 first (the two recorded gaps), then the 14 checks never reached, at 100%/125%/150% display scale — all 17 checks PASS on Windows 11 25H2
 
 **UI hint**: yes
 
@@ -215,7 +215,7 @@ Plans:
 | 19. Monitor-Tile Dashboard & MonitorPanelForm Retirement | v2.1 | 5/5 | Complete   | 2026-08-10 |
 | 20. Custom Toggle-Switch Control | v2.1 | 3/3 | Complete    | 2026-08-10 |
 | 21. Accent-Color Reading & Live Update | v2.1 | 3/3 | Complete    | 2026-08-11 |
-| 22. SettingsForm Layout Pass | v2.1 | 4/5 | In Progress|  |
+| 22. SettingsForm Layout Pass | v2.1 | 5/5 | Complete   | 2026-08-16 |
 | 23. Manual Light/Dark Override | v2.1 | 0/TBD | Not started | - |
 
 ## Backlog
