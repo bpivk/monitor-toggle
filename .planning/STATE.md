@@ -4,15 +4,15 @@ milestone: v2.1
 milestone_name: Modern UI Redesign & Theme Backlog
 current_phase: 23
 status: Phase 22 shipped — pushed directly to origin/master (f85332d), no PR (branching_strategy=none)
-stopped_at: Phase 22 complete (5/5) — ready to discuss Phase 23
-last_updated: "2026-08-16T11:59:03.087Z"
+stopped_at: Phase 23 context gathered
+last_updated: "2026-08-16T12:11:34.663Z"
 last_activity: 2026-08-16
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 16
   completed_plans: 16
-  percent: 60
+  percent: 80
 ---
 
 # Project State
@@ -142,9 +142,9 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-15T19:02:37Z
-Stopped at: Phase 22 Plan 03 complete (both tasks); rig verification FAILED (Check 1 -- grid/audio picker missing; Check 3 -- resize broken). Phase 22 requires a gap-closure plan.
-Resume file: .planning/phases/22-settingsform-layout-pass/22-03-SUMMARY.md
+Last session: 2026-08-16T12:11:34.634Z
+Stopped at: Phase 23 context gathered
+Resume file: .planning/phases/23-manual-light-dark-override/23-CONTEXT.md
 
 ## Operator Next Steps
 
