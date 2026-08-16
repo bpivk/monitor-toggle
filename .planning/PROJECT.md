@@ -122,10 +122,12 @@ All eight target features shipped as scoped; no scope was dropped or added mid-m
 
 - [x] The Rig/Normal toggle is a custom-drawn toggle-switch control (track + thumb), distinguishable by shape/position alone, not color (THEME-08) — Validated in Phase 20: Custom Toggle-Switch Control. Rig-verified after 2 fix rounds (row sizing/focus-ring clipping, then an action-row merge with Identify + Identify's corner rounding for visual consistency); a post-rig code review then found and fixed a real concurrency race (the confirm dialog's nested message loop wasn't holding the same exclusive-access lease `OnTileAction` already uses, letting a hotkey/tray toggle mutate state while the dialog was open) plus three lower-severity findings (focus-ring margin math, keyboard-autorepeat re-firing, two unguarded settings loads).
 - [x] Key interactive elements (monitor tiles, toggle switch, Identify/Settings focus rings) pick up the user's live Windows accent color instead of a fixed palette, updating live on accent change without restart, matching Settings > Colors including for a custom non-default accent (THEME-07) — Validated in Phase 21: Accent-Color Reading & Live Update. `IThemeProvider` extended with `AccentColor`/`AccentColorChanged`, read registry-primary (`HKCU\...\DWM\AccentColor`) with `DwmGetColorizationColor` fallback, diffed inside the existing `SystemEvents.UserPreferenceChanged` handler (no second subscription). Rig-verified on real Windows 11 hardware — all 3 success criteria passed, including the phase's one open technical question (registry byte-order: confirmed correct as implemented, no swap needed). Code review found 2 non-blocking warnings (byte-order math lacks unit coverage; `Color` equality vs `.ToArgb()` in change detection) — tracked, not yet fixed.
+- [x] SettingsForm has no overlapping or crowded controls at its default window size (SETTINGS-01) — Validated in Phase 22: SettingsForm Layout Pass. Migrated the form from `Location`/`ClientSize` pixel positioning to a `TableLayoutPanel`-based layout across 3 plans; the first rig pass (Plan 03) FAILED outright on real hardware (monitor grid + audio picker entirely absent from both mode columns, manual resize dead) — a stronger failure than "crowded." Root-caused to two defects (wrapper `Panel`s not measuring `Dock=Fill` content; `Form.AutoSize` fighting manual `WM_SIZING`) and fixed in gap-closure Plan 04; a second rig pass (Plan 05) confirmed all 17 checks PASS on Windows 11 25H2 at 100/125/150% scale. Post-rig code review then found and fixed two further Critical bugs in the same new `OnLoad` sizing method (working-area clamp not accounting for window chrome; wrong-monitor screen resolution before `CenterParent`) — user-confirmed on the real rig (non-primary monitor + 150% scale) as a follow-up UAT item.
+- [x] Each mode's monitor grid, audio device pickers, app path control, and hotkey capture box are visually grouped and consistently spaced (SETTINGS-02) — Validated in Phase 22, same evidence as SETTINGS-01.
 
 ### Active
 
-Continuing v2.1 requirements (SettingsForm layout pass, THEME-09) — see `.planning/REQUIREMENTS.md`.
+Continuing v2.1 requirements (THEME-09) — see `.planning/REQUIREMENTS.md`.
 
 ### Out of Scope
 
@@ -217,4 +219,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-11 — Phase 21 (Accent-Color Reading & Live Update, THEME-07) shipped, rig-verified.*
+*Last updated: 2026-08-16 — Phase 22 (SettingsForm Layout Pass, SETTINGS-01/SETTINGS-02) shipped, rig-verified after two gap-closure rounds.*
