@@ -187,7 +187,20 @@ Plans:
   1. Settings offers a System/Light/Dark choice, defaulting to System
   2. Selecting Light or Dark immediately locks the app's theme and applies without restarting the app
   3. Once locked to Light or Dark, a live OS theme flip does not silently override the app's theme; selecting System restores today's live-follow behavior
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+**Wave 1**
+
+- [ ] 23-01-PLAN.md — AppSettings.ThemeOverride, the OverridableThemeProvider resolver, composition-root wiring, and an effective-theme-derived application color mode (closes Pitfall 6's three-copy risk)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 23-02-PLAN.md — System/Light/Dark radio group in Phase 22's reserved slot, load/Save persistence, apply-on-click preview and revert on Discard/Esc/close
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 23-03-PLAN.md — Six static audits plus a blocking 15-check rig verification of all three success criteria and Pitfall 6's warning-signs procedure
+
 **UI hint**: yes
 
 ## Progress
