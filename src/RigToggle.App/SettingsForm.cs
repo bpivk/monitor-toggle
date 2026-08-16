@@ -112,7 +112,22 @@ namespace RigToggle.App
             // FormClosed unsubscribe (not Dispose) is REQUIRED here or every dialog open
             // leaks a handler onto the outliving provider (T-12-05).
             _themeProvider.ThemeChanged += OnThemeChanged;
-            this.FormClosed += (_, _) => _themeProvider.ThemeChanged -= OnThemeChanged;
+
+            // THEME-09/23-02/D-02/D-03: unconditionally drops any active live preview and
+            // re-resolves from whatever is persisted, on every close route (Discard, Esc,
+            // the window X, and even Save-then-close). Unsubscribing ThemeChanged FIRST
+            // means the revert cannot try to repaint a form that is already closing. Firing
+            // unconditionally rather than branching on DialogResult is deliberate: after a
+            // successful Save this is a no-op (persisted already equals the preview), and
+            // after any non-save exit it restores the last-saved override (or System/
+            // live-follow if none was ever saved) — one line correctly covers every exit
+            // route this.CancelButton = btnDiscardChanges already funnels Discard/Esc/X
+            // through, with no new close-handling pattern introduced.
+            this.FormClosed += (_, _) =>
+            {
+                _themeProvider.ThemeChanged -= OnThemeChanged;
+                _applyThemeOverride();
+            };
 
             // 12-03/THEME-06: this dialog is always shown immediately via ShowDialog
             // (never hidden-tray-started like MainForm), so no --tray-safe timing
@@ -135,6 +150,18 @@ namespace RigToggle.App
             dgvMonitorsNormal.CellValueChanged += OnMonitorNormalCellValueChanged;
             cboAudioNormal.SelectedIndexChanged += OnPickerChanged;
             cboAudioRig.SelectedIndexChanged += OnPickerChanged;
+
+            // THEME-09/23-02/D-01: all three options share one handler — the theme
+            // radio group is the single field in this form that intentionally applies
+            // before Save, so it is deliberately excluded from the Save-enablement
+            // validation gate that governs every field above (unlike
+            // btnSaveSettings.Enabled's other dependencies, a click here is never
+            // blocked by form validity). No unsaved-changes indicator is added for it
+            // either — the live preview itself is the feedback that a change was made
+            // (UI-SPEC Interaction Contract item 5).
+            rdoThemeSystem.CheckedChanged += OnThemeRadioCheckedChanged;
+            rdoThemeLight.CheckedChanged += OnThemeRadioCheckedChanged;
+            rdoThemeDark.CheckedChanged += OnThemeRadioCheckedChanged;
 
             // D-01: capture mode must only ever begin via an explicit mouse click, never
             // via GotFocus alone (UI-SPEC Interaction States) — MouseDown fires before
@@ -362,6 +389,42 @@ namespace RigToggle.App
         }
 
         private void OnPickerChanged(object? sender, EventArgs e) => ValidateSettingsForm();
+
+        /// <summary>
+        /// THEME-09/23-02/D-01: live-preview handler shared by all three theme radio
+        /// buttons. This is the whole of D-01 — it puts the unsaved value into the
+        /// shared resolver, which raises ThemeChanged, which every subscriber (this
+        /// form, MainForm, and any MonitorConfirmDialog currently open) already handles
+        /// through its existing repaint pipeline. No new repaint call, no Refresh(),
+        /// no direct ThemeApplier invocation here, and no Save-enablement re-check —
+        /// the theme field is never gated by that validation.
+        /// </summary>
+        private void OnThemeRadioCheckedChanged(object? sender, EventArgs e)
+        {
+            // Load-time selection (SettingsForm_Load) writes .Checked programmatically —
+            // that must never be mistaken for a user click and must never fire a preview.
+            if (_updatingThemeRadiosProgrammatically)
+            {
+                return;
+            }
+
+            // CheckedChanged fires twice per user selection in a mutually-exclusive
+            // group (once for the option being cleared, once for the option being set) —
+            // only the checked one is a real selection.
+            if (sender is not RadioButton radio || !radio.Checked)
+            {
+                return;
+            }
+
+            _pendingThemeOverride = radio switch
+            {
+                _ when ReferenceEquals(radio, rdoThemeLight) => AppTheme.Light,
+                _ when ReferenceEquals(radio, rdoThemeDark) => AppTheme.Dark,
+                _ => null,
+            };
+
+            _previewThemeOverride(_pendingThemeOverride);
+        }
 
         // TRIG-01/D-01, UI-SPEC "Interaction States — txtHotkey": renders the idle
         // (non-Recording) display from the current _pendingHotkeyModifiers/_pendingHotkeyKey
