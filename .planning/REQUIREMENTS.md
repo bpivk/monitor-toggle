@@ -33,7 +33,7 @@ Requirements for the v2.1 milestone (Modern UI Redesign & Theme Backlog). Each m
 
 - [x] **THEME-07**: Interactive elements — at minimum the toggle switch's "on" state — pick up the live Windows accent color instead of a fixed palette, updating live if the user changes their accent color while the app is running
 - [x] **THEME-08**: The Rig/Normal toggle is a custom-drawn toggle-switch control (track + thumb), remaining distinguishable by shape/position, not color alone
-- [x] **THEME-09**: A System/Light/Dark setting lets the user manually override the app's theme independent of live Windows theme-follow — System preserves today's live-follow behavior; Light/Dark lock the theme and are not silently overridden by an OS theme flip
+- [ ] **THEME-09**: A System/Light/Dark setting lets the user manually override the app's theme independent of live Windows theme-follow — System preserves today's live-follow behavior; Light/Dark lock the theme and are not silently overridden by an OS theme flip
 
 ## Out of Scope
 
