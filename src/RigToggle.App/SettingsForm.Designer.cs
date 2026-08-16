@@ -61,9 +61,16 @@ namespace RigToggle.App
             this.flpShared = new System.Windows.Forms.FlowLayoutPanel();
             this.tlpAppPath = new System.Windows.Forms.TableLayoutPanel();
             this.tlpHotkey = new System.Windows.Forms.TableLayoutPanel();
-            // pnlThemeReserved intentionally gets no Suspend/Resume pair below -- it has
-            // no children by design (hard constraint 6), so the bracket would be a no-op.
+            // 23-02: pnlThemeReserved now hosts flpTheme (the System/Light/Dark radio
+            // stack) and gets a Suspend/Resume pair below like every other populated
+            // container -- the "no children" premise that used to justify skipping the
+            // bracket no longer holds.
             this.pnlThemeReserved = new System.Windows.Forms.Panel();
+            this.flpTheme = new System.Windows.Forms.FlowLayoutPanel();
+            this.lblThemeCaption = new System.Windows.Forms.Label();
+            this.rdoThemeSystem = new System.Windows.Forms.RadioButton();
+            this.rdoThemeLight = new System.Windows.Forms.RadioButton();
+            this.rdoThemeDark = new System.Windows.Forms.RadioButton();
 
             // 22-02/D-05/D-06: right-aligned Save/Discard button row.
             this.flpButtons = new System.Windows.Forms.FlowLayoutPanel();
@@ -138,6 +145,8 @@ namespace RigToggle.App
             this.tlpHotkey.SuspendLayout();
             this.pnlSharedSection.SuspendLayout();
             this.flpShared.SuspendLayout();
+            this.pnlThemeReserved.SuspendLayout();
+            this.flpTheme.SuspendLayout();
             this.flpButtons.SuspendLayout();
             this.tlpAudioNormal.SuspendLayout();
             this.tlpNormalColumn.SuspendLayout();
@@ -775,19 +784,16 @@ namespace RigToggle.App
             this.lblAutostartWarning.Name = "lblAutostartWarning";
 
             //
-            // pnlThemeReserved (D-04/THEME-09: named, empty, zero-size insertion point
-            // reserved for Phase 23's System/Light/Dark radio group. Phase 22 does NOT
-            // build that control -- no new AppSettings field, no visible child control,
-            // no BorderStyle, no Text. The plain Size = (0, 0) below is deliberate -- a
-            // bare Panel serializes a 200x100 default Size, and stating (0, 0) explicitly
-            // guarantees the slot is zero-size at construction rather than relying solely
-            // on the first AutoSize pass; this is one of only two permitted plain .Size =
-            // assignments left in this file (the other is txtHotkey's Size(200, 23)).
-            // Because it is AutoSize with no children it occupies zero space and is
-            // invisible today; Phase 23 adds its radio group as children and this row
-            // grows on its own with no reflow of anything above it. Deliberately NO
-            // Suspend/Resume pair -- it has no children to batch, see the field
-            // construction comment above.)
+            // pnlThemeReserved (D-04/THEME-09: 23-02 fills the insertion point Phase 22
+            // reserved with the System/Light/Dark radio group. The slot's own layout
+            // contract -- Margin, Anchor, AutoSize, AutoSizeMode, TabIndex, Name -- is
+            // untouched from Phase 22, so nothing above it in flpShared reflows; only its
+            // children are new. The plain Size = (0, 0) below is still left in place from
+            // Phase 22 -- a bare Panel serializes a 200x100 default Size, and stating
+            // (0, 0) explicitly guarantees the slot starts zero-size before the first
+            // AutoSize/GrowAndShrink layout pass recomputes it against its new children;
+            // this remains one of only two permitted plain .Size = assignments left in
+            // this file (the other is txtHotkey's Size(200, 23)).)
             //
             this.pnlThemeReserved.AutoSize = true;
             this.pnlThemeReserved.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
@@ -796,6 +802,71 @@ namespace RigToggle.App
             this.pnlThemeReserved.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
             this.pnlThemeReserved.TabIndex = 8;
             this.pnlThemeReserved.Name = "pnlThemeReserved";
+            this.pnlThemeReserved.Controls.Add(this.flpTheme);
+
+            //
+            // flpTheme (23-02: inner flow container mirroring flpShared's own proven
+            // property set -- a plain Panel positions children absolutely, so this inner
+            // FlowLayoutPanel, not Location arithmetic, is what stacks the caption and the
+            // three radio buttons top-down and keeps the group DPI-safe under
+            // AutoScaleMode.Font.)
+            //
+            this.flpTheme.FlowDirection = System.Windows.Forms.FlowDirection.TopDown;
+            this.flpTheme.WrapContents = false;
+            this.flpTheme.AutoSize = true;
+            this.flpTheme.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.flpTheme.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.flpTheme.Margin = new System.Windows.Forms.Padding(0);
+            this.flpTheme.Padding = new System.Windows.Forms.Padding(0);
+            this.flpTheme.TabIndex = 0;
+            this.flpTheme.Name = "flpTheme";
+            this.flpTheme.Controls.Add(this.lblThemeCaption);
+            this.flpTheme.Controls.Add(this.rdoThemeSystem);
+            this.flpTheme.Controls.Add(this.rdoThemeLight);
+            this.flpTheme.Controls.Add(this.rdoThemeDark);
+
+            //
+            // lblThemeCaption
+            //
+            this.lblThemeCaption.Text = "Theme:";
+            this.lblThemeCaption.AutoSize = true;
+            this.lblThemeCaption.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.lblThemeCaption.Margin = new System.Windows.Forms.Padding(0, 0, 0, 4);
+            this.lblThemeCaption.TabIndex = 0;
+            this.lblThemeCaption.Name = "lblThemeCaption";
+
+            //
+            // rdoThemeSystem (D-07: pre-selected -- the structural guarantee that the
+            // group is never rendered with all three options unselected; SettingsForm_Load
+            // still re-derives the selection from persisted settings.)
+            //
+            this.rdoThemeSystem.Text = "System (default)";
+            this.rdoThemeSystem.Checked = true;
+            this.rdoThemeSystem.AutoSize = true;
+            this.rdoThemeSystem.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.rdoThemeSystem.Margin = new System.Windows.Forms.Padding(0, 0, 0, 8);
+            this.rdoThemeSystem.TabIndex = 1;
+            this.rdoThemeSystem.Name = "rdoThemeSystem";
+
+            //
+            // rdoThemeLight
+            //
+            this.rdoThemeLight.Text = "Light";
+            this.rdoThemeLight.AutoSize = true;
+            this.rdoThemeLight.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.rdoThemeLight.Margin = new System.Windows.Forms.Padding(0, 0, 0, 8);
+            this.rdoThemeLight.TabIndex = 2;
+            this.rdoThemeLight.Name = "rdoThemeLight";
+
+            //
+            // rdoThemeDark
+            //
+            this.rdoThemeDark.Text = "Dark";
+            this.rdoThemeDark.AutoSize = true;
+            this.rdoThemeDark.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.rdoThemeDark.Margin = new System.Windows.Forms.Padding(0, 0, 0, 8);
+            this.rdoThemeDark.TabIndex = 3;
+            this.rdoThemeDark.Name = "rdoThemeDark";
 
             //
             // pnlSharedSection (D-02/THEME-05: full-width shared settings section --
@@ -986,6 +1057,10 @@ namespace RigToggle.App
             this.tlpHotkey.PerformLayout();
             this.flpShared.ResumeLayout(false);
             this.flpShared.PerformLayout();
+            this.flpTheme.ResumeLayout(false);
+            this.flpTheme.PerformLayout();
+            this.pnlThemeReserved.ResumeLayout(false);
+            this.pnlThemeReserved.PerformLayout();
             this.pnlSharedSection.ResumeLayout(false);
             this.pnlSharedSection.PerformLayout();
             this.flpButtons.ResumeLayout(false);
@@ -1019,6 +1094,11 @@ namespace RigToggle.App
         private System.Windows.Forms.TableLayoutPanel tlpAppPath;
         private System.Windows.Forms.TableLayoutPanel tlpHotkey;
         private System.Windows.Forms.Panel pnlThemeReserved;
+        private System.Windows.Forms.FlowLayoutPanel flpTheme;
+        private System.Windows.Forms.Label lblThemeCaption;
+        private System.Windows.Forms.RadioButton rdoThemeSystem;
+        private System.Windows.Forms.RadioButton rdoThemeLight;
+        private System.Windows.Forms.RadioButton rdoThemeDark;
         private System.Windows.Forms.FlowLayoutPanel flpButtons;
 
         private System.Windows.Forms.Panel pnlMonitor;
