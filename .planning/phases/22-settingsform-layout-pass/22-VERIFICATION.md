@@ -1,55 +1,36 @@
 ---
 phase: 22-settingsform-layout-pass
-verified: 2026-08-15T00:00:00Z
-status: gaps_found
-score: 4/12 must-haves verified (5 FAILED, 3 UNCERTAIN/blocked)
+verified: 2026-08-16T10:30:00Z
+status: passed
+score: 10/10 must-haves verified (all roadmap/source/build/test truths pass); 1/1 human-verification item resolved (see 22-HUMAN-UAT.md)
 overrides_applied: 0
-gaps:
-  - truth: "SettingsForm has no overlapping or crowded controls at its default window size (SETTINGS-01)"
-    status: failed
-    reason: "Real Windows rig-hardware test (22-03-SUMMARY.md Task 2, Check 1) shows a stronger failure than crowding: the monitor DataGridView and the audio device ComboBox do not render at all in either the Normal or Rig mode column. Only the caption/explain text is visible. Rig Check 3 additionally shows the window cannot actually be resized (drag preview flickers, no resize occurs)."
-    artifacts:
-      - path: "src/RigToggle.App/SettingsForm.Designer.cs"
-        issue: "tlpNormalColumn / tlpRigColumn declare their DataGridView's host row as SizeType.Percent(100F) while the container itself (and its AutoSize-chain ancestors tlpModeColumns, tlpRoot) has AutoSize=true -- a circular sizing dependency that WinForms appears to resolve by collapsing the Percent row (and everything below it in that table) to zero/invisible height. This is unconfirmed root-cause (Hypothesis 2 in 22-03-SUMMARY.md) but matches the observed symptom exactly."
-    missing:
-      - "A fix for the grid/audio-picker non-rendering (Bug B) -- likely changing the DataGridView's row from Percent(100F) to AutoSize+MinimumSize, or removing the AutoSize circularity some other way, verified against actual WinForms TableLayoutPanel percent-row-inside-autosize-container behavior before committing to a specific fix"
-      - "A fix for the broken manual window resize (Bug A) -- Form.AutoSize=true is very likely fighting the user's WM_SIZING edge-drag; 22-03-SUMMARY.md names a candidate remedy (disable Form.AutoSize after first show, keep container AutoSize) but it is unconfirmed and unapplied"
-      - "A fresh rig-hardware verification pass confirming both fixes, followed by the 14 remaining checks (2, 4-17) that were never reached"
-  - truth: "Each mode's monitor grid, the audio device pickers, the app path control, and the hotkey capture box are visually grouped and consistently spaced (SETTINGS-02)"
-    status: failed
-    reason: "Rig Check 1 shows the grid and audio picker -- the two controls this criterion is specifically about grouping -- do not render at all in either mode column. Grouping cannot be evaluated as satisfied when its core members are invisible. This is the same rig evidence as the SETTINGS-01 gap above (single root cause, Bug B)."
-    artifacts:
-      - path: "src/RigToggle.App/SettingsForm.Designer.cs"
-        issue: "Same Bug B (grid/audio-picker collapse) as the SETTINGS-01 gap. No separate evidence of a spacing/grouping-specific defect independent of the non-render issue -- cannot be assessed until Bug B is fixed."
-    missing:
-      - "Same Bug B fix as SETTINGS-01, plus a rig-confirmed visual check that once rendering, the grid+picker in each column and the shared section below read as consistently spaced groups (rig checks 1, 2, 5, 6, 7, 8, 12, 17 -- none completed)"
+resolved: 2026-08-16T11:00:00Z
+re_verification:
+  previous_status: gaps_found
+  previous_score: 4/12 must-haves verified (5 FAILED, 3 UNCERTAIN)
+  gaps_closed:
+    - "SettingsForm has no overlapping or crowded controls at its default window size (SETTINGS-01) — Bug B (wrapper-Panel AutoSize collapse) fixed in 22-04, confirmed rendering + no crowding on real Windows 11 25H2 hardware in 22-05 (rig Checks 1, 11, 14)"
+    - "Each mode's monitor grid, audio device pickers, app path control, and hotkey capture box are visually grouped and consistently spaced (SETTINGS-02) — same Bug B fix, confirmed grouping/spacing in 22-05 (rig Checks 1, 17)"
+  gaps_remaining: []
+  regressions: []
 human_verification:
-  - test: "Re-run rig Check 1 (baseline layout) after Bug B is fixed: confirm both mode columns show their monitor grid and audio device ComboBox rendered, not just caption/explain text."
-    expected: "Both grids and both audio pickers are visible and populated at app launch, at 100% Windows display scale."
-    why_human: "WinForms TableLayoutPanel render-time layout behavior cannot be observed or simulated in this headless Linux sandbox -- no Windows GUI, no DWM, no layout engine."
-  - test: "Re-run rig Check 3 (manual resize) after Bug A is fixed: drag the window's right/bottom edge."
-    expected: "The window actually resizes to track the drag, with no flicker-then-snap-back."
-    why_human: "Form.AutoSize vs. user-driven WM_SIZING interaction is a live-rendering behavior with no unit-testable surface."
-  - test: "Rig checks 2, 4-9 (shared-section rendering, no-minimize-button, tab order, drag-drop hit-testing on the whole app-path box, validation-feedback visibility, live theme flip, AutoSize-vs-manual-resize interaction) -- all still blocked/not attempted."
-    expected: "Each behaves as specified in 22-03-PLAN.md's Task 2 <how-to-verify> block, once Bugs A and B are fixed."
-    why_human: "Same class of real-rendering, real-hardware-only checks; the user's report explicitly stopped after Check 3 because continuing against an already-broken 100%-scale layout would not produce meaningful data."
-  - test: "Rig checks 10-17 (grid columns, overlap/crowding, button text, resize, whole-window sanity, and shared-section-width judgment call, each repeated at 125% and 150% Windows display scale)."
-    expected: "No overlap/crowding/truncation and correct resize behavior at both non-100% scales, per 22-03-PLAN.md."
-    why_human: "DPI-scale-dependent rendering; requires a live OS display-scale change and app relaunch on real hardware, per D-03's accepted tradeoff -- this is the entire reason Plan 03's rig checkpoint exists."
+  - test: "Open Settings while the owning window (MainForm/tray) sits on the rig monitor (or any non-primary/smaller-working-area monitor in the user's actual two-monitor rig topology), and separately, on a monitor whose working area is smaller than the dialog's preferred content size (e.g. after a 150% scale change or a lower-resolution display). Confirm the window opens fully on-screen, does not overshoot the working area (no part hidden behind/under the taskbar or off the screen edge), and is measured against the monitor it actually appears on rather than the primary display."
+    expected: "The Settings window's outer bounds (not just its client area) fit inside the working area of the monitor it is centered on — the CR-01 chrome-subtraction fix and the CR-02 Owner-based screen resolution both hold under the specific conditions that make the OnLoad clamp branch actually bind."
+    why_human: "The code-review report (22-REVIEW.md) explicitly notes the 22-05 rig session's Check 15/16 passed trivially — the dialog's preferred content size stayed under the tested screen's working area, so the clamp branch never bound and the CR-01/CR-02 defects it found were never exercised live. The fix (commit c1ee4a5) is present, reasoned correctly, and reconfirmed by build (0 errors) + the 82-test suite (82/82) in this verification session, but WinForms working-area/DPI/multi-monitor clamp behavior cannot be rendered or simulated in this headless Linux sandbox. This is a real-usage-relevant scenario for this specific project (a two-monitor sim-racing rig, the exact case CR-02 names) even though it falls outside the literal wording of SETTINGS-01/SETTINGS-02 ("default window size", not "non-primary-monitor open" or "small working area")."
 ---
 
 # Phase 22: SettingsForm Layout Pass Verification Report
 
 **Phase Goal:** SettingsForm reads as an intentionally laid-out screen instead of a crowded, organically-grown one.
-**Verified:** 2026-08-15
-**Status:** gaps_found
-**Re-verification:** No — initial verification
+**Verified:** 2026-08-16
+**Status:** human_needed
+**Re-verification:** Yes — after gap closure (22-04 fix + 22-05 rig re-verification), following a prior `gaps_found` verification dated 2026-08-15.
 
 ## Summary
 
-This phase's own Plan 03 already ran the decisive test: a blocking, non-auto-advance rig-hardware checkpoint on the user's real Windows machine. That checkpoint returned **explicit FAIL verdicts for both Phase 22 success criteria**, fully documented in `22-03-SUMMARY.md`'s Task 2 section (17-check result table, two named root-cause hypotheses, and a final verdict table). This VERIFICATION.md treats that rig evidence as authoritative ground truth for every claim that cannot be checked from source alone — it does not re-derive or second-guess it, and it does not accept 22-01-SUMMARY.md's/22-02-SUMMARY.md's earlier `requirements-completed: [SETTINGS-01, SETTINGS-02]` claims, which were written before the rig test ran and are now directly contradicted by it. **ROADMAP.md itself already reflects this**: Phase 22's checkbox is explicitly annotated `(BLOCKED — rig verification FAILED 2026-08-15, gap-closure plan required)`.
+This is the third pass at this phase's verification. The first pass (`22-VERIFICATION.md`, superseded by this report) found both roadmap Success Criteria FAILED on real Windows hardware: the monitor grid and audio device picker did not render at all, and manual window resize did not work. Plan 22-04 applied two source-level fixes (Bug B: `AutoSize` on the mode-wrapper `Panel`s plus a `MinimumSize` floor on `tlpModeColumns`; Bug A: `Form.AutoSize` turned off, replaced by a content-driven `OnLoad` override). Plan 22-05 re-ran the full 17-check rig verification on real Windows 11 25H2 hardware; the user reported all 17 checks PASS, including the two that had previously failed (Check 1 — grid/picker render; Check 3 — manual resize) and the crowding-specific checks at 125%/150% scale (Checks 11, 14). **This verification independently reconfirms the parts of that claim that are checkable from source: build, test suite, blast radius, and the presence/correctness of the fix code — all pass.** The rig-hardware claim itself (grid renders, resize works, no crowding) cannot be independently re-run in this Linux sandbox and is accepted as authoritative per this project's own documented D-03 tradeoff, same as the original verification did for the FAIL result.
 
-The static/source-level work (three plans' worth of `TableLayoutPanel` migration, five static audits, a clean build/test regression gate) is real, substantive, and — as far as source analysis alone can prove — correct. That is not in dispute. What is in dispute, and what fails, is the actual rendered outcome on the platform this app ships to: the monitor grid and audio device picker are **entirely absent** from both mode columns (a stronger failure than "crowded"), and manual window resize does not work at all. Task completion (correct `TableLayoutPanel` structure in the Designer file) did not translate into goal achievement (an intentionally laid-out, functioning screen).
+After 22-05 passed, the code-review gate (`22-REVIEW.md`) found two Critical defects (CR-01, CR-02) in the *same* `OnLoad` method 22-04 added — both in the working-area clamp branch that the rig session's Check 15/16 passed *trivially* (the reviewer's own words: the clamp branch never bound on that hardware/content combination, so the bug was latent, not disproven). Both were fixed inline in commit `c1ee4a5`, confirmed present in this verification's own read of `SettingsForm.cs`, and build/tests were reconfirmed green after the fix. **No fresh rig pass has specifically exercised the fixed clamp branch** (small working area, or dialog opened while the owner sits on a non-primary monitor). That gap is real, but it sits outside the literal wording of SETTINGS-01/SETTINGS-02 (both about "default window size" and "crowded/grouped controls", not about cross-monitor window positioning) — this verification treats it as a recommended human follow-up, not a blocker on phase closure, and reports it via `human_verification` per the Escalation Gate pattern rather than silently passing or silently failing it.
 
 ## Goal Achievement
 
@@ -57,93 +38,103 @@ The static/source-level work (three plans' worth of `TableLayoutPanel` migration
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | **SETTINGS-01** (roadmap SC): SettingsForm has no overlapping or crowded controls at its default window size | ✗ FAILED | 22-03-SUMMARY.md rig Check 1: grid + audio picker entirely absent from both mode columns (stronger than "crowded" — a total non-render). Rig Check 3: manual resize does not work. |
-| 2 | **SETTINGS-02** (roadmap SC): Each mode's monitor grid, audio device pickers, app path control, and hotkey capture box are visually grouped and consistently spaced | ✗ FAILED | Same rig Check 1 — grouping cannot be evaluated when the grid and audio picker (the controls the criterion is about) don't render at all. |
-| 3 | Two monitor grids sit side by side in an evenly split, resize-responsive two-column container, not hardcoded 396x234 panels at fixed x=12/x=420 (Plan 01) | ✗ FAILED | Source correct (`tlpModeColumns` with two `Percent(50F)` columns confirmed via direct read, lines 320-326; Audit 1 confirms zero `Location`/`ClientSize`/`Absolute` usages) — but on real hardware the grids inside that container do not render at all (rig Check 1). Structural correctness did not produce the claimed runtime behavior. |
-| 4 | Each mode column contains its own monitor grid AND its own audio device picker (D-01 mode-based grouping) | ✗ FAILED | Source-level parentage is correct (22-03-SUMMARY.md Audit 2's 32-row control→parent table confirms `dgvMonitors`/`cboAudioRig` under `tlpRigColumn`, `dgvMonitorsNormal`/`cboAudioNormal` under `tlpNormalColumn`) — but rig Check 1: "Both modes only have explanations and monitor and audio are both missing" (user's own words). |
-| 5 | The old shared `pnlAudioDevices` panel and its "Audio Devices" caption no longer exist anywhere in the form | ✓ VERIFIED | `grep -rc` for `pnlAudioDevices`/`lblAudioDevicesCaption` returns 0 across all of `src/` (22-03-SUMMARY.md Audit 2); string-literal diff against baseline confirms exactly one line removed (`"Audio Devices"`), nothing else. This is a pure source-code fact, unaffected by the rendering bug. |
-| 6 | Shared full-width section (app path, hotkey, debug logging, tray/autostart checkboxes) exists below the two mode columns (D-02) | ? UNCERTAIN | Source-level parentage into `flpShared`/`pnlSharedSection` confirmed (Audit 2). Not rig-confirmed — rig checks 2 and 5-8 (which probe this section specifically) are recorded blocked/not-attempted because testing stopped at Check 3. Given the leading root-cause hypothesis describes a *cascading* AutoSize/Percent circularity across nested containers (`tlpRoot` → `tlpModeColumns` → mode columns, all three levels flagged), it cannot be assumed the shared section beneath is unaffected. |
-| 7 | Phase 23's reserved insertion point (`pnlThemeReserved`) exists, empty, zero-size, with an identifying comment (D-04) | ? UNCERTAIN | Source confirmed present (`Size(0, 0)` at line 752, parented in `flpShared` per Audit 2). Not rig-confirmed for the same reason as #6 — its host container's rendering health is unverified. |
-| 8 | Save Settings / Discard Changes sit right-aligned in their own row and can never truncate their text | ? UNCERTAIN | Source-level `AutoSize=true` + `MinimumSize` floor confirmed for both buttons (Audit 1). Rig Check 4 (button text at 125%) is recorded not-attempted — never reached. |
-| 9 | The form has no `ClientSize` assignment, sizes itself to its content, and can be resized by dragging its edges with no maximize and no minimize button (D-05, D-06) | ✗ FAILED | `ClientSize` absence and `MaximizeBox=false` are confirmed source facts (Audit 1). But "can be resized by dragging its edges" is directly falsified: rig Check 3 — "settings window can be dragged to be resized but then nothing happens... resize preview flickers when dragged but then disappears, nothing resizes" (user's own words). |
-| 10 | No control anywhere in `SettingsForm.Designer.cs` is positioned by a `Location` assignment | ✓ VERIFIED | `grep -c ".Location = new System.Drawing.Point("` returns 0 (Audit 1). Pure static source fact, independent of the rendering bug. |
-| 11 | The solution still builds with 0 errors and the 82-test suite still passes (all three plans) | ✓ VERIFIED | Re-run live in 22-03: `dotnet build` → 0 Errors, 4 pre-existing unrelated warnings; `dotnet test` → 82/82 passed. Matches phase-base baseline exactly. |
-| 12 | Blast radius is exactly one file; `SettingsForm.cs`/`ThemeApplier.cs`/every `.csproj`/`.sln` are byte-identical to the phase base commit `0c1234f` | ✓ VERIFIED | `git diff --stat 0c1234f -- src/` shows only `SettingsForm.Designer.cs` changed (523 insertions, 171 deletions); `git diff --stat 0c1234f -- '*.csproj' '*.sln'` empty; re-confirmed directly in this verification session. |
+| 1 | **SETTINGS-01** (roadmap SC): SettingsForm has no overlapping or crowded controls at its default window size | ✓ VERIFIED | 22-05-SUMMARY.md 17-check table: Check 1 (grid + audio picker render, both mode columns, 100%) PASS; Check 11 (no overlap/crowding, 125%) PASS; Check 14 (repeat 10/11/12, 150%) PASS. Source-level: `TableLayoutPanel` structure, `AutoSize`/`MinimumSize` chain confirmed correct by direct read of `SettingsForm.Designer.cs` in this session. |
+| 2 | **SETTINGS-02** (roadmap SC): Each mode's monitor grid, audio device pickers, app path control, and hotkey capture box are visually grouped and consistently spaced | ✓ VERIFIED | 22-05-SUMMARY.md: Check 1 (grid + audio picker group correctly per mode column) PASS; Check 17 (shared section reads as one coherent, consistently-spaced group) PASS. |
+| 3 | Bug B fix: mode-column sizing chain cannot collapse to invisible (root cause of the original SETTINGS-01/02 FAIL) | ✓ VERIFIED | Direct read of `SettingsForm.Designer.cs` lines 169-170 (`pnlMonitor.AutoSize=true`/`GrowAndShrink`) and line 336-337 (`tlpModeColumns.MinimumSize`/`AutoSize`) confirms the fix is present exactly as 22-04-SUMMARY.md describes. Rig Check 1 confirms the runtime effect. |
+| 4 | Bug A fix: `Form.AutoSize` no longer fights manual edge-drag resize | ✓ VERIFIED | Direct read of `SettingsForm.cs` lines 148-186 confirms the `OnLoad` override (content-driven `ClientSize` from `tlpRoot.PreferredSize`, then `MinimumSize` floor) is present. Rig Checks 3, 9, 13, 16 (resize at 100%/125%/150%, and after a warning label appears) all PASS per 22-05-SUMMARY.md. |
+| 5 | Code-review Critical findings CR-01 (chrome-unaware clamp) and CR-02 (wrong-monitor clamp) are fixed, not just recorded | ✓ VERIFIED (source) / **? not rig-confirmed for this specific branch** | `SettingsForm.cs` lines 172-186 (read directly in this session) show `chrome = this.Size - this.ClientSize` subtracted from the working area (CR-01 fix) and `Screen.FromControl(this.Owner)` used instead of `Screen.FromControl(this)` (CR-02 fix) — matches `22-REVIEW.md`'s prescribed fixes exactly. Commit `c1ee4a5` confirmed in `git log`. Build and test reconfirmed green after this fix (see Behavioral Spot-Checks below). **Not exercised by any rig session** — see Human Verification below. |
+| 6 | Code-review Warnings (WR-01, WR-02) and Info (IN-01) were knowingly left unfixed, not silently dropped | ✓ VERIFIED | `22-REVIEW.md`'s frontmatter (`fixed_inline: [CR-01, CR-02]`) and its post-review note explicitly state WR-01/WR-02/IN-01 "were left as recorded findings, not fixed, since they fall outside this phase's layout/resize scope." This is documented disposition, not an omission — acceptable per the project's own review-gate convention (fix Criticals inline, record but don't require fixing Warnings/Info for a layout-scoped phase). |
+| 7 | Blast radius stays scoped: no `Location`/`ClientSize` assignments in the Designer file, `pnlAudioDevices` fully removed, `.csproj`/`.sln`/`ThemeApplier.cs` untouched | ✓ VERIFIED | `grep -c "Location = new System.Drawing.Point"` on `SettingsForm.Designer.cs` → 0. `grep -rc "pnlAudioDevices"` across `src/` → 0 everywhere. `git diff --stat 0c1234f -- '*.csproj' '*.sln'` → empty. `git diff 0c1234f -- src/RigToggle.App/ThemeApplier.cs` → 0 lines. All re-run directly in this session, not taken from SUMMARY claims. |
+| 8 | The solution still builds with 0 errors and the (non-Windows-only) test suite still passes | ✓ VERIFIED | Re-ran independently in this session: `dotnet build RigToggle.sln -p:EnableWindowsTargeting=true --no-incremental` → `Build succeeded`, `0 Error(s)`, 4 pre-existing `xUnit1031` warnings (matches documented baseline). `dotnet test src/RigToggle.Tests/RigToggle.Tests.csproj` → `Passed! Failed: 0, Passed: 82, Skipped: 0, Total: 82`. (`RigToggle.Windows.Tests` cannot execute in this sandbox — missing `Microsoft.WindowsDesktop.App` runtime — same environment limitation as every prior phase in this project; not a regression.) |
+| 9 | No debt markers (TBD/FIXME/XXX/TODO/HACK/PLACEHOLDER) introduced in the modified files | ✓ VERIFIED | `grep -n -E "TBD\|FIXME\|XXX\|TODO\|HACK\|PLACEHOLDER"` on `SettingsForm.cs` and `SettingsForm.Designer.cs` → zero matches, re-run directly in this session. |
+| 10 | Requirements SETTINGS-01/SETTINGS-02 traced with no orphans | ✓ VERIFIED | Declared in `requirements:` frontmatter of all 5 plans (22-01 through 22-05). `REQUIREMENTS.md`'s traceability table maps both to Phase 22 exclusively. `ROADMAP.md` Phase 22 line confirms `(rig-verified 2026-08-16 after gap-closure plans 22-04/22-05)` with no `BLOCKED` annotation remaining. |
 
-**Score:** 4/12 truths fully VERIFIED, 5/12 FAILED, 3/12 UNCERTAIN (blocked, never reached by the rig test).
-
-**On the two truths that matter most — the roadmap Success Criteria themselves (#1, #2) — the verdict is unambiguous FAIL, corroborated directly by the user's own real-hardware report, not inferred.**
+**Score:** 10/10 truths VERIFIED. One additional item (CR-01/CR-02 rig confirmation) is neither pass nor fail — it is an unexercised, out-of-literal-scope edge case surfaced for human decision (see Human Verification Required).
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/RigToggle.App/SettingsForm.Designer.cs` | `TableLayoutPanel`-based mode columns + shared section, replacing all `Location`/`ClientSize` positioning | ⚠️ **STRUCTURALLY CORRECT, RUNTIME HOLLOW** | Exists, substantive (694-line diff, no stub markers, no TBD/FIXME/XXX found in this verification's own grep pass), and wired (32/32 original controls confirmed present, parented, and event-wired per Audit 2/4). **Fails Level 4 (does it actually render real content on the target platform):** rig hardware confirms the monitor grid and audio picker rows collapse to invisible in both mode columns, and the form's `AutoSize=true` fights its own `FormBorderStyle.Sizable` resize. The file is a textbook example of "artifact exists, is substantive, is wired — and is still not the goal" because the failure is in WinForms' own layout-engine resolution of nested `AutoSize`/`Percent` containers, not in anything a static grep can catch. |
-| `.planning/phases/22-settingsform-layout-pass/22-03-SUMMARY.md` | Recorded build/test output, five static audit results, and per-item rig verdict for both success criteria | ✓ VERIFIED | Present, contains the full 17-check rig result table, explicit per-criterion FAIL verdicts, and two named unconfirmed root-cause hypotheses for gap-closure research. This is exactly the artifact Plan 03's own `must_haves.artifacts` specified. |
+| `src/RigToggle.App/SettingsForm.Designer.cs` | `TableLayoutPanel`-based mode columns + shared section, wrapper-Panel `AutoSize` fix, `tlpModeColumns.MinimumSize` floor | ✓ VERIFIED | Exists, substantive, wired, and — per 22-05's real-hardware confirmation — renders correctly. All invariant counts (Percent 100F: 11, Percent 50F: 2, AutoSize rows: 18, Location: 0, ClientSize: 0, Absolute: 0) reconfirmed live in this session via direct grep. |
+| `src/RigToggle.App/SettingsForm.cs` | `OnLoad` override providing content-driven sizing (Bug A) plus the CR-01/CR-02 chrome/monitor fix | ✓ VERIFIED | Present, single new method, no other change. Confirmed via direct read (lines 148-201) and `git diff 0c1234f --stat` (exactly 2 files changed, matches documented blast radius). |
+| `.planning/phases/22-settingsform-layout-pass/22-05-SUMMARY.md` | Published binary path, 17-check PASS table, per-criterion verdict for SETTINGS-01/02 | ✓ VERIFIED | Present, contains all required elements per its own plan's `must_haves.artifacts`. |
+| `.planning/phases/22-settingsform-layout-pass/22-REVIEW.md` | Code review findings + fixed-inline disposition | ✓ VERIFIED | Present, frontmatter `fixed_inline: [CR-01, CR-02]` matches the actual diff in commit `c1ee4a5`. |
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
 |------|-----|-----|--------|---------|
-| `SettingsForm.Designer.cs` | `System.Windows.Forms.TableLayoutPanel` | `tlpModeColumns` two `Percent(50F)` `ColumnStyle`s hosting `pnlMonitorNormal`/`pnlMonitor` | ✓ WIRED (source) / ✗ **NOT OBSERVABLE ON HARDWARE** | Confirmed present in source (lines 320-330). Rig evidence shows the columns' *content* (grid, audio picker) does not render, even though the column scaffold itself is wired correctly. |
-| `SettingsForm.Designer.cs` | `SettingsForm.cs` | `cboAudioNormal`/`cboAudioRig` instance fields resolvable by name after reparenting | ✓ WIRED | `ThemeApplier.*` calls in `SettingsForm.cs` target named instance fields, not a recursive `Controls` walk (`grep -n ".Parent"` returns 0 matches, confirmed in 22-03-SUMMARY.md Audit 5). Reparenting required zero code-behind changes, as designed. This link is a source-code fact and is unaffected by the rendering bug. |
-| `SettingsForm.Designer.cs` | `SettingsForm.cs` | `AppPath_DragEnter`/`AppPath_DragDrop` wired to `pnlAppPath`, `txtAppPath`, and `tlpAppPath` (T-12-07) | ✓ WIRED (source) / ? **UNCONFIRMED ON HARDWARE** | `AllowDrop=true` on all three + both handler subscriptions confirmed (Audit 4: 3/3/3 matches). Rig Check 6 (drag-drop still works on the whole box) was never reached. |
-| `.planning/phases/22-settingsform-layout-pass/22-03-SUMMARY.md` | `.planning/ROADMAP.md` | Explicit per-criterion verdict naming its evidence source | ✓ WIRED | 22-03-SUMMARY.md's final verdict table names SETTINGS-01/SETTINGS-02 explicitly with FAIL and cites the specific rig checks as evidence. ROADMAP.md's Phase 22 line is independently annotated `(BLOCKED — rig verification FAILED 2026-08-15, gap-closure plan required)`, confirming the link was actually acted on, not just written. |
+| `SettingsForm.cs` `OnLoad` | `SettingsForm.Designer.cs` `tlpRoot` | `tlpRoot.PreferredSize` read after `PerformLayout()` | ✓ WIRED | Confirmed present, `tlpRoot.PreferredSize` appears twice as documented (22-04-SUMMARY.md invariant table), reconfirmed live via direct file read. |
+| `SettingsForm.cs` `OnLoad` | `tlpModeColumns.MinimumSize` | Mechanism-independent floor that survives regardless of which node in the chain actually caused Bug B | ✓ WIRED | `tlpModeColumns.MinimumSize = new System.Drawing.Size(0, 280);` confirmed present at Designer.cs line ~349 region. |
+| `22-05-SUMMARY.md` | `22-VERIFICATION.md` (prior) | Each recorded gap answered by the specific rig check that closes it | ✓ WIRED | 22-05-SUMMARY.md's "Gaps Closed" table names Check 1/Check 3 against both prior gaps by exact text match. |
+| `22-REVIEW.md` | `SettingsForm.cs` commit `c1ee4a5` | CR-01/CR-02 findings map 1:1 to the diff | ✓ WIRED | Confirmed: `git show c1ee4a5` touches exactly `SettingsForm.cs` (+25/-3) and `22-REVIEW.md` itself; diff content matches the two fixes CR-01/CR-02 prescribe. |
+| `22-05-SUMMARY.md` | `ROADMAP.md` | Explicit per-criterion verdict replacing the BLOCKED annotation | ✓ WIRED | ROADMAP.md Phase 22 line (77) now reads `(rig-verified 2026-08-16 after gap-closure plans 22-04/22-05)`, no `BLOCKED` text remains; all 5 wave checkboxes ticked. |
 
 ### Data-Flow / Render Trace (Level 4 — adapted for WinForms rig evidence)
 
 | Artifact | Claimed Behavior | Source Supports It? | Renders On Real Hardware? | Status |
 |----------|-------------------|----------------------|----------------------------|--------|
-| `dgvMonitors` / `dgvMonitorsNormal` inside `tlpRigColumn`/`tlpNormalColumn` | Visible monitor grid, 120px height floor, `Dock=Fill`/`Percent(100F)` row | Yes — `MinimumSize(0,120)` and `Percent(100F)` row confirmed (Audit 1, Audit 4) | **No** — rig Check 1: grid entirely absent | ✗ DISCONNECTED (row collapses to zero height; see Hypothesis 2, likely AutoSize/Percent circularity across `tlpRoot`→`tlpModeColumns`→mode columns) |
-| `cboAudioNormal` / `cboAudioRig` inside `tlpAudioNormal`/`tlpAudioRig` (an `AutoSize` row, not the `Percent` row) | Visible audio picker per mode column | Yes — parentage and `AutoSize` row confirmed (Audit 2) | **No** — rig Check 1: audio picker entirely absent | ✗ DISCONNECTED — notably, this row is `AutoSize`, not `Percent`, so the leading hypothesis (Percent-row collapse) does not fully explain its absence; 22-03-SUMMARY.md itself flags this as a distinct open question for gap-closure research |
-| `SettingsForm` window edge (`FormBorderStyle.Sizable` + `AutoSize=true`) | User can drag-resize the window | Yes — both properties confirmed set (lines 905-907) | **No** — rig Check 3: resize preview flickers, no actual resize | ✗ DISCONNECTED — classic `Form.AutoSize` vs. user-driven `WM_SIZING` conflict (Hypothesis 1), unconfirmed but well-grounded in the file's own pre-existing code comment about this exact interaction |
+| `dgvMonitors`/`dgvMonitorsNormal` inside fixed `pnlMonitor`/`pnlMonitorNormal` | Visible monitor grid in both mode columns | Yes — `AutoSize` fix + `MinimumSize` floor confirmed in source | Yes — 22-05 rig Check 1 PASS | ✓ FLOWING |
+| `cboAudioNormal`/`cboAudioRig` | Visible audio picker in both mode columns | Yes — parentage unchanged, now reachable since the wrapper Panel measures it | Yes — 22-05 rig Check 1 PASS | ✓ FLOWING |
+| `SettingsForm` window edge (`FormBorderStyle.Sizable`, `Form.AutoSize=false` + `OnLoad`) | User can drag-resize the window | Yes — `OnLoad` computes content-driven size once, then stays out of the way of `WM_SIZING` | Yes — 22-05 rig Checks 3, 9, 13, 16 PASS | ✓ FLOWING |
+| `OnLoad`'s working-area clamp branch (`Math.Min(preferredSize, maxClientWidth/Height)`) | Prevents the window from overshooting the screen at large content/small working area | Yes — CR-01/CR-02 fix present and internally coherent | **Not exercised** — 22-REVIEW.md documents the rig session's Check 15/16 passed without this branch ever binding | ⚠️ UNCONFIRMED (not DISCONNECTED — code path is correct on inspection, simply untested live) |
 
 ### Behavioral Spot-Checks
 
-Step 7b: **SKIPPED** — this phase's subject matter (WinForms rendering, live window resize, live DWM theming) has no runnable entry point in this headless Linux sandbox. No server, CLI, or API surface exists to spot-check; the phase's own Plan 03 already substituted the correct mechanism (a blocking rig-hardware checkpoint) for what would otherwise be this step, and that checkpoint's result is used directly above.
+| Behavior | Command | Result | Status |
+|----------|---------|--------|--------|
+| Solution builds clean | `dotnet build RigToggle.sln -p:EnableWindowsTargeting=true --no-incremental` | `Build succeeded`, 0 Errors, 4 pre-existing warnings | ✓ PASS |
+| Cross-platform test suite passes | `dotnet test src/RigToggle.Tests/RigToggle.Tests.csproj -p:EnableWindowsTargeting=true` | `Passed! Failed: 0, Passed: 82, Skipped: 0, Total: 82` | ✓ PASS |
+| Windows-only test suite | `dotnet test src/RigToggle.Windows.Tests/...` | Fails to launch — missing `Microsoft.WindowsDesktop.App` runtime in this Linux sandbox | ? SKIP (environment limitation, not a regression — this project's Windows-only tests have never been runnable in this sandbox) |
+| No debt markers in modified files | `grep -n -E "TBD\|FIXME\|XXX\|TODO\|HACK\|PLACEHOLDER"` on both files | Zero matches | ✓ PASS |
+| Blast radius exactly 2 files vs. phase base | `git diff --stat 0c1234f -- src/` | `SettingsForm.Designer.cs` + `SettingsForm.cs` only | ✓ PASS |
+
+WinForms rendering/resize/DPI behavior itself is not spot-checkable in this Linux sandbox — that is what the rig-hardware checkpoints (22-03, 22-05) exist for, and their results are accepted as ground truth per this project's D-03 tradeoff, same as the prior (FAIL) verification did.
 
 ### Probe Execution
 
-Step 7c: **No probes found.** `find scripts -path '*/tests/probe-*.sh'` returned nothing, and no PLAN/SUMMARY file in this phase references a probe script. N/A for this phase.
+No probes found (`find scripts -path '*/tests/probe-*.sh'` empty, no PLAN/SUMMARY references a probe script). N/A for this phase.
 
 ### Requirements Coverage
 
 | Requirement | Source Plan(s) | Description | Status | Evidence |
 |--------------|----------------|--------------|--------|----------|
-| SETTINGS-01 | 22-01, 22-02, 22-03 | SettingsForm has no overlapping or crowded controls at its default window size | ✗ **BLOCKED** | Rig Checks 1 and 3 (22-03-SUMMARY.md). **Note:** 22-01-SUMMARY.md and 22-02-SUMMARY.md both wrote `requirements-completed: [SETTINGS-01, SETTINGS-02]` in their frontmatter — those claims were made before the rig test ran and are now directly contradicted by 22-03's own hardware evidence. This is a concrete instance of the exact failure mode this verification process exists to catch: a SUMMARY claiming completion that the actual runtime behavior does not support. |
-| SETTINGS-02 | 22-01, 22-02, 22-03 | Related controls (each mode's monitor grid, audio device pickers, app path, hotkey capture) are visually grouped and consistently spaced | ✗ **BLOCKED** | Same rig evidence as SETTINGS-01; same premature `requirements-completed` claim issue in 22-01/22-02-SUMMARY.md. |
+| SETTINGS-01 | 22-01, 22-02, 22-03, 22-04, 22-05 | SettingsForm has no overlapping or crowded controls at its default window size | ✓ **SATISFIED** | 22-05-SUMMARY.md rig Checks 1, 11, 14 PASS on real Windows 11 25H2 hardware; source-level fix independently reconfirmed in this session. |
+| SETTINGS-02 | 22-01, 22-02, 22-03, 22-04, 22-05 | Related controls visually grouped and consistently spaced | ✓ **SATISFIED** | 22-05-SUMMARY.md rig Checks 1, 17 PASS. |
 
-**No orphaned requirements.** REQUIREMENTS.md's traceability table maps exactly SETTINGS-01 and SETTINGS-02 to Phase 22, and both are declared in all three plans' `requirements:` frontmatter field. Full coverage of the requirement *surface*; the requirements themselves are not yet *satisfied*.
+**No orphaned requirements.** Both IDs map exclusively to Phase 22 in `REQUIREMENTS.md`'s traceability table and appear in every plan's `requirements:` frontmatter field.
+
+**Documentation note (informational, not a gap):** `REQUIREMENTS.md`'s own checkbox list still shows `- [ ] **SETTINGS-01**` and `- [ ] **SETTINGS-02**` unchecked (lines 29-30), while sibling requirements completed in earlier phases (THEME-07, THEME-08) are ticked `[x]`. This is a documentation-sync gap in `REQUIREMENTS.md` itself, not a code or verification gap — the underlying requirements are satisfied per the evidence above. Recommend ticking both boxes as part of closing this phase.
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| `src/RigToggle.App/SettingsForm.Designer.cs` | — | `TBD`/`FIXME`/`XXX`/`TODO`/`HACK`/`PLACEHOLDER` | None found | Re-checked directly in this verification session (`grep -n -E "TBD\|FIXME\|XXX\|TODO\|HACK\|PLACEHOLDER"`) — zero matches. No debt markers, no stub-classification anti-patterns in the modified file. |
-| `.planning/phases/22-settingsform-layout-pass/22-01-SUMMARY.md`, `22-02-SUMMARY.md` | frontmatter `requirements-completed` field | Premature completion claim | ℹ️ Info (documented above under Requirements Coverage, not a blocker on its own since the phase's own later plan caught and corrected it) | Illustrates why SUMMARY.md claims cannot be trusted at face value — both plans marked SETTINGS-01/02 complete a full plan-wave before the rig test that falsified that claim ran. No corrective edit was made to those two SUMMARY files' frontmatter after the FAIL was discovered; 22-03-SUMMARY.md is the authoritative override but the stale claim remains in the earlier files' frontmatter as written. |
+| `src/RigToggle.App/SettingsForm.cs`, `SettingsForm.Designer.cs` | — | TBD/FIXME/XXX/TODO/HACK/PLACEHOLDER | None found | Re-checked directly in this session, zero matches. |
+| `.planning/STATE.md` | frontmatter + "Blockers/Concerns" | Stale tracking state | ℹ️ Info | `STATE.md` still reads `stopped_at: Phase 22 Plan 03 complete... rig verification FAILED` and lists the FAILED rig verification as an open "Blockers/Concerns" item, even though `ROADMAP.md` and `22-05-SUMMARY.md` both confirm the gap-closure plans (22-04, 22-05) completed successfully and the phase is done. This is orchestration-tracking staleness, not a code defect — likely because this verification is running out of the normal orchestrator sequence. Recommend updating `STATE.md`'s `stopped_at`/`Blockers/Concerns` once this VERIFICATION.md is accepted. |
+| `.planning/REQUIREMENTS.md` | lines 29-30 | Stale checkbox | ℹ️ Info | See Requirements Coverage note above. |
 
-No blocker-level anti-patterns (debt markers, empty implementations, hardcoded stub returns) found in the source diff itself. The blocker in this phase is not a code-smell — it is a demonstrated, hardware-confirmed runtime layout failure that static analysis structurally cannot detect, which is exactly why this phase's own plan correctly escalated to a mandatory rig-hardware checkpoint rather than declaring victory on green static audits alone.
+No blocker-level anti-patterns found in the source diff. No debt markers, no stub returns, no hollow implementations.
 
 ### Human Verification Required
 
-See `human_verification` in the frontmatter above. In summary, once a gap-closure plan lands a fix for Bug A (resize) and Bug B (grid/audio-picker collapse), the following must be re-run on real Windows rig hardware — this is not new work invented by this verification, it is the same 14 checks (2, 4-17) that 22-03-PLAN.md already specified and that the user's own report left blocked/not-attempted:
+### 1. CR-01/CR-02 working-area clamp under real overshoot conditions
 
-1. Baseline render (Check 1) — grid + audio picker actually visible in both columns
-2. Manual resize (Check 3) — window actually tracks the drag
-3. Shared-section rendering, no-minimize-button, tab order, drag-drop on the whole app-path box, validation-feedback visibility, live theme flip, AutoSize-vs-manual-resize interaction (Checks 2, 4-9)
-4. Full repeat of grid/overlap/button-text/resize/whole-window-sanity/shared-section-width checks at 125% and 150% Windows display scale (Checks 10-17)
+**Test:** Open Settings while the owning window/tray icon sits on a non-primary monitor in the actual two-monitor rig setup, and separately with Windows display scale at 150% on a smaller or lower-resolution display where the dialog's preferred content size exceeds the working area.
+**Expected:** The Settings window's full outer bounds (including title bar and border) fit within the working area of the monitor it actually appears on — no part hidden behind the taskbar or off-screen — and the size is computed against the correct monitor, not always the primary display.
+**Why human:** `22-REVIEW.md` documents that the 22-05 rig session's Check 15/16 passed without ever exercising this code branch (the clamp only binds when content overshoots the working area, which didn't happen on the tested hardware/content combination). The fix (commit `c1ee4a5`) is present and correct on inspection — chrome subtraction and `Owner`-based screen resolution both verified directly in this session — but WinForms multi-monitor/DPI clamp behavior cannot be rendered in this headless Linux sandbox. This scenario is directly relevant to this project's real topology (a two-monitor sim-racing rig) even though it falls outside SETTINGS-01/SETTINGS-02's literal wording ("default window size"), so it is surfaced here rather than silently passed or silently blocking phase closure.
+
+**Resolved 2026-08-16:** User tested both sub-scenarios on real rig hardware — Settings opened with the owner on the non-primary (rig) monitor, and again at 150% display scale after relaunch. Both PASS, no clipping or mispositioning. Recorded in `22-HUMAN-UAT.md` (status: resolved).
 
 ## Gaps Summary
 
-Phase 22's static/structural work is real and correctly executed — three plans' worth of `TableLayoutPanel` migration replaced 100% of the form's pixel-positioned layout, preserved every one of 32 original controls with verbatim properties, and left a clean one-file blast radius. None of that is in question.
+No gaps remain against the phase's two roadmap Success Criteria. Both SETTINGS-01 and SETTINGS-02 are now backed by real Windows 11 25H2 rig-hardware confirmation (22-05-SUMMARY.md's full 17-check table, all PASS), source-level fixes independently reconfirmed by this verification's own direct reads and re-run build/test commands (not merely trusted from SUMMARY claims), and a clean, correctly-scoped blast radius (exactly the two files the gap-closure plans were authorized to touch).
 
-But the phase's actual goal — "SettingsForm reads as an intentionally laid-out screen instead of a crowded, organically-grown one" — is not achieved. On real Windows hardware, the form is not "intentionally laid out"; large parts of it (the monitor grid and audio device picker, in **both** mode columns) do not render at all, and the newly-added edge-resize capability does not work. This is a stronger failure than the "crowded controls" the phase set out to fix — controls that don't render can't be crowded, but they also can't be used, which is a regression relative to the pre-phase baseline where these controls at least worked (even if inelegantly laid out).
+The one residual item surfaced for developer decision — the code-review gate's CR-01/CR-02 fix (working-area clamp chrome-subtraction and correct-monitor resolution), which had not been exercised by any rig-hardware session — has since been tested directly by the user and PASSED (see Resolved note above and `22-HUMAN-UAT.md`). No gaps remain, tracked or residual.
 
-This phase's own Plan 03 already did the correct thing: it ran the mandatory rig checkpoint, recorded the FAIL honestly rather than inferring or assuming a pass, named two unconfirmed root-cause hypotheses to seed a gap-closure plan's research step, and explicitly declared "Phase 22 is not complete." This verification confirms that self-assessment rather than overriding it — both because the rig evidence is authoritative and because there is no static-analysis basis to disagree with it. ROADMAP.md already reflects the blocked state; no change to it was needed as part of this verification.
-
-**Next step:** a gap-closure plan targeting Bug A (`Form.AutoSize` vs. manual resize conflict) and Bug B (`Percent`-row-inside-`AutoSize`-container collapse hypothesis, plus the separate open question of why the `AutoSize`-row audio picker is also missing) is required before a fresh rig-verification pass can close this phase.
+Two informational documentation-sync items were also found (stale `STATE.md` tracking state, unchecked `REQUIREMENTS.md` boxes for SETTINGS-01/02) — neither affects code correctness or the phase goal; recommend fixing as part of phase close-out.
 
 ---
 
-*Verified: 2026-08-15*
+*Verified: 2026-08-16*
 *Verifier: Claude (gsd-verifier)*
