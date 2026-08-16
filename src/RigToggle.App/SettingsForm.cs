@@ -21,6 +21,14 @@ namespace RigToggle.App
         private readonly Func<bool> _tryRegisterConfiguredHotkey;
         private readonly Action _applyTrayVisibility;
 
+        // THEME-09/23-02: two constructor-injected callback delegates from the
+        // composition root's OverridableThemeProvider (never a new AppSettings-level
+        // event) — one previews an unsaved radio selection immediately (D-01), the
+        // other drops any active preview and re-resolves from whatever is persisted
+        // (D-02/D-03). Mirrors the _applyTrayVisibility idiom above exactly.
+        private readonly Action<AppTheme?> _previewThemeOverride;
+        private readonly Action _applyThemeOverride;
+
         private AppSettings _settings = new();
 
         // TRIG-01/D-01: the working (not-yet-saved) hotkey combo, initialized from
@@ -58,6 +66,19 @@ namespace RigToggle.App
         // since the two grids are edited/committed independently (16-PATTERNS.md).
         private bool _updatingMonitorGridNormalProgrammatically;
 
+        // THEME-09/23-02: the working (not-yet-saved) theme override, mirroring the
+        // _pendingHotkeyModifiers/_pendingHotkeyKey idiom — null means System/live-follow,
+        // matching AppSettings.ThemeOverride's own "null = unset" convention.
+        private AppTheme? _pendingThemeOverride;
+
+        // Reentrancy guard for the programmatic radio-selection write in
+        // SettingsForm_Load — mirrors _updatingMonitorGridProgrammatically. Without this,
+        // assigning .Checked at load time would raise CheckedChanged and be
+        // mistaken for a user click, firing a spurious live preview. Task 3's
+        // OnThemeRadioCheckedChanged reads _updatingThemeRadiosProgrammatically first,
+        // returning immediately while it is set.
+        private bool _updatingThemeRadiosProgrammatically;
+
         /// <summary>
         /// Display/value wrapper for ComboBox binding (DisplayMember/ValueMember) —
         /// 02-RESEARCH.md Pattern 2. 15-03/D-02: Id widened to string? so a sentinel
@@ -70,7 +91,7 @@ namespace RigToggle.App
         // 12-02: ctor param + field only in this plan -- SettingsForm's own
         // subscribe/OnThemeChanged/per-control theming lands in plan 12-03. Threaded
         // here so the composition root (Program.cs SettingsFormFactory) compiles.
-        public SettingsForm(IMonitorController monitorController, IAudioController audioController, ISettingsStore settingsStore, IAutostartConfigurator autostartConfigurator, IThemeProvider themeProvider, Func<bool> tryRegisterConfiguredHotkey, Action applyTrayVisibility)
+        public SettingsForm(IMonitorController monitorController, IAudioController audioController, ISettingsStore settingsStore, IAutostartConfigurator autostartConfigurator, IThemeProvider themeProvider, Func<bool> tryRegisterConfiguredHotkey, Action applyTrayVisibility, Action<AppTheme?> previewThemeOverride, Action applyThemeOverride)
         {
             _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
             _audioController = audioController ?? throw new ArgumentNullException(nameof(audioController));
@@ -79,6 +100,8 @@ namespace RigToggle.App
             _themeProvider = themeProvider ?? throw new ArgumentNullException(nameof(themeProvider));
             _tryRegisterConfiguredHotkey = tryRegisterConfiguredHotkey ?? throw new ArgumentNullException(nameof(tryRegisterConfiguredHotkey));
             _applyTrayVisibility = applyTrayVisibility ?? throw new ArgumentNullException(nameof(applyTrayVisibility));
+            _previewThemeOverride = previewThemeOverride ?? throw new ArgumentNullException(nameof(previewThemeOverride));
+            _applyThemeOverride = applyThemeOverride ?? throw new ArgumentNullException(nameof(applyThemeOverride));
 
             InitializeComponent();
 
@@ -316,6 +339,23 @@ namespace RigToggle.App
                 lblAutostartWarning.Text = $"Could not read Start with Windows state: {ex.Message}";
                 lblAutostartWarning.Visible = true;
                 errAutostart.SetError(chkStartWithWindows, lblAutostartWarning.Text);
+            }
+
+            // THEME-09/23-02/D-01: select the radio matching the persisted override
+            // (System when null) without triggering a spurious live preview — the guard
+            // is set for the duration of the programmatic .Checked writes below and reset
+            // in a finally so it can't get stuck true if a handler throws mid-assignment.
+            _pendingThemeOverride = _settings.ThemeOverride;
+            _updatingThemeRadiosProgrammatically = true;
+            try
+            {
+                rdoThemeSystem.Checked = _pendingThemeOverride is null;
+                rdoThemeLight.Checked = _pendingThemeOverride == AppTheme.Light;
+                rdoThemeDark.Checked = _pendingThemeOverride == AppTheme.Dark;
+            }
+            finally
+            {
+                _updatingThemeRadiosProgrammatically = false;
             }
 
             ValidateSettingsForm();
@@ -1183,6 +1223,9 @@ namespace RigToggle.App
                 // the conflicting app).
                 HotkeyModifiers = _pendingHotkeyModifiers,
                 HotkeyKey = _pendingHotkeyKey,
+                // THEME-09/23-02: null persists System/live-follow, matching the
+                // "null = unset" convention every other nullable AppSettings field uses.
+                ThemeOverride = _pendingThemeOverride,
             };
 
             // Persist before the declarative DialogResult.OK closes the dialog.
@@ -1195,6 +1238,12 @@ namespace RigToggle.App
             // below) so it still executes even if the later hotkey-registration step
             // resets DialogResult to None and keeps the dialog open.
             _applyTrayVisibility();
+
+            // THEME-09/23-02/D-01: apply the just-saved override live, the moment
+            // settings persist — same slot, same reason as _applyTrayVisibility() above.
+            // After a successful Save this is a no-op (the persisted value already equals
+            // the preview); the FormClosed lambda below covers every non-save exit.
+            _applyThemeOverride();
 
             // T-08-LIE: apply the autostart registry write AFTER settings persist
             // succeeds. A failure here must never claim a success that did not happen —
