@@ -282,3 +282,7 @@ None — this plan's new surface (radio group click → in-memory preview → sh
 ---
 *Phase: 23-manual-light-dark-override*
 *Completed: 2026-08-16*
+
+## Self-Check: PASSED
+
+All created/modified files confirmed on disk (`SettingsForm.Designer.cs`, `SettingsForm.cs`, `Program.cs`, this SUMMARY.md); all four commits (`7627543`, `483ce1a`, `0eb6c88`, `112caed`) confirmed in `git log --oneline --all`.
