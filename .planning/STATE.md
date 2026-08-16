@@ -4,8 +4,8 @@ milestone: v2.1
 milestone_name: Modern UI Redesign & Theme Backlog
 current_phase: 23
 status: Phase 22 shipped — pushed directly to origin/master (f85332d), no PR (branching_strategy=none)
-stopped_at: Phase 23 context gathered
-last_updated: "2026-08-16T12:11:34.663Z"
+stopped_at: Phase 23 UI-SPEC approved
+last_updated: "2026-08-16T20:15:45.446Z"
 last_activity: 2026-08-16
 progress:
   total_phases: 5
@@ -142,9 +142,9 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-16T12:11:34.634Z
-Stopped at: Phase 23 context gathered
-Resume file: .planning/phases/23-manual-light-dark-override/23-CONTEXT.md
+Last session: 2026-08-16T20:15:45.418Z
+Stopped at: Phase 23 UI-SPEC approved
+Resume file: .planning/phases/23-manual-light-dark-override/23-UI-SPEC.md
 
 ## Operator Next Steps
 
