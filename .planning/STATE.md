@@ -2,10 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Modern UI Redesign & Theme Backlog
-current_phase: 23
-status: completed
+status: Awaiting next milestone
 stopped_at: Completed 23-03-PLAN.md — Phase 23 rig-verified, all criteria PASS
-last_updated: "2026-08-17T20:20:24.988Z"
+last_updated: "2026-08-17T20:39:37.760Z"
 last_activity: 2026-08-17
 last_activity_desc: Phase 23 complete
 progress:
@@ -14,6 +13,7 @@ progress:
   total_plans: 19
   completed_plans: 19
   percent: 100
+current_phase: 23
 current_phase_name: manual-light-dark-override
 ---
 
@@ -28,12 +28,10 @@ See: .planning/PROJECT.md (updated 2026-08-09)
 
 ## Current Position
 
-Phase: 23
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-08-17 — Phase 23 complete
-
-Progress: [██████████] 100%
+Phase: Milestone v2.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-08-17 — Milestone v2.1 completed and archived
 
 ## Performance Metrics
 
@@ -169,5 +167,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- All five v2.1 milestone phases (19-23) are now complete and rig-verified. `.planning/REQUIREMENTS.md`'s v2.1 requirement set (TILE-01..07, MAIN-01..02, SETTINGS-01..02, THEME-07..09) is fully checked off.
-- Next step: run `/gsd-complete-milestone` (or `/gsd-ship`, per this project's normal workflow) to close out v2.1 and prepare for the next milestone cycle.
+- Start the next milestone with /gsd-new-milestone
