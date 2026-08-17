@@ -75,7 +75,7 @@ Full phase details: `.planning/milestones/v2.0-ROADMAP.md`
 - [x] **Phase 20: Custom Toggle-Switch Control** - The Rig/Normal toggle becomes a custom-drawn track+thumb switch (THEME-08) (completed 2026-08-10)
 - [x] **Phase 21: Accent-Color Reading & Live Update** - Interactive elements pick up the live Windows accent color (THEME-07) (completed 2026-08-11)
 - [x] **Phase 22: SettingsForm Layout Pass** - SettingsForm's controls are regrouped and respaced, no overlap at default size (rig-verified 2026-08-16 after gap-closure plans 22-04/22-05)
-- [ ] **Phase 23: Manual Light/Dark Override** - A System/Light/Dark setting overrides live theme-follow (THEME-09)
+- [x] **Phase 23: Manual Light/Dark Override** - A System/Light/Dark setting overrides live theme-follow (THEME-09) (rig-verified 2026-08-17, all 15 checks PASS)
 
 ## Phase Details
 
@@ -202,7 +202,7 @@ Plans:
   2. Selecting Light or Dark immediately locks the app's theme and applies without restarting the app
   3. Once locked to Light or Dark, a live OS theme flip does not silently override the app's theme; selecting System restores today's live-follow behavior
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 Plans:
 **Wave 1**
 
@@ -214,7 +214,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 23-03-PLAN.md — Six static audits plus a blocking 15-check rig verification of all three success criteria and Pitfall 6's warning-signs procedure
+- [x] 23-03-PLAN.md — Six static audits plus a blocking 15-check rig verification of all three success criteria and Pitfall 6's warning-signs procedure
 
 **UI hint**: yes
 
@@ -244,7 +244,7 @@ Plans:
 | 20. Custom Toggle-Switch Control | v2.1 | 3/3 | Complete    | 2026-08-10 |
 | 21. Accent-Color Reading & Live Update | v2.1 | 3/3 | Complete    | 2026-08-11 |
 | 22. SettingsForm Layout Pass | v2.1 | 5/5 | Complete    | 2026-08-16 |
-| 23. Manual Light/Dark Override | v2.1 | 2/3 | In Progress|  |
+| 23. Manual Light/Dark Override | v2.1 | 3/3 | Complete    | 2026-08-17 |
 
 ## Backlog
 

@@ -4,17 +4,17 @@ milestone: v2.1
 milestone_name: Modern UI Redesign & Theme Backlog
 current_phase: 23
 current_phase_name: manual-light-dark-override
-status: executing
-stopped_at: Completed 23-02-PLAN.md
-last_updated: "2026-08-16T21:09:01.953Z"
+status: verifying
+stopped_at: Completed 23-03-PLAN.md — Phase 23 rig-verified, all criteria PASS
+last_updated: "2026-08-17T20:08:07.280Z"
 last_activity: 2026-08-16
 last_activity_desc: Phase 23 planning complete
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 19
-  completed_plans: 18
-  percent: 80
+  completed_plans: 19
+  percent: 100
 ---
 
 # Project State
@@ -28,12 +28,12 @@ See: .planning/PROJECT.md (updated 2026-08-09)
 
 ## Current Position
 
-Phase: 23 (manual-light-dark-override) — EXECUTING
+Phase: 23 (manual-light-dark-override) — COMPLETE
 Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-08-16 — Phase 23 execution started
+Status: Phase complete — rig-verified 2026-08-17, all 15 checks PASS, all 3 success criteria PASS. v2.1 milestone's five phases (19-23) are now all complete.
+Last activity: 2026-08-17 — Phase 23 rig verification checkpoint resolved
 
-Progress: [██████████] 95%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -79,6 +79,7 @@ Progress: [██████████] 95%
 |------|----------|-------|-------|
 | Phase 23 P01 | 35min | 2 tasks | 9 files |
 | Phase 23 P02 | 25min | 3 tasks | 3 files |
+| Phase 23 P03 | 40min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,7 @@ Full decision log lives in PROJECT.md's Key Decisions table. v2.0's decisions (o
 - [Phase ?]: Application color mode now derived from the effective theme at every theming call site plus one composition-root priming call, replacing the prior always-follow-OS SetColorMode(System) calls
 - [Phase ?]: Two constructor-injected callback delegates (previewThemeOverride, applyThemeOverride) mirror the existing _applyTrayVisibility idiom -- no AppSettings-level event was invented
 - [Phase ?]: FormClosed lambda calls _applyThemeOverride() unconditionally (not branched on DialogResult) -- correct for Discard/Esc/X/Save-then-close alike since a successful Save leaves it a no-op
+- [Phase ?]: Phase 23 rig-verified 2026-08-17: all 15 checks PASS, all 3 success criteria PASS, THEME-09 ticked complete — check 12 (in-place Settings repaint) passed both halves, no gap-closure plan needed
 
 ### Pending Todos
 
@@ -109,8 +111,11 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 22 rig verification FAILED (2026-08-15, recorded in `22-03-SUMMARY.md`, commit a40e173). User tested the published binary on real Windows hardware and reported: Check 1 FAIL (both the monitor `DataGridView` and the audio device `ComboBox` are entirely absent from both the Normal and Rig mode columns — only captions/explain text render), and Check 3 FAIL (dragging the window's edge to resize shows a flickering preview but the window never actually resizes). Testing stopped there rather than continuing checks 2/4-17 against an already-broken 100%-scale layout. Both SETTINGS-01 and SETTINGS-02 are recorded FAIL. Two unconfirmed root-cause hypotheses are recorded in the SUMMARY for gap-closure research: (A) `Form.AutoSize=true` + `FormBorderStyle.Sizable` fighting the user's manual resize; (B, leading hypothesis) a `Percent 100F` `TableLayoutPanel` row (hosting the grid) nested inside an `AutoSize=true` container (`tlpNormalColumn`/`tlpRigColumn`, and the same pattern repeats at `tlpModeColumns` and `tlpRoot`) — a circular sizing dependency WinForms is known to resolve by collapsing the percent row to zero height. Neither hypothesis was fixed or applied — this verification plan made no source change (hard constraint 1). **Phase 22 needs a gap-closure plan** (fix both bugs, most likely in `SettingsForm.Designer.cs`) followed by a fresh rig-verification pass before it can close.
-- Research flags Phase 21 (accent color, since completed) and the manual-override phase (now Phase 23, was Phase 22 before the 2026-08-11 reorder) as needing deeper research during planning — see `.planning/research/SUMMARY.md` "Research Flags" — no official Microsoft documentation confirms which registry key/API is "the" accent color, and the manual-override/live-theme-follow composition needs careful sequencing relative to the `IsDark` property consolidation.
+None currently open.
+
+Resolved 2026-08-16: Phase 22 rig verification originally FAILED (2026-08-15, recorded in `22-03-SUMMARY.md`, commit a40e173) — Check 1 (monitor grid/audio ComboBox absent) and Check 3 (manual resize not working). Gap-closure plans 22-04/22-05 fixed both root causes (`Percent 100F` `TableLayoutPanel` row collapsing inside `AutoSize=true` containers; `Form.AutoSize` fighting manual `WM_SIZING`); a second rig pass (22-05) confirmed all 17 checks PASS on Windows 11 25H2 at 100/125/150% scale. Phase 22 is complete (`ROADMAP.md`, `PROJECT.md` Validated (v2.1) section). No longer an open item.
+
+Resolved 2026-08-17: Research flagged Phase 21 (accent color) and Phase 23 (manual-override) as needing deeper research during planning — see `.planning/research/SUMMARY.md` "Research Flags". Both phases have since shipped and rig-verified with no unresolved accent-color or theme-sequencing gaps (Phase 21 complete 2026-08-11; Phase 23 complete 2026-08-17, all 15 rig checks PASS). No longer an open item.
 
 ### Quick Tasks Completed
 
@@ -156,11 +161,11 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-16T21:09:01.921Z
-Stopped at: Completed 23-02-PLAN.md
+Last session: 2026-08-17T20:08:07.250Z
+Stopped at: Completed 23-03-PLAN.md — Phase 23 rig-verified, all criteria PASS
 Resume file: None
 
 ## Operator Next Steps
 
-- Plan and execute a gap-closure plan for Phase 22 addressing two confirmed rig defects: (1) the monitor `DataGridView` and audio device `ComboBox` do not render in either the Normal or Rig mode column (leading hypothesis: `Percent 100F` row nested inside an `AutoSize=true` `TableLayoutPanel` collapses to zero height — see `22-03-SUMMARY.md` Hypothesis 2 for the three-level nesting detail), and (2) manual window resize does not work (leading hypothesis: `Form.AutoSize=true` fighting `FormBorderStyle.Sizable` — see `22-03-SUMMARY.md` Hypothesis 1). Both hypotheses are unconfirmed and need research/verification before a fix is committed.
-- After the gap-closure fix, publish a fresh rig binary and re-run the full 17-check list in `.planning/phases/22-settingsform-layout-pass/22-03-PLAN.md` Task 2's `<how-to-verify>` block at 100%, 125%, and 150% Windows display scale — this time starting from Check 1 again since nothing past Check 3 was actually exercised.
+- All five v2.1 milestone phases (19-23) are now complete and rig-verified. `.planning/REQUIREMENTS.md`'s v2.1 requirement set (TILE-01..07, MAIN-01..02, SETTINGS-01..02, THEME-07..09) is fully checked off.
+- Next step: run `/gsd-complete-milestone` (or `/gsd-ship`, per this project's normal workflow) to close out v2.1 and prepare for the next milestone cycle.
