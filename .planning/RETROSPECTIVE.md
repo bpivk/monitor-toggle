@@ -114,6 +114,46 @@
 
 ---
 
+## Milestone: v2.1 — Modern UI Redesign & Theme Backlog
+
+**Shipped:** 2026-08-17
+**Phases:** 5 (19-23) | **Plans:** 19 | **Sessions:** multiple, spanning discuss/plan/execute across all 5 phases plus rig checkpoints and this milestone-close session
+
+### What Was Built
+- MainForm redesigned into a live, hotplug-reactive monitor-tile dashboard (one clickable tile per monitor, icon+number+status, Identify, keyboard nav) that absorbed and fully retired the standalone `MonitorPanelForm` — deleted outright, no shim, both entry points gone (Phase 19, 9/9 requirements).
+- The Rig/Normal toggle rebuilt as a custom-drawn, owner-painted `ToggleSwitch` control, a byte-identical port of the four-gate click handler behind a new shape (Phase 20, THEME-08).
+- `IThemeProvider` extended with a live `AccentColor`/`AccentColorChanged` pair (registry-primary, DWM-fallback, diffed inside the existing OS-preference handler); five accent consumers repointed from a hardcoded placeholder to the live value (Phase 21, THEME-07).
+- SettingsForm fully migrated from hardcoded `Panel`/pixel positioning to a `TableLayoutPanel` layout — 2 gap-closure rounds after the first rig pass failed outright (missing controls, dead resize), then a post-rig code-review round fixed 2 further Critical working-area-clamp bugs (Phase 22, SETTINGS-01/02).
+- A manual System/Light/Dark theme override collapsing three independently-mirrored `IsDark`/`IsDarkTheme` resolution points into one shared `OverridableThemeProvider` decorator, wired in at a single composition-root swap — the structural fix for a consistency risk the milestone's own research had flagged in advance (Pitfall 6) (Phase 23, THEME-09, 15/15 rig checks PASS on first pass).
+
+### What Worked
+- **Research flagging a specific failure mode in advance, then the plan naming it as the phase's actual goal, paid off directly.** Pitfall 6 predicted exactly the "missed one of three copies" bug THEME-09 was at risk of; Phase 23's plan named collapsing to one resolver as a required task, not an incidental refactor, and the rig checkpoint specifically re-ran Pitfall 6's warning-signs procedure on all three surfaces rather than trusting the collapse by inspection alone.
+- **A dedicated tracer-slice plan (23-01) that touches nothing user-facing paid for itself.** Building the resolver + composition-root wiring as its own plan, verified by 15 new unit tests plus a build/test gate, meant the two following plans (the UI control, then the rig proof) each had a stable, already-proven foundation instead of debugging the resolver and the UI simultaneously.
+- **Deliberately declining a "safe-looking" optimization when it would reintroduce the exact bug being fixed.** Phase 23 explicitly considered and rejected diffing `ThemeChanged` before re-raising it (ARCHITECTURE.md's own suggested refinement) because suppressing the event would leave native-control drift uncorrected — recording the decision *not* to take a shortcut is as valuable as recording the ones taken.
+- **The rig-verified-before-checkbox discipline held even under a real slip.** Phase 23's wave-2 executor prematurely ticked THEME-09 complete before the blocking rig checkpoint ran — caught and reverted by the orchestrator within the same session, consistent with this project's own recorded history of the identical mistake (T-22-26) in the immediately preceding phase.
+
+### What Was Inefficient
+- **Phase 22's first rig pass failed outright**, not just "crowded" — the entire `TableLayoutPanel` migration's core claim (controls render, window resizes) was unverified until real hardware proved two structural defects (`AutoSize` wrapper-Panel collapse, `Form.AutoSize` fighting manual resize). Both defects existed at 100% scale, the simplest case — a lighter interim verification step (even a screenshot from any available Windows machine) before committing to the full TableLayoutPanel migration might have caught this earlier than a full rig round-trip.
+- **A worktree isolation fork-base drift cost one full dispatch-and-diagnose cycle in Phase 23's execution** — the harness's `isolation="worktree"` forked from a stale base three commits behind current `master`, causing a `worktree_branch_check` halt on the very first executor dispatch. The session correctly diagnosed it and degraded to sequential execution for the rest of the phase, but for a 3-plan, fully-sequential phase (each plan depends on the last) there was no parallelism to lose — attempting worktree isolation at all was avoidable overhead for this specific phase's dependency shape.
+- **TILE-01..07/MAIN-01/02's REQUIREMENTS.md checkboxes were never ticked when Phase 19 completed on 2026-08-10**, despite the phase verifying `passed` and all 9 requirements being listed in the final plan's SUMMARY frontmatter — a `phase.complete` traceability-writer gap that went unnoticed for 8 days and 4 subsequent phases until the milestone audit's 3-source cross-reference caught it. The same class of gap recurred for THEME-09 itself at Phase 23's own close. Worth a `phase.complete` traceability-writer fix so this stops recurring per-milestone.
+
+### Patterns Established
+- **A "reserved slot" left by an earlier phase for a later one, filled exactly as specified with zero reflow.** Phase 22 explicitly reserved `pnlThemeReserved` (empty, zero-size, named) for Phase 23's radio group; Phase 23's integration confirmed it landed there with no changes to anything else in the shared section — a concrete, verifiable handoff contract between sequential phases that don't otherwise share code.
+- **Naming a phase's rig checklist directly after a named research risk, not generically.** Phase 23's rig checks 6-9 are explicitly "Pitfall 6, main window / Settings window / confirm dialog / System restores live-follow" rather than generic "theme checks" — making the traceability from predicted risk to verification evidence explicit rather than implicit.
+- **A deliberate declined-optimization gets recorded as a decision, not silently omitted.** See "ThemeChanged re-raised unconditionally" above — PROJECT.md's Key Decisions table now carries both what was built and what was considered and rejected, for the same reason.
+
+### Key Lessons
+1. When research predicts a specific failure mode with a name (a numbered Pitfall), make closing that exact named risk an explicit plan task and an explicit rig-check target — not just "keep the pitfall in mind." Traceability from prediction to verification is what turns a research finding into a closed risk rather than a hopeful one.
+2. A phase whose plans form a strict dependency chain (each plan depends on the prior, no two plans in the same wave) gets zero benefit from parallel worktree isolation and should default to sequential execution — reserve isolation overhead for phases with genuine cross-plan parallelism.
+3. A traceability-writer gap that silently skips a REQUIREMENTS.md checkbox update is now confirmed to recur across multiple phases and multiple milestones (Phase 19 and Phase 23, this milestone alone) — this is a tooling gap worth fixing once rather than re-discovering at every milestone audit.
+
+### Cost Observations
+- Model mix: planning delegated to Opus (gsd-planner), research/execution/verification/UI/code-review delegated to Sonnet, consistent with prior milestones.
+- Sessions: multiple, spanning discuss → UI-phase → plan → execute across all 5 phases, each including at least one real-rig checkpoint (Phase 22 needed two), plus this milestone-close session which itself ran the audit, integration check, and full archival inline.
+- Notable: at 8 days for 5 phases, this milestone ran slower per-phase than v2.0 (5 days/4 phases) — largely explained by Phase 22's two gap-closure rounds after its first rig pass failed outright, not by any single phase being under-scoped.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
