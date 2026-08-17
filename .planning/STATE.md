@@ -144,7 +144,7 @@ Permanently out of scope (not v2 candidates):
 | out-of-scope | TRIG-02 (CLI toggle argument) | Removed — not needed | v1.1 milestone close 2026-08-01 — Phase 10 never planned/executed; tray+hotkey triggers already cover the daily-use need, user confirmed CLI trigger unnecessary |
 | out-of-scope | TRIG-03 (CLI status query argument) | Removed — not needed | v1.1 milestone close 2026-08-01 — same as TRIG-02 |
 
-Items acknowledged and deferred at v1.0 milestone close on 2026-07-26, reconfirmed at v1.1 close on 2026-08-01, reconfirmed again at v1.2 close on 2026-08-04, and reconfirmed once more at v2.0 close on 2026-08-09 (pre-close artifact audit — all are scanner false positives, not real gaps, confirmed by direct inspection each time):
+Items acknowledged and deferred at v1.0 milestone close on 2026-07-26, reconfirmed at v1.1 close on 2026-08-01, reconfirmed again at v1.2 close on 2026-08-04, reconfirmed once more at v2.0 close on 2026-08-09, and reconfirmed again at v2.1 close on 2026-08-17 (pre-close artifact audit — all are scanner false positives, not real gaps, confirmed by direct inspection each time):
 
 | Category | Item | Status |
 |----------|------|--------|
@@ -152,6 +152,7 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-07-26, reconfirm
 | uat_gap | Phase 05 (05-HUMAN-UAT.md) | File's own frontmatter already reads `status: resolved` with 0 pending scenarios; the scanner surfaces any existing UAT file regardless of resolution. Already resolved — acknowledged, no action needed. |
 | quick_task | 260728-qj1-fix-windowsmonitorcontroller-getallmonit | Scanner flags "missing" status, but `260728-qj1-SUMMARY.md` exists and STATE.md's Quick Tasks Completed table confirms it shipped in commit `fe0aee7`. False positive — the scanner's completion check doesn't recognize this quick-task's status format. |
 | quick_task | 260728-rmp-improve-settings-monitor-grid-clarity-re | Same false-positive pattern as above; shipped in commit `d76b5db`, confirmed via `260728-rmp-SUMMARY.md` and the Quick Tasks Completed table. |
+| quick_task | 260804-9rt-fix-uf-14-01-and-uf-14-02-from-phase-14- | Same false-positive pattern; shipped in commit `dd974e3`, confirmed via `260804-9rt-SUMMARY.md` and the Quick Tasks Completed table. First flagged at v2.1 close (2026-08-17) — did not appear as open at v2.0 close, but the underlying evidence (SUMMARY.md + completed-table row + commit) predates this and is not new work. |
 | uat_gap | Phase 13 (13-HUMAN-UAT.md) | Same pattern as Phase 05: file's own body already showed 2/2 passed, 0 pending, "Gaps: None" before v1.2 close — frontmatter `status: partial` was stale and has been flipped to `resolved` (commit `38d756a`). Not a real gap. |
 
 Resolved at v1.1 close (2026-08-01): Phase 11's `11-HUMAN-UAT.md` (2 pending human-verify scenarios — CR-01 lockout-guard re-verification, tray-behavior regression spot-check) — both confirmed pass on the real rig; `11-VERIFICATION.md` status updated `human_needed` → `passed`. No longer an open item.
