@@ -11,18 +11,18 @@ Requirements for the v2.1 milestone (Modern UI Redesign & Theme Backlog). Each m
 
 ### Tile Dashboard
 
-- [ ] **TILE-01**: One tile per detected monitor appears on MainForm, showing an icon, its number, and live on/off status via icon (not text)
-- [ ] **TILE-02**: Clicking a tile toggles that monitor's enabled/disabled state directly, taking effect immediately
-- [ ] **TILE-03**: Disabling a monitor via a tile is gated by the existing `SkipMonitorConfirmation` setting, identical to the retired panel's behavior
-- [ ] **TILE-04**: An Identify action near the tiles briefly overlays a number on each physical screen
-- [ ] **TILE-05**: Tab moves keyboard focus between tiles; Space or Enter toggles the focused tile
-- [ ] **TILE-06**: The tile row's status refreshes live when a monitor is connected or disconnected while MainForm is visible (not required while hidden in tray)
-- [ ] **TILE-07**: The standalone Monitors panel (`MonitorPanelForm`) and both its entry points (MainForm button, tray context-menu item) are removed
+- [x] **TILE-01**: One tile per detected monitor appears on MainForm, showing an icon, its number, and live on/off status via icon (not text)
+- [x] **TILE-02**: Clicking a tile toggles that monitor's enabled/disabled state directly, taking effect immediately
+- [x] **TILE-03**: Disabling a monitor via a tile is gated by the existing `SkipMonitorConfirmation` setting, identical to the retired panel's behavior
+- [x] **TILE-04**: An Identify action near the tiles briefly overlays a number on each physical screen
+- [x] **TILE-05**: Tab moves keyboard focus between tiles; Space or Enter toggles the focused tile
+- [x] **TILE-06**: The tile row's status refreshes live when a monitor is connected or disconnected while MainForm is visible (not required while hidden in tray)
+- [x] **TILE-07**: The standalone Monitors panel (`MonitorPanelForm`) and both its entry points (MainForm button, tray context-menu item) are removed
 
 ### Main Window
 
-- [ ] **MAIN-01**: The Rig/Normal mode toggle sits directly below the monitor tile row, as the next primary action after the tiles
-- [ ] **MAIN-02**: The Settings entry point is relocated to a secondary, de-emphasized position — no longer visually competing with the toggle or the tile row
+- [x] **MAIN-01**: The Rig/Normal mode toggle sits directly below the monitor tile row, as the next primary action after the tiles
+- [x] **MAIN-02**: The Settings entry point is relocated to a secondary, de-emphasized position — no longer visually competing with the toggle or the tile row
 
 ### Settings Layout
 
