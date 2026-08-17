@@ -13,13 +13,14 @@ requires:
     provides: SettingsForm System/Light/Dark radio group, live-preview/Save/Discard wiring
 provides:
   - Six static-audit results confirming Pitfall 6's three-copy risk is closed and nothing outside the declared ten-file scope moved
-  - The full fifteen-check rig checklist, ready to hand to the user, with no verdicts fabricated or inferred
+  - Fifteen-check rig verification of all three Phase 23 success criteria, all PASS, run and reported by the user on real Windows hardware
+  - THEME-09 authorized complete in REQUIREMENTS.md
 affects: []
 
 actuals:
-  tokens: 3100
-  tasks: 1
-  commits: 1
+  tokens: 4800
+  tasks: 2
+  commits: 2
 
 tech-stack:
   added: []
@@ -32,10 +33,11 @@ key-files:
 
 key-decisions:
   - "Task 1's six static audits all PASS with recorded verbatim evidence; no source file was touched (git status --porcelain src/ empty before and after)"
-  - "This SUMMARY is written in two parts: Task 1's audit evidence (complete, below) and Task 2's rig checklist (unanswered — awaiting the user's own PASS/FAIL verdicts on real Windows hardware, per hard constraints 3 and 4)"
-  - "status: halted — this plan reached its designed blocking checkpoint (Task 2) and intentionally stopped there; it is not done until the user reports rig verdicts and a continuation pass records them"
+  - "Task 2's fifteen rig checks were run by the user on real Windows hardware and reported back through the orchestrator; all fifteen PASS, including check 12's in-place-repaint half (which passed cleanly — better than the pre-scoped expected residual), so the Known Residual Risk section's pre-authorized gap-closure direction was not needed"
+  - "All three Phase 23 success criteria are PASS; THEME-09 is ticked in REQUIREMENTS.md as authorized by this rig pass"
+  - "status: complete — both tasks finished, all fifteen rig checks and all three success criteria carry a user-reported PASS verdict"
 
-requirements-completed: []
+requirements-completed: [THEME-09]
 
 coverage:
   - id: A1
@@ -83,26 +85,29 @@ coverage:
   - id: D1
     description: "Rig checks 1-15 covering all three Phase 23 Success Criteria and Pitfall 6's warning-signs procedure on real Windows hardware"
     requirement: "THEME-09"
-    verification: []
+    verification:
+      - kind: manual_procedural
+        ref: "23-03-PLAN.md Task 2, checks 1-15, run by the user on real Windows hardware and reported through the orchestrator"
+        status: pass
     human_judgment: true
-    rationale: "This build host has no Windows GUI, no registry, no DWM and no display. Every visual/live-flip claim in 23-01 and 23-02 is unverifiable here by design (hard constraints 3 and 4, T-23-12). The checklist below is unanswered — the executor did not run it, infer it, or fabricate verdicts. It is presented as-is, ready for the user to execute on the real rig."
+    rationale: "This build host has no Windows GUI, no registry, no DWM and no display — every visual/live-flip claim required a human on real rig hardware (hard constraints 3 and 4, T-23-12). The user ran all fifteen checks and reported PASS for every one; verdicts recorded verbatim below, not inferred or fabricated by the executor."
 
-duration: ~15min (Task 1 only; Task 2 pending)
-completed: PENDING — plan not done until Task 2's rig verdicts are recorded
-status: halted
+duration: ~40min (Task 1 ~15min static audits + Task 2 rig verification round trip)
+completed: 2026-08-17
+status: complete
 ---
 
 # Phase 23 Plan 3: Static Audits & Rig Verification Checklist Summary
 
-**Six static audits confirm Pitfall 6's three-copy consistency risk is closed with a single resolver and nothing outside the declared ten-file scope moved; the fifteen-check rig verification checklist is prepared and handed to the user unanswered — this build host cannot observe any of Windows' rendering, theme flips, or settings.json writes.**
+**Six static audits confirm Pitfall 6's three-copy consistency risk is closed with a single resolver, and all fifteen rig checks pass on real Windows hardware — all three Phase 23 success criteria are PASS, including the known open question (check 12's in-place Settings repaint) resolving cleanly with no residual gap.**
 
 ## Performance
 
-- **Duration:** ~15 min (Task 1 only)
+- **Duration:** ~40 min (Task 1 ~15 min static audits + Task 2 rig verification round trip)
 - **Started:** 2026-08-16T21:09:01Z
-- **Completed:** PENDING (Task 2 is a blocking checkpoint awaiting the user's rig verdicts)
-- **Tasks:** 1 of 2 complete
-- **Files modified:** 1 (this SUMMARY.md, created)
+- **Completed:** 2026-08-17
+- **Tasks:** 2 of 2 complete
+- **Files modified:** 1 (this SUMMARY.md, created then updated with rig verdicts)
 
 ## Accomplishments
 
@@ -112,13 +117,15 @@ status: halted
 - Confirmed nothing outside the declared ten-file scope moved: zero diff in `RigToggle.Windows/` and every `.csproj` since the phase base commit
 - Confirmed the live-preview path writes nothing to disk (`SetPreviewOverride`/`RefreshOverride` never call `.Save(`)
 - Build green (0 errors), full test suite green (97/97, above the 92-total floor)
-- The fifteen-check rig verification checklist (Task 2) is prepared below, unanswered, ready to hand to the user
+- All fifteen rig checks (Task 2) PASS on real Windows hardware, reported by the user — including check 12's in-place Settings repaint, which resolved cleanly (no gap-closure needed)
+- All three Phase 23 success criteria PASS; THEME-09 ticked in `REQUIREMENTS.md`
 
 ## Task Commits
 
-1. **Task 1: Static audits — prove the three-copy risk is closed and nothing outside scope moved** - (commit recorded below, this SUMMARY.md is the task's sole deliverable; no source file changed)
+1. **Task 1: Static audits — prove the three-copy risk is closed and nothing outside scope moved** - `7f24ec7` (docs; this SUMMARY.md is the task's sole deliverable, no source file changed)
+2. **Task 2: Rig-hardware verification of all three Phase 23 success criteria and Pitfall 6** - (recorded in this update; the checkpoint's deliverable is the verdicts below, committed alongside this SUMMARY update)
 
-_Task 2 (rig verification) is a `checkpoint:human-verify` and has not been executed or committed — it awaits the user's own PASS/FAIL verdicts on real Windows hardware._
+_Task 2 is a `checkpoint:human-verify` — its content is the user's own PASS/FAIL verdicts, run on real Windows hardware and reported through the orchestrator. No source file changed._
 
 ## Files Created/Modified
 
@@ -271,95 +278,66 @@ public void SetPreviewOverride(AppTheme? previewOverride)
 public void RefreshOverride()
 ```
 
-## Three Phase 23 Success Criteria — Machine-Verified vs. Rig-Pending
+## Three Phase 23 Success Criteria — Final Verdicts
 
-| # | Criterion | Machine-verified (this task) | Rig-pending (Task 2) |
-|---|-----------|-------------------------------|------------------------|
-| 1 | Settings offers System/Light/Dark, defaulting to System | Audit 2: exactly 3 radios, exactly 1 pre-checked, correct labels in source | Checks 1, 5 — actual rendered appearance/pre-selection |
-| 2 | Selecting Light/Dark locks and applies without restart | Audit 1 (single resolver), Audit 3 (color-mode derivation), Audit 5 (no premature write) | Checks 3, 5, 12 — actual live repaint across all three surfaces, including the known residual (in-place Settings repaint) |
-| 3 | A live OS flip does not override a lock; System restores live-follow | Audit 1 (resolution order unchanged in source) | Checks 6, 7, 8, 9 — actual Pitfall 6 warning-signs procedure on real hardware |
+| # | Criterion | Checks | Verdict |
+|---|-----------|--------|---------|
+| 1 | Settings offers System/Light/Dark, defaulting to System | 1, 5 | **PASS** |
+| 2 | Selecting Light/Dark locks and applies without restart | 3, 5, 12 | **PASS** (including check 12's first half — see below) |
+| 3 | A live OS flip does not override a lock; System restores live-follow | 6, 7, 8, 9 | **PASS** |
 
-**All three criteria remain rig-pending.** Static inspection cannot confirm rendered/runtime behavior — that is exactly what Task 2 exists for.
+**All three success criteria are PASS.** `THEME-09` is ticked in `.planning/REQUIREMENTS.md`, authorized by this rig pass.
 
 ---
 
-## Task 2: Rig-Hardware Verification Checklist (UNANSWERED — awaiting user execution)
+## Task 2: Rig-Hardware Verification Checklist — Verdicts (run by the user on real Windows hardware)
 
-**This build host has no Windows GUI, no registry, no DWM and no display. None of the fifteen checks below can be observed, inferred, or fabricated here.** The executor has not attempted to answer any of them. They are presented exactly as scoped in `23-03-PLAN.md` Task 2, ready for the user to run on real Windows hardware.
+**This build host has no Windows GUI, no registry, no DWM and no display — the executor could not run, infer, or fabricate any of these checks.** The user personally ran all fifteen checks on real Windows hardware and reported the verdicts below through the orchestrator, itemized by group, matching this plan's exact checklist from `23-03-PLAN.md` Task 2.
 
-**Publish command:** `dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true` (reuse whichever workflow Phase 21/22 actually used if it differed, and record which).
+**Publish command used:** `dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true`.
 
-**Before starting:** note current Windows theme (Settings > Personalization > Colors > "Choose your mode") and copy `%LOCALAPPDATA%\RigToggle\settings.json` — checks 10 and 11 compare against it.
+1. **Default is System.** **PASS** — no notes.
+2. **It looks like a sibling, not a feature.** **PASS** — no notes.
+3. **Light/Dark applies immediately, no Save, no restart.** **PASS** — no notes.
+4. **Discard reverts the preview (Discard Changes / Esc / window X).** **PASS** — no notes.
+5. **Save persists across relaunch.** **PASS** — no notes.
+6. **Pitfall 6, main window.** **PASS** — nothing followed Windows to light; main window stayed dark through the live OS flip.
+7. **Pitfall 6, Settings window.** **PASS** — Settings opened fully dark with Windows on Light and the app locked Dark.
+8. **Pitfall 6, confirmation dialog.** **PASS** — confirmation dialog rendered fully dark under the same conditions.
+9. **System restores live-follow (both directions).** **PASS** — app followed Windows' live flips correctly in both directions, no notes.
+10. **Windows itself is untouched.** **PASS** — no notes.
+11. **Nothing else in settings.json moved.** **PASS** — only `ThemeOverride` differed after a theme-only Save; a previewed-then-discarded change left `settings.json` byte-identical.
+12. **The known open question — in-place repaint of the Settings window itself.** **PASS, both halves.** The already-open Settings window fully repainted to dark in place the instant `Dark` was clicked (radio labels, checkbox labels, section captions, and panel backgrounds all turned dark, not just the `ThemeApplier`-managed buttons/grids/dropdowns) — better than the pre-scoped expected residual. It was also fully dark on close/reopen. **The Known Residual Risk section's pre-authorized gap-closure direction was NOT needed — no gap to record.**
+13. **Main window background matches its tiles.** **PASS** — no seam, no notes.
+14. **No functional regression.** **PASS** — full toggle, tray, hotkey, and accent-color (THEME-07) behavior all unchanged with a theme lock active.
+15. **Tray startup with a lock set.** **PASS** — app started already dark from `--tray` with a saved `Dark` override, no light flash.
 
-1. **Default is System.** Open Settings. Confirm the Theme group exists near the bottom of the shared section, shows exactly three options reading `System (default)`, `Light` and `Dark` in that order, and that `System (default)` is selected (assuming no override was ever saved on this machine). Report the exact label text, character for character.
-
-2. **It looks like a sibling, not a feature.** Confirm the Theme group carries no bold caption, no border/box, no different font, sits in the same flat stack as the debug-logging and tray checkboxes above it. Confirm nothing above it moved/overlaps and no resize was needed.
-
-3. **Light/Dark applies immediately, no Save, no restart.** With Settings open, click `Dark` — the main window behind it should repaint immediately (background, tiles, switch, buttons, title bar). Do not Save. Report. Then click `Light`, report. Then click `Dark` again and leave it for check 4.
-
-4. **Discard reverts the preview.** With `Dark` previewed and unsaved, click **Discard Changes** — should revert to pre-open state (System/live-follow). Repeat, exiting via **Esc**, then via the window's **X** — all three should revert identically. Report each.
-
-5. **Save persists.** Open Settings, select `Dark`, click **Save Changes**. App stays dark. Close and relaunch entirely — should come up dark with no flash, and Settings should show `Dark` selected. Report both.
-
-6. **Pitfall 6, main window.** With `Dark` saved and running, flip Windows Settings > Personalization > Colors to **Light**. The app's main window must stay dark (background, tiles, switch, buttons, title bar). Report which elements, if any, followed Windows to light. **Most important check in this list.**
-
-7. **Pitfall 6, Settings window.** With Windows on Light and app locked Dark, open Settings — must open fully dark (labels, checkboxes, radios, both grids, dropdowns, hotkey box, buttons). Report anything light.
-
-8. **Pitfall 6, confirmation dialog.** With Windows on Light and app locked Dark, trigger the monitor confirmation dialog. Must appear fully dark. Cancel. Report anything light.
-
-9. **System restores live-follow.** Select `System (default)`, Save. App should immediately follow Windows' current mode (Light). Flip Windows to Dark — app follows live, no restart. Flip to Light again — follows again. Report all three transitions; confirm main window, a freshly-opened Settings window, and the confirmation dialog all agree each time.
-
-10. **Windows itself is untouched.** Confirm nothing in the app changed Windows' "Choose your mode", accent color, or other personalization settings. Report current Windows mode and confirm it's where you last put it.
-
-11. **Nothing else in settings.json moved.** Change only Theme, Save, compare `%LOCALAPPDATA%\RigToggle\settings.json` against the pre-start copy — only `ThemeOverride` should differ (integer: `0`=Light, `1`=Dark, absent/null=System). Confirm monitors/audio/app path/hotkey/tray-autostart checkboxes unchanged (verify by reopening Settings too). Separately: preview a change, click Discard, confirm settings.json is byte-identical afterward.
-
-12. **The known open question — in-place repaint of the Settings window itself.** With Windows on Light and no override saved, open Settings and click `Dark` while it stays open. Report specifically: do the radio labels, the four checkbox labels, section captions, and window/panel backgrounds *inside that already-open window* turn dark, or stay light while buttons/grids/dropdowns go dark? Then close and reopen Settings — should now be fully dark. Report both halves separately. **A FAIL on the first half with a PASS on the second is the specific outcome this check exists to detect** — see the plan's Known Residual Risk section for the pre-authorised gap-closure direction if it fails.
-
-13. **Main window background matches its tiles.** In dark mode, confirm the main window's background matches the monitor tiles' shade — no seam, no change to rounded-corner/Mica look versus before this phase.
-
-14. **No functional regression.** One full Rig→Normal→Rig toggle with a theme lock active. Confirm monitors/audio switch as always, companion app launches/minimizes as usual, tray icon/menu work, global hotkey triggers a toggle. Confirm accent color still tints the switch's ON state and focus rings (THEME-07 must not regress). Report anything different from before this phase.
-
-15. **Tray startup with a lock set.** Save a `Dark` override, exit, start with `--tray`. Restore from tray — should already be dark, no light flash. Report what you see.
-
-**For any FAIL:** state which check, what was expected, what was actually seen, and (where relevant) a screenshot. Do not fix anything — a FAIL becomes a gap-closure plan, per hard constraint 1.
-
-### Criteria → Check Mapping (for the continuation pass to fill in verdicts)
-
-| Criterion | Checks | Verdict |
-|-----------|--------|---------|
-| 1 — System/Light/Dark, default System | 1, 5 | *(pending)* |
-| 2 — Lock applies without restart | 3, 5, 12 | *(pending)* |
-| 3 — Live flip doesn't override lock; System restores live-follow | 6, 7, 8, 9 | *(pending)* |
-
-**THEME-09 requirement status:** NOT ticked in `.planning/REQUIREMENTS.md` — will only be ticked once every criterion above is PASS, per this plan's acceptance criteria.
+**No FAILs.** No gap-closure plan is needed for this phase.
 
 ## Decisions Made
 
 - Followed the plan's `acceptance_criteria` (the binding contract) over its `<action>` narrative prose where the two diverged slightly (Audit 2's raw `Auto` grep count) — documented above with the precise alternative check that confirms no violation exists.
-- Wrote this SUMMARY.md in two halves so Task 1's completed, evidence-backed work is committed and durable even though Task 2 (the blocking checkpoint) has not resolved — this plan is explicitly `status: halted`, not `complete`.
+- Recorded Task 1's evidence-backed audit results in a first commit, then updated the same SUMMARY.md with Task 2's rig verdicts once the user reported them — the plan spent one round as `status: halted` (blocking checkpoint outstanding) before flipping to `status: complete` here.
+- Check 12 passing both halves means the plan's pre-authorized gap-closure direction (extending `ThemeApplier` with an explicit `ForeColor`/`BackColor` pass over `SettingsForm`) is not applied — it remains documented in the plan as a contingency that was not triggered.
 
 ## Deviations from Plan
 
-None — Task 1 executed exactly as written, all six audits recorded PASS with verbatim evidence, `git status --porcelain src/` confirmed empty both before and after.
+None — Task 1 executed exactly as written, all six audits recorded PASS with verbatim evidence, `git status --porcelain src/` confirmed empty both before and after. Task 2 was executed by the user exactly per the plan's checklist, with no FAILs and no need for the pre-authorized gap-closure fallback.
 
 ## Issues Encountered
 
-None for Task 1. Task 2 has not been attempted — it requires real Windows rig hardware this build host does not have.
+None. All fifteen rig checks and all six static audits passed on the first attempt.
 
 ## User Setup Required
 
-**This plan cannot complete without you.** Task 2 is a blocking human-verify checkpoint (`gate="blocking"`, `autonomous: false`) requiring:
-1. A Windows 10/11 rig with the app's configured monitors and audio devices
-2. Publishing the app per the command above and running it there
-3. Working through all fifteen checks in order and reporting each as PASS or FAIL with notes
-
-See the full checklist above.
+None remaining — the user has already completed the one setup step this plan required (running the fifteen-check rig verification on real Windows hardware).
 
 ## Next Phase Readiness
 
-- Not ready — Phase 23 is not done until Task 2's rig verdicts are recorded and all three success criteria carry a traceable PASS or FAIL.
-- `git status --porcelain src/` is clean; no source file was touched by this plan.
-- Once the user reports verdicts, a continuation pass should: record each check's verdict verbatim in this SUMMARY, fill in the criteria table above, tick THEME-09 in REQUIREMENTS.md only if every criterion is PASS, flip `status: halted` to `status: complete`, and update STATE.md/ROADMAP.md.
+- Phase 23 (Manual Light/Dark Override, THEME-09) is complete. All three success criteria are PASS, all fifteen rig checks are PASS, THEME-09 is ticked in `REQUIREMENTS.md`.
+- `git status --porcelain src/` is clean; no source file was touched anywhere in this plan.
+- No blockers. No gap-closure plan is needed — check 12 (the plan's one open question) resolved cleanly.
+- This closes out the v2.1 milestone's THEME-07/08/09 backlog (Phases 20, 21, 23) alongside Phase 19 (tile dashboard) and Phase 22 (Settings layout) — v2.1's full requirement set is now shipped.
 
 ## Known Stubs
 
@@ -371,4 +349,4 @@ None — this plan introduced no new surface; it only reads and audits existing 
 
 ---
 *Phase: 23-manual-light-dark-override*
-*Completed: PENDING (Task 2 rig checkpoint outstanding)*
+*Completed: 2026-08-17*
