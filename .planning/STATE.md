@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Auto-Update, Single-Instance Guard & Smaller Footprint
 status: planning
-last_updated: "2026-08-18T05:29:59.168Z"
+last_updated: "2026-08-18T07:25:05.000Z"
 last_activity: 2026-08-18
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,17 +17,19 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-08-09)
+See: .planning/PROJECT.md (updated 2026-08-18)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably applies Normal mode's own explicitly configured monitor/audio state on toggle-back (revised at v2.0 — see DISPLAY-10/AUDIO-04).
-**Current focus:** Phase 23 — manual-light-dark-override
+**Current focus:** Phase 24 — self-contained-exe-size-reduction
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-08-18 — Milestone v2.2 started
+Phase: 24 of 26 (Self-Contained Exe Size Reduction) — Not started, ready to plan
+Plan: — (no plans yet — roadmap just created)
+Status: Roadmap created — ready to plan Phase 24
+Last activity: 2026-08-18 — ROADMAP.md created for v2.2 (Phases 24-26), REQUIREMENTS.md traceability updated, 10/10 requirements mapped
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -84,6 +86,7 @@ Last activity: 2026-08-18 — Milestone v2.2 started
 - v1.2 roadmap created 2026-08-02: 3 phases derived from THEME/ICON/DOCS requirement categories (coarse granularity). Phase 12 (Theme Infrastructure) sequenced first per research risk-priority (highest-novelty work; live-update gap and `--tray` handle-timing risk). Phase 13 (Tray & App Icon Redesign) is architecturally independent of Phase 12 but sequenced second by convention, not dependency. Phase 14 (README) sequenced last, depends on both since it documents/screenshots the finished visual result. Rig-only-catchable risks (live theme flip while running, both taskbar themes, extended-session GDI handle stability, `--tray` hidden-start timing, Windows 10 fallback) were folded into Phase 12/13 success criteria and plan-level human verification rather than a separate verification phase, consistent with this project's established UAT-per-phase pattern (Phase 8, 9, 11).
 - v2.0 roadmap created 2026-08-04: 4 phases (15-18) derived from the 19 v2.0 requirements (coarse granularity), continuing numbering from v1.2's Phase 14. Structure follows research/SUMMARY.md's proposed sequencing closely: Phase 15 (optional App/Audio targets) first as lowest-risk, no-prerequisite validation-gate relaxation; Phase 16 (Normal-mode explicit monitor config + mode-store redesign) second as the core, highest-risk piece — forces `IsInRigMode()` off snapshot-file-presence onto an explicit persisted flag, landed alongside the monitor-set rewrite per research's Pitfall 4/5 warnings; Phase 17 (manual monitor panel + shared safety guard) third, depends on Phase 16's controller-call unification so the panel doesn't introduce a second implementation of "toggle a monitor." DISPLAY-12 (safety guard enforced identically across Rig toggle, Normal toggle, and the manual panel) was assigned to Phase 17 rather than Phase 16 since full three-way enforcement can only be verified once the panel (the third path) exists. Phase 18 (cleanup + exe-size reduction) last, since the snapshot/restore subsystem is only confirmed genuinely dead once Phase 16 ships. DISPLAY-13 (crash-recovery marker) and PANEL-04/05 (confirmation gate, Identify action) — both resolved into requirements after research/SUMMARY.md was written — were folded into Phase 16 and Phase 17 respectively, consistent with the research's existing rationale for those phases.
 - v2.1 roadmap created 2026-08-09: 5 phases (19-23) derived from the 14 v2.1 requirements (TILE-01..07, MAIN-01..02, SETTINGS-01..02, THEME-07..09; coarse granularity), continuing numbering from v2.0's Phase 18. Structure follows research/SUMMARY.md's proposed sequencing closely: Phase 19 (monitor-tile dashboard + MonitorPanelForm retirement) first — highest complexity/regression-risk, absorbs all 5 of the retiring panel's behaviors (TILE-01..07) plus the toggle/Settings repositioning (MAIN-01/02), sequenced so the tile replacement is proven working before the standalone panel is deleted. Phase 20 (custom toggle-switch control, THEME-08) second, right after the dashboard stabilizes since it redraws the same button Phase 19 repositions — avoids compounding two risky UI changes in one diff. Phase 21 (accent-color reading, THEME-07) third, soft-ordered before Phase 22 since it's architecturally independent but pairs naturally with an accent-tinted switch. Phase 22 (manual light/dark override, THEME-09) fourth, last among theme work since it decorates whatever `IThemeProvider` interface Phase 21 leaves behind. Phase 23 (SettingsForm layout pass) last — fully independent of every other phase, scheduled as the natural mop-up/filler with no dependency edges. All 14 requirements mapped 1:1, no orphans.
+- v2.2 roadmap created 2026-08-18: 3 phases (24-26) derived from the 10 v2.2 requirements (UPDATE-01..07, INSTANCE-01/02, PERF-03; coarse granularity), continuing numbering from v2.1's Phase 23. Structure follows research/SUMMARY.md's proposed build order exactly: Phase 24 (exe-size reduction, PERF-03) first — fully isolated from the other two features, zero `Program.cs`/runtime code changes, so every later phase's manual builds already run against the smaller artifact. Phase 25 (single-instance guard, INSTANCE-01/02) second, sequenced before auto-update specifically because it restructures `Program.cs`'s startup gate sequence and must establish the internal-relaunch bypass pattern (UPDATE-07) deliberately, in isolation, rather than inventing it under pressure while also debugging the update-apply mechanism — UPDATE-07 was therefore mapped to Phase 25 (where the bypass is built and rig-verified via scripted relaunch) rather than Phase 26 (where it's consumed end-to-end). Phase 26 (auto-update, UPDATE-01..06) last, depends on Phase 25's bypass pattern; UPDATE-01 (version-stamping infra) folded in as an early sub-step of this phase rather than split into its own phase since it's meaningless without the check logic it unblocks, and UPDATE-05 (failed-apply safety) and UPDATE-06 (manual check) were folded into the same phase as UPDATE-04 per research guidance (safety property of the same apply step; thin additive UI hook once check logic exists). All 10 requirements mapped 1:1, no orphans.
 
 ### Decisions
 
@@ -95,6 +98,8 @@ Full decision log lives in PROJECT.md's Key Decisions table. v2.0's decisions (o
 - [Phase ?]: Two constructor-injected callback delegates (previewThemeOverride, applyThemeOverride) mirror the existing _applyTrayVisibility idiom -- no AppSettings-level event was invented
 - [Phase ?]: FormClosed lambda calls _applyThemeOverride() unconditionally (not branched on DialogResult) -- correct for Discard/Esc/X/Save-then-close alike since a successful Save leaves it a no-op
 - [Phase ?]: Phase 23 rig-verified 2026-08-17: all 15 checks PASS, all 3 success criteria PASS, THEME-09 ticked complete — check 12 (in-place Settings repaint) passed both halves, no gap-closure plan needed
+- [Roadmap/v2.2]: No new NuGet packages for any of the three v2.2 capabilities — auto-update (HttpClient + System.Text.Json), single-instance guard (named `System.Threading.Mutex`), and exe-size reduction (MSBuild feature switches only) all hand-rolled, matching this codebase's existing pattern (hand-rolled `IPolicyConfig` COM interop, `RegisterHotKey` P/Invoke)
+- [Roadmap/v2.2]: Single-instance guard sequenced before auto-update specifically so the internal-relaunch bypass (UPDATE-07) is built and rig-verified in isolation, not invented under pressure while also debugging the self-replace mechanism
 
 ### Pending Todos
 
@@ -112,6 +117,8 @@ Resolved 2026-08-16: Phase 22 rig verification originally FAILED (2026-08-15, re
 
 Resolved 2026-08-17: Research flagged Phase 21 (accent color) and Phase 23 (manual-override) as needing deeper research during planning — see `.planning/research/SUMMARY.md` "Research Flags". Both phases have since shipped and rig-verified with no unresolved accent-color or theme-sequencing gaps (Phase 21 complete 2026-08-11; Phase 23 complete 2026-08-17, all 15 rig checks PASS). No longer an open item.
 
+Open (carried from v2.2 research, `.planning/research/SUMMARY.md` "Gaps to Address"): the rename-while-running self-update mechanism, Mark-of-the-Web/SmartScreen behavior for HttpClient downloads, `mainForm.BeginInvoke`/`Handle` existence under `--tray` hidden startup, and the exact signal mechanism for single-instance activation (named pipe vs. `RegisterWindowMessage`) are all flagged MEDIUM confidence and not yet rig-verified — expected to be resolved during Phase 25/26 planning and rig checkpoints, not blocking roadmap creation.
+
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit | Directory |
@@ -127,9 +134,11 @@ Items acknowledged and carried forward from previous milestone close:
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
 | dropped | LOG-01 (toggle history/log) | Dropped, not carried forward | Deferred at v1.0, v1.1, v1.2, and v2.0 scoping; explicitly dropped by user at v2.1 scoping 2026-08-09 — will not resurface as a backlog candidate |
-| v2.1 | THEME-07 (accent-color-aware highlight) | Scoped into v2.1 Phase 21 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 roadmap 2026-08-09 |
-| v2.1 | THEME-08 (custom-drawn toggle-switch control) | Scoped into v2.1 Phase 20 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 roadmap 2026-08-09 |
-| v2.1 | THEME-09 (manual theme override) | Scoped into v2.1 Phase 23 | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 roadmap 2026-08-09; reordered from Phase 22 to Phase 23 (behind SettingsForm layout pass) at user request 2026-08-11 |
+| shipped | THEME-07 (accent-color-aware highlight) | Scoped into v2.1 Phase 21, shipped | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 roadmap 2026-08-09; shipped 2026-08-17 |
+| shipped | THEME-08 (custom-drawn toggle-switch control) | Scoped into v2.1 Phase 20, shipped | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 roadmap 2026-08-09; shipped 2026-08-17 |
+| shipped | THEME-09 (manual theme override) | Scoped into v2.1 Phase 23, shipped | Deferred at v1.2 scoping 2026-08-02; scoped into v2.1 roadmap 2026-08-09; reordered from Phase 22 to Phase 23 at user request 2026-08-11; shipped 2026-08-17 |
+| backlog | UPDATE-08 (WM_COPYDATA/named-pipe IPC between instances) | Deferred, tracked in REQUIREMENTS.md Future Requirements | Explicitly TRIG-02/TRIG-03 territory, permanently out of scope per v1.1 close; not reopened at v2.2 scoping 2026-08-18 |
+| backlog | DIST-01 (Velopack/installer packaging reconsideration) | Deferred, tracked in REQUIREMENTS.md Future Requirements | Only relevant if a future milestone deliberately drops the standalone-.exe distribution constraint; not applicable to v2.2 |
 
 Permanently out of scope (not v2 candidates):
 
@@ -137,6 +146,8 @@ Permanently out of scope (not v2 candidates):
 |----------|------|--------|-------------|
 | out-of-scope | TRIG-02 (CLI toggle argument) | Removed — not needed | v1.1 milestone close 2026-08-01 — Phase 10 never planned/executed; tray+hotkey triggers already cover the daily-use need, user confirmed CLI trigger unnecessary |
 | out-of-scope | TRIG-03 (CLI status query argument) | Removed — not needed | v1.1 milestone close 2026-08-01 — same as TRIG-02 |
+| out-of-scope | UI modernization second pass (rounded corners, borderless chrome, motion/animation, Fluent iconography) | Explicitly raised and dropped | v2.2 scoping 2026-08-18 — user explicitly raised then dropped it; v2.1's redesign stands as-is |
+| out-of-scope | Silent background auto-update / manual-check-only auto-update / silent-exit on duplicate launch / delta updates / IL trimming / Native AOT / PublishReadyToRun for exe size | User-locked design choices, see REQUIREMENTS.md Out of Scope table | v2.2 requirements definition 2026-08-18 |
 
 Items acknowledged and deferred at v1.0 milestone close on 2026-07-26, reconfirmed at v1.1 close on 2026-08-01, reconfirmed again at v1.2 close on 2026-08-04, reconfirmed once more at v2.0 close on 2026-08-09, and reconfirmed again at v2.1 close on 2026-08-17 (pre-close artifact audit — all are scanner false positives, not real gaps, confirmed by direct inspection each time):
 
@@ -157,10 +168,11 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-17T20:08:07.250Z
-Stopped at: Completed 23-03-PLAN.md — Phase 23 rig-verified, all criteria PASS
+Last session: 2026-08-18T07:25:05.000Z
+Stopped at: ROADMAP.md and REQUIREMENTS.md traceability created/updated for v2.2 (Phases 24-26, 10/10 requirements mapped) — awaiting user approval, then ready to plan Phase 24
 Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Review the v2.2 roadmap draft (`.planning/ROADMAP.md`) and requirements traceability (`.planning/REQUIREMENTS.md`)
+- Once approved: `/gsd-plan-phase 24`

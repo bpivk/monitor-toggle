@@ -58,22 +58,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UPDATE-01 | TBD | Pending |
-| UPDATE-02 | TBD | Pending |
-| UPDATE-03 | TBD | Pending |
-| UPDATE-04 | TBD | Pending |
-| UPDATE-05 | TBD | Pending |
-| UPDATE-06 | TBD | Pending |
-| UPDATE-07 | TBD | Pending |
-| INSTANCE-01 | TBD | Pending |
-| INSTANCE-02 | TBD | Pending |
-| PERF-03 | TBD | Pending |
+| UPDATE-01 | Phase 26 | Pending |
+| UPDATE-02 | Phase 26 | Pending |
+| UPDATE-03 | Phase 26 | Pending |
+| UPDATE-04 | Phase 26 | Pending |
+| UPDATE-05 | Phase 26 | Pending |
+| UPDATE-06 | Phase 26 | Pending |
+| UPDATE-07 | Phase 25 | Pending |
+| INSTANCE-01 | Phase 25 | Pending |
+| INSTANCE-02 | Phase 25 | Pending |
+| PERF-03 | Phase 24 | Pending |
 
 **Coverage:**
 - v2.2 requirements: 10 total
-- Mapped to phases: 0
-- Unmapped: 10 ⚠️ (roadmap not yet created)
+- Mapped to phases: 10
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-08-18*
-*Last updated: 2026-08-18 after initial v2.2 definition*
+*Last updated: 2026-08-18 after v2.2 roadmap creation (Phases 24-26)*
