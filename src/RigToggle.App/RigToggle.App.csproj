@@ -47,4 +47,26 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <!-- Excludes WinForms Design-time and VisualBasic-compatibility assemblies that the
+       Microsoft.NET.Sdk automatically pulls into UseWindowsForms=true self-contained
+       publishes even though this app never uses PropertyGrid/IDesigner/VB interop
+       (verified: zero references to System.ComponentModel.Design, System.Drawing.Design,
+       or Microsoft.VisualBasic anywhere in src/, 24-RESEARCH.md). This is a manually
+       curated deny-list of 7 specific, known-unused files, not IL trimming; it performs
+       no reachability analysis and cannot misclassify the COM/P-Invoke marshalling code
+       paths CLAUDE.md warns PublishTrimmed breaks. -->
+  <Target Name="RemoveUnusedDesignerAndVbAssemblies" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="
+        '%(FileName)%(Extension)'=='System.Windows.Forms.Design.dll' or
+        '%(FileName)%(Extension)'=='System.Windows.Forms.Design.Editors.dll' or
+        '%(FileName)%(Extension)'=='System.Design.dll' or
+        '%(FileName)%(Extension)'=='System.Drawing.Design.dll' or
+        '%(FileName)%(Extension)'=='Microsoft.VisualBasic.Core.dll' or
+        '%(FileName)%(Extension)'=='Microsoft.VisualBasic.Forms.dll' or
+        '%(FileName)%(Extension)'=='Microsoft.VisualBasic.dll'
+      " />
+    </ItemGroup>
+  </Target>
+
 </Project>
