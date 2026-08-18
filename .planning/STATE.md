@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: Modern UI Redesign & Theme Backlog
-status: Awaiting next milestone
-stopped_at: Completed 23-03-PLAN.md — Phase 23 rig-verified, all criteria PASS
-last_updated: "2026-08-17T20:39:37.760Z"
-last_activity: 2026-08-17
-last_activity_desc: Phase 23 complete
+milestone: v2.2
+milestone_name: Auto-Update, Single-Instance Guard & Smaller Footprint
+status: planning
+last_updated: "2026-08-18T05:29:59.168Z"
+last_activity: 2026-08-18
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 19
-  completed_plans: 19
-  percent: 100
-current_phase: 23
-current_phase_name: manual-light-dark-override
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -28,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-08-09)
 
 ## Current Position
 
-Phase: Milestone v2.1 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-08-17 — Milestone v2.1 completed and archived
+Status: Defining requirements
+Last activity: 2026-08-18 — Milestone v2.2 started
 
 ## Performance Metrics
 

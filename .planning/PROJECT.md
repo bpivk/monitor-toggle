@@ -16,11 +16,21 @@ v2.1 replaced both windows' bolted-on-feature layout with an intentional, modern
 
 **Not yet done:** the four README screenshot placeholders (`docs/screenshots/*.png`) are still broken-image links from v1.2 — real screenshots must be supplied by the user from the rig (no Windows GUI in this build environment). Now more out of date than ever given the MainForm redesign.
 
-## Current Milestone: v2.1 Modern UI Redesign & Theme Backlog
+## Current Milestone: v2.2 Auto-Update, Single-Instance Guard & Smaller Footprint
 
-**Goal:** Replace both windows' bolted-on-feature layout with an intentional, modern design — MainForm becomes a monitor-tile dashboard leading into the mode toggle, SettingsForm gets a real layout pass, and the deferred theme backlog (accent color, custom toggle switch, manual override) closes out.
+**Goal:** Keep the app current and well-behaved as a background/tray-resident tool — check GitHub for new releases and let the user install them with one confirm, prevent duplicate instances from ever running side-by-side, and continue trimming the self-contained exe's size using only safe (non-trimming) levers.
 
 **Target features:**
+- Auto-update: on launch, check GitHub Releases for a newer version than the running build; if found, prompt the user to confirm before downloading and applying it, then relaunch on the new version
+- Single-instance guard: launching the app while an instance is already running focuses that existing instance instead of starting a duplicate
+- Further self-contained exe size reduction beyond v2.0's 57.79% cut, using safe MSBuild-level levers only — no IL trimming, consistent with existing project guidance on COM/P-Invoke-heavy code
+
+**Key context:** UI modernization was raised and explicitly dropped from this milestone's scope by the user — v2.1's redesign stands as-is for now. Auto-update and the single-instance guard are both new capabilities, not extensions of existing requirement categories.
+
+<details>
+<summary>Archived: v2.1 milestone framing (superseded)</summary>
+
+**v2.1 Modern UI Redesign & Theme Backlog target features (shipped 2026-08-17, as scoped 2026-08-09):**
 - MainForm redesign: clickable per-monitor tiles (icon + number, live on/off status) as the primary screen, Rig/Normal toggle button placed after the tile row, Settings relocated to a secondary/bottom position
 - Monitor tiles absorb the standalone Monitors panel's functionality (direct toggle, Identify action moved near the tiles, existing `SkipMonitorConfirmation` safety gate preserved) — the separate `MonitorPanelForm` and its entry points (MainForm button + tray item) are retired
 - SettingsForm layout pass: fix overlapping/crowded controls, better grouping and spacing for the two monitor grids, audio dropdowns, app path, and hotkey box
@@ -28,7 +38,9 @@ v2.1 replaced both windows' bolted-on-feature layout with an intentional, modern
 - THEME-07: key interactive elements pick up the Windows accent color instead of a fixed palette
 - THEME-09: a manual light/dark override setting, independent of live Windows theme-follow
 
-**Key context:** This milestone retires Phase 17's standalone Manual Monitor Panel (`MonitorPanelForm`) by folding its capability directly into the redesigned MainForm — the panel's underlying `IMonitorController.DeactivateMonitors`/`ActivateMonitors` calls and the shared DISPLAY-12 safety guard stay, only the separate window and its two entry points go away. LOG-01 (toggle history/log) was considered and explicitly dropped — not carried forward again.
+All six target features shipped as scoped; no scope was dropped or added mid-milestone.
+
+</details>
 
 <details>
 <summary>Archived: v2.0 milestone framing (superseded)</summary>
@@ -130,7 +142,7 @@ All five v2.1 roadmap phases (19-23) are now complete and verified. THEME-07/08/
 
 ### Active
 
-None — v2.1's feature work is complete pending the REQUIREMENTS.md checkbox reconciliation noted above.
+Defining v2.2 requirements (auto-update, single-instance guard, exe size reduction) — see `.planning/REQUIREMENTS.md`.
 
 ### Out of Scope
 
@@ -229,4 +241,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-17 — Phase 23 (Manual Light/Dark Override, THEME-09) shipped, rig-verified 15/15 checks on first pass. Last phase of v2.1 — milestone ready for `/gsd-complete-milestone` pending the TILE/MAIN checkbox reconciliation noted above.*
+*Last updated: 2026-08-18 — v2.2 milestone started (Auto-Update, Single-Instance Guard & Smaller Footprint); requirements being defined.*
