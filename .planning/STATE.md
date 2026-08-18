@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Auto-Update, Single-Instance Guard & Smaller Footprint
 current_phase: 24
-current_phase_name: Not started, ready to plan
-status: planning
-stopped_at: Phase 24 context gathered
-last_updated: "2026-08-18T10:37:24.496Z"
+current_phase_name: self-contained-exe-size-reduction
+status: executing
+stopped_at: "Phase 24 Plan 01: Tasks 1-2 complete, halted at Task 3 blocking rig checkpoint"
+last_updated: "2026-08-18T10:43:03.543Z"
 last_activity: 2026-08-18
-last_activity_desc: ROADMAP.md created for v2.2 (Phases 24-26), REQUIREMENTS.md traceability updated, 10/10 requirements mapped
+last_activity_desc: Phase 24 Plan 01 Tasks 1-2 executed (exe-size lever added, measured, audited); Task 3 blocking rig checkpoint pending operator
 progress:
   total_phases: 3
   completed_phases: 0
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-08-18)
 
 ## Current Position
 
-Phase: 24 of 26 (Self-Contained Exe Size Reduction) — Not started, ready to plan
-Plan: — (no plans yet — roadmap just created)
-Status: Roadmap created — ready to plan Phase 24
-Last activity: 2026-08-18 — ROADMAP.md created for v2.2 (Phases 24-26), REQUIREMENTS.md traceability updated, 10/10 requirements mapped
+Phase: 24 (self-contained-exe-size-reduction) — EXECUTING (halted at blocking checkpoint)
+Plan: 1 of 1 — Tasks 1-2 complete, Task 3 (rig verification) pending operator
+Status: Blocked on real Windows rig hardware verification (Task 3 of 24-01-PLAN.md)
+Last activity: 2026-08-18 — Tasks 1-2 executed and committed (67f4bfd, 8ee769c); Task 3 checkpoint returned
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -115,7 +115,7 @@ None.
 
 ### Blockers/Concerns
 
-None currently open.
+Open: Phase 24 Plan 01 Task 3 (blocking checkpoint) requires real Windows rig hardware verification — not available in this build environment. Operator must build `RigToggle.App.exe` natively on Windows at commit `67f4bfd`, run the six checks in `24-01-PLAN.md` Task 3, and report results to resume execution. PERF-03 is not yet marked complete and Phase 24 is not yet closed pending this.
 
 Resolved 2026-08-16: Phase 22 rig verification originally FAILED (2026-08-15, recorded in `22-03-SUMMARY.md`, commit a40e173) — Check 1 (monitor grid/audio ComboBox absent) and Check 3 (manual resize not working). Gap-closure plans 22-04/22-05 fixed both root causes (`Percent 100F` `TableLayoutPanel` row collapsing inside `AutoSize=true` containers; `Form.AutoSize` fighting manual `WM_SIZING`); a second rig pass (22-05) confirmed all 17 checks PASS on Windows 11 25H2 at 100/125/150% scale. Phase 22 is complete (`ROADMAP.md`, `PROJECT.md` Validated (v2.1) section). No longer an open item.
 
@@ -172,9 +172,9 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-18T10:06:41.933Z
-Stopped at: Phase 24 context gathered
-Resume file: .planning/phases/24-self-contained-exe-size-reduction/24-CONTEXT.md
+Last session: 2026-08-18T10:43:03.304Z
+Stopped at: Phase 24 Plan 01: Tasks 1-2 complete, halted at Task 3 blocking rig checkpoint
+Resume file: .planning/phases/24-self-contained-exe-size-reduction/24-01-SUMMARY.md
 
 ## Operator Next Steps
 
