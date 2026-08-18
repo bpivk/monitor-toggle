@@ -102,7 +102,8 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
   2. A full toggle round trip (Rig → Normal → Rig) and a cold autostart boot both succeed on real rig hardware after the size-reduction changes, with no functional regression
   3. No IL trimming (`PublishTrimmed`), Native AOT (`PublishAot`), or `PublishReadyToRun` properties were introduced — only additive, safe MSBuild feature switches
 
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 24-01-PLAN.md — Add the `RemoveUnusedDesignerAndVbAssemblies` publish-exclusion target to `RigToggle.App.csproj`, measure fresh before/after byte counts, audit that no excluded lever or dependency change slipped in, and rig-verify the smaller exe
 
 ### Phase 25: Single-Instance Guard
 
