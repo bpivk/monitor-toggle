@@ -8,13 +8,15 @@ namespace RigToggle.Windows.Tests;
 
 // Covers the pure, unit-testable helpers exposed off WindowsMonitorController via
 // InternalsVisibleTo: the AnyRectanglesOverlap bounding-box geometry check, the
-// MergeAllMonitors dedup/promotion logic, and the ComputeUndetectedDevicePaths
-// already-disabled-vs-never-detected classification seam (debug session
-// toggle-false-incomplete-error), all reachable without live display hardware. The
-// mutating CCD methods (ActivateMonitors/DeactivateMonitors) are NOT unit-tested
-// here — they call PathInfo.GetActivePaths()/GetAllPaths()/ApplyPathInfos() directly,
-// which are static calls into real native CCD APIs with no injectable seam, so they
-// remain verified only via live rig testing (see 04-01/04-03 SUMMARY.md).
+// MergeAllMonitors dedup/promotion logic, the ComputeUnexpectedlyActivated
+// Extend-side-effect-detection seam (debug session monitor-enable-affects-other),
+// and the ComputeUndetectedDevicePaths already-disabled-vs-never-detected
+// classification seam (debug session toggle-false-incomplete-error), all reachable
+// without live display hardware. The mutating CCD methods (ActivateMonitors/
+// DeactivateMonitors) are NOT unit-tested here — they call PathInfo.GetActivePaths()/
+// GetAllPaths()/ApplyPathInfos()/ApplyTopology() directly, which are static calls
+// into real native CCD APIs with no injectable seam, so they remain verified only
+// via live rig testing (see 04-01/04-03 SUMMARY.md).
 public class WindowsMonitorControllerTests
 {
     // Covers the pure axis-aligned bounding-box overlap helper added in Phase 6 Plan
@@ -152,6 +154,71 @@ public class WindowsMonitorControllerTests
         MonitorInfo disabled = result.Single(r => r.DevicePath == "DEV3");
         Assert.False(disabled.IsPrimary);
         Assert.False(disabled.IsActive);
+    }
+
+    // Covers the debug-session monitor-enable-affects-other fix: ActivateMonitors'
+    // ApplyTopology(Extend) call is whole-topology, not scoped to the caller's
+    // requested device path(s) — it can reactivate an unrelated, still-should-stay-
+    // disabled monitor as a side effect. ComputeUnexpectedlyActivated is the pure
+    // seam that detects this so the caller can correct it via DeactivateMonitors.
+    // Same "pure logic only, no live CCD hardware" discipline as the rest of this file.
+    [Fact]
+    public void ComputeUnexpectedlyActivated_RigRegressionScenario_ExtendReactivatesOtherDisabledMonitor_FlagsIt()
+    {
+        // Mirrors the reported 3-monitor rig bug exactly: DEV1 (primary) stays active
+        // throughout; DEV2 and DEV3 are both disabled before the tile click; the user
+        // clicks DEV2's tile (requesting only DEV2); Extend comes back with DEV2 AND
+        // DEV3 active. Only DEV3 (active, not previously active, not requested) should
+        // be flagged for correction.
+        var preActive = new HashSet<string> { "DEV1" };
+        var postActive = new HashSet<string> { "DEV1", "DEV2", "DEV3" };
+        var requested = new HashSet<string> { "DEV2" };
+
+        var result = WindowsMonitorController.ComputeUnexpectedlyActivated(preActive, postActive, requested);
+
+        Assert.Single(result);
+        Assert.Contains("DEV3", result);
+    }
+
+    [Fact]
+    public void ComputeUnexpectedlyActivated_ExtendOnlyActivatesRequestedMonitor_ReturnsEmpty()
+    {
+        // The pre-upgrade 2-monitor case (and the well-behaved 3-monitor case): Extend
+        // activates exactly what was requested and nothing else — no correction needed.
+        var preActive = new HashSet<string> { "DEV1" };
+        var postActive = new HashSet<string> { "DEV1", "DEV2" };
+        var requested = new HashSet<string> { "DEV2" };
+
+        var result = WindowsMonitorController.ComputeUnexpectedlyActivated(preActive, postActive, requested);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void ComputeUnexpectedlyActivated_AlreadyActiveBeforeExtend_NotFlaggedEvenThoughUnrequested()
+    {
+        // A device path that was ALREADY active before Extend ran must never be
+        // flagged for correction, even though it isn't in the requested set — it
+        // wasn't caused by this call, so DeactivateMonitors must not touch it.
+        var preActive = new HashSet<string> { "DEV1", "DEV3" };
+        var postActive = new HashSet<string> { "DEV1", "DEV2", "DEV3" };
+        var requested = new HashSet<string> { "DEV2" };
+
+        var result = WindowsMonitorController.ComputeUnexpectedlyActivated(preActive, postActive, requested);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void ComputeUnexpectedlyActivated_NoNewActivations_ReturnsEmpty()
+    {
+        var preActive = new HashSet<string> { "DEV1", "DEV2" };
+        var postActive = new HashSet<string> { "DEV1", "DEV2" };
+        var requested = new HashSet<string> { "DEV2" };
+
+        var result = WindowsMonitorController.ComputeUnexpectedlyActivated(preActive, postActive, requested);
+
+        Assert.Empty(result);
     }
 
     // Covers the debug session toggle-false-incomplete-error fix: DeactivateMonitors'

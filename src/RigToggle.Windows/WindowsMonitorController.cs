@@ -172,6 +172,18 @@ public sealed class WindowsMonitorController : IMonitorController
     // for the same reason. ToggleService is the enforcement point for this ordering;
     // documented here too so a reader of this adapter alone still understands the
     // contract.
+    //
+    // Rig-confirmed (3-monitor rig, debug session monitor-enable-affects-other): Extend
+    // being whole-topology cuts both ways — it doesn't just risk repositioning an
+    // unrelated already-active monitor (Pitfall 3 below), it can REACTIVATE an
+    // unrelated monitor that was deliberately left OS-disabled, if the persistence
+    // database's last-known extend layout still includes it. With only one candidate
+    // disabled monitor (the pre-upgrade 2-monitor case) this was unobservable; with two
+    // or more simultaneously-disabled-but-available monitors, calling Extend to
+    // reactivate just one of them can reactivate the other(s) too. The correction below
+    // detects any device path that came back active but was neither previously active
+    // nor requested, and turns it back off via the same already rig-proven
+    // DeactivateMonitors CCD-removal path — never via manual reconstruction.
     public void ActivateMonitors(IReadOnlySet<string> monitorDevicePaths)
     {
         if (monitorDevicePaths.Count == 0) return;
@@ -204,13 +216,35 @@ public sealed class WindowsMonitorController : IMonitorController
 
         PathInfo.ApplyTopology(DisplayConfigTopologyId.Extend, allowPersistence: false);
 
+        PathInfo[] postExtend = PathInfo.GetActivePaths(virtualModeAware: false);
+        var postExtendActiveDevicePaths = postExtend
+            .SelectMany(p => p.TargetsInfo)
+            .Select(t => t.DisplayTarget.DevicePath)
+            .ToHashSet();
+
+        // Whole-topology correction (rig-confirmed, see class-level remarks above):
+        // Extend can reactivate device paths beyond the requested set. Any device path
+        // that is active now, was NOT active before this call, and was NOT requested
+        // must be turned back off — otherwise a single-tile "enable one monitor" action
+        // could silently reactivate an unrelated, deliberately-disabled monitor.
+        IReadOnlySet<string> unexpectedlyActivated = ComputeUnexpectedlyActivated(
+            currentlyActiveDevicePaths, postExtendActiveDevicePaths, monitorDevicePaths);
+
+        if (unexpectedlyActivated.Count > 0)
+        {
+            // Reuses the already rig-proven CCD-removal path (repositioning-aware
+            // ApplyPathInfos + its own verify-and-throw) — never a manual
+            // PathTargetInfo/mode reconstruction (see class-level remarks).
+            DeactivateMonitors(unexpectedlyActivated);
+        }
+
         // Verify-and-throw (D-03/D-04 discipline, unchanged): re-query, confirm every
         // requested device path is now active. Never trust a non-throwing return
         // alone, never use Screen.AllScreens as the oracle. No further automatic
         // recovery is attempted on mismatch (D-05).
-        PathInfo[] postExtend = PathInfo.GetActivePaths(virtualModeAware: false);
+        PathInfo[] postCorrection = PathInfo.GetActivePaths(virtualModeAware: false);
         var stillInactive = monitorDevicePaths.Except(
-            postExtend.SelectMany(p => p.TargetsInfo).Select(t => t.DisplayTarget.DevicePath)).ToArray();
+            postCorrection.SelectMany(p => p.TargetsInfo).Select(t => t.DisplayTarget.DevicePath)).ToArray();
 
         if (stillInactive.Length > 0)
         {
@@ -218,6 +252,22 @@ public sealed class WindowsMonitorController : IMonitorController
                 $"Monitor enable did not take effect: {string.Join(", ", stillInactive)}. " +
                 "No further automatic recovery is attempted (D-05).");
         }
+    }
+
+    // Pure seam (unit-tested, RigToggle.Windows.Tests — no live CCD hardware needed)
+    // extracted from ActivateMonitors so the rig-confirmed "Extend reactivates
+    // unrelated disabled monitors" correction is directly testable. A device path
+    // belongs in the result iff it is active after Extend, was NOT active before
+    // Extend, and was NOT part of the caller's requested set — i.e. it came back
+    // "for free" as an unrequested side effect of the whole-topology Extend call.
+    internal static IReadOnlySet<string> ComputeUnexpectedlyActivated(
+        IReadOnlySet<string> preActiveDevicePaths,
+        IReadOnlySet<string> postActiveDevicePaths,
+        IReadOnlySet<string> requestedDevicePaths)
+    {
+        return postActiveDevicePaths
+            .Where(dp => !preActiveDevicePaths.Contains(dp) && !requestedDevicePaths.Contains(dp))
+            .ToHashSet();
     }
 
     // Pure seam (unit-tested, RigToggle.Windows.Tests — no live CCD hardware needed)
