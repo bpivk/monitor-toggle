@@ -102,9 +102,9 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
   2. A full toggle round trip (Rig → Normal → Rig) and a cold autostart boot both succeed on real rig hardware after the size-reduction changes, with no functional regression
   3. No IL trimming (`PublishTrimmed`), Native AOT (`PublishAot`), or `PublishReadyToRun` properties were introduced — only additive, safe MSBuild feature switches
 
-**Plans**: 1 plan (in progress — Tasks 1-2 complete, Task 3 blocking rig checkpoint pending)
+**Plans**: 1/1 plans executed
 
-- [ ] 24-01-PLAN.md — Add the `RemoveUnusedDesignerAndVbAssemblies` publish-exclusion target to `RigToggle.App.csproj`, measure fresh before/after byte counts, audit that no excluded lever or dependency change slipped in, and rig-verify the smaller exe (Tasks 1-2 done, commit `67f4bfd`; Task 3 rig verification pending operator)
+- [x] 24-01-PLAN.md — Add the `RemoveUnusedDesignerAndVbAssemblies` publish-exclusion target to `RigToggle.App.csproj`, measure fresh before/after byte counts, audit that no excluded lever or dependency change slipped in, and rig-verify the smaller exe (Tasks 1-2 done, commit `67f4bfd`; Task 3 rig verification pending operator)
 
 ### Phase 25: Single-Instance Guard
 
@@ -162,7 +162,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
 | 21. Accent-Color Reading & Live Update | v2.1 | 3/3 | Complete | 2026-08-11 |
 | 22. SettingsForm Layout Pass | v2.1 | 5/5 | Complete | 2026-08-16 |
 | 23. Manual Light/Dark Override | v2.1 | 3/3 | Complete | 2026-08-17 |
-| 24. Self-Contained Exe Size Reduction | v2.2 | 0/1 | In Progress (blocking checkpoint pending) | - |
+| 24. Self-Contained Exe Size Reduction | v2.2 | 1/1 | In Progress|  |
 | 25. Single-Instance Guard | v2.2 | 0/TBD | Not started | - |
 | 26. Auto-Update | v2.2 | 0/TBD | Not started | - |
 

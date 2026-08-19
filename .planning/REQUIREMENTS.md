@@ -24,7 +24,7 @@ Requirements for the "Auto-Update, Single-Instance Guard & Smaller Footprint" mi
 
 ### Performance
 
-- [ ] **PERF-03**: Self-contained exe is measurably smaller than the v2.1 baseline via additional safe MSBuild-level levers only (no IL trimming, no Native AOT, no `PublishReadyToRun`)
+- [x] **PERF-03**: Self-contained exe is measurably smaller than the v2.1 baseline via additional safe MSBuild-level levers only (no IL trimming, no Native AOT, no `PublishReadyToRun`)
 
 ## Future Requirements
 
@@ -67,9 +67,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UPDATE-07 | Phase 25 | Pending |
 | INSTANCE-01 | Phase 25 | Pending |
 | INSTANCE-02 | Phase 25 | Pending |
-| PERF-03 | Phase 24 | Pending |
+| PERF-03 | Phase 24 | Complete |
 
 **Coverage:**
+
 - v2.2 requirements: 10 total
 - Mapped to phases: 10
 - Unmapped: 0 ✓

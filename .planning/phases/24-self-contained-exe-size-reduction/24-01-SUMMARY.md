@@ -35,7 +35,6 @@ key-decisions:
 patterns-established:
   - "MSBuild deny-list lever pattern: <Target AfterTargets=\"ComputeResolvedFilesToPublishList\"> with an ItemGroup Remove Condition matching exact '%(FileName)%(Extension)' equality — reusable for any future confirmed-unused-assembly exclusion, never a wildcard/Contains() match"
 
-requirements-completed: []  # PERF-03 NOT marked complete — Task 3 (blocking rig-hardware checkpoint) is still pending
 
 coverage:
   - id: D1
@@ -59,38 +58,49 @@ coverage:
   - id: D3
     description: "Full Rig -> Normal -> Rig toggle round trip, cold autostart boot, Settings window, and tray-triggered toggle all succeed on real Windows rig hardware running the post-change exe"
     requirement: "PERF-03"
-    verification: []
+    verification:
+      - kind: other
+        ref: "Task 3 six-check operator verification on real Windows rig hardware, all PASS"
+        status: pass
     human_judgment: true
-    rationale: "Requires real Windows rig hardware (CCD display topology control, IPolicyConfig COM audio switching, Moza Companion process, autostart registration) not present in this build environment. Task 3 is a blocking checkpoint pending operator execution on the rig — see 'Checkpoint Status' below."
+    rationale: "Requires real Windows rig hardware (CCD display topology control, IPolicyConfig COM audio switching, Moza Companion process, autostart registration) not present in this build environment. Operator ran all six checks on the real rig and confirmed PASS."
+
+requirements-completed: [PERF-03]
 
 duration: 20min
-completed: 2026-08-18
-status: halted
+completed: 2026-08-19
+status: complete
 ---
 
 # Phase 24 Plan 01: Self-Contained Exe Size Reduction Summary
 
-**Added one MSBuild deny-list target excluding 7 unused WinForms Design/VB assemblies, cutting the self-contained exe by 2,596,463 bytes (5.26%) — Tasks 1-2 complete and all automated gates pass; Task 3 (blocking rig-hardware verification) is pending operator execution.**
+**Added one MSBuild deny-list target excluding 7 unused WinForms Design/VB assemblies, cutting the self-contained exe by 2,596,463 bytes (5.26%) — all three tasks complete, including operator rig verification on real Windows hardware.**
 
 ## Performance
 
-- **Duration:** 20 min (Tasks 1-2 only; Task 3 not yet run)
+- **Duration:** 20 min (Tasks 1-2) + operator rig session (Task 3, elapsed time not tracked by this environment)
 - **Started:** 2026-08-18T10:38:XXZ (approx, per orchestrator init)
 - **Completed (Tasks 1-2):** 2026-08-18T10:41:46Z
-- **Tasks:** 2 of 3 completed (Task 3 blocked on real Windows rig hardware)
+- **Completed (Task 3, operator-reported):** 2026-08-19
+- **Tasks:** 3 of 3 completed
 - **Files modified:** 1 (`src/RigToggle.App/RigToggle.App.csproj`)
+
+## Rig Verification (Task 3)
+
+All six checks performed by the operator on the real Windows rig, using a Windows-native build at commit `67f4bfd`. All PASS.
+
+1. **Byte count on Windows** — **PASS**. Windows-native size: **46,774,899 bytes**, confirmed under the 49,356,430-byte v2.1 baseline (margin: 2,581,531 bytes). This differs from Task 1's Linux-cross-compile AFTER figure (46,770,881 bytes) by 4,018 bytes — consistent with the same class of SDK/platform build drift already documented for the BEFORE measurement (FA-2); the pass/fail margin absorbs it by a wide factor.
+2. **Cold launch, window mode** — **PASS**. Operator confirmed: main window, tiles, and toggle switch render normally on cold launch, no exception dialog or missing-assembly error.
+3. **Settings window** — **PASS**. Operator confirmed: all controls (monitor grid, audio device pickers, launch-target picker, theme override) render and are interactive.
+4. **Full toggle round trip** — **PASS**. Operator confirmed: Rig → Normal → Rig sequence completes correctly, monitors/audio/Moza Companion all behave as expected both directions.
+5. **Cold autostart boot** — **PASS**. Operator's own words: "autostart felt about the same as before" — no regression in perceived tray-icon startup timing.
+6. **Tray-triggered toggle** — **PASS**. Operator confirmed toggle from the tray icon completes correctly.
+
+No `FileNotFoundException`, `TypeLoadException`, `MissingMethodException`, or unhandled-exception dialog observed during any check.
 
 ## Checkpoint Status
 
-**BLOCKED at Task 3 — `type="checkpoint:human-verify" gate="blocking"`.**
-
-This build environment has no Windows GUI, no rig monitor, no rig audio endpoint, and no Moza Companion install. Task 3 requires all six checks to be performed on real Windows rig hardware by the operator, using a Windows-built (not Linux-cross-compiled) `RigToggle.App.exe` produced from commit `67f4bfd`. Per the plan's `must_haves.prohibitions` (prohibition 2) and the plan's own note, this checkpoint "must not be waived, deferred to a later phase, or marked passed on a build-output byte count" — so it was not fabricated. PERF-03 is **not** marked complete in REQUIREMENTS.md and the phase does not close until the operator reports the six checks.
-
-**What the operator needs to do:**
-1. Get a Windows-native build of `RigToggle.App.exe` at commit `67f4bfd` — either run the release publish command natively on the rig (`dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -p:PublishProfile=win-x64`, omitting `EnableWindowsTargeting` since that flag is only needed for the Linux cross-compile), or pull the artifact from the repo's `release.yml` `windows-latest` workflow run against this commit.
-2. Replace the installed exe with this build.
-3. Work through the six numbered checks in Task 3's `<how-to-verify>` (byte count on Windows; cold launch; Settings window; full Rig→Normal→Rig round trip; cold autostart boot; tray-triggered toggle), reporting each as PASS/FAIL with a short observational note.
-4. Report back — a follow-up execution pass will transcribe the result into this SUMMARY's Rig Verification section, mark PERF-03 complete in REQUIREMENTS.md, and make the final phase-completion commit. If any check FAILs, `git revert 67f4bfd` restores the prior publish output exactly, and the failing check's exact exception text plus the implicated assembly should be reported so the deny-list can be narrowed.
+**RESOLVED.** Task 3's `type="checkpoint:human-verify" gate="blocking"` checkpoint was not waived, deferred, or marked passed on a build-output byte count alone (per `must_haves.prohibitions` prohibition 2) — it was closed by the operator's own six-check confirmation on real Windows rig hardware, transcribed above. PERF-03 is now marked complete in `.planning/REQUIREMENTS.md`.
 
 ## Accomplishments
 
@@ -104,9 +114,7 @@ This build environment has no Windows GUI, no rig monitor, no rig audio endpoint
 
 1. **Task 1: End-to-end — fresh baseline, add the exclusion target, prove a smaller exe** - `67f4bfd` (feat)
 2. **Task 2: Regression and prohibition audit — prove nothing else moved** - no commit (read-only audit task; produced no file changes, per its own `reversibility` rating: "nothing to reverse")
-3. **Task 3: Rig verification** - NOT STARTED (blocking checkpoint, pending operator on real Windows rig hardware)
-
-**Plan metadata:** pending (this SUMMARY commit; final phase-completion commit deferred until Task 3 resolves)
+3. **Task 3: Rig verification** - no code commit (operator-verification task; result transcribed into this SUMMARY, phase-completion commit follows)
 
 ## Measurement
 
@@ -182,23 +190,18 @@ None during Tasks 1-2. `bc` was unavailable in this environment for percentage-d
 
 ## Flagged assumptions resolution
 
-- **FA-1** (PERF-03 returned `unclassified` by the deterministic edge probe): resolved as intended — the concrete acceptance criteria derived from ROADMAP's three success criteria (Task 1's byte-count gate, Task 2's five audit gates) are fully satisfied and documented above. Only Task 3's operator-judgment criterion remains open, which was always the intended shape (grep/build gates cannot prove hardware-level correctness).
-- **FA-2** (fresh vs. recorded baseline drift): further confirmed this session — a second fresh Linux cross-compile BEFORE measurement (49,367,344) again differs from the recorded 49,356,430 by ~11 KB, and by only 2 bytes from `24-RESEARCH.md`'s own prior same-session figure (49,367,342). Impact remains negligible (bar clears by >2.5 MB either way). Not yet fully closed — Task 3 check 1 (native-Windows byte count) is what resolves the Linux-cross-compile-vs-native-build attribution question, and that check has not yet run.
-- **FA-3** (grep cannot prove the seven assemblies are unreachable): not yet resolved — this is precisely what Task 3's blocking rig checkpoint exists to close. No shortcut was taken; the checkpoint is reported as pending, not waived.
+- **FA-1** (PERF-03 returned `unclassified` by the deterministic edge probe): resolved — the concrete acceptance criteria derived from ROADMAP's three success criteria (Task 1's byte-count gate, Task 2's five audit gates, Task 3's six rig checks) are all fully satisfied and documented above.
+- **FA-2** (fresh vs. recorded baseline drift): resolved. The Task 3 check 1 native-Windows byte count (46,774,899) differs from Task 1's Linux-cross-compile AFTER figure (46,770,881) by 4,018 bytes — a small, expected platform/toolchain build delta, not attributable to any code difference. Both figures clear the 49,356,430-byte v2.1 baseline by well over 2.5 MB, so the drift has zero practical effect on the pass/fail outcome. Cross-platform build measurement remains a reliable proxy for this class of MSBuild-only change; native measurement is the authoritative number and is now recorded.
+- **FA-3** (grep cannot prove the seven assemblies are unreachable): resolved. The operator's six-check rig verification — including the Settings window (the app's heaviest WinForms surface) and a full toggle round trip on real hardware — surfaced no `FileNotFoundException`, `TypeLoadException`, `MissingMethodException`, or unhandled exception. This is the actual evidence the checkpoint existed to produce; no reflection-reachable dependency on the excluded assemblies was found.
 
 ## User Setup Required
 
-None - no external service configuration required. Operator action needed is the Task 3 rig verification described above, not environment/service setup.
+None beyond the completed rig verification — no ongoing external service configuration required.
 
 ## Next Phase Readiness
 
-**Not ready to close this phase.** Task 3 (blocking rig-hardware checkpoint) must be completed by the operator before:
-- PERF-03 can be marked complete in `.planning/REQUIREMENTS.md`
-- `.planning/ROADMAP.md` can show Phase 24 as fully done
-- The final phase-metadata commit can be made
-
-Once the operator reports the six rig checks, resume execution from Task 3: transcribe the Rig Verification results into this SUMMARY, update requirements/roadmap/state, and make the final commit. If any check FAILs, `git revert 67f4bfd` isolates the exclusion target as the sole candidate cause, and the failing assembly should be identified so the deny-list can be narrowed rather than the whole lever abandoned.
+**Phase complete.** All three tasks done, all ROADMAP success criteria met, PERF-03 marked complete. Phase 25 (Single-Instance Guard) has no dependency on this phase and can proceed independently.
 
 ---
 *Phase: 24-self-contained-exe-size-reduction*
-*Status: halted at Task 3 (blocking checkpoint) — Tasks 1-2 complete 2026-08-18*
+*Status: complete — all 3 tasks done, rig-verified 2026-08-19*
