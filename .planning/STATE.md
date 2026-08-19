@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Auto-Update, Single-Instance Guard & Smaller Footprint
-current_phase: 24
-current_phase_name: self-contained-exe-size-reduction
-status: executing
+current_phase: 25
+current_phase_name: Single-Instance Guard
+status: planning
 stopped_at: "Phase 24 Plan 01: Tasks 1-2 complete, halted at Task 3 blocking rig checkpoint"
-last_updated: "2026-08-18T10:43:03.543Z"
-last_activity: 2026-08-18
-last_activity_desc: Phase 24 Plan 01 Tasks 1-2 executed (exe-size lever added, measured, audited); Task 3 blocking rig checkpoint pending operator
+last_updated: "2026-08-19T19:33:09.066Z"
+last_activity: 2026-08-19
+last_activity_desc: Phase 24 complete, transitioned to Phase 25
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 1
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 33
 ---
 
 # Project State
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-08-18)
 
 ## Current Position
 
-Phase: 24 (self-contained-exe-size-reduction) — EXECUTING (halted at blocking checkpoint)
-Plan: 1 of 1 — Tasks 1-2 complete, Task 3 (rig verification) pending operator
-Status: Blocked on real Windows rig hardware verification (Task 3 of 24-01-PLAN.md)
-Last activity: 2026-08-18 — Tasks 1-2 executed and committed (67f4bfd, 8ee769c); Task 3 checkpoint returned
+Phase: 25 — Single-Instance Guard
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-08-19 — Phase 24 complete, transitioned to Phase 25
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -39,7 +39,7 @@ Progress: [░░░░░░░░░░] 0%
 
 **Velocity:**
 
-- Total plans completed: 81
+- Total plans completed: 82
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -67,6 +67,7 @@ Progress: [░░░░░░░░░░] 0%
 | 21 | 3 | - | - |
 | 22 | 5 | - | - |
 | 23 | 3 | - | - |
+| 24 | 1 | - | - |
 
 **Recent Trend:**
 
