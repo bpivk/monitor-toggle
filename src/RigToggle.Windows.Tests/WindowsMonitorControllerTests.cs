@@ -7,13 +7,14 @@ using Xunit;
 namespace RigToggle.Windows.Tests;
 
 // Covers the pure, unit-testable helpers exposed off WindowsMonitorController via
-// InternalsVisibleTo: the AnyRectanglesOverlap bounding-box geometry check and the
-// MergeAllMonitors dedup/promotion logic, both reachable without live display
-// hardware. The mutating CCD methods (ActivateMonitors/DeactivateMonitors) are NOT
-// unit-tested here — they call PathInfo.GetActivePaths()/GetAllPaths()/
-// ApplyPathInfos() directly, which are static calls into real native CCD APIs with
-// no injectable seam, so they remain verified only via live rig testing (see
-// 04-01/04-03 SUMMARY.md).
+// InternalsVisibleTo: the AnyRectanglesOverlap bounding-box geometry check, the
+// MergeAllMonitors dedup/promotion logic, and the ComputeUndetectedDevicePaths
+// already-disabled-vs-never-detected classification seam (debug session
+// toggle-false-incomplete-error), all reachable without live display hardware. The
+// mutating CCD methods (ActivateMonitors/DeactivateMonitors) are NOT unit-tested
+// here — they call PathInfo.GetActivePaths()/GetAllPaths()/ApplyPathInfos() directly,
+// which are static calls into real native CCD APIs with no injectable seam, so they
+// remain verified only via live rig testing (see 04-01/04-03 SUMMARY.md).
 public class WindowsMonitorControllerTests
 {
     // Covers the pure axis-aligned bounding-box overlap helper added in Phase 6 Plan
@@ -151,5 +152,70 @@ public class WindowsMonitorControllerTests
         MonitorInfo disabled = result.Single(r => r.DevicePath == "DEV3");
         Assert.False(disabled.IsPrimary);
         Assert.False(disabled.IsActive);
+    }
+
+    // Covers the debug session toggle-false-incomplete-error fix: DeactivateMonitors'
+    // pre-mutation guard previously conflated "requested but already inactive"
+    // (already satisfies the disable postcondition — not an error) with "requested
+    // but never detected by Windows at all" (a real, actionable error — unplugged/
+    // disconnected monitor). ComputeUndetectedDevicePaths is the pure seam extracted
+    // to make the corrected classification directly testable. Same "pure logic only,
+    // no live CCD hardware" discipline as the rest of this file.
+    [Fact]
+    public void ComputeUndetectedDevicePaths_RequestedButAlreadyInactive_NotFlaggedAsMissing()
+    {
+        // Mirrors the reported bug exactly: DEV1 is manually disabled before the
+        // toggle runs, and is also in Rig mode's disable-set — Windows still detects
+        // it (it's in availableDevicePaths), it's just not currently active. This must
+        // NOT be treated as an error.
+        var requested = new HashSet<string> { "DEV1" };
+        var available = new HashSet<string> { "DEV1", "DEV2" };
+
+        var result = WindowsMonitorController.ComputeUndetectedDevicePaths(requested, available);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void ComputeUndetectedDevicePaths_RequestedButNeverDetected_FlaggedAsMissing()
+    {
+        // A genuinely unplugged/disconnected monitor is still a real error — this is
+        // the case the original guard was protecting against and must still catch.
+        var requested = new HashSet<string> { "DEV1", "DEV3" };
+        var available = new HashSet<string> { "DEV1", "DEV2" };
+
+        var result = WindowsMonitorController.ComputeUndetectedDevicePaths(requested, available);
+
+        Assert.Single(result);
+        Assert.Contains("DEV3", result);
+    }
+
+    [Fact]
+    public void ComputeUndetectedDevicePaths_MixOfActiveAndAlreadyInactiveRequested_OnlyTrulyMissingFlagged()
+    {
+        // Mixed disable-set: DEV1 is currently active (needs deactivating), DEV2 is
+        // already inactive (no-op, satisfied), DEV3 is not detected at all (error).
+        // Only DEV3 should be flagged — DEV1 and DEV2 are both "available" regardless
+        // of their active/inactive state, since availability is orthogonal to
+        // activeness (callers derive `available` from GetAllPaths()+IsAvailable, not
+        // from GetActivePaths()).
+        var requested = new HashSet<string> { "DEV1", "DEV2", "DEV3" };
+        var available = new HashSet<string> { "DEV1", "DEV2" };
+
+        var result = WindowsMonitorController.ComputeUndetectedDevicePaths(requested, available);
+
+        Assert.Single(result);
+        Assert.Contains("DEV3", result);
+    }
+
+    [Fact]
+    public void ComputeUndetectedDevicePaths_AllRequestedDetected_ReturnsEmpty()
+    {
+        var requested = new HashSet<string> { "DEV1", "DEV2" };
+        var available = new HashSet<string> { "DEV1", "DEV2", "DEV3" };
+
+        var result = WindowsMonitorController.ComputeUndetectedDevicePaths(requested, available);
+
+        Assert.Empty(result);
     }
 }

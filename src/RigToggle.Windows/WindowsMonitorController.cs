@@ -220,6 +220,25 @@ public sealed class WindowsMonitorController : IMonitorController
         }
     }
 
+    // Pure seam (unit-tested, RigToggle.Windows.Tests — no live CCD hardware needed)
+    // extracted from DeactivateMonitors (debug session toggle-false-incomplete-error)
+    // so the "already-disabled is not an error" fix is directly testable. A requested
+    // device path belongs in the result iff Windows does not currently detect it at
+    // all (absent from availableDevicePaths, which callers derive from
+    // GetAllPaths()+IsAvailable — the same "is this device known to Windows"
+    // oracle ActivateMonitors' own missing-target guard already uses). A requested
+    // path that IS detected but simply inactive (already disabled) is deliberately
+    // NOT included here — it already satisfies DeactivateMonitors' "end up disabled"
+    // postcondition and must not be treated as an error.
+    internal static IReadOnlySet<string> ComputeUndetectedDevicePaths(
+        IReadOnlySet<string> requestedDevicePaths,
+        IReadOnlySet<string> availableDevicePaths)
+    {
+        return requestedDevicePaths
+            .Where(dp => !availableDevicePaths.Contains(dp))
+            .ToHashSet();
+    }
+
     // Real repositioning-aware CCD N-target removal (04-RESEARCH.md Pattern 1,
     // generalized 1->N per 06-RESEARCH.md Pattern 1 — empirically confirmed GO on
     // this rig by Plan 01's spike/PHASE4-RETEST.md rig re-test for the single-target
@@ -243,16 +262,38 @@ public sealed class WindowsMonitorController : IMonitorController
             .Where(p => p.TargetsInfo.Any(t => monitorDevicePaths.Contains(t.DisplayTarget.DevicePath)))
             .ToArray();
 
-        // Generalized "not currently active" guard (was a single not-found check
-        // pre-06): compute every requested device path NOT present among any
-        // currently-active target.
-        var missing = monitorDevicePaths.Except(
-            currentPaths.SelectMany(p => p.TargetsInfo).Select(t => t.DisplayTarget.DevicePath)).ToArray();
+        // debug session toggle-false-incomplete-error: a requested-to-disable device
+        // path that is NOT currently active is not necessarily an error — it may
+        // already be disabled (e.g. manually disabled via the tile dashboard before
+        // this toggle ran, and also configured as disabled in the target mode), which
+        // already satisfies this method's "end up disabled" postcondition for that
+        // path with nothing left to do. The only genuine error is a requested device
+        // path Windows doesn't detect AT ALL (unplugged/disconnected) — checked
+        // against GetAllPaths()+IsAvailable, the same "is this device known to
+        // Windows at all" oracle ActivateMonitors already uses for its own
+        // missing-target guard above. Using GetActivePaths() alone (the pre-fix
+        // check) could never distinguish "already disabled" from "never detected".
+        PathInfo[] allPaths = PathInfo.GetAllPaths(virtualModeAware: false);
+        var availableDevicePaths = allPaths
+            .SelectMany(p => p.TargetsInfo)
+            .Where(t => t.DisplayTarget.IsAvailable)
+            .Select(t => t.DisplayTarget.DevicePath)
+            .ToHashSet();
+        var missing = ComputeUndetectedDevicePaths(monitorDevicePaths, availableDevicePaths);
 
-        if (missing.Length > 0)
+        if (missing.Count > 0)
         {
             throw new InvalidOperationException(
-                $"Configured monitor(s) not currently active: {string.Join(", ", missing)}");
+                $"Configured monitor(s) not detected: {string.Join(", ", missing)}");
+        }
+
+        if (targets.Length == 0)
+        {
+            // Every requested device path is already inactive (mirrors ActivateMonitors'
+            // own "nothing to do" skip-optimization above, Pitfall 3) — already disabled,
+            // already satisfies the postcondition. Never call ApplyPathInfos just to
+            // reapply the unchanged current topology.
+            return;
         }
 
         PathInfo[] survivors = currentPaths.Where(p => !targets.Contains(p)).ToArray();
