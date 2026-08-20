@@ -5,8 +5,8 @@ milestone_name: Auto-Update, Single-Instance Guard & Smaller Footprint
 current_phase: 25
 current_phase_name: Single-Instance Guard
 status: planning
-stopped_at: "Phase 24 Plan 01: Tasks 1-2 complete, halted at Task 3 blocking rig checkpoint"
-last_updated: "2026-08-19T19:33:09.066Z"
+stopped_at: Phase 25 context gathered
+last_updated: "2026-08-20T11:02:14.669Z"
 last_activity: 2026-08-19
 last_activity_desc: Phase 24 complete, transitioned to Phase 25
 progress:
@@ -173,9 +173,9 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-18T10:43:03.304Z
-Stopped at: Phase 24 Plan 01: Tasks 1-2 complete, halted at Task 3 blocking rig checkpoint
-Resume file: .planning/phases/24-self-contained-exe-size-reduction/24-01-SUMMARY.md
+Last session: 2026-08-20T11:02:14.629Z
+Stopped at: Phase 25 context gathered
+Resume file: /home/bpivk/moza/.planning/phases/25-single-instance-guard/25-CONTEXT.md
 
 ## Operator Next Steps
 
