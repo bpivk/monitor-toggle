@@ -45,6 +45,32 @@ namespace RigToggle.App
             // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
 
+            // INSTANCE-01/D-02: the single-instance guard is acquired here, above every
+            // other bootstrap step -- before settingsStore, before modeStore, before any
+            // Form is constructed. This is deliberately NOT wrapped in this file's
+            // best-effort swallow-and-continue try/catch idiom (see the trace-listener
+            // block below): a second instance that got as far as, say, hotkey
+            // registration would hard-fail RegisterHotKey and surface a spurious
+            // user-facing error on every accidental double-launch (STACK.md §2 row 4),
+            // so failing this check must short-circuit everything after it, not degrade
+            // gracefully and continue. `using var` means the compiler emits the
+            // try/finally that covers everything below including Application.Run --
+            // rewriting this to a bare local or a static field would drop that finally
+            // and lose deterministic mutex release on the exception path.
+            using var guard = SingleInstanceGuard.Acquire();
+
+            // D-02: exactly one duplicate-launch branch, handled identically regardless
+            // of why the second launch happened (accidental double-click, autostart
+            // racing a manual launch, tray relaunch) -- no reason-based sub-case. D-01:
+            // the only action is broadcasting the activation signal; no toast, no
+            // dialog, no notification of any kind is raised here or anywhere else on
+            // this path.
+            if (!guard.IsPrimaryInstance)
+            {
+                ActivationSignal.BroadcastActivation();
+                return;
+            }
+
             string basePath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "RigToggle");

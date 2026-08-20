@@ -243,12 +243,28 @@ namespace RigToggle.App
         /// skipping it (e.g. inside an early-return branch) would silently break WinForms'
         /// own focus/tray/paint message handling for this window. Do not "optimize" this
         /// into a conditional base call.
+        ///
+        /// INSTANCE-02/D-01: a second branch below intercepts the single-instance
+        /// activation broadcast (ActivationSignal), posted by a duplicate launch that
+        /// lost the mutex race in Program.cs. wParam and lParam are deliberately
+        /// ignored -- the signal is payload-free by design, so nothing is read from the
+        /// message beyond the fact that it arrived. The non-zero MessageId guard below
+        /// is not optional: ActivationSignal.MessageId is 0 when RegisterWindowMessage
+        /// failed, and WM_NULL is also 0, so an unguarded comparison would restore the
+        /// window on every WM_NULL. This branch, like the WM_HOTKEY branch above, must
+        /// never early-return or otherwise skip the unconditional base.WndProc call
+        /// below.
         /// </summary>
         protected override void WndProc(ref Message m)
         {
             if (m.Msg == GlobalHotkey.WmHotkey && (int)m.WParam == GlobalHotkeyId)
             {
                 HandleHotkeyToggle();
+            }
+
+            if (ActivationSignal.MessageId != 0 && m.Msg == (int)ActivationSignal.MessageId)
+            {
+                RestoreAndFocus();
             }
 
             base.WndProc(ref m);
@@ -1526,10 +1542,22 @@ namespace RigToggle.App
         {
             if (e.Button == MouseButtons.Left)
             {
-                Show();
-                WindowState = FormWindowState.Normal;
-                Activate();
+                RestoreAndFocus();
             }
+        }
+
+        /// <summary>
+        /// INSTANCE-02/D-01: the single canonical restore-and-focus sequence for this
+        /// window — Show(); WindowState = Normal; Activate(), in that order. Reused by
+        /// two callers: the tray icon's left-click handler (NotifyIcon_MouseClick,
+        /// above) and the single-instance activation branch in WndProc (below), so the
+        /// two paths cannot drift apart into two slightly different restore sequences.
+        /// </summary>
+        private void RestoreAndFocus()
+        {
+            Show();
+            WindowState = FormWindowState.Normal;
+            Activate();
         }
 
         private void TraySettingsMenuItem_Click(object? sender, EventArgs e) => OpenSettingsDialog();
