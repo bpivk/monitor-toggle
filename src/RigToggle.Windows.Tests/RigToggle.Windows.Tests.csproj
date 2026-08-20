@@ -23,4 +23,21 @@
     <ProjectReference Include="..\RigToggle.Windows\RigToggle.Windows.csproj" />
   </ItemGroup>
 
+  <!-- 25-03/D-05: publishes the dotnet-build output path of the real built
+       RigToggle.App.exe as assembly metadata so SingleInstanceProcessTests can locate
+       and launch it as a genuine child process without referencing the RigToggle.App
+       project directly. Referencing a project that carries a RuntimeIdentifier
+       (RigToggle.App is win-x64-only) from one that does not is a known build-warning
+       source, and this phase gates on a zero-warning build. Targets the plain
+       `dotnet build` output (not the single-file publish output) since CI builds but
+       does not publish, and nothing about the guard's mechanism (a named kernel
+       object, a registered window message, a window handle) behaves differently
+       under single-file bundling. -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>RigToggleAppExePath</_Parameter1>
+      <_Parameter2>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', 'RigToggle.App', 'bin', '$(Configuration)', 'net10.0-windows', 'win-x64', 'RigToggle.App.exe'))</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>
