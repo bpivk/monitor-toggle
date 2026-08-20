@@ -253,4 +253,178 @@ public sealed class SingleInstanceProcessTests : IDisposable
             }
         }
     }
+
+    /// <summary>
+    /// INSTANCE-02, ROADMAP success criterion 2, D-01. Starts the primary tray-hidden
+    /// (so no window is ever shown) and asserts its <see cref="Process.MainWindowHandle"/>
+    /// is <see cref="IntPtr.Zero"/> first -- this is the control, not decoration: a
+    /// tray-hidden start that already shows a window invalidates the test's premise.
+    /// Then a duplicate launch is started and must exit; the primary is polled,
+    /// refreshed each round, until its handle becomes non-zero.
+    ///
+    /// A bounded poll (rather than a handle wait) is used here deliberately: there is
+    /// no waitable kernel object for "another process's window became visible," so
+    /// this is the one place in this file where polling is the only available
+    /// mechanism -- it is still bounded and message-carrying, never a blind sleep.
+    /// <see cref="Process.MainWindowHandle"/> returns a real handle only for a
+    /// visible, top-level, owner-less window, so a transition from zero to non-zero is
+    /// exactly the observable effect of the restore sequence's <c>Show()</c> call.
+    /// </summary>
+    [Fact]
+    public void DuplicateLaunch_RestoresHiddenWindowOfExistingInstance()
+    {
+        Process primary = StartApp("--tray");
+        Assert.True(
+            SingleInstanceGuard.WaitForInstanceReady(ReadinessTimeout),
+            "The primary instance never published readiness, so the rest of this test would be meaningless.");
+
+        primary.Refresh();
+        Assert.True(
+            primary.MainWindowHandle == IntPtr.Zero,
+            "A tray-hidden start that already shows a window invalidates this test's premise.");
+
+        Process duplicate = StartApp("--tray");
+        bool duplicateExited = duplicate.WaitForExit((int)SettleTimeout.TotalMilliseconds);
+        Assert.True(duplicateExited, "The duplicate launch did not exit within the settle timeout.");
+
+        DateTime deadline = DateTime.UtcNow + WindowRestoreTimeout;
+        IntPtr handle;
+        do
+        {
+            primary.Refresh();
+            handle = primary.MainWindowHandle;
+            if (handle == IntPtr.Zero && DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(PollInterval);
+            }
+        }
+        while (handle == IntPtr.Zero && DateTime.UtcNow < deadline);
+
+        Assert.True(
+            handle != IntPtr.Zero,
+            "MainWindowHandle never became non-zero within the window-restore timeout -- either the activation signal was lost in the startup race, or the window-procedure branch never fired.");
+    }
+
+    /// <summary>
+    /// UPDATE-07, ROADMAP success criterion 3, D-05. Acquires the guard inside this
+    /// test process and asserts it is primary -- the test itself now holds the
+    /// single-instance name, so any normal launch must lose. A bypass-flagged launch
+    /// must still exit with <see cref="StartupArgs.ApplyUpdateBypassExitCode"/> while
+    /// the name is held. The second half -- a normal launch under the identical held
+    /// condition exiting with 0, specifically not the bypass code -- is what makes the
+    /// first half mean something: it proves the two paths are distinguishable and
+    /// that the bypass code was reached by the bypass branch, not by any process that
+    /// merely exits. Finally asserts no process named <see cref="AppProcessName"/> is
+    /// alive, proving the bypass launch did not leave a process behind.
+    /// </summary>
+    [Fact]
+    public void ApplyUpdateBypass_RunsWhileGuardIsHeld()
+    {
+        using SingleInstanceGuard guard = SingleInstanceGuard.Acquire();
+        Assert.True(
+            guard.IsPrimaryInstance,
+            "This test must hold the single-instance name as its control. If it is not primary, a real Rig Toggle instance is already running on this machine and this test's premise is broken.");
+
+        Process bypassProcess = StartApp(StartupArgs.ApplyUpdateFlag, "token-one", "token-two", "token-three", "--tray");
+        bool bypassExited = bypassProcess.WaitForExit((int)SettleTimeout.TotalMilliseconds);
+        Assert.True(bypassExited, "The --apply-update process did not exit within the settle timeout while the guard was held.");
+        Assert.Equal(StartupArgs.ApplyUpdateBypassExitCode, bypassProcess.ExitCode);
+
+        Process normalProcess = StartApp("--tray");
+        bool normalExited = normalProcess.WaitForExit((int)SettleTimeout.TotalMilliseconds);
+        Assert.True(normalExited, "The normal launch did not exit within the settle timeout while the guard was held.");
+        Assert.Equal(0, normalProcess.ExitCode);
+        Assert.NotEqual(StartupArgs.ApplyUpdateBypassExitCode, normalProcess.ExitCode);
+
+        Process[] survivors = Process.GetProcessesByName(AppProcessName);
+        try
+        {
+            Assert.Empty(survivors);
+        }
+        finally
+        {
+            foreach (Process survivor in survivors)
+            {
+                survivor.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    /// The resolved UPDATE-07 idempotency edge. Phase 25's guarantee rests on
+    /// <c>UpdateApplyEntryPoint</c> being side-effect-free by contract; plan 25-02
+    /// enforces that with a source-level gate, and this test is the behavioural half
+    /// of the same claim -- running the identical apply-update command line twice in
+    /// sequence must both exit with the bypass code and leave no process behind.
+    /// </summary>
+    [Fact]
+    public void ApplyUpdateBypass_IsIdempotentAndSideEffectFree()
+    {
+        Process first = StartApp(StartupArgs.ApplyUpdateFlag, "token-one", "--tray");
+        bool firstExited = first.WaitForExit((int)SettleTimeout.TotalMilliseconds);
+        Assert.True(firstExited, "The first --apply-update run did not exit within the settle timeout.");
+        Assert.Equal(StartupArgs.ApplyUpdateBypassExitCode, first.ExitCode);
+
+        Process second = StartApp(StartupArgs.ApplyUpdateFlag, "token-one", "--tray");
+        bool secondExited = second.WaitForExit((int)SettleTimeout.TotalMilliseconds);
+        Assert.True(secondExited, "The second, identical --apply-update run did not exit within the settle timeout.");
+        Assert.Equal(StartupArgs.ApplyUpdateBypassExitCode, second.ExitCode);
+
+        Process[] survivors = Process.GetProcessesByName(AppProcessName);
+        try
+        {
+            Assert.Empty(survivors);
+        }
+        finally
+        {
+            foreach (Process survivor in survivors)
+            {
+                survivor.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    /// The resolved UPDATE-07 concurrency edge. Three concurrent apply-update launches
+    /// alongside a live normal instance must all complete with the bypass exit code,
+    /// while the primary remains undisturbed -- the unguarded concurrency is
+    /// deliberate (it is the requirement, not an oversight); Phase 26 owns serialising
+    /// the real apply logic once the body does real work.
+    /// </summary>
+    [Fact]
+    public void ApplyUpdateBypass_ConcurrentInvocationsDoNotInterfere()
+    {
+        Process primary = StartApp("--tray");
+        Assert.True(
+            SingleInstanceGuard.WaitForInstanceReady(ReadinessTimeout),
+            "The primary instance never published readiness, so the rest of this test would be meaningless.");
+
+        Process bypass1 = StartApp(StartupArgs.ApplyUpdateFlag, "token-one", "--tray");
+        Process bypass2 = StartApp(StartupArgs.ApplyUpdateFlag, "token-two", "--tray");
+        Process bypass3 = StartApp(StartupArgs.ApplyUpdateFlag, "token-three", "--tray");
+
+        foreach (Process bypass in new[] { bypass1, bypass2, bypass3 })
+        {
+            bool exited = bypass.WaitForExit((int)SettleTimeout.TotalMilliseconds);
+            Assert.True(exited, "A concurrent --apply-update process did not exit within the settle timeout.");
+            Assert.Equal(StartupArgs.ApplyUpdateBypassExitCode, bypass.ExitCode);
+        }
+
+        primary.Refresh();
+        Assert.False(primary.HasExited, "The primary instance exited unexpectedly during the concurrent bypass launches.");
+
+        Process[] survivors = Process.GetProcessesByName(AppProcessName);
+        try
+        {
+            Process onlySurvivor = Assert.Single(survivors);
+            Assert.Equal(primary.Id, onlySurvivor.Id);
+        }
+        finally
+        {
+            foreach (Process survivor in survivors)
+            {
+                survivor.Dispose();
+            }
+        }
+    }
 }
