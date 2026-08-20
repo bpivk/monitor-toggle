@@ -120,10 +120,11 @@ public sealed class SingleInstanceProcessTests : IDisposable
     }
 
     /// <summary>
-    /// Kills the entire process tree of every process this instance started that is
-    /// still running, and waits briefly for exit. Swallows only the exceptions that
-    /// arise from a process that already exited -- a leaked instance would poison
-    /// every later test in the run and, on CI, the job itself (T-25-10).
+    /// Kills every process this instance started that is still running, and CONFIRMS
+    /// exit (retrying once) rather than trusting an unchecked <c>WaitForExit</c>
+    /// return value. Swallows only the exceptions that arise from a process that
+    /// already exited -- a leaked instance would poison every later test in the run
+    /// and, on CI, the job itself (T-25-10).
     /// </summary>
     public void Dispose()
     {
@@ -134,8 +135,7 @@ public sealed class SingleInstanceProcessTests : IDisposable
                 process.Refresh();
                 if (!process.HasExited)
                 {
-                    process.Kill(entireProcessTree: true);
-                    process.WaitForExit((int)SettleTimeout.TotalMilliseconds);
+                    KillAndConfirmExit(process);
                 }
             }
             catch (InvalidOperationException)
@@ -149,6 +149,46 @@ public sealed class SingleInstanceProcessTests : IDisposable
             finally
             {
                 process.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Kills <paramref name="process"/> and confirms exit via <c>WaitForExit</c>'s
+    /// RETURN VALUE -- unlike this harness's original version, which called
+    /// <c>WaitForExit(timeout)</c> but never checked whether it actually returned
+    /// true, silently moving on even if the process had not genuinely exited within
+    /// the timeout (25-03 Task 3 operator checkpoint investigation). A single retry
+    /// gives a process still tearing down under heavy concurrent process-launch load
+    /// a second, bounded chance before this method gives up -- a leaked,
+    /// still-mutex-holding process here would make the NEXT test's freshly started
+    /// "primary" silently become non-primary, poisoning every later test in the run
+    /// (T-25-10).
+    ///
+    /// Uses plain <see cref="Process.Kill()"/>, not <c>Kill(entireProcessTree: true)</c>
+    /// -- RigToggle.App.exe never spawns a child process on any path this file
+    /// exercises (bypass, duplicate-detection, and primary startup are all
+    /// self-contained), so the tree-walking overload's extra
+    /// <c>CreateToolhelp32Snapshot</c> walk finds nothing to kill while adding real
+    /// fragility under the heavy concurrent process churn this file produces (dozens
+    /// of RigToggle.App.exe launches within a single run) -- a documented source of
+    /// instability for that API when processes are being created/destroyed
+    /// concurrently on the same machine.
+    /// </summary>
+    private static void KillAndConfirmExit(Process process)
+    {
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            process.Kill();
+            if (process.WaitForExit((int)SettleTimeout.TotalMilliseconds))
+            {
+                return;
+            }
+
+            process.Refresh();
+            if (process.HasExited)
+            {
+                return;
             }
         }
     }
@@ -240,10 +280,11 @@ public sealed class SingleInstanceProcessTests : IDisposable
                         : $"Round {round}: 0 processes alive -- both processes exited and the user got nothing.");
 
                 Process survivor = survivors[0];
-                survivor.Kill(entireProcessTree: true);
+                KillAndConfirmExit(survivor);
+                survivor.Refresh();
                 Assert.True(
-                    survivor.WaitForExit((int)SettleTimeout.TotalMilliseconds),
-                    $"Round {round}: survivor did not exit after Kill within the settle timeout.");
+                    survivor.HasExited,
+                    $"Round {round}: survivor did not exit after Kill within the settle timeout (retried once) -- a still-alive survivor here would poison the next round.");
             }
             finally
             {
