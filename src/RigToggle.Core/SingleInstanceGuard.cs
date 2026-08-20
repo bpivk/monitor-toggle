@@ -37,7 +37,7 @@ namespace RigToggle.Core;
 /// below) modelling a level-triggered "ready" signal: the primary creates and holds it
 /// (held == "not ready yet"), <see cref="MarkReady"/> releases it (released == "ready,
 /// forever, for any number of future waiters"), and a losing process's
-/// <see cref="WaitForInstanceReady(TimeSpan)"/> opens the same name and blocks in
+/// <see cref="WaitForInstanceReady(TimeSpan, string?)"/> opens the same name and blocks in
 /// <c>WaitOne</c> until it becomes available, then immediately releases it again so the
 /// signal remains available to the next waiter too. <see cref="IsGlobalScope"/> is
 /// resolved exactly once, at acquisition, and applied identically to
@@ -67,7 +67,7 @@ public sealed class SingleInstanceGuard : IDisposable
     public const string InstanceId = "8f3a1c42-7b5e-4d19-9a06-2e5c1f8b7d34";
 
     /// <summary>
-    /// Default budget <see cref="WaitForInstanceReady(TimeSpan)"/> is called with by
+    /// Default budget <see cref="WaitForInstanceReady(TimeSpan, string?)"/> is called with by
     /// the losing process before broadcasting the activation signal regardless.
     /// </summary>
     public static readonly TimeSpan DefaultReadyWaitTimeout = TimeSpan.FromSeconds(5);
@@ -126,7 +126,7 @@ public sealed class SingleInstanceGuard : IDisposable
     /// <summary>
     /// The named readiness-signal this instance publishes (if primary) once its window
     /// handle provably exists (<see cref="MarkReady"/>), and the name a losing
-    /// process's <see cref="WaitForInstanceReady(TimeSpan)"/> call opens. Despite the
+    /// process's <see cref="WaitForInstanceReady(TimeSpan, string?)"/> call opens. Despite the
     /// name, this is backed by a second named <see cref="Mutex"/>, not a Windows Event
     /// object — see the class doc comment's Deviation note.
     /// </summary>
@@ -144,11 +144,26 @@ public sealed class SingleInstanceGuard : IDisposable
     /// triggers a single retry in the session-local <c>Local\</c> namespace instead of
     /// propagating out of <c>Main()</c>. No other exception type is caught here: this
     /// is a correctness-critical call, not a best-effort one.
+    ///
+    /// <paramref name="instanceId"/> is a TEST-ONLY escape hatch (25-03 Task 3 operator
+    /// checkpoint regression): defaults to <see cref="InstanceId"/> for every real
+    /// caller. <c>RigToggle.App</c>'s <c>Program.cs</c> must never pass a non-null
+    /// value here — doing so would break real single-instance detection against the
+    /// actual shipped application. It exists solely so in-process unit tests
+    /// (<c>SingleInstanceGuardTests</c>, cross-platform, <c>RigToggle.Tests</c>) can
+    /// prove this class's acquire/reject/release/readiness semantics against a
+    /// process-unique test name instead of the literal production name --
+    /// <c>RigToggle.Windows.Tests</c>' child-process tests run in a SEPARATE VSTest
+    /// host process in the same <c>dotnet test</c> invocation and, before this fix,
+    /// both projects contended for the exact same machine-wide named kernel object,
+    /// producing cross-assembly test flakiness that looked like (but was not) a bug
+    /// in the guard itself.
     /// </summary>
-    public static SingleInstanceGuard Acquire()
+    public static SingleInstanceGuard Acquire(string? instanceId = null)
     {
+        string effectiveInstanceId = instanceId ?? InstanceId;
         bool isGlobalScope = true;
-        string mutexName = BuildName("RigToggle-" + InstanceId, isGlobalScope);
+        string mutexName = BuildName("RigToggle-" + effectiveInstanceId, isGlobalScope);
         Mutex mutex;
         bool createdNew;
         try
@@ -158,7 +173,7 @@ public sealed class SingleInstanceGuard : IDisposable
         catch (UnauthorizedAccessException)
         {
             isGlobalScope = false;
-            mutexName = BuildName("RigToggle-" + InstanceId, isGlobalScope);
+            mutexName = BuildName("RigToggle-" + effectiveInstanceId, isGlobalScope);
             mutex = new Mutex(initiallyOwned: true, mutexName, out createdNew);
         }
 
@@ -166,7 +181,7 @@ public sealed class SingleInstanceGuard : IDisposable
         // MutexName and ReadyEventName below -- see the class doc comment for why a
         // mismatch between the two names would be the single worst failure available
         // here.
-        string readyEventName = BuildName("RigToggle-Ready-" + InstanceId, isGlobalScope);
+        string readyEventName = BuildName("RigToggle-Ready-" + effectiveInstanceId, isGlobalScope);
 
         // Created here, at acquisition, held (owned) in the "not ready yet" state -- not
         // later -- so a loser arriving microseconds after this call can already find it
@@ -181,7 +196,7 @@ public sealed class SingleInstanceGuard : IDisposable
 
     /// <summary>
     /// Signals this instance's readiness by releasing the readiness mutex, waking any
-    /// process currently blocked in <see cref="WaitForInstanceReady(TimeSpan)"/> and
+    /// process currently blocked in <see cref="WaitForInstanceReady(TimeSpan, string?)"/> and
     /// leaving it available to any future waiter too (level-triggered, not
     /// single-consumer). No-op (never throws) when this guard is not primary — a
     /// non-primary guard never published a readiness mutex and has nothing to signal.
@@ -213,9 +228,17 @@ public sealed class SingleInstanceGuard : IDisposable
     /// genuine Rig Toggle instance ever published readiness — fails fast rather than
     /// burning the whole timeout), or it opened but was never released within the
     /// remaining budget (a real instance exists but did not confirm readiness in time).
+    ///
+    /// <paramref name="instanceId"/> is the same TEST-ONLY escape hatch documented on
+    /// <see cref="Acquire(string?)"/> — defaults to <see cref="InstanceId"/> for every
+    /// real caller (both <c>Program.cs</c>'s loser branch and
+    /// <c>SingleInstanceProcessTests</c>' in-test-host waits against a real child
+    /// process legitimately need the production name; only
+    /// <c>SingleInstanceGuardTests</c>' in-process tests pass a non-null override).
     /// </summary>
-    public static bool WaitForInstanceReady(TimeSpan timeout)
+    public static bool WaitForInstanceReady(TimeSpan timeout, string? instanceId = null)
     {
+        string effectiveInstanceId = instanceId ?? InstanceId;
         var stopwatch = Stopwatch.StartNew();
 
         Mutex? readyMutex = null;
@@ -226,9 +249,9 @@ public sealed class SingleInstanceGuard : IDisposable
                 Thread.Sleep(ReadyHandleOpenRetryDelay);
             }
 
-            if (!Mutex.TryOpenExisting(BuildName("RigToggle-Ready-" + InstanceId, isGlobalScope: true), out readyMutex))
+            if (!Mutex.TryOpenExisting(BuildName("RigToggle-Ready-" + effectiveInstanceId, isGlobalScope: true), out readyMutex))
             {
-                Mutex.TryOpenExisting(BuildName("RigToggle-Ready-" + InstanceId, isGlobalScope: false), out readyMutex);
+                Mutex.TryOpenExisting(BuildName("RigToggle-Ready-" + effectiveInstanceId, isGlobalScope: false), out readyMutex);
             }
         }
 
@@ -292,7 +315,7 @@ public sealed class SingleInstanceGuard : IDisposable
     /// <summary>
     /// Shared release helper for both <see cref="_mutex"/> (in <see cref="Dispose"/>)
     /// and <see cref="_readyMutex"/> (in <see cref="MarkReady"/>/<see cref="Dispose"/>
-    /// and <see cref="WaitForInstanceReady(TimeSpan)"/>'s re-release after a successful
+    /// and <see cref="WaitForInstanceReady(TimeSpan, string?)"/>'s re-release after a successful
     /// wait). <see cref="ApplicationException"/> — the documented exception thrown when
     /// the calling thread does not own the mutex — is swallowed here so release can
     /// never throw out of a <c>using</c> block in <c>Main()</c>.

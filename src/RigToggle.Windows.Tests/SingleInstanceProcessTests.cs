@@ -50,7 +50,7 @@ public sealed class SingleInstanceProcessTests : IDisposable
     /// <summary>Round count for <see cref="TightRaceLaunch_ExactlyOneProcessSurvives"/> -- PITFALLS.md Pitfall 8.</summary>
     private const int TightRaceRounds = 3;
 
-    /// <summary>Bound on <see cref="SingleInstanceGuard.WaitForInstanceReady(TimeSpan)"/> calls in this file.</summary>
+    /// <summary>Bound on <see cref="SingleInstanceGuard.WaitForInstanceReady(TimeSpan, string?)"/> calls in this file.</summary>
     private static readonly TimeSpan ReadinessTimeout = TimeSpan.FromSeconds(15);
 
     /// <summary>Bound on every per-launch settle wait (duplicate exit, bypass exit) -- generous enough for a cold first start on a loaded CI runner.</summary>
