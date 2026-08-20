@@ -30,6 +30,12 @@ namespace RigToggle.App
         /// unconditionally (08-RESEARCH.md Pitfall 6): under `--tray`, `Form.Load` never
         /// fires because the form is never shown, so the tray icon/menu must be primed
         /// here instead of relying on the form's own `Load` handler.
+        ///
+        /// 25-02/UPDATE-07: Main()'s very first branch after the two position-sensitive
+        /// calls above parses the `--apply-update` internal relaunch flag and, if
+        /// present, transfers control to `UpdateApplyEntryPoint.Run` and returns
+        /// before the single-instance guard below is ever touched — see that type's
+        /// doc comment for why this must precede the guard.
         /// </remarks>
         [STAThread]
         static void Main(string[] args)
@@ -44,6 +50,21 @@ namespace RigToggle.App
             // To customize application configuration such as set high DPI settings or default font,
             // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
+
+            // UPDATE-07/D-03/D-04 (ARCHITECTURE.md Pattern 1): the --apply-update
+            // bypass must be the very first branch in Main(), strictly above the
+            // single-instance guard acquisition below and above every other
+            // bootstrap step. Letting this helper through the guard first would make
+            // its brief existence observable to and blockable by the very mechanism
+            // it exists to bypass -- Phase 26's internal update-apply relaunch must
+            // never be blocked by a guard the process it is replacing still holds.
+            // Main is `static void`, hence the exit code is published through the
+            // process-wide exit-code property rather than a returned value.
+            if (StartupArgs.TryGetApplyUpdateArgs(args, out var applyUpdateArgs))
+            {
+                Environment.ExitCode = UpdateApplyEntryPoint.Run(applyUpdateArgs);
+                return;
+            }
 
             // INSTANCE-01/D-02: the single-instance guard is acquired here, above every
             // other bootstrap step -- before settingsStore, before modeStore, before any
