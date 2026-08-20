@@ -23,6 +23,20 @@ namespace RigToggle.Windows;
 /// posts with wParam and lParam both zero, and callers must never start passing data
 /// through them. The whole effect on receipt is "make this app's own window visible and
 /// focused" — nothing is delivered, read, or trusted from the broadcast itself.
+///
+/// INSTANCE-02 regression fix (25-03 Task 3 operator checkpoint, real Windows hardware):
+/// posting the message alone is not sufficient for an ALREADY-VISIBLE, minimized primary
+/// window to actually come to the front. Windows' anti-focus-stealing heuristic blocks
+/// the primary's own <c>Activate()</c>/<c>SetForegroundWindow</c> call unless SOME
+/// process currently holds "may set foreground window" permission at the moment it's
+/// called — the primary itself does not hold it (it is a background process from the
+/// OS's point of view at that moment), and merely receiving a posted message does not
+/// grant it. The loser DOES hold it (inherited from Explorer launching it moments
+/// earlier) and can explicitly forward it via <c>AllowSetForegroundWindow</c> before it
+/// exits. <see cref="BroadcastActivation"/> grants it (<c>ASFW_ANY</c>) immediately
+/// before every retry attempt below, matching the same repeated-robustness posture
+/// already used for the message itself — a lone grant call could otherwise be consumed
+/// or expire before a late-listening primary's <c>Activate()</c> call runs.
 /// </summary>
 public static class ActivationSignal
 {
@@ -75,6 +89,11 @@ public static class ActivationSignal
                 Thread.Sleep(BroadcastRetryDelay);
             }
 
+            // Best-effort, fire-and-forget, matching PostMessage's own posture on the
+            // next line — a failed grant here (return value ignored) is not fatal, it
+            // just means this particular attempt's Activate() call may not visibly
+            // take effect; the retry loop is the tolerance mechanism for both calls.
+            NativeMethods.AllowSetForegroundWindow(NativeMethods.ASFW_ANY);
             NativeMethods.PostMessage((IntPtr)NativeMethods.HWND_BROADCAST, messageId, IntPtr.Zero, IntPtr.Zero);
         }
     }

@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using RigToggle.Core;
+using RigToggle.Windows;
 using Xunit;
 
 namespace RigToggle.Windows.Tests;
@@ -269,6 +270,17 @@ public sealed class SingleInstanceProcessTests : IDisposable
     /// <see cref="Process.MainWindowHandle"/> returns a real handle only for a
     /// visible, top-level, owner-less window, so a transition from zero to non-zero is
     /// exactly the observable effect of the restore sequence's <c>Show()</c> call.
+    ///
+    /// KNOWN GAP (25-03 Task 3 operator checkpoint, real Windows hardware): this
+    /// assertion proves <c>IsWindowVisible</c> flipped, which is necessary but NOT
+    /// sufficient to prove the window actually became the foreground/active window --
+    /// a never-shown (tray-hidden) window's first <c>Show()</c> is not gated by
+    /// Windows' anti-focus-stealing heuristic the same way activating an
+    /// ALREADY-VISIBLE minimized window is. This test passed on real Windows hardware
+    /// while the real-world manual scenario below (an already-visible, minimized
+    /// primary) still failed to restore -- see
+    /// <see cref="DuplicateLaunch_RestoresMinimizedVisibleWindowToForeground"/> below
+    /// for the stronger assertion that actually caught the regression.
     /// </summary>
     [Fact]
     public void DuplicateLaunch_RestoresHiddenWindowOfExistingInstance()
@@ -303,6 +315,98 @@ public sealed class SingleInstanceProcessTests : IDisposable
         Assert.True(
             handle != IntPtr.Zero,
             "MainWindowHandle never became non-zero within the window-restore timeout -- either the activation signal was lost in the startup race, or the window-procedure branch never fired.");
+    }
+
+    /// <summary>
+    /// INSTANCE-02 regression test (25-03 Task 3 operator checkpoint, real Windows
+    /// hardware): reproduces the actual manual scenario that caught a real bug the
+    /// test above did not -- a primary started VISIBLE (not tray-hidden), minimized
+    /// via the standard OS minimize (<c>ShowWindow(SW_MINIMIZE)</c>, matching a user
+    /// clicking the taskbar minimize button, not <c>--tray</c>'s never-shown state),
+    /// then a duplicate launch attempting to restore it. Unlike the test above, this
+    /// asserts <see cref="NativeMethods.GetForegroundWindow"/> actually returns the
+    /// primary's handle -- proving genuine foreground activation, not merely that
+    /// <c>IsWindowVisible</c> is true. This is what actually caught the regression:
+    /// Windows' anti-focus-stealing heuristic blocks a background process's own
+    /// <c>Activate()</c>/<c>SetForegroundWindow</c> call on an already-visible window
+    /// unless some process currently holds "may set foreground window" permission --
+    /// see <c>ActivationSignal.BroadcastActivation</c>'s <c>AllowSetForegroundWindow</c>
+    /// fix, which this test proves closes the gap.
+    /// </summary>
+    [Fact]
+    public void DuplicateLaunch_RestoresMinimizedVisibleWindowToForeground()
+    {
+        Process primary = StartApp();
+        Assert.True(
+            SingleInstanceGuard.WaitForInstanceReady(ReadinessTimeout),
+            "The primary instance never published readiness, so the rest of this test would be meaningless.");
+
+        IntPtr primaryHandle = WaitForNonZeroMainWindowHandle(primary, WindowRestoreTimeout);
+        Assert.True(
+            primaryHandle != IntPtr.Zero,
+            "The visibly-started primary never got a MainWindowHandle -- this test's premise (a real visible window to minimize) is broken.");
+
+        Assert.True(
+            NativeMethods.ShowWindow(primaryHandle, NativeMethods.SW_MINIMIZE),
+            "ShowWindow(SW_MINIMIZE) returned false -- could not put the primary into the minimized-but-visible state this test needs to reproduce the manual repro.");
+
+        DateTime minimizedDeadline = DateTime.UtcNow + WindowRestoreTimeout;
+        while (!NativeMethods.IsIconic(primaryHandle) && DateTime.UtcNow < minimizedDeadline)
+        {
+            Thread.Sleep(PollInterval);
+        }
+
+        Assert.True(
+            NativeMethods.IsIconic(primaryHandle),
+            "The primary never actually became minimized (IsIconic) within the timeout.");
+
+        Process duplicate = StartApp();
+        bool duplicateExited = duplicate.WaitForExit((int)SettleTimeout.TotalMilliseconds);
+        Assert.True(duplicateExited, "The duplicate launch did not exit within the settle timeout.");
+
+        DateTime foregroundDeadline = DateTime.UtcNow + WindowRestoreTimeout;
+        IntPtr foregroundWindow;
+        do
+        {
+            foregroundWindow = NativeMethods.GetForegroundWindow();
+            if (foregroundWindow != primaryHandle && DateTime.UtcNow < foregroundDeadline)
+            {
+                Thread.Sleep(PollInterval);
+            }
+        }
+        while (foregroundWindow != primaryHandle && DateTime.UtcNow < foregroundDeadline);
+
+        Assert.True(
+            foregroundWindow == primaryHandle,
+            "GetForegroundWindow() never returned the primary's handle within the window-restore timeout -- the window may have un-minimized without actually becoming the foreground/active window (the anti-focus-stealing gap this test exists to catch).");
+
+        Assert.False(
+            NativeMethods.IsIconic(primaryHandle),
+            "The primary is still minimized (IsIconic) even though it became the foreground window -- WindowState never actually transitioned to Normal.");
+    }
+
+    /// <summary>
+    /// Polls <see cref="Process.MainWindowHandle"/> until it is non-zero or the
+    /// timeout elapses, refreshing the process handle each round. Used only by tests
+    /// that start a VISIBLE (non-<c>--tray</c>) primary, where the window handle
+    /// becomes available shortly after process start rather than immediately.
+    /// </summary>
+    private static IntPtr WaitForNonZeroMainWindowHandle(Process process, TimeSpan timeout)
+    {
+        DateTime deadline = DateTime.UtcNow + timeout;
+        IntPtr handle;
+        do
+        {
+            process.Refresh();
+            handle = process.MainWindowHandle;
+            if (handle == IntPtr.Zero && DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(PollInterval);
+            }
+        }
+        while (handle == IntPtr.Zero && DateTime.UtcNow < deadline);
+
+        return handle;
     }
 
     /// <summary>
