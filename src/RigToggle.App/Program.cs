@@ -62,11 +62,18 @@ namespace RigToggle.App
             // D-02: exactly one duplicate-launch branch, handled identically regardless
             // of why the second launch happened (accidental double-click, autostart
             // racing a manual launch, tray relaunch) -- no reason-based sub-case. D-01:
-            // the only action is broadcasting the activation signal; no toast, no
-            // dialog, no notification of any kind is raised here or anywhere else on
-            // this path.
+            // the only action is waiting for readiness then broadcasting the activation
+            // signal; no toast, no dialog, no notification of any kind is raised here or
+            // anywhere else on this path.
             if (!guard.IsPrimaryInstance)
             {
+                // Pitfall 8: wait for the primary instance's readiness handle before
+                // broadcasting -- but broadcast either way, since a false result here is
+                // not proof no window exists (it may just mean the wait timed out or the
+                // handle opened but was never signalled in time). ActivationSignal itself
+                // also retries multiple times, giving this a second layer of tolerance
+                // against a startup race.
+                SingleInstanceGuard.WaitForInstanceReady(SingleInstanceGuard.DefaultReadyWaitTimeout);
                 ActivationSignal.BroadcastActivation();
                 return;
             }
@@ -207,6 +214,17 @@ namespace RigToggle.App
             // throws) so it cannot block startup — same posture as the trace-listener
             // block above.
             mainForm.RegisterHotkeyAtStartup();
+
+            // Pitfall 8: publish this instance's readiness signal only now -- after
+            // InitializeTrayState() above, which calls ApplyDwmChrome(), which reads
+            // Handle, which is what forces the window handle into existence on BOTH the
+            // visible and --tray startup paths (MainForm.cs's ApplyDwmChrome doc comment
+            // states this explicitly). A broadcast window message can only reach a
+            // window that already exists, so signalling readiness any earlier would
+            // reopen exactly the race this call closes. A message posted between handle
+            // creation and Application.Run below is not lost -- it queues on this
+            // thread's message queue and is dispatched once the pump starts.
+            guard.MarkReady();
 
             // D-06, rig-corrected: 08-RESEARCH.md's original theory — that
             // `new ApplicationContext(mainForm)` (passing the form in) suppresses the

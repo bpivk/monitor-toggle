@@ -1,3 +1,5 @@
+using System.Threading;
+
 namespace RigToggle.Windows;
 
 /// <summary>
@@ -30,6 +32,19 @@ public static class ActivationSignal
     /// </summary>
     public const string MessageName = "RigToggle_ShowExisting_8f3a1c42-7b5e-4d19-9a06-2e5c1f8b7d34";
 
+    /// <summary>
+    /// Number of times <see cref="BroadcastActivation"/> posts the activation message.
+    /// Repeating is safe rather than merely tolerable: the receiving handler
+    /// (MainForm.RestoreAndFocus — Show/restore/Activate) is idempotent, and
+    /// PostMessage is fire-and-forget with no delivery confirmation available, so
+    /// repeated posting is the only robustness lever available to the sending side
+    /// against the Pitfall 8 startup race (a receiver that is not listening yet on the
+    /// first attempt).
+    /// </summary>
+    public const int BroadcastAttempts = 3;
+
+    private static readonly TimeSpan BroadcastRetryDelay = TimeSpan.FromMilliseconds(150);
+
     private static uint? _messageId;
 
     /// <summary>
@@ -40,7 +55,8 @@ public static class ActivationSignal
     public static uint MessageId => _messageId ??= NativeMethods.RegisterWindowMessage(MessageName);
 
     /// <summary>
-    /// Broadcasts the activation signal to every top-level window on the desktop.
+    /// Broadcasts the activation signal to every top-level window on the desktop,
+    /// <see cref="BroadcastAttempts"/> times with a short delay between attempts.
     /// Returns immediately without posting when <see cref="MessageId"/> is zero
     /// (registration failed) — there is nothing meaningful to broadcast in that case.
     /// </summary>
@@ -52,6 +68,14 @@ public static class ActivationSignal
             return;
         }
 
-        NativeMethods.PostMessage((IntPtr)NativeMethods.HWND_BROADCAST, messageId, IntPtr.Zero, IntPtr.Zero);
+        for (int attempt = 0; attempt < BroadcastAttempts; attempt++)
+        {
+            if (attempt > 0)
+            {
+                Thread.Sleep(BroadcastRetryDelay);
+            }
+
+            NativeMethods.PostMessage((IntPtr)NativeMethods.HWND_BROADCAST, messageId, IntPtr.Zero, IntPtr.Zero);
+        }
     }
 }

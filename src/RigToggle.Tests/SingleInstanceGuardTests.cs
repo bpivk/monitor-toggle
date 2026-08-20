@@ -146,10 +146,22 @@ public class SingleInstanceGuardTests : IDisposable
     /// Pitfall 8's actual shape: a loser waiting on the readiness handle must still see
     /// it become true when the winner signals concurrently -- not just when readiness
     /// was already published before the wait began. Deterministic (no Thread.Sleep
-    /// timing guess, 07-RESEARCH.md Pitfall 2 discipline): a ManualResetEvent-backed
-    /// readiness handle is level-triggered, so MarkReady() being called anywhere before
-    /// or during the background WaitForInstanceReady call still makes the bounded join
+    /// timing guess, 07-RESEARCH.md Pitfall 2 discipline): the readiness mutex is
+    /// level-triggered once released, so MarkReady() being called anywhere before or
+    /// during the background WaitForInstanceReady call still makes the bounded join
     /// below succeed deterministically.
+    ///
+    /// Deliberately a synchronous (not `async`/`await`) test method, matching
+    /// ToggleOrchestratorTests' established `.GetAwaiter().GetResult()` blocking-wait
+    /// convention (xUnit1031 warning accepted, same as that file's existing 4
+    /// instances) rather than `await`: a named <see cref="Mutex"/> has THREAD affinity
+    /// on the acquiring side (the `using var guard` above must be disposed on the exact
+    /// thread that acquired it). An `async Task` test method's continuation after an
+    /// `await` can legitimately resume on a different thread-pool thread than the one
+    /// that ran the method's synchronous prologue -- which would silently break the
+    /// guard's release (the swallowed <see cref="ApplicationException"/> from a
+    /// wrong-thread <c>ReleaseMutex</c> call) and leak the mutex into subsequent tests.
+    /// Keeping the whole test body synchronous keeps `guard` on one thread throughout.
     /// </summary>
     private static readonly TimeSpan ConcurrentReadinessJoinTimeout = TimeSpan.FromSeconds(6);
 
