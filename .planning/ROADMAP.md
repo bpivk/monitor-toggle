@@ -118,9 +118,16 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
   3. The startup sequence has an explicit, deliberately-built bypass path that an internal self-relaunch (e.g. an update-apply relaunch in Phase 26) can use to skip the single-instance mutex check without racing it, verified by a scripted simulated relaunch rather than left to be improvised later
 
 **Plans**: 3 plans
+**Wave 1**
 
 - [ ] 25-01-PLAN.md — Named-mutex single-instance guard end-to-end: Core guard class, `user32` activation-broadcast facade, `Program.cs` gate above all bootstrap, `MainForm.WndProc` restore branch, plus Pitfall-8 readiness handshake and namespace fallback (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 25-02-PLAN.md — The deliberate `--apply-update` startup-gate bypass: `StartupArgs.TryGetApplyUpdateArgs` in Core, side-effect-free placeholder entry point, and the first branch in `Main()` above the guard (wave 2, blocking decision checkpoint on the one-way contract)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 25-03-PLAN.md — Six automated child-process tests launching the real built exe: rapid relaunch, tight race, hidden-window restore, and bypass-under-held-guard with idempotency and concurrency (wave 3, blocking operator verification on Windows)
 
 ### Phase 26: Auto-Update
