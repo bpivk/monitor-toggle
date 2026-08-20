@@ -163,4 +163,32 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+    // INSTANCE-02 regression fix (25-03 Task 3 operator checkpoint): Windows' anti-
+    // focus-stealing heuristic silently blocks a background process's attempt to
+    // activate/restore ANOTHER process's already-visible-but-minimized top-level
+    // window unless the calling process currently holds the "may set foreground
+    // window" permission (SetForegroundWindow's documented restriction, tracked
+    // internally per-process). The losing (duplicate) process inherits that
+    // permission from Explorer at the moment the user double-clicks the exe -- but
+    // that permission is not delegable to a DIFFERENT process (the primary) just by
+    // posting it a message. AllowSetForegroundWindow lets the loser explicitly grant
+    // the permission onward before it exits, so the primary's own Activate() call
+    // (routed through RestoreAndFocus, in response to the broadcast below) can
+    // actually succeed instead of silently no-opping. ASFW_ANY targets whichever
+    // process next calls SetForegroundWindow, avoiding the need to look up the
+    // primary's exact process id from inside the loser.
+    public const uint ASFW_ANY = 0xFFFFFFFF;
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool AllowSetForegroundWindow(uint dwProcessId);
+
+    // Used by SingleInstanceProcessTests (InternalsVisibleTo) to prove a restored
+    // window genuinely became the real foreground window, not merely
+    // IsWindowVisible-true -- Process.MainWindowHandle transitioning non-zero proves
+    // visibility, not activation, and the two are not the same claim (see the
+    // regression this fix addresses).
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
 }
