@@ -45,6 +45,39 @@ namespace RigToggle.App
             // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
 
+            // INSTANCE-01/D-02: the single-instance guard is acquired here, above every
+            // other bootstrap step -- before settingsStore, before modeStore, before any
+            // Form is constructed. This is deliberately NOT wrapped in this file's
+            // best-effort swallow-and-continue try/catch idiom (see the trace-listener
+            // block below): a second instance that got as far as, say, hotkey
+            // registration would hard-fail RegisterHotKey and surface a spurious
+            // user-facing error on every accidental double-launch (STACK.md §2 row 4),
+            // so failing this check must short-circuit everything after it, not degrade
+            // gracefully and continue. `using var` means the compiler emits the
+            // try/finally that covers everything below including Application.Run --
+            // rewriting this to a bare local or a static field would drop that finally
+            // and lose deterministic mutex release on the exception path.
+            using var guard = SingleInstanceGuard.Acquire();
+
+            // D-02: exactly one duplicate-launch branch, handled identically regardless
+            // of why the second launch happened (accidental double-click, autostart
+            // racing a manual launch, tray relaunch) -- no reason-based sub-case. D-01:
+            // the only action is waiting for readiness then broadcasting the activation
+            // signal; no toast, no dialog, no notification of any kind is raised here or
+            // anywhere else on this path.
+            if (!guard.IsPrimaryInstance)
+            {
+                // Pitfall 8: wait for the primary instance's readiness handle before
+                // broadcasting -- but broadcast either way, since a false result here is
+                // not proof no window exists (it may just mean the wait timed out or the
+                // handle opened but was never signalled in time). ActivationSignal itself
+                // also retries multiple times, giving this a second layer of tolerance
+                // against a startup race.
+                SingleInstanceGuard.WaitForInstanceReady(SingleInstanceGuard.DefaultReadyWaitTimeout);
+                ActivationSignal.BroadcastActivation();
+                return;
+            }
+
             string basePath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "RigToggle");
@@ -181,6 +214,17 @@ namespace RigToggle.App
             // throws) so it cannot block startup — same posture as the trace-listener
             // block above.
             mainForm.RegisterHotkeyAtStartup();
+
+            // Pitfall 8: publish this instance's readiness signal only now -- after
+            // InitializeTrayState() above, which calls ApplyDwmChrome(), which reads
+            // Handle, which is what forces the window handle into existence on BOTH the
+            // visible and --tray startup paths (MainForm.cs's ApplyDwmChrome doc comment
+            // states this explicitly). A broadcast window message can only reach a
+            // window that already exists, so signalling readiness any earlier would
+            // reopen exactly the race this call closes. A message posted between handle
+            // creation and Application.Run below is not lost -- it queues on this
+            // thread's message queue and is dispatched once the pump starts.
+            guard.MarkReady();
 
             // D-06, rig-corrected: 08-RESEARCH.md's original theory — that
             // `new ApplicationContext(mainForm)` (passing the form in) suppresses the

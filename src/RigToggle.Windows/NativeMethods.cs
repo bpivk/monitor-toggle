@@ -146,4 +146,21 @@ internal static class NativeMethods
     // exception.
     [DllImport("dwmapi.dll")]
     internal static extern int DwmGetColorizationColor(out uint pcrColorization, [MarshalAs(UnmanagedType.Bool)] out bool pfOpaqueBlend);
+
+    // INSTANCE-01/INSTANCE-02 single-instance activation broadcast: the pair below
+    // reserves a machine-wide-unique message id for our custom activation signal, then
+    // fan-out-delivers it to every top-level window on the desktop so the losing process
+    // doesn't need to know the winning process's window handle. Exposed to RigToggle.App
+    // only through the public ActivationSignal façade (ActivationSignal.cs in this same
+    // namespace), never through a new InternalsVisibleTo grant, matching this class's
+    // existing GlobalHotkey/RegisterHotKey encapsulation. The constant below is the
+    // fan-out destination handle for the second call in that pair.
+    public const int HWND_BROADCAST = 0xFFFF;
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern uint RegisterWindowMessage(string lpString);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 }
