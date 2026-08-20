@@ -17,9 +17,29 @@ namespace RigToggle.Tests;
 /// tests run sequentially within this class (xUnit's default for methods in one class),
 /// so there is no cross-test parallelism to guard against. Real cross-process
 /// end-to-end proof (a genuine second launched process) is plan 25-03's responsibility.
+///
+/// 25-03 Task 3 regression fix: every <c>Acquire()</c>/<c>WaitForInstanceReady(...)</c>
+/// call in this file passes <see cref="TestInstanceId"/>, NEVER the default (production)
+/// instance id. <c>dotnet test RigToggle.sln</c> runs this project (RigToggle.Tests) and
+/// RigToggle.Windows.Tests as two SEPARATE VSTest host processes in parallel; before this
+/// fix, this file's in-process tests and RigToggle.Windows.Tests'
+/// <c>SingleInstanceProcessTests</c> (which launches real <c>RigToggle.App.exe</c> child
+/// processes) both contended for the exact same machine-wide named kernel object
+/// (<c>Global\RigToggle-{the hardcoded production GUID}</c>), producing genuine
+/// cross-assembly test failures that looked like guard bugs but were actually two
+/// unrelated test suites racing on the one real production mutex name. A random GUID
+/// generated once per test-assembly load is unique to this run and cannot collide with
+/// the real app's name or with any other concurrent test run on the same machine.
 /// </summary>
 public class SingleInstanceGuardTests : IDisposable
 {
+    // Deliberately NOT SingleInstanceGuard.InstanceId -- see the class doc comment's
+    // 25-03 Task 3 regression note. Computed once per test-assembly load (static
+    // readonly), shared by every test method in this class so within-test acquire
+    // sequences (e.g. Acquire_WhileFirstInstanceAlive_ReturnsNonPrimaryGuard's
+    // first/second pair) still observe each other correctly.
+    private static readonly string TestInstanceId = Guid.NewGuid().ToString();
+
     // No shared external resource to clean up across tests -- every guard this class's
     // tests create is scoped with `using`/`using var` at the point of creation, which
     // deterministically releases the named mutex/event handle (even on assertion
@@ -33,7 +53,7 @@ public class SingleInstanceGuardTests : IDisposable
     [Fact]
     public void Acquire_NothingHoldsMutex_ReturnsPrimaryGuard()
     {
-        using var guard = SingleInstanceGuard.Acquire();
+        using var guard = SingleInstanceGuard.Acquire(TestInstanceId);
 
         Assert.True(guard.IsPrimaryInstance);
     }
@@ -44,8 +64,8 @@ public class SingleInstanceGuardTests : IDisposable
         // INSTANCE-01: the kernel semantic this whole plan rests on -- a second
         // acquisition against a live first must observe "not primary," provable without
         // spawning a process.
-        using var first = SingleInstanceGuard.Acquire();
-        using var second = SingleInstanceGuard.Acquire();
+        using var first = SingleInstanceGuard.Acquire(TestInstanceId);
+        using var second = SingleInstanceGuard.Acquire(TestInstanceId);
 
         Assert.True(first.IsPrimaryInstance);
         Assert.False(second.IsPrimaryInstance);
@@ -54,18 +74,18 @@ public class SingleInstanceGuardTests : IDisposable
     [Fact]
     public void Dispose_ReleasesMutex_SubsequentAcquireIsPrimaryAgain()
     {
-        var first = SingleInstanceGuard.Acquire();
+        var first = SingleInstanceGuard.Acquire(TestInstanceId);
         Assert.True(first.IsPrimaryInstance);
         first.Dispose();
 
-        using var second = SingleInstanceGuard.Acquire();
+        using var second = SingleInstanceGuard.Acquire(TestInstanceId);
         Assert.True(second.IsPrimaryInstance);
     }
 
     [Fact]
     public void Dispose_CalledTwice_DoesNotThrow()
     {
-        var guard = SingleInstanceGuard.Acquire();
+        var guard = SingleInstanceGuard.Acquire(TestInstanceId);
         guard.Dispose();
 
         var exception = Record.Exception(() => guard.Dispose());
@@ -78,8 +98,8 @@ public class SingleInstanceGuardTests : IDisposable
     {
         // A non-primary guard never owned the mutex, so its release path must be
         // skipped entirely, not attempted (and failed) against a mutex it never held.
-        using var primary = SingleInstanceGuard.Acquire();
-        var nonPrimary = SingleInstanceGuard.Acquire();
+        using var primary = SingleInstanceGuard.Acquire(TestInstanceId);
+        var nonPrimary = SingleInstanceGuard.Acquire(TestInstanceId);
         Assert.False(nonPrimary.IsPrimaryInstance);
 
         var exception = Record.Exception(() => nonPrimary.Dispose());
@@ -93,7 +113,7 @@ public class SingleInstanceGuardTests : IDisposable
         // The namespace-scope decision (Global\ vs Local\) must be made exactly once
         // and applied identically to both names -- a mismatch would leave the loser
         // waiting on a handle the winner never signals (Pitfall 8 reopened permanently).
-        using var guard = SingleInstanceGuard.Acquire();
+        using var guard = SingleInstanceGuard.Acquire(TestInstanceId);
         string expectedPrefix = guard.IsGlobalScope ? @"Global\" : @"Local\";
 
         Assert.StartsWith(expectedPrefix, guard.MutexName);
@@ -103,10 +123,10 @@ public class SingleInstanceGuardTests : IDisposable
     [Fact]
     public void MarkReady_OnPrimaryGuard_MakesWaitForInstanceReadyReturnTrue()
     {
-        using var guard = SingleInstanceGuard.Acquire();
+        using var guard = SingleInstanceGuard.Acquire(TestInstanceId);
         guard.MarkReady();
 
-        bool result = SingleInstanceGuard.WaitForInstanceReady(TimeSpan.FromSeconds(2));
+        bool result = SingleInstanceGuard.WaitForInstanceReady(TimeSpan.FromSeconds(2), TestInstanceId);
 
         Assert.True(result);
     }
@@ -114,8 +134,8 @@ public class SingleInstanceGuardTests : IDisposable
     [Fact]
     public void MarkReady_OnNonPrimaryGuard_DoesNotThrow()
     {
-        using var primary = SingleInstanceGuard.Acquire();
-        using var nonPrimary = SingleInstanceGuard.Acquire();
+        using var primary = SingleInstanceGuard.Acquire(TestInstanceId);
+        using var nonPrimary = SingleInstanceGuard.Acquire(TestInstanceId);
         Assert.False(nonPrimary.IsPrimaryInstance);
 
         var exception = Record.Exception(() => nonPrimary.MarkReady());
@@ -133,7 +153,7 @@ public class SingleInstanceGuardTests : IDisposable
         // readiness, not merely "not yet."
         var stopwatch = Stopwatch.StartNew();
 
-        bool result = SingleInstanceGuard.WaitForInstanceReady(SingleInstanceGuard.DefaultReadyWaitTimeout);
+        bool result = SingleInstanceGuard.WaitForInstanceReady(SingleInstanceGuard.DefaultReadyWaitTimeout, TestInstanceId);
 
         stopwatch.Stop();
         Assert.False(result);
@@ -168,9 +188,9 @@ public class SingleInstanceGuardTests : IDisposable
     [Fact]
     public void WaitForInstanceReady_ReadinessPublishedWhileWaitInProgress_ReturnsTrue()
     {
-        using var guard = SingleInstanceGuard.Acquire();
+        using var guard = SingleInstanceGuard.Acquire(TestInstanceId);
 
-        var waitTask = Task.Run(() => SingleInstanceGuard.WaitForInstanceReady(SingleInstanceGuard.DefaultReadyWaitTimeout));
+        var waitTask = Task.Run(() => SingleInstanceGuard.WaitForInstanceReady(SingleInstanceGuard.DefaultReadyWaitTimeout, TestInstanceId));
 
         guard.MarkReady();
 
