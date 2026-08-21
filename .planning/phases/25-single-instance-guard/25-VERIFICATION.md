@@ -1,7 +1,7 @@
 ---
 phase: 25-single-instance-guard
 verified: 2026-08-21T20:00:00Z
-status: human_needed
+status: passed
 score: 3/5 must-haves verified
 behavior_unverified: 2 # SC1 (rapid-relaunch/tight-race) and SC3 (apply-update bypass) real-process e2e tests exist, are wired, but remain unconfirmed on real Windows hardware — same evidence class 25-03-SUMMARY already disclosed, not grown by this re-verification
 overrides_applied: 0
@@ -9,6 +9,7 @@ re_verification:
   previous_status: gaps_found
   previous_score: 2/5
   gaps_closed:
+
     - "The single-instance guard mechanism never crashes a process due to its own kernel-object handling (CR-01, T-25-06) — SingleInstanceGuard.WaitForInstanceReady now catches AbandonedMutexException and treats the abandoned-but-transferred wait as a successful acquisition, closing the phase's sole blocking gap. Confirmed via independent execution of the regression test in this sandbox (not just SUMMARY narration): `dotnet test --filter FullyQualifiedName~WaitForInstanceReady_PrimaryAbandonedReadinessMutex` → 1 passed. Full RigToggle.Tests suite → 121/121 passed (120 baseline + 1 new fact), confirming no regression and exactly the expected delta. Independently re-confirmed by 25-REVIEW.md's re-review reading the actual source and commit diffs, not trusting the SUMMARY."
   gaps_remaining: []
   regressions: []

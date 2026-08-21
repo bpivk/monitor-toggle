@@ -86,7 +86,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
 **Milestone Goal:** Keep the app current and well-behaved as a background/tray-resident tool — check GitHub for new releases and let the user install them with one confirm, prevent duplicate instances from ever running side-by-side, and continue trimming the self-contained exe's size using only safe (non-trimming) levers.
 
 - [x] **Phase 24: Self-Contained Exe Size Reduction** - Additional safe MSBuild-only levers shrink the exe further below the v2.1 baseline, no IL trimming/AOT/ReadyToRun (completed 2026-08-19)
-- [ ] **Phase 25: Single-Instance Guard** - A duplicate launch focuses the already-running instance instead of starting a second process; establishes the bypass pattern auto-update's relaunch will reuse
+- [x] **Phase 25: Single-Instance Guard** - A duplicate launch focuses the already-running instance instead of starting a second process; establishes the bypass pattern auto-update's relaunch will reuse (completed 2026-08-21)
 - [ ] **Phase 26: Auto-Update** - On-launch GitHub Releases check, confirm-before-install prompt, safe self-replace-and-relaunch, and a manual "Check for Updates" action
 
 ## Phase Details
@@ -178,7 +178,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
 | 22. SettingsForm Layout Pass | v2.1 | 5/5 | Complete | 2026-08-16 |
 | 23. Manual Light/Dark Override | v2.1 | 3/3 | Complete | 2026-08-17 |
 | 24. Self-Contained Exe Size Reduction | v2.2 | 1/1 | Complete    | 2026-08-19 |
-| 25. Single-Instance Guard | v2.2 | 4/4 | In Progress|  |
+| 25. Single-Instance Guard | v2.2 | 4/4 | Complete    | 2026-08-21 |
 | 26. Auto-Update | v2.2 | 0/TBD | Not started | - |
 
 ## Backlog

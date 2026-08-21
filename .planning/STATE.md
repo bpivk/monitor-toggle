@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Auto-Update, Single-Instance Guard & Smaller Footprint
-current_phase: 25
-current_phase_name: single-instance-guard
-status: executing
+current_phase: 26
+current_phase_name: Auto-Update
+status: planning
 stopped_at: "Phase 25 complete: Plan 04 Task 3 closed by operator authorization on partial evidence (build+app-works confirmed; 3x flakiness check, ApplyUpdateBypass_* confirmation, and live CR-01 repro remain open follow-up items, not performed)"
-last_updated: "2026-08-21T19:21:17.956Z"
+last_updated: "2026-08-21T19:55:11.393Z"
 last_activity: 2026-08-21
 last_activity_desc: Phase 25 Plan 04 Task 3 checkpoint closed by operator authorization on partial evidence
 progress:
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-08-18)
 
 ## Current Position
 
-Phase: 25 (single-instance-guard) — 4/4 plans executed
-Plan: 4 of 4 (25-04 closed by operator authorization on partial hardware evidence — see 25-04-SUMMARY.md)
-Status: All plans executed; phase-level verification re-check not yet performed
-Last activity: 2026-08-21 — Phase 25 Plan 04 Task 3 checkpoint closed by operator
+Phase: 26 — Auto-Update
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-08-21 — Phase 25 complete, transitioned to Phase 26
 
 Progress: [██████████] 100%
 
@@ -39,7 +39,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 82
+- Total plans completed: 86
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -68,6 +68,7 @@ Progress: [██████████] 100%
 | 22 | 5 | - | - |
 | 23 | 3 | - | - |
 | 24 | 1 | - | - |
+| 25 | 4 | - | - |
 
 **Recent Trend:**
 
