@@ -272,7 +272,28 @@ public sealed class SingleInstanceGuard : IDisposable
             TimeSpan elapsed = stopwatch.Elapsed;
             TimeSpan remaining = elapsed < timeout ? timeout - elapsed : TimeSpan.Zero;
 
-            bool acquired = readyMutex.WaitOne(remaining);
+            bool acquired;
+            try
+            {
+                acquired = readyMutex.WaitOne(remaining);
+            }
+            catch (AbandonedMutexException)
+            {
+                // CR-01: the primary died between Acquire() and MarkReady(), so the OS
+                // marked this readiness mutex abandoned. The .NET contract for this
+                // exception is that the wait SUCCEEDED and ownership WAS transferred to
+                // this thread -- and the readiness mutex carries no shared state beyond a
+                // held-or-released signal, so there is no inconsistent state here that a
+                // normal successful wait would not also have. Treating this as acquired
+                // is what routes control into the release branch below, which clears the
+                // abandoned state; returning false instead would skip that release, leave
+                // this thread owning the mutex, and re-abandon it the moment this method
+                // returns -- turning one dead primary into an unbounded chain of this same
+                // exception for every launch that follows.
+                acquired = true;
+                TryLog("WaitForInstanceReady: readiness mutex was abandoned (primary died before MarkReady) -- treating as a successful acquisition (CR-01).");
+            }
+
             if (acquired)
             {
                 // Release immediately -- this models a level-triggered readiness signal,
