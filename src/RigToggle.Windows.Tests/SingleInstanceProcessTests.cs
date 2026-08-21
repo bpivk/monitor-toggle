@@ -62,6 +62,30 @@ public sealed class SingleInstanceProcessTests : IDisposable
     /// <summary>Poll interval used by every bounded poll loop in this file (never a fixed sleep used as the synchronisation mechanism itself).</summary>
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(250);
 
+    /// <summary>
+    /// 25-03 Task 3 operator checkpoint investigation: a small, deliberate gap
+    /// inserted between successive process launches in
+    /// <see cref="RapidRelaunch_ExactlyOneProcessSurvives"/> and
+    /// <see cref="ApplyUpdateBypass_ConcurrentInvocationsDoNotInterfere"/> ONLY --
+    /// NOT a synchronisation mechanism (neither test's correctness assertion depends
+    /// on this delay; both still assert real exit codes/process counts with bounded
+    /// waits exactly as before). This exists to bound how many
+    /// near-simultaneous cold starts of the same exe this test file itself produces,
+    /// after real Windows hardware reproducibly crashed one child process with
+    /// `System.InvalidOperationException: SetCompatibleTextRenderingDefault must be
+    /// called before the first IWin32Window object is created`
+    /// (`Application.SetColorMode`'s SystemEvents subscription races a background
+    /// window-creation thread against `ApplicationConfiguration.Initialize()`'s
+    /// same-process guard -- confirmed via the actual .NET 10.0.10 binaries' own
+    /// symbols, not guessed). That race requires ~10 near-simultaneous cold starts of
+    /// the SAME exe to reproduce -- a condition no real user ever creates (even
+    /// TRAY-01's autostart launches this app exactly once per boot) and one this test
+    /// file was the first to manufacture. Deliberately NOT applied to
+    /// <see cref="TightRaceLaunch_ExactlyOneProcessSurvives"/>, whose entire premise
+    /// (Pitfall 8) requires zero gap between its two per-round launches.
+    /// </summary>
+    private static readonly TimeSpan LaunchStaggerDelay = TimeSpan.FromMilliseconds(150);
+
     private static readonly string ExePath = ResolveExePath();
 
     private readonly List<Process> _startedProcesses = new();
@@ -213,6 +237,14 @@ public sealed class SingleInstanceProcessTests : IDisposable
 
         for (int iteration = 0; iteration < RapidRelaunchIterations; iteration++)
         {
+            if (iteration > 0)
+            {
+                // LaunchStaggerDelay: bounds how tightly this loop packs cold starts
+                // of the same exe -- see that constant's doc comment. Not part of the
+                // guard-blocking assertion below, which is unchanged.
+                Thread.Sleep(LaunchStaggerDelay);
+            }
+
             Process duplicate = StartApp("--tray");
             bool exited = duplicate.WaitForExit((int)SettleTimeout.TotalMilliseconds);
             Assert.True(
@@ -544,8 +576,16 @@ public sealed class SingleInstanceProcessTests : IDisposable
             SingleInstanceGuard.WaitForInstanceReady(ReadinessTimeout),
             "The primary instance never published readiness, so the rest of this test would be meaningless.");
 
+        // LaunchStaggerDelay between each -- see that constant's doc comment. Each
+        // cold start takes well over this delay to actually exit, so the three
+        // processes still run genuinely concurrently/overlapping; this only bounds
+        // how many start within the same instant. The concurrency claim under test
+        // (all three complete with the bypass code, undisturbed by each other and by
+        // the live primary) is unaffected -- still asserted exactly as before.
         Process bypass1 = StartApp(StartupArgs.ApplyUpdateFlag, "token-one", "--tray");
+        Thread.Sleep(LaunchStaggerDelay);
         Process bypass2 = StartApp(StartupArgs.ApplyUpdateFlag, "token-two", "--tray");
+        Thread.Sleep(LaunchStaggerDelay);
         Process bypass3 = StartApp(StartupArgs.ApplyUpdateFlag, "token-three", "--tray");
 
         foreach (Process bypass in new[] { bypass1, bypass2, bypass3 })
