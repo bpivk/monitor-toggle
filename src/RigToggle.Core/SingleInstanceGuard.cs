@@ -27,8 +27,17 @@ namespace RigToggle.Core;
 /// for any reason, including a crash or a kill — there is no OS-level "abandoned mutex"
 /// state that can permanently wedge future launches; the only documented artifact is that
 /// the next <see cref="Mutex.WaitOne()"/>-style acquisition on that name throws
-/// <see cref="AbandonedMutexException"/>, which this class's constructor path (a plain
-/// <c>new Mutex(...)</c>, not a <c>WaitOne</c>) never surfaces in the first place.
+/// <see cref="AbandonedMutexException"/>. The MAIN mutex is acquired via a plain
+/// <c>new Mutex(...)</c>, not a <c>WaitOne</c>, so it never surfaces that exception. The
+/// SEPARATE readiness mutex is different: <see cref="WaitForInstanceReady(TimeSpan, string?)"/>
+/// genuinely does <c>WaitOne</c> it, and DOES surface <see cref="AbandonedMutexException"/>
+/// when the primary dies anywhere between <see cref="Acquire(string?)"/> and
+/// <see cref="MarkReady"/> (CR-01, 25-REVIEW.md/25-VERIFICATION.md). That case is caught
+/// at the <c>WaitOne</c> call site and treated as a successful acquisition, because the
+/// wait genuinely did acquire ownership and the release that follows is exactly what
+/// clears the abandoned state for the next waiter. See
+/// <c>WaitForInstanceReady_PrimaryAbandonedReadinessMutex_ReturnsTrueWithoutThrowing</c>
+/// in <c>SingleInstanceGuardTests</c> for the regression proof.
 ///
 /// PITFALLS.md Pitfall 8 / T-25-07: winning the mutex alone does not guarantee the
 /// "loser" process can actually wake this instance's window — a separate readiness
@@ -47,6 +56,22 @@ namespace RigToggle.Core;
 /// create or open a name in the <c>Global\</c> namespace — falls back to a session-local
 /// (<c>Local\</c>) scope rather than propagating out of <c>Main()</c>, per
 /// <see cref="StartupArgs"/>' documented never-crash-on-startup posture.
+///
+/// WR-01, known accepted limitation: <see cref="IsGlobalScope"/> is resolved
+/// independently per-process, so two processes whose tokens disagree about
+/// <c>Global\</c> access — one launched elevated and one not, or two login/RDP
+/// sessions — can each resolve a different namespace, each observe
+/// <c>createdNew == true</c>, and each believe it is primary, silently defeating
+/// INSTANCE-01 with two processes writing <c>mode.json</c>, <c>settings.json</c>, and
+/// the monitor/audio state with no coordination. Accepted at ASVS level 1 for this
+/// single-user personal rig, where every launch is the same non-elevated user in one
+/// session, and this has never been observed. The deferred stronger fix — have the
+/// primary-concluding path probe the opposite namespace with
+/// <see cref="Mutex.TryOpenExisting(string, out Mutex?)"/> before concluding it is
+/// primary, so a scope mismatch degrades to "cannot tell, assume duplicate and
+/// broadcast" — is deliberately NOT implemented here: it changes single-instance
+/// detection semantics and carries more regression risk than the failure it prevents,
+/// which has never been observed on this rig.
 ///
 /// Deviation from the original design (documented in 25-01-SUMMARY.md): the readiness
 /// signal was originally specified as a named <c>EventWaitHandle</c>. Empirically, named
@@ -187,9 +212,39 @@ public sealed class SingleInstanceGuard : IDisposable
         // later -- so a loser arriving microseconds after this call can already find it
         // (Pitfall 8's "make the receiver ready as early as possible" guidance). Only
         // the primary instance publishes it; a non-primary guard has nothing to signal.
-        Mutex? readyMutex = createdNew
-            ? new Mutex(initiallyOwned: true, readyEventName, out _)
-            : null;
+        //
+        // WR-02/T-25-06: this construction is guarded, unlike the main mutex's
+        // correctness-critical construction above. Three reasons. First, why broad
+        // here while the main mutex's catch two blocks above is deliberately narrow:
+        // the main mutex decides primary-vs-duplicate and is correctness-critical, so
+        // swallowing an unexpected exception type there would trade a loud failure for
+        // a silent INSTANCE-01 violation; this readiness mutex is a Pitfall-8 latency
+        // optimisation layered over an already-tolerant broadcast path, so no failure
+        // to create it may ever be allowed to take down startup (Security Domain V5's
+        // never-crash-on-startup posture -- the same contract CR-01 violated at the
+        // other end of this class). Second, the degraded state is already fully
+        // supported and already reachable: MarkReady() no-ops on a null readiness
+        // mutex, Dispose() null-guards it, the loser's WaitForInstanceReady already
+        // fails fast to false when the handle never appears, and Program.cs broadcasts
+        // regardless -- so this adds a failure mode, not a code path, and
+        // MarkReady_OnNonPrimaryGuard_DoesNotThrow and
+        // WaitForInstanceReady_NoInstancePublished_ReturnsFalseQuickly already cover
+        // the resulting behaviour. Third, without this guard the exception escaped
+        // Acquire() before its own TryLog line ever ran, so the app crashed on
+        // startup with zero diagnostic trail AND leaked the already-owned main mutex
+        // handle.
+        Mutex? readyMutex = null;
+        if (createdNew)
+        {
+            try
+            {
+                readyMutex = new Mutex(initiallyOwned: true, readyEventName, out _);
+            }
+            catch (Exception ex)
+            {
+                TryLog($"Acquire: failed to construct readiness mutex '{readyEventName}': {ex}. Readiness will never be signalled by this instance (WR-02).");
+            }
+        }
 
         TryLog($"Acquire: IsPrimaryInstance={createdNew}, MutexName={mutexName}, IsGlobalScope={isGlobalScope}.");
 

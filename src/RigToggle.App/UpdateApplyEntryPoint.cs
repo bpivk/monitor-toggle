@@ -4,10 +4,13 @@ namespace RigToggle.App;
 
 /// <summary>
 /// The placeholder relaunch-helper entry point for the app's own internal
-/// self-update relaunch (UPDATE-07). Reached only from the very first branch of
-/// Program.Main(), before the single-instance guard is ever acquired and before any
-/// other bootstrap step -- so the app's own relaunch of itself can never be blocked
-/// by the very guard mechanism the currently-running instance holds (D-03,
+/// self-update relaunch (UPDATE-07). IN-01: reached from the first branch of
+/// Program.Main() after its two position-sensitive bootstrap calls --
+/// <c>Application.SetColorMode(...)</c> and <c>ApplicationConfiguration.Initialize()</c>
+/// (the latter's documented <c>SystemEvents</c> background-thread spin-up) -- and
+/// strictly before the single-instance guard is ever acquired and before every other
+/// bootstrap step, so the app's own relaunch of itself can never be blocked by the
+/// very guard mechanism the currently-running instance holds (D-03,
 /// ARCHITECTURE.md Pattern 1).
 ///
 /// Phase 25 ships Run's body deliberately empty; Phase 26 replaces the body with the
