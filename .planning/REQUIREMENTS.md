@@ -15,12 +15,12 @@ Requirements for the "Auto-Update, Single-Instance Guard & Smaller Footprint" mi
 - [ ] **UPDATE-04**: Confirming downloads the new release exe, applies it in place, and relaunches on the new version
 - [ ] **UPDATE-05**: A failed update apply (interrupted download, disk full, locked file) leaves the original exe intact and runnable — never stranding the app in a non-launchable state
 - [ ] **UPDATE-06**: A manual "Check for Updates" action lets the user trigger the same check on demand, independent of the automatic on-launch check
-- [ ] **UPDATE-07**: The update-apply relaunch always succeeds despite the new single-instance guard being active (the guard must not block the app's own internal relaunch)
+- [x] **UPDATE-07**: The update-apply relaunch always succeeds despite the new single-instance guard being active (the guard must not block the app's own internal relaunch)
 
 ### Single-Instance Guard
 
-- [ ] **INSTANCE-01**: Launching the app while an instance is already running does not start a second instance
-- [ ] **INSTANCE-02**: The already-running instance is brought to focus (shown/restored if minimized or tray-hidden) when a duplicate launch is attempted
+- [x] **INSTANCE-01**: Launching the app while an instance is already running does not start a second instance
+- [x] **INSTANCE-02**: The already-running instance is brought to focus (shown/restored if minimized or tray-hidden) when a duplicate launch is attempted
 
 ### Performance
 
@@ -64,9 +64,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UPDATE-04 | Phase 26 | Pending |
 | UPDATE-05 | Phase 26 | Pending |
 | UPDATE-06 | Phase 26 | Pending |
-| UPDATE-07 | Phase 25 | Pending |
-| INSTANCE-01 | Phase 25 | Pending |
-| INSTANCE-02 | Phase 25 | Pending |
+| UPDATE-07 | Phase 25 | Complete |
+| INSTANCE-01 | Phase 25 | Complete |
+| INSTANCE-02 | Phase 25 | Complete |
 | PERF-03 | Phase 24 | Complete |
 
 **Coverage:**

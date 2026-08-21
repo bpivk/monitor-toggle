@@ -5,10 +5,10 @@ milestone_name: Auto-Update, Single-Instance Guard & Smaller Footprint
 current_phase: 25
 current_phase_name: single-instance-guard
 status: executing
-stopped_at: "Phase 25 Plan 04: Tasks 1-2 complete (CR-01/WR-02 fixed and committed); Task 3 blocking checkpoint reached, awaiting Windows rig verification"
-last_updated: "2026-08-21T18:27:08.371Z"
+stopped_at: "Phase 25 complete: Plan 04 Task 3 closed by operator authorization on partial evidence (build+app-works confirmed; 3x flakiness check, ApplyUpdateBypass_* confirmation, and live CR-01 repro remain open follow-up items, not performed)"
+last_updated: "2026-08-21T19:21:17.956Z"
 last_activity: 2026-08-21
-last_activity_desc: Phase 25 execution started
+last_activity_desc: Phase 25 Plan 04 Task 3 checkpoint closed by operator authorization on partial evidence
 progress:
   total_phases: 3
   completed_phases: 2
@@ -28,12 +28,12 @@ See: .planning/PROJECT.md (updated 2026-08-18)
 
 ## Current Position
 
-Phase: 25 (single-instance-guard) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 25
-Last activity: 2026-08-21 — Phase 25 execution started
+Phase: 25 (single-instance-guard) — 4/4 plans executed
+Plan: 4 of 4 (25-04 closed by operator authorization on partial hardware evidence — see 25-04-SUMMARY.md)
+Status: All plans executed; phase-level verification re-check not yet performed
+Last activity: 2026-08-21 — Phase 25 Plan 04 Task 3 checkpoint closed by operator
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -83,6 +83,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 23 P02 | 25min | 3 tasks | 3 files |
 | Phase 23 P03 | 40min | 2 tasks | 1 files |
 | Phase 25 P04 | 40min | 2 tasks | 3 files |
+| Phase 25 P04 | ~40min (Tasks 1-2); Task 3 closed via operator override | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,7 @@ Full decision log lives in PROJECT.md's Key Decisions table. v2.0's decisions (o
 - [Phase ?]: Abandoned readiness-mutex wait treated as acquired=true (CR-01 fix) -- routes into existing release branch rather than re-abandoning the mutex for the next waiter
 - [Phase ?]: WR-02's readiness-mutex construction guarded with a broad catch, deliberately asymmetric to the main mutex's narrow catch, since the readiness mutex is a best-effort optimisation and the main mutex is correctness-critical
 - [Phase ?]: WR-01's cross-namespace probe explicitly deferred -- accepted as a known limitation at ASVS L1 for this single-user rig
+- [Phase ?]: Phase 25 Plan 04 Task 3 closed by explicit operator authorization on partial evidence (build succeeds + app works on real hardware); the three-run flakiness check, ApplyUpdateBypass_* confirmation, and live CR-01 repro were NOT performed and remain open follow-up items
 
 ### Pending Todos
 
@@ -128,7 +130,7 @@ Resolved 2026-08-17: Research flagged Phase 21 (accent color) and Phase 23 (manu
 
 Open (carried from v2.2 research, `.planning/research/SUMMARY.md` "Gaps to Address"): the rename-while-running self-update mechanism, Mark-of-the-Web/SmartScreen behavior for HttpClient downloads, `mainForm.BeginInvoke`/`Handle` existence under `--tray` hidden startup, and the exact signal mechanism for single-instance activation (named pipe vs. `RegisterWindowMessage`) are all flagged MEDIUM confidence and not yet rig-verified — expected to be resolved during Phase 25/26 planning and rig checkpoints, not blocking roadmap creation.
 
-- Phase 25 Plan 04 Task 3 (blocking checkpoint) requires real Windows rig hardware: three consecutive dotnet test RigToggle.sln -c Release --no-build runs plus a real CR-01 (abandoned-mutex) reproduction. Not available in this Linux sandbox. Operator must build at commit 9d555f8 or later, run Task 3's checks in 25-04-PLAN.md, and report results to resume execution.
+Resolved 2026-08-21 (partial): Phase 25 Plan 04 Task 3's blocking checkpoint (real Windows rig verification) was closed by explicit operator authorization rather than by completing its original ask. The operator confirmed the solution builds and the app functions correctly on real Windows hardware, but declined to run the three-consecutive-clean-runs flakiness check, confirm the three `ApplyUpdateBypass_*` facts, or perform the live CR-01 (abandoned-mutex) reproduction ("doesn't work on my pc") — see `25-04-SUMMARY.md`'s "Task 3: Operator Verification" section for the verbatim exchange. INSTANCE-01/INSTANCE-02/UPDATE-07 are marked complete on the operator's sign-off; the three unperformed checks remain open follow-up items, not fabricated passes, and should be run if the opportunity arises.
 
 ### Quick Tasks Completed
 
@@ -179,9 +181,9 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-21T18:27:00.479Z
-Stopped at: Phase 25 Plan 04: Tasks 1-2 complete (CR-01/WR-02 fixed and committed); Task 3 blocking checkpoint reached, awaiting Windows rig verification
-Resume file: .planning/phases/25-single-instance-guard/25-04-PLAN.md
+Last session: 2026-08-21T19:21:17.929Z
+Stopped at: Phase 25 complete: Plan 04 Task 3 closed by operator authorization on partial evidence (build+app-works confirmed; 3x flakiness check, ApplyUpdateBypass_* confirmation, and live CR-01 repro remain open follow-up items, not performed)
+Resume file: None
 
 ## Operator Next Steps
 

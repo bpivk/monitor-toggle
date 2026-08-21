@@ -117,7 +117,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
   2. When a duplicate launch is attempted, the already-running instance is brought to focus and made visible (restored from minimized/tray-hidden) rather than the duplicate launch silently exiting or erroring
   3. The startup sequence has an explicit, deliberately-built bypass path that an internal self-relaunch (e.g. an update-apply relaunch in Phase 26) can use to skip the single-instance mutex check without racing it, verified by a scripted simulated relaunch rather than left to be improvised later
 
-**Plans**: 4/4 plans executed (3/4 executed — 25-04 is gap closure, pending)
+**Plans**: 4/4 plans executed (25-04 gap closure closed 2026-08-21 by operator authorization on partial hardware evidence — see 25-04-SUMMARY.md)
 **Wave 1**
 
 - [x] 25-01-PLAN.md — Named-mutex single-instance guard end-to-end: Core guard class, `user32` activation-broadcast facade, `Program.cs` gate above all bootstrap, `MainForm.WndProc` restore branch, plus Pitfall-8 readiness handshake and namespace fallback (wave 1)
@@ -132,7 +132,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
 
 **Wave 4** *(gap closure — blocked on Wave 3 verification)*
 
-- [x] 25-04-PLAN.md — Gap closure for 25-VERIFICATION.md's blocking gap and 25-REVIEW.md's CR-01: catch `AbandonedMutexException` in `WaitForInstanceReady` so a duplicate launch stops crashing when the primary dies mid-startup, proven by a red-first regression test; plus WR-02's unguarded readiness-mutex construction and three corrected doc comments (wave 4, blocking operator verification on Windows)
+- [x] 25-04-PLAN.md — Gap closure for 25-VERIFICATION.md's blocking gap and 25-REVIEW.md's CR-01: catch `AbandonedMutexException` in `WaitForInstanceReady` so a duplicate launch stops crashing when the primary dies mid-startup, proven by a red-first regression test; plus WR-02's unguarded readiness-mutex construction and three corrected doc comments (wave 4; Task 3's operator verification checkpoint closed on partial evidence — build succeeds and app works on real hardware, but the 3x flakiness check, `ApplyUpdateBypass_*` confirmation, and live CR-01 repro were not performed)
 
 ### Phase 26: Auto-Update
 
