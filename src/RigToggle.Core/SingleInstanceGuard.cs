@@ -191,6 +191,8 @@ public sealed class SingleInstanceGuard : IDisposable
             ? new Mutex(initiallyOwned: true, readyEventName, out _)
             : null;
 
+        TryLog($"Acquire: IsPrimaryInstance={createdNew}, MutexName={mutexName}, IsGlobalScope={isGlobalScope}.");
+
         return new SingleInstanceGuard(mutex, createdNew, mutexName, isGlobalScope, readyEventName, readyMutex);
     }
 
@@ -206,12 +208,14 @@ public sealed class SingleInstanceGuard : IDisposable
     {
         if (_readyMutex is null)
         {
+            TryLog("MarkReady: no-op -- this guard is not primary, nothing to signal.");
             return;
         }
 
         if (Interlocked.Exchange(ref _readyMutexReleased, 1) == 0)
         {
             ReleaseIgnoringOwnershipError(_readyMutex);
+            TryLog("MarkReady: readiness mutex released -- instance is now signalled ready.");
         }
     }
 
@@ -259,6 +263,7 @@ public sealed class SingleInstanceGuard : IDisposable
         {
             // The readiness mutex never appeared -- no genuine Rig Toggle instance ever
             // published it. Fail fast rather than burn the whole timeout.
+            TryLog($"WaitForInstanceReady: readiness mutex never opened after {ReadyHandleOpenAttempts} attempts -- no instance ever published readiness. Returning false.");
             return false;
         }
 
@@ -275,12 +280,30 @@ public sealed class SingleInstanceGuard : IDisposable
                 ReleaseIgnoringOwnershipError(readyMutex);
             }
 
+            TryLog($"WaitForInstanceReady: readiness mutex opened, WaitOne(remaining={remaining}) returned {acquired}.");
             return acquired;
         }
     }
 
     private static string BuildName(string suffix, bool isGlobalScope) =>
         (isGlobalScope ? @"Global\" : @"Local\") + suffix;
+
+    // Best-effort diagnostic logging (25-03 Task 3 operator checkpoint investigation),
+    // routed through Trace.WriteLine so RigToggle.App's TextWriterTraceListener (wired
+    // in Program.cs, now before the guard acquisition -- see that file's own
+    // investigation note) persists it to %LOCALAPPDATA%\RigToggle\debug.log. Never
+    // throws -- a logging failure must never affect this correctness-critical guard.
+    private static void TryLog(string message)
+    {
+        try
+        {
+            Trace.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] SingleInstanceGuard: {message}");
+        }
+        catch
+        {
+            // Logging is diagnostic-only; never let it affect guard behavior.
+        }
+    }
 
     /// <summary>
     /// Releases mutex ownership (only if this instance actually owns it — a

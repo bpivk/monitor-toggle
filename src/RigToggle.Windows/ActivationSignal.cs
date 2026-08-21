@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading;
 
 namespace RigToggle.Windows;
@@ -77,8 +78,10 @@ public static class ActivationSignal
     public static void BroadcastActivation()
     {
         uint messageId = MessageId;
+        Log($"BroadcastActivation: resolved messageId={messageId}.");
         if (messageId == 0)
         {
+            Log("BroadcastActivation: messageId is 0 (RegisterWindowMessage failed) -- nothing to broadcast.");
             return;
         }
 
@@ -93,8 +96,27 @@ public static class ActivationSignal
             // next line — a failed grant here (return value ignored) is not fatal, it
             // just means this particular attempt's Activate() call may not visibly
             // take effect; the retry loop is the tolerance mechanism for both calls.
-            NativeMethods.AllowSetForegroundWindow(NativeMethods.ASFW_ANY);
-            NativeMethods.PostMessage((IntPtr)NativeMethods.HWND_BROADCAST, messageId, IntPtr.Zero, IntPtr.Zero);
+            bool allowed = NativeMethods.AllowSetForegroundWindow(NativeMethods.ASFW_ANY);
+            bool posted = NativeMethods.PostMessage((IntPtr)NativeMethods.HWND_BROADCAST, messageId, IntPtr.Zero, IntPtr.Zero);
+            Log($"BroadcastActivation: attempt {attempt}: AllowSetForegroundWindow={allowed}, PostMessage={posted}.");
+        }
+    }
+
+    // Best-effort diagnostic logging (25-03 Task 3 operator checkpoint investigation),
+    // routed through Trace.WriteLine (the established convention in this codebase --
+    // WindowsAppController.cs, WindowsThemeProvider.cs, WindowsAutostartConfigurator.cs)
+    // so RigToggle.App's TextWriterTraceListener persists it to
+    // %LOCALAPPDATA%\RigToggle\debug.log. Never throws -- a logging failure must never
+    // affect the activation broadcast itself.
+    private static void Log(string message)
+    {
+        try
+        {
+            Trace.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] ActivationSignal: {message}");
+        }
+        catch
+        {
+            // Logging is diagnostic-only; never let it affect broadcast behavior.
         }
     }
 }

@@ -66,48 +66,29 @@ namespace RigToggle.App
                 return;
             }
 
-            // INSTANCE-01/D-02: the single-instance guard is acquired here, above every
-            // other bootstrap step -- before settingsStore, before modeStore, before any
-            // Form is constructed. This is deliberately NOT wrapped in this file's
-            // best-effort swallow-and-continue try/catch idiom (see the trace-listener
-            // block below): a second instance that got as far as, say, hotkey
-            // registration would hard-fail RegisterHotKey and surface a spurious
-            // user-facing error on every accidental double-launch (STACK.md §2 row 4),
-            // so failing this check must short-circuit everything after it, not degrade
-            // gracefully and continue. `using var` means the compiler emits the
-            // try/finally that covers everything below including Application.Run --
-            // rewriting this to a bare local or a static field would drop that finally
-            // and lose deterministic mutex release on the exception path.
-            using var guard = SingleInstanceGuard.Acquire();
-
-            // D-02: exactly one duplicate-launch branch, handled identically regardless
-            // of why the second launch happened (accidental double-click, autostart
-            // racing a manual launch, tray relaunch) -- no reason-based sub-case. D-01:
-            // the only action is waiting for readiness then broadcasting the activation
-            // signal; no toast, no dialog, no notification of any kind is raised here or
-            // anywhere else on this path.
-            if (!guard.IsPrimaryInstance)
-            {
-                // Pitfall 8: wait for the primary instance's readiness handle before
-                // broadcasting -- but broadcast either way, since a false result here is
-                // not proof no window exists (it may just mean the wait timed out or the
-                // handle opened but was never signalled in time). ActivationSignal itself
-                // also retries multiple times, giving this a second layer of tolerance
-                // against a startup race.
-                SingleInstanceGuard.WaitForInstanceReady(SingleInstanceGuard.DefaultReadyWaitTimeout);
-                ActivationSignal.BroadcastActivation();
-                return;
-            }
-
             string basePath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "RigToggle");
 
             var settingsStore = new JsonSettingsStore(Path.Combine(basePath, "settings.json"));
 
-            // Settings must be loaded before the trace-listener block below so the
-            // EnableDebugLogging flag can gate it. Best-effort: if Load throws, default to
-            // logging OFF rather than blocking startup or falling back to "on".
+            // 25-03 Task 3 operator checkpoint (INSTANCE-02 restore investigation):
+            // settings-loading and the trace-listener wiring below were originally
+            // positioned AFTER the single-instance guard's early-return branch (further
+            // down this file, past the point where a duplicate/loser process returns).
+            // That meant a duplicate launch -- exactly the path this investigation needs
+            // to observe (WaitForInstanceReady, BroadcastActivation) -- could NEVER write
+            // to debug.log, in any build, regardless of AppSettings.EnableDebugLogging.
+            // Moved here, above the guard acquisition, so BOTH the primary and duplicate
+            // paths can log. Still strictly AFTER the --apply-update bypass branch above
+            // (D-03's contract: the bypass runs before settings/mode-store bootstrap of
+            // any kind, before the guard, before anything else -- moving this any earlier
+            // would violate that one-way, Phase-26-consumed ordering guarantee). Settings
+            // loading itself is unchanged: still best-effort, still defaults to
+            // EnableDebugLogging=false on a read failure rather than blocking startup or
+            // guessing "on" -- this is purely a reordering, not a behavior change to D-01/
+            // D-02 (still zero visible feedback on a duplicate launch, still exactly one
+            // code path regardless of launch reason).
             AppSettings settings;
             try
             {
@@ -142,6 +123,47 @@ namespace RigToggle.App
                 {
                     // Diagnostic logging is best-effort only — never let it prevent startup.
                 }
+            }
+
+            // INSTANCE-01/D-02: the single-instance guard is acquired here, above every
+            // other bootstrap step except settings-loading/trace-listener wiring above --
+            // before modeStore, before any Form is constructed. This is deliberately NOT
+            // wrapped in this file's best-effort swallow-and-continue try/catch idiom (see
+            // the trace-listener block above): a second instance that got as far as, say,
+            // hotkey registration would hard-fail RegisterHotKey and surface a spurious
+            // user-facing error on every accidental double-launch (STACK.md §2 row 4),
+            // so failing this check must short-circuit everything after it, not degrade
+            // gracefully and continue. `using var` means the compiler emits the
+            // try/finally that covers everything below including Application.Run --
+            // rewriting this to a bare local or a static field would drop that finally
+            // and lose deterministic mutex release on the exception path.
+            using var guard = SingleInstanceGuard.Acquire();
+
+            // D-02: exactly one duplicate-launch branch, handled identically regardless
+            // of why the second launch happened (accidental double-click, autostart
+            // racing a manual launch, tray relaunch) -- no reason-based sub-case. D-01:
+            // the only action is waiting for readiness then broadcasting the activation
+            // signal; no toast, no dialog, no notification of any kind is raised here or
+            // anywhere else on this path. The Trace.WriteLine calls below are new
+            // (25-03 Task 3 investigation) and purely diagnostic -- individually
+            // try/caught so a logging failure can never turn a clean duplicate-process
+            // exit into an unhandled-exception exit code.
+            if (!guard.IsPrimaryInstance)
+            {
+                TryLog("Program.Main: duplicate launch detected (not primary instance) -- waiting for existing instance's readiness signal.");
+
+                // Pitfall 8: wait for the primary instance's readiness handle before
+                // broadcasting -- but broadcast either way, since a false result here is
+                // not proof no window exists (it may just mean the wait timed out or the
+                // handle opened but was never signalled in time). ActivationSignal itself
+                // also retries multiple times, giving this a second layer of tolerance
+                // against a startup race.
+                bool becameReady = SingleInstanceGuard.WaitForInstanceReady(SingleInstanceGuard.DefaultReadyWaitTimeout);
+                TryLog($"Program.Main: WaitForInstanceReady returned {becameReady}.");
+
+                ActivationSignal.BroadcastActivation();
+                TryLog("Program.Main: ActivationSignal.BroadcastActivation completed; duplicate process exiting.");
+                return;
             }
 
             string legacyStateJsonPath = Path.Combine(basePath, "state.json");
@@ -267,6 +289,28 @@ namespace RigToggle.App
             else
             {
                 Application.Run(mainForm);
+            }
+        }
+
+        /// <summary>
+        /// 25-03 Task 3 operator checkpoint: best-effort diagnostic logging for the
+        /// duplicate-launch branch, matching this codebase's established
+        /// Trace.WriteLine-is-diagnostic-only convention (WindowsAppController.cs,
+        /// WindowsThemeProvider.cs, WindowsAutostartConfigurator.cs). Individually
+        /// try/caught -- a Trace write failure (e.g. a disk error mid-write) must
+        /// never turn a clean duplicate-process exit (D-01/D-02: exit code 0, no
+        /// visible feedback) into an unhandled-exception exit, which would silently
+        /// change this file's most correctness-sensitive path for a logging reason.
+        /// </summary>
+        private static void TryLog(string message)
+        {
+            try
+            {
+                Trace.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Program: {message}");
+            }
+            catch
+            {
+                // Logging is diagnostic-only; never let it affect startup/exit behavior.
             }
         }
     }
