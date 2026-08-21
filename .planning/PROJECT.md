@@ -143,10 +143,13 @@ All five v2.1 roadmap phases (19-23) are now complete and verified. THEME-07/08/
 ### Validated (v2.2)
 
 - [x] Self-contained exe measurably smaller than the v2.1 baseline via an additional safe, non-trimming MSBuild lever (PERF-03) — Validated in Phase 24: Self-Contained Exe Size Reduction. A new `RemoveUnusedDesignerAndVbAssemblies` `<Target>` deny-lists 7 unused WinForms Design-time/VisualBasic-compat assemblies from the self-contained publish output: 49,367,344 → 46,770,881 bytes (5.26% additional reduction, well under the 49,356,430-byte v2.1 baseline). No IL trimming/AOT/ReadyToRun introduced; five automated audit gates plus a six-check rig verification (byte count, cold launch, Settings window, full Rig↔Normal toggle round trip, cold autostart boot, tray-triggered toggle) all passed on real Windows hardware. Rig testing on the user's now-3-monitor rig also surfaced two pre-existing, unrelated monitor-control bugs (see Key Decisions and Context) — both root-caused and fixed via separate debug sessions, not part of this phase's own scope.
+- [x] Launching the app while an instance is already running does not start a second instance (INSTANCE-01) — Validated in Phase 25: Single-Instance Guard. A named cross-process `Global\RigToggle-*` mutex gates `Program.cs` above all bootstrap; a gap-closure round (Plan 25-04) fixed a real crash bug found by code review (CR-01: unhandled `AbandonedMutexException` when the primary dies mid-startup while a duplicate waits) with a red-then-green regression test, independently re-confirmed by this session re-running the test itself (not just trusting the SUMMARY). Marked complete on explicit operator authorization: the operator confirmed the solution builds and the app works correctly on real Windows hardware, but the three-consecutive-clean-runs flakiness check for the real-process `SingleInstanceProcessTests` suite was not run ("doesn't work on my pc") — this remains an open, disclosed follow-up, not a fabricated pass.
+- [x] The already-running instance is brought to focus (shown/restored if minimized or tray-hidden) when a duplicate launch is attempted (INSTANCE-02) — Validated in Phase 25, same evidence as INSTANCE-01. Strong direct-hardware evidence from Phase 25 Plan 03: operator-confirmed via `debug.log` ground truth (`GetForegroundWindow()==Handle`) plus direct visual observation, unaffected by the later CR-01 gap closure.
+- [x] The update-apply relaunch always succeeds despite the new single-instance guard being active (UPDATE-07) — Validated in Phase 25. `StartupArgs.TryGetApplyUpdateArgs`'s `--apply-update` flag is checked as the first branch in `Main()`, strictly above guard acquisition, transferring control to a side-effect-free placeholder entry point Phase 26's real apply logic will extend. The bypass mechanism itself is structurally verified and unaffected by CR-01 (never reaches `WaitForInstanceReady`); the three `ApplyUpdateBypass_*` real-process facts remain `unknown` (not run to a confirmed-green result on Windows hardware) — same disclosed open item as INSTANCE-01.
 
 ### Active
 
-Defining v2.2 requirements (auto-update, single-instance guard) — see `.planning/REQUIREMENTS.md`. Exe size reduction (PERF-03) shipped in Phase 24.
+Defining Phase 26 requirements (auto-update, UPDATE-01 through UPDATE-06) — see `.planning/REQUIREMENTS.md`. Single-instance guard (INSTANCE-01/02, UPDATE-07) and exe size reduction (PERF-03) shipped in Phases 25 and 24.
 
 ### Out of Scope
 
@@ -251,4 +254,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-19 — Phase 24 (Self-Contained Exe Size Reduction, PERF-03) shipped and rig-verified; two pre-existing multi-monitor bugs found during rig testing fixed via separate debug sessions.*
+*Last updated: 2026-08-21 — Phase 25 (Single-Instance Guard, INSTANCE-01/02, UPDATE-07) marked complete on operator authorization; the CR-01 abandoned-mutex crash bug (gap-closure Plan 25-04) is fixed and independently re-confirmed, but the Windows-hardware flakiness check and ApplyUpdateBypass_* facts remain open follow-up items.*
