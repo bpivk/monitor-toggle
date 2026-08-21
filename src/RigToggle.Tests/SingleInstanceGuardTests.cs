@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using RigToggle.Core;
 using Xunit;
@@ -196,5 +197,85 @@ public class SingleInstanceGuardTests : IDisposable
 
         Assert.True(waitTask.Wait(ConcurrentReadinessJoinTimeout), "Background WaitForInstanceReady call never returned.");
         Assert.True(waitTask.Result);
+    }
+
+    // Named timeouts for the abandoned-readiness-mutex fact below -- no fixed-duration
+    // sleep anywhere in this fact, only bounded waits on real synchronization handles.
+    private static readonly TimeSpan OwnerThreadAcquireJoinTimeout = TimeSpan.FromSeconds(6);
+    private static readonly TimeSpan AbandonedWaitTimeout = TimeSpan.FromSeconds(6);
+
+    /// <summary>
+    /// 25-REVIEW.md CR-01 / 25-VERIFICATION.md's blocking gap: the production trigger is
+    /// the primary process dying anywhere between <see cref="SingleInstanceGuard.Acquire(string?)"/>
+    /// and <see cref="SingleInstanceGuard.MarkReady"/> -- a window that in <c>Program.cs</c>
+    /// spans <c>StartupRecoveryChecker.Run</c>, <c>MainForm</c> construction,
+    /// <c>InitializeTrayState()</c>, and <c>RegisterHotkeyAtStartup()</c>. In-process THREAD
+    /// termination while owning the readiness mutex is the deterministic equivalent of that
+    /// PROCESS termination: the OS marks a mutex abandoned on owning-thread exit exactly as
+    /// it does on owning-process exit, and the waiter observes an identical
+    /// <see cref="AbandonedMutexException"/> either way.
+    ///
+    /// Deliberately does NOT use <see cref="TestInstanceId"/> -- this guard is never
+    /// released (that is the abandonment), so sharing the class-wide id would leave the
+    /// mutex held for the remainder of the test-assembly lifetime and silently flip
+    /// <c>IsPrimaryInstance</c> to false in every sibling fact that runs after it under
+    /// xUnit's unordered execution. A locally-generated id confines the leak to this fact
+    /// alone.
+    /// </summary>
+    [Fact]
+    public void WaitForInstanceReady_PrimaryAbandonedReadinessMutex_ReturnsTrueWithoutThrowing()
+    {
+        string abandonedInstanceId = Guid.NewGuid().ToString();
+
+        SingleInstanceGuard? abandonedGuard = null;
+        using var acquired = new ManualResetEventSlim(false);
+
+        // Abandonment is produced by the OWNING THREAD exiting while still holding the
+        // readiness mutex -- not by calling Dispose(), which releases it cleanly under
+        // the _readyMutexReleased interlock and would produce a permanently-green test
+        // that proves nothing (see this plan's prohibitions). The thread body is exactly
+        // two statements and returns immediately after Set() -- no MarkReady(), no
+        // Dispose(), no join-blocking work.
+        var owner = new Thread(() =>
+        {
+            abandonedGuard = SingleInstanceGuard.Acquire(abandonedInstanceId);
+            acquired.Set();
+        });
+
+        owner.Start();
+        Assert.True(
+            acquired.Wait(OwnerThreadAcquireJoinTimeout),
+            "Owner thread never acquired the guard, so the rest of this fact would be meaningless.");
+        owner.Join();
+
+        try
+        {
+            Assert.NotNull(abandonedGuard);
+            Assert.True(
+                abandonedGuard!.IsPrimaryInstance,
+                "A non-primary guard publishes no readiness mutex, so there would be nothing to abandon.");
+
+            bool result = false;
+            var exception = Record.Exception(() => result = SingleInstanceGuard.WaitForInstanceReady(AbandonedWaitTimeout, abandonedInstanceId));
+
+            // Asserted in this order so a failing run names the actual defect rather
+            // than a bare boolean: first that this is not the CR-01 crash, then that
+            // nothing else escaped, then that the wait genuinely acquired ownership.
+            Assert.False(
+                exception is AbandonedMutexException,
+                "CR-01: an abandoned wait must be caught inside WaitForInstanceReady and treated as a successful acquisition, not left to escape as AbandonedMutexException.");
+            Assert.Null(exception);
+            Assert.True(
+                result,
+                "An abandoned wait genuinely acquired ownership of the readiness mutex; reporting false would skip the release that follows and re-abandon the mutex for the next waiter.");
+        }
+        finally
+        {
+            // Releases the leaked handles, and keeps abandonedGuard reachable for the
+            // whole wait above so the finalizer cannot close the last handle to the
+            // named object mid-test and turn a genuine abandoned-wait into a spurious
+            // "handle never opened" false negative.
+            abandonedGuard?.Dispose();
+        }
     }
 }
