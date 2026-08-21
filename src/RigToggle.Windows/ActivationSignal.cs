@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 
 namespace RigToggle.Windows;
@@ -34,10 +35,21 @@ namespace RigToggle.Windows;
 /// OS's point of view at that moment), and merely receiving a posted message does not
 /// grant it. The loser DOES hold it (inherited from Explorer launching it moments
 /// earlier) and can explicitly forward it via <c>AllowSetForegroundWindow</c> before it
-/// exits. <see cref="BroadcastActivation"/> grants it (<c>ASFW_ANY</c>) immediately
-/// before every retry attempt below, matching the same repeated-robustness posture
-/// already used for the message itself — a lone grant call could otherwise be consumed
-/// or expire before a late-listening primary's <c>Activate()</c> call runs.
+/// exits. <see cref="BroadcastActivation"/> grants it immediately before every retry
+/// attempt below, matching the same repeated-robustness posture already used for the
+/// message itself — a lone grant call could otherwise be consumed or expire before a
+/// late-listening primary's <c>Activate()</c> call runs.
+///
+/// Follow-up hardening (25-03, second debug.log capture): the grant now targets the
+/// specific peer process id (resolved via <see cref="System.Diagnostics.Process"/> by
+/// process name, since exactly one other Rig Toggle process should exist while a
+/// duplicate is running) instead of the wildcard <c>ASFW_ANY</c>. <c>ASFW_ANY</c> grants
+/// the permission to whichever process next calls <c>SetForegroundWindow</c> —
+/// literally any window on the desktop, not necessarily ours — so an unrelated
+/// application happening to call it in the brief window between our grant and the
+/// primary's own <c>Activate()</c> call could consume it first, wasting the grant. A
+/// PID-targeted grant can only be consumed by the intended primary. Falls back to
+/// <c>ASFW_ANY</c> only if the peer's process id could not be resolved.
 /// </summary>
 public static class ActivationSignal
 {
@@ -85,6 +97,11 @@ public static class ActivationSignal
             return;
         }
 
+        uint foregroundGrantTarget = ResolvePeerProcessId() ?? NativeMethods.ASFW_ANY;
+        Log(foregroundGrantTarget == NativeMethods.ASFW_ANY
+            ? "BroadcastActivation: could not resolve a specific peer process id -- falling back to ASFW_ANY."
+            : $"BroadcastActivation: targeting foreground grant at peer process id {foregroundGrantTarget}.");
+
         for (int attempt = 0; attempt < BroadcastAttempts; attempt++)
         {
             if (attempt > 0)
@@ -96,9 +113,51 @@ public static class ActivationSignal
             // next line — a failed grant here (return value ignored) is not fatal, it
             // just means this particular attempt's Activate() call may not visibly
             // take effect; the retry loop is the tolerance mechanism for both calls.
-            bool allowed = NativeMethods.AllowSetForegroundWindow(NativeMethods.ASFW_ANY);
+            bool allowed = NativeMethods.AllowSetForegroundWindow(foregroundGrantTarget);
             bool posted = NativeMethods.PostMessage((IntPtr)NativeMethods.HWND_BROADCAST, messageId, IntPtr.Zero, IntPtr.Zero);
             Log($"BroadcastActivation: attempt {attempt}: AllowSetForegroundWindow={allowed}, PostMessage={posted}.");
+        }
+    }
+
+    /// <summary>
+    /// True iff <paramref name="handle"/> is currently the OS-level foreground window
+    /// (<c>GetForegroundWindow() == handle</c>) -- the unambiguous ground-truth signal
+    /// for "did this window actually come to the front," independent of
+    /// <c>Control.Focused</c>/<c>ContainsFocus</c> (which reflect keyboard-focus
+    /// assignment among a form's CHILD controls and can legitimately be false on the
+    /// form itself even when the form genuinely is the foreground window).
+    /// </summary>
+    public static bool IsForegroundWindow(IntPtr handle) => NativeMethods.GetForegroundWindow() == handle;
+
+    /// <summary>
+    /// Resolves the process id of the one other Rig Toggle process expected to be
+    /// running (the primary, from this loser's point of view) by matching on this
+    /// process's own name -- best-effort, returns null on any failure or if zero/more
+    /// than one other candidate is found (ambiguous; ASFW_ANY is the safer fallback in
+    /// that case rather than guessing which candidate is the real primary).
+    /// </summary>
+    private static uint? ResolvePeerProcessId()
+    {
+        try
+        {
+            using var currentProcess = Process.GetCurrentProcess();
+            Process[] candidates = Process.GetProcessesByName(currentProcess.ProcessName);
+            try
+            {
+                Process[] others = candidates.Where(p => p.Id != currentProcess.Id).ToArray();
+                return others.Length == 1 ? (uint)others[0].Id : null;
+            }
+            finally
+            {
+                foreach (Process candidate in candidates)
+                {
+                    candidate.Dispose();
+                }
+            }
+        }
+        catch
+        {
+            return null;
         }
     }
 
