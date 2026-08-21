@@ -264,6 +264,18 @@ namespace RigToggle.App
 
             if (ActivationSignal.MessageId != 0 && m.Msg == (int)ActivationSignal.MessageId)
             {
+                // 25-03 Task 3 operator checkpoint investigation: try/caught so a
+                // logging failure can never turn "WndProc must run unconditionally"
+                // into a swallowed exception that skips base.WndProc below.
+                try
+                {
+                    System.Diagnostics.Trace.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MainForm.WndProc: activation signal received -- calling RestoreAndFocus().");
+                }
+                catch
+                {
+                    // Logging is diagnostic-only.
+                }
+
                 RestoreAndFocus();
             }
 
@@ -1555,9 +1567,29 @@ namespace RigToggle.App
         /// </summary>
         private void RestoreAndFocus()
         {
+            // 25-03 Task 3 operator checkpoint investigation: before/after state
+            // snapshot, individually try/caught so a logging failure can never affect
+            // the actual restore sequence below.
+            TryLogRestoreState("before");
+
             Show();
             WindowState = FormWindowState.Normal;
             Activate();
+
+            TryLogRestoreState("after");
+        }
+
+        private void TryLogRestoreState(string when)
+        {
+            try
+            {
+                System.Diagnostics.Trace.WriteLine(
+                    $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.RestoreAndFocus ({when}): Visible={Visible}, WindowState={WindowState}, Focused={Focused}, Handle={Handle}.");
+            }
+            catch
+            {
+                // Logging is diagnostic-only.
+            }
         }
 
         private void TraySettingsMenuItem_Click(object? sender, EventArgs e) => OpenSettingsDialog();
