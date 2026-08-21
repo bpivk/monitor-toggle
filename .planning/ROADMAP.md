@@ -117,7 +117,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
   2. When a duplicate launch is attempted, the already-running instance is brought to focus and made visible (restored from minimized/tray-hidden) rather than the duplicate launch silently exiting or erroring
   3. The startup sequence has an explicit, deliberately-built bypass path that an internal self-relaunch (e.g. an update-apply relaunch in Phase 26) can use to skip the single-instance mutex check without racing it, verified by a scripted simulated relaunch rather than left to be improvised later
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 **Wave 1**
 
 - [x] 25-01-PLAN.md — Named-mutex single-instance guard end-to-end: Core guard class, `user32` activation-broadcast facade, `Program.cs` gate above all bootstrap, `MainForm.WndProc` restore branch, plus Pitfall-8 readiness handshake and namespace fallback (wave 1)
@@ -128,7 +128,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 25-03-PLAN.md — Six automated child-process tests launching the real built exe: rapid relaunch, tight race, hidden-window restore, and bypass-under-held-guard with idempotency and concurrency (wave 3, blocking operator verification on Windows)
+- [x] 25-03-PLAN.md — Six automated child-process tests launching the real built exe: rapid relaunch, tight race, hidden-window restore, and bypass-under-held-guard with idempotency and concurrency (wave 3, blocking operator verification on Windows)
 
 ### Phase 26: Auto-Update
 
@@ -174,7 +174,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
 | 22. SettingsForm Layout Pass | v2.1 | 5/5 | Complete | 2026-08-16 |
 | 23. Manual Light/Dark Override | v2.1 | 3/3 | Complete | 2026-08-17 |
 | 24. Self-Contained Exe Size Reduction | v2.2 | 1/1 | Complete    | 2026-08-19 |
-| 25. Single-Instance Guard | v2.2 | 2/3 | In Progress|  |
+| 25. Single-Instance Guard | v2.2 | 3/3 | In Progress|  |
 | 26. Auto-Update | v2.2 | 0/TBD | Not started | - |
 
 ## Backlog
