@@ -113,7 +113,31 @@ namespace RigToggle.App
                 try
                 {
                     Directory.CreateDirectory(basePath);
-                    var traceWriter = new StreamWriter(Path.Combine(basePath, "debug.log"), append: true)
+
+                    // 25-03 Task 3 operator checkpoint investigation, second logging
+                    // gap: the path-based StreamWriter(path, append) constructor opens
+                    // its underlying FileStream with FileShare.Read only (confirmed --
+                    // this is documented .NET StreamWriter behavior), NOT
+                    // FileShare.ReadWrite. With the primary instance holding debug.log
+                    // open for its whole lifetime, a duplicate/loser process's own
+                    // attempt to open the SAME file for its own append-write would
+                    // throw a sharing-violation IOException -- silently swallowed by
+                    // the catch below, producing zero log output for the duplicate
+                    // process even though every other part of this fix (the ordering
+                    // fix, the Trace.WriteLine instrumentation) was working correctly.
+                    // Opening the FileStream explicitly with FileShare.ReadWrite lets
+                    // every process (primary and any number of duplicates) hold its
+                    // own writable handle to the same file concurrently. Interleaved
+                    // appends across processes are acceptable here -- this is a
+                    // diagnostic-only, human-read log, not a structured/parsed one, so
+                    // no cross-process locking or write-ordering coordination is
+                    // needed beyond what OS-level append semantics already provide.
+                    var logStream = new FileStream(
+                        Path.Combine(basePath, "debug.log"),
+                        FileMode.Append,
+                        FileAccess.Write,
+                        FileShare.ReadWrite);
+                    var traceWriter = new StreamWriter(logStream)
                     {
                         AutoFlush = true,
                     };
