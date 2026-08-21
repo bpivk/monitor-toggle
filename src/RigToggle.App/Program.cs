@@ -49,7 +49,60 @@ namespace RigToggle.App
 
             // To customize application configuration such as set high DPI settings or default font,
             // see https://aka.ms/applicationconfiguration.
-            ApplicationConfiguration.Initialize();
+            //
+            // 25-03 Task 3 operator checkpoint: CONFIRMED real-usage crash (Windows
+            // Event Viewer detail plus a real 2-launch repro on real hardware -- an
+            // ordinary "app already running, user double-clicks it again" scenario,
+            // NOT an artificial test-harness burst). Application.SetColorMode(System)
+            // above subscribes to Microsoft.Win32.SystemEvents.UserPreferenceChanged
+            // (needed for live OS theme-follow), whose first-use initialization
+            // lazily spins up a dedicated background thread that creates a native
+            // window asynchronously relative to this thread (confirmed directly from
+            // the actual .NET 10.0.10 binaries' own symbols -- SystemEvents.dll's
+            // s_windowThread/WindowThreadProc/CreateWindowExW, not guessed).
+            // ApplicationConfiguration.Initialize()'s SetCompatibleTextRenderingDefault
+            // call asserts no window has been created yet in this process; under
+            // ordinary scheduling contention from an already-running instance's own
+            // message pump/GC (reproduced with as few as two total processes on the
+            // machine, no artificial concurrent burst needed), that background thread
+            // can occasionally win the race and create its window first, throwing
+            // InvalidOperationException and crashing the whole process before it ever
+            // reaches the single-instance guard below -- which is what made a real
+            // duplicate launch look like a broken restore path: the process crashed
+            // before WaitForInstanceReady/BroadcastActivation ever ran.
+            //
+            // Catching InvalidOperationException narrowly around this one call
+            // converts that crash into a graceful continuation. This is safe because
+            // EnableVisualStyles()/SetHighDpiMode() -- the two calls the generated
+            // Initialize() method makes before SetCompatibleTextRenderingDefault --
+            // have already completed successfully by the time this specific exception
+            // can be thrown (execution reached the LAST statement), so this app's DPI
+            // awareness and visual-styles configuration are unaffected either way.
+            // Only SetCompatibleTextRenderingDefault's own setting (false) might not
+            // get explicitly (re-)asserted in the rare case this race is lost -- and
+            // .NET's own WinForms runtime already defaults new controls to
+            // UseCompatibleTextRendering=false without this call, so the practical
+            // effect of skipping it here is negligible. Deliberately NOT retried
+            // (calling ApplicationConfiguration.Initialize() again would re-invoke
+            // SetHighDpiMode(), which MSDN documents as throwing if called a second
+            // time -- turning this exception into a different, guaranteed one) and
+            // deliberately NOT fixed by reordering SetColorMode after this call
+            // instead (Pitfall 1's title-bar-flash fix, above, is Phase 12's own
+            // rig-verified ordering; reordering it without a real Windows visual
+            // re-check risks silently reintroducing a previously-fixed bug that no
+            // build-time gate can catch). This is a narrow, defensive catch around
+            // one documented SDK bootstrap call, not a broad swallow-all -- any other
+            // exception from this call (which this codebase does not otherwise expect
+            // to throw) still propagates and crashes the process exactly as before.
+            bool applicationConfigurationRaceHit = false;
+            try
+            {
+                ApplicationConfiguration.Initialize();
+            }
+            catch (InvalidOperationException)
+            {
+                applicationConfigurationRaceHit = true;
+            }
 
             // UPDATE-07/D-03/D-04 (ARCHITECTURE.md Pattern 1): the --apply-update
             // bypass must be the very first branch in Main(), strictly above the
@@ -147,6 +200,15 @@ namespace RigToggle.App
                 {
                     // Diagnostic logging is best-effort only — never let it prevent startup.
                 }
+            }
+
+            // Logged here (not at the actual catch site above) so it is observable at
+            // all -- the trace listener isn't wired up yet at the point the race can
+            // occur. See the ApplicationConfiguration.Initialize() comment above for
+            // the full explanation of what this means and why it's safe to continue past.
+            if (applicationConfigurationRaceHit)
+            {
+                TryLog("Program.Main: ApplicationConfiguration.Initialize() threw InvalidOperationException (SetColorMode/SystemEvents race, 25-03 Task 3) -- continued startup without crashing.");
             }
 
             // INSTANCE-01/D-02: the single-instance guard is acquired here, above every
