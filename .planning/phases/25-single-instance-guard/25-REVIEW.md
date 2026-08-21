@@ -16,226 +16,153 @@ files_reviewed_list:
   - src/RigToggle.Windows.Tests/RigToggle.Windows.Tests.csproj
   - src/RigToggle.Windows.Tests/SingleInstanceProcessTests.cs
 findings:
-  critical: 1
+  critical: 0
   warning: 2
   info: 1
-  total: 4
+  total: 3
 status: issues_found
 ---
 
-# Phase 25: Code Review Report
+# Phase 25: Code Review Report (Re-Review After 25-04 Gap Closure)
 
-**Reviewed:** 2026-08-21T00:00:00Z
+**Reviewed:** 2026-08-21
 **Depth:** standard
 **Files Reviewed:** 11
 **Status:** issues_found
 
 ## Summary
 
-Reviewed the single-instance guard mechanism (`SingleInstanceGuard`, `ActivationSignal`,
-`StartupArgs`, `UpdateApplyEntryPoint`), its wiring into `Program.cs`/`MainForm.cs`
-(activation-broadcast `WndProc` branch, `RestoreAndFocus`), the supporting P/Invoke
-surface (`NativeMethods`), and the accompanying unit/process tests.
+This is a re-review of the single-instance guard implementation after plan 25-04 landed
+two targeted fixes for the prior review's CR-01 and WR-02 findings. Both were verified
+directly against current source (not trusted from the prior review's characterization)
+and against the two 25-04 commits (`eb30b78`, `9d555f8`):
 
-The design is unusually well-documented and most of the documented edge cases (Pitfall
-8 tight-race, foreground-activation heuristic, cross-assembly test-name collisions,
-`Global\` vs `Local\` fallback) are genuinely handled and covered by tests. However, one
-genuine crash-causing gap survives: `WaitForInstanceReady`'s call to
-`Mutex.WaitOne(TimeSpan)` on the readiness mutex is not guarded against
-`AbandonedMutexException`, and the exact real-world trigger condition (a primary
-process dying mid-startup while a duplicate is concurrently blocked waiting for
-readiness) is the same class of failure this codebase's own "25-03 Task 3" debug
-history proves actually happens on real hardware. This is the review's one BLOCKER.
+- **CR-01 (closed, confirmed):** `SingleInstanceGuard.WaitForInstanceReady` (SingleInstanceGuard.cs:330-350)
+  now wraps `readyMutex.WaitOne(remaining)` in `try/catch (AbandonedMutexException)`,
+  treats the abandoned-but-transferred wait as `acquired = true`, and routes into the
+  existing release branch that clears the abandoned state for the next waiter. The
+  regression test `WaitForInstanceReady_PrimaryAbandonedReadinessMutex_ReturnsTrueWithoutThrowing`
+  (SingleInstanceGuardTests.cs:226-280) genuinely reproduces abandonment via an owning
+  thread exiting without releasing (not `Dispose()`, which would prove nothing), and
+  asserts both "no `AbandonedMutexException` escapes" and "the wait reports true." This
+  is a real fix, not a cosmetic one — traced end to end, no gaps found.
 
-Two further correctness gaps were found around the `Global\`/`Local\` namespace
-fallback in `SingleInstanceGuard.Acquire()`: the fallback resolution can silently
-diverge between two processes with different security contexts (defeating the
-single-instance guarantee itself), and the readiness-mutex construction that follows
-the main-mutex fallback has no equivalent retry/guard of its own.
+- **WR-02 (closed, confirmed):** `Acquire()`'s readiness-mutex construction
+  (SingleInstanceGuard.cs:236-247) is now wrapped in `try/catch (Exception ex)`,
+  degrading to a logged `null` handle instead of letting construction failure escape
+  `Acquire()` (which previously would have crashed startup with zero diagnostic trail
+  and leaked the already-owned main mutex handle). Every downstream consumer of a
+  possibly-null `_readyMutex` (`MarkReady()`, `Dispose()`, `WaitForInstanceReady`'s
+  fail-fast path, `Program.cs`'s unconditional broadcast) already null-guards correctly,
+  and existing tests (`MarkReady_OnNonPrimaryGuard_DoesNotThrow`,
+  `WaitForInstanceReady_NoInstancePublished_ReturnsFalseQuickly`) already exercise that
+  degraded state. Confirmed closed.
 
-## Critical Issues
+- **WR-01 (deferred, honestly represented):** The class doc comment
+  (SingleInstanceGuard.cs:60-74) accurately describes the accepted, unfixed limitation —
+  two processes whose tokens disagree about `Global\` access can each conclude they are
+  primary — states the accepted risk level (ASVS L1, single-user rig), names the trigger,
+  and names the deferred stronger fix (probe-before-conclude via `TryOpenExisting`)
+  without claiming it was implemented. No contradiction between the comment and the
+  code: `IsGlobalScope` is still resolved once per process with no cross-process probe.
+  This is a genuine, non-silent deferral, not a dropped fix.
 
-### CR-01: `WaitForInstanceReady` crashes the duplicate process on an abandoned readiness mutex
-
-**File:** `src/RigToggle.Core/SingleInstanceGuard.cs:270-285` (call site: `src/RigToggle.App/Program.cs:247`)
-
-**Issue:** `WaitForInstanceReady` calls `readyMutex.WaitOne(remaining)` directly, with no
-try/catch for `System.Threading.AbandonedMutexException`. The class's own doc comment
-(lines 26-31) correctly notes that the *main* single-instance mutex can never surface
-this exception because it is acquired via the `new Mutex(...)` constructor path, not
-`WaitOne`. But the *readiness* mutex is a completely separate object, and it genuinely
-is waited on via `WaitOne` here — the one call site in this file that is subject to
-`AbandonedMutexException`, and the doc comment's blanket "no abandoned-mutex risk"
-claim does not actually cover it.
-
-Concrete trigger: instance A wins the main-mutex race and creates+holds the readiness
-mutex (`Acquire()`, lines 186-192) before it has called `MarkReady()`. If A terminates
-abnormally in that window — a crash, a kill, an unhandled exception during
-`ApplicationConfiguration.Initialize()`/`StartupRecoveryChecker.Run`/`MainForm`
-construction/`InitializeTrayState()`/`RegisterHotkeyAtStartup()`, all of which run
-between `Acquire()` and `MarkReady()` in `Program.cs` — while instance B is concurrently
-blocked in `WaitForInstanceReady`'s `WaitOne` call (exactly the "Pitfall 8 tight race"
-scenario this codebase already has dedicated tests for, `TightRaceLaunch_ExactlyOneProcessSurvives`),
-the OS marks the readiness mutex abandoned. B's `WaitOne` call then throws
-`AbandonedMutexException` instead of returning `true`.
-
-That exception is not caught anywhere: not in `WaitForInstanceReady`, and not at its
-only production call site in `Program.cs:247`
-(`bool becameReady = SingleInstanceGuard.WaitForInstanceReady(...)`, unlike the
-`TryLog` calls immediately around it, which are individually try/caught). There is also
-no `AppDomain.UnhandledException`/`Application.ThreadException` handler registered
-anywhere in `RigToggle.App` to catch it as a last resort (verified: no matches for
-`UnhandledException`/`ThreadException` in the App project). The result: the duplicate
-process crashes with an unhandled exception instead of gracefully broadcasting
-activation and exiting — precisely the "a real duplicate launch look[s] like a broken
-restore path" failure class the 25-03 investigation comments elsewhere in this same
-file/`Program.cs` were written to prevent, just via a different code path.
-
-`SingleInstanceGuardTests`/`SingleInstanceProcessTests` do not cover this path (they
-only ever exercise a graceful `MarkReady()`-then-wait sequence), so nothing in CI would
-catch a regression here.
-
-**Fix:**
-```csharp
-using (readyMutex)
-{
-    TimeSpan elapsed = stopwatch.Elapsed;
-    TimeSpan remaining = elapsed < timeout ? timeout - elapsed : TimeSpan.Zero;
-
-    bool acquired;
-    try
-    {
-        acquired = readyMutex.WaitOne(remaining);
-    }
-    catch (AbandonedMutexException)
-    {
-        // The primary died after creating the readiness mutex but before calling
-        // MarkReady()/disposing cleanly. This wait still succeeded in acquiring
-        // ownership -- treat it exactly like a normal successful wait rather than
-        // letting the exception crash this (duplicate) process.
-        acquired = true;
-    }
-
-    if (acquired)
-    {
-        ReleaseIgnoringOwnershipError(readyMutex);
-    }
-
-    TryLog($"WaitForInstanceReady: readiness mutex opened, WaitOne(remaining={remaining}) returned {acquired}.");
-    return acquired;
-}
-```
-Consider also adding a `SingleInstanceGuardTests` case that acquires the readiness
-mutex, disposes the guard object *without* calling `MarkReady()` first (simulating an
-abandoned mutex), and asserts `WaitForInstanceReady` still returns `true` rather than
-throwing.
+No new Critical findings. Two Warnings and one Info item below are new observations
+from this pass, independent of the CR-01/WR-01/WR-02 verification above.
 
 ## Warnings
 
-### WR-01: `Global\`/`Local\` namespace resolution can diverge between two processes, silently defeating single-instance detection
+### WR-01: `Acquire()`'s `Local\` fallback construction is unguarded, contradicting its own doc comment's "never propagate out of Main()" claim
 
-**File:** `src/RigToggle.Core/SingleInstanceGuard.cs:162-197`
+**File:** `src/RigToggle.Core/SingleInstanceGuard.cs:194-203`
+**Issue:** The class doc comment (lines 55-58) and the method doc comment (lines 167-171)
+both assert that the `Global\`→`Local\` fallback means startup failure here "falls back
+to a session-local (`Local\`) scope rather than propagating out of `Main()`." The code
+only delivers on that promise for the *first* attempt:
 
-**Issue:** `Acquire()` resolves `isGlobalScope` independently, per-process: it tries
-`Global\RigToggle-{id}` first and only falls back to `Local\RigToggle-{id}` if creating
-or opening the `Global\` name throws `UnauthorizedAccessException` for *this* process's
-token. If two Rig Toggle processes run under security contexts that disagree on
-`Global\` access — e.g. one launched normally and a second launched via "Run as
-Administrator" against an object whose DACL doesn't grant the other integrity level
-access, or two different login/RDP sessions — the second process's `Global\` attempt
-can throw while the first process's already succeeded. The second process then falls
-back to `Local\RigToggle-{id}`, a namespace the first process never touched, and
-`createdNew` comes back `true` there: process B genuinely becomes a *second* primary
-instance, fully bypassing the single-instance guarantee this whole phase exists to
-provide. Both processes then independently mutate the same on-disk `mode.json`/
-`settings.json`/monitor and audio state with no coordination.
-
-The class doc comment (lines 33-59) discusses this fallback purely from the
-single-process resilience angle ("this token cannot create or open a name … falls back
-… rather than propagating out of `Main()`") and never addresses the cross-process
-consistency risk that two independently-resolved scopes create. No test in
-`SingleInstanceGuardTests`/`SingleInstanceProcessTests` exercises mismatched security
-contexts (both test scaffolds run same-session, same-token processes only), so this gap
-is unverified either way.
-
-**Fix:** At minimum, document this as a known, accepted limitation next to the
-`Global\`/`Local\` fallback (the current doc comment reads as though the fallback is
-fully safe). A stronger fix: have the *loser* path in `WaitForInstanceReady`/
-`Acquire()`'s failure branch also attempt to detect a same-user primary in the other
-namespace before concluding it is primary (e.g. via `Mutex.TryOpenExisting` against the
-opposite scope before creating a new one), so a scope mismatch degrades to "can't tell,
-assume duplicate and broadcast" rather than "assume primary."
-
-### WR-02: Readiness-mutex construction has no fallback/guard of its own
-
-**File:** `src/RigToggle.Core/SingleInstanceGuard.cs:186-192`
-
-**Issue:** After the main mutex's `Global\`→`Local\` fallback resolves `isGlobalScope`,
-the readiness mutex is constructed unconditionally in that same scope with no
-try/catch:
 ```csharp
-Mutex? readyMutex = createdNew
-    ? new Mutex(initiallyOwned: true, readyEventName, out _)
-    : null;
-```
-If this throws for any reason (e.g. an asymmetric permission failure between the main
-mutex name and the readiness name, or any other `Mutex` construction failure), the
-exception propagates straight out of the static `Acquire()` method — before the
-`TryLog("Acquire: ...")` line is ever reached, so there is zero diagnostic trail — and
-also before a `SingleInstanceGuard` instance exists to dispose. The already-created
-main mutex handle (`mutex`, which this process now legitimately owns as primary) is
-never released or disposed on this path, and `Program.cs`'s `using var guard =
-SingleInstanceGuard.Acquire();` line has no surrounding try/catch (deliberately, per
-its own comment, but that comment's rationale is about a *live competing primary*, not
-an unexpected construction failure), so the whole app would crash on startup with no
-log line explaining why.
-
-**Fix:** Wrap the readiness-mutex construction in the same defensive pattern already
-used for the main mutex, e.g. falling back to a null `readyMutex` (degrading to
-"no readiness signal published, losers fall back to the retry-broadcast tolerance
-already built into `ActivationSignal`") rather than letting an exception escape
-`Acquire()` entirely:
-```csharp
-Mutex? readyMutex = null;
-if (createdNew)
+try
 {
-    try
-    {
-        readyMutex = new Mutex(initiallyOwned: true, readyEventName, out _);
-    }
-    catch (Exception ex)
-    {
-        TryLog($"Acquire: failed to create readiness mutex '{readyEventName}': {ex}. Readiness will never be signalled by this instance.");
-    }
+    mutex = new Mutex(initiallyOwned: true, mutexName, out createdNew);
 }
+catch (UnauthorizedAccessException)
+{
+    isGlobalScope = false;
+    mutexName = BuildName("RigToggle-" + effectiveInstanceId, isGlobalScope);
+    mutex = new Mutex(initiallyOwned: true, mutexName, out createdNew);   // <-- unguarded
+}
+```
+
+If the second (`Local\`) construction also throws — `UnauthorizedAccessException` again,
+or any other exception type (e.g. a name-collision `WaitHandleCannotBeOpenedException` if
+another kernel object already holds that exact name) — it propagates straight out of
+`Acquire()`. `Program.cs` calls `SingleInstanceGuard.Acquire()` with no surrounding
+try/catch (by design — the main mutex path is documented as "correctness-critical...
+not best-effort"), so this becomes an unhandled exception that crashes the app on
+startup with zero diagnostic trail (the crash happens before any `TryLog` call in this
+method can run) — the exact failure mode WR-02 was just fixed to prevent for the
+readiness mutex. `Local\` construction failing is extremely unlikely on an interactive,
+non-elevated Windows session (this app's only supported context per CLAUDE.md), which is
+presumably why this was accepted, but the doc comment currently overstates what the code
+guarantees.
+**Fix:** Either wrap the `Local\` fallback construction in its own guard (matching the
+posture WR-02 just established for the readiness mutex) and decide what "guard
+acquisition genuinely failed" should mean for `Program.cs` (e.g. treat as non-primary
+and broadcast-only, or let it propagate but say so explicitly in the doc), or narrow the
+doc comment to state the true, weaker guarantee ("recovers from the single documented
+`Global\`-namespace-denied case; a second failure in `Local\` still propagates").
+Leaving the code as-is without correcting the comment risks a future reader trusting a
+guarantee the code does not provide.
+
+### WR-02: `SingleInstanceProcessTests.TightRaceLaunch_ExactlyOneProcessSurvives` can throw an unhandled exception instead of a clean assertion failure on a benign race
+
+**File:** `src/RigToggle.Windows.Tests/SingleInstanceProcessTests.cs:305-327`
+**Issue:** After the polling loop confirms `aliveCount <= 1`, the test re-queries
+`Process.GetProcessesByName(AppProcessName)` and then calls
+`KillAndConfirmExit(survivors[0])` (line 315) with no exception guard. `Dispose()`
+(lines 153-178) — which performs the structurally identical "kill a process this file
+started" operation — explicitly wraps the same kind of call in
+`catch (InvalidOperationException)` / `catch (Win32Exception)` because a process can
+legitimately exit between the last liveness check and the `Kill()` call. This call site
+lacks that guard: if the "survivor" identified by the fresh `GetProcessesByName` query
+happens to exit in the small window before `KillAndConfirmExit` runs (e.g. it crashes
+shortly after winning the single-instance race), `process.Kill()` inside
+`KillAndConfirmExit` throws an unguarded `InvalidOperationException`/`Win32Exception`,
+failing the test with a confusing low-level exception instead of the descriptive
+`Assert.True` messages this file otherwise favors everywhere else.
+**Fix:** Wrap the `KillAndConfirmExit(survivor)` call (and ideally extract the
+try/catch pattern already used in `Dispose()` into a shared helper) so an
+already-exited survivor is treated as "confirmed exited," not an unhandled failure:
+```csharp
+try
+{
+    KillAndConfirmExit(survivor);
+}
+catch (InvalidOperationException) { /* already exited between check and kill */ }
+catch (Win32Exception) { /* already exiting/exited at the OS level */ }
 ```
 
 ## Info
 
-### IN-01: `UpdateApplyEntryPoint`'s doc comment overstates ordering relative to `Program.Main()`
+### IN-01: `ActivationSignal.MessageId`'s lazily-initialized cache is not thread-safe
 
-**File:** `src/RigToggle.App/UpdateApplyEntryPoint.cs:8-9`
-
-**Issue:** The doc comment states the bypass is "Reached only from the very first
-branch of Program.Main(), before … any other bootstrap step," but `Program.cs`
-actually runs `Application.SetColorMode(...)` and `ApplicationConfiguration.Initialize()`
-(including its own `SystemEvents` background-thread spin-up, documented at length
-elsewhere in the same file) before the `--apply-update` check at line 116. `Program.cs`'s
-own comment is more accurate ("Main()'s very first branch *after the two
-position-sensitive calls above*"). The load-bearing property (before the
-single-instance guard, before settings/mode-store bootstrap) still holds either way, so
-this is documentation-only, but the inconsistency between the two files' doc comments
-could mislead a future editor into believing `UpdateApplyEntryPoint.Run` is reached with
-zero prior process state, when `SetColorMode`'s `SystemEvents` subscription has already
-run by that point.
-
-**Fix:** Reword `UpdateApplyEntryPoint.cs`'s doc comment to match `Program.cs`'s more
-precise phrasing ("the first branch after the two position-sensitive `SetColorMode`/
-`ApplicationConfiguration.Initialize()` calls, and strictly before the single-instance
-guard and all other bootstrap steps").
+**File:** `src/RigToggle.Windows/ActivationSignal.cs:75-82`
+**Issue:** `public static uint MessageId => _messageId ??= NativeMethods.RegisterWindowMessage(MessageName);`
+is not synchronized. If two threads race on first access (unlikely in this app's normal
+single-UI-thread usage, but `MessageId` is a public static member reachable from any
+caller, e.g. a future background thread), both could call `RegisterWindowMessage`
+concurrently. This is low-impact in practice — `RegisterWindowMessage` is idempotent
+(the OS returns the same id for the same string every time), so a torn race merely
+means the call runs twice, not that an incorrect id gets cached — but it is a
+data race on a shared field by the strict definition, and worth a one-line
+acknowledgment or a `lock`/`Interlocked` for defensiveness given how central this id
+is to the whole activation-broadcast mechanism.
+**Fix:** Low priority; either leave as-is with a short comment noting the race is
+benign (idempotent OS call), or use `LazyInitializer.EnsureInitialized(ref _messageId, ...)`
+for a fully race-free cache if this codebase wants zero data races as a hard rule.
 
 ---
 
-_Reviewed: 2026-08-21T00:00:00Z_
+_Reviewed: 2026-08-21_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
