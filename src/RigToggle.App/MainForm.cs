@@ -1579,12 +1579,27 @@ namespace RigToggle.App
             TryLogRestoreState("after");
         }
 
+        /// <summary>
+        /// 25-03 Task 3 operator checkpoint, second debug.log capture: <c>Focused</c>
+        /// alone is a misleading signal for "did this window actually come to the
+        /// front" -- <c>Control.Focused</c> reflects raw Win32 keyboard focus
+        /// (<c>GetFocus() == Handle</c>) on THIS EXACT control, not the form's
+        /// subtree. A multi-control dashboard form like this one routinely has
+        /// keyboard focus sitting on a CHILD control (a tile, the toggle switch) even
+        /// when the form itself is genuinely the active, topmost, foreground window --
+        /// so <c>Focused=False</c> here is expected and does NOT by itself mean
+        /// activation failed. <c>ActivationSignal.IsForegroundWindow(Handle)</c> (a
+        /// direct <c>GetForegroundWindow() == Handle</c> check) is the unambiguous
+        /// ground truth this investigation actually needs; <c>ContainsFocus</c> (true
+        /// if keyboard focus is anywhere in this form's subtree, not just on the form
+        /// itself) is logged alongside it for completeness.
+        /// </summary>
         private void TryLogRestoreState(string when)
         {
             try
             {
                 System.Diagnostics.Trace.WriteLine(
-                    $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.RestoreAndFocus ({when}): Visible={Visible}, WindowState={WindowState}, Focused={Focused}, Handle={Handle}.");
+                    $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.RestoreAndFocus ({when}): Visible={Visible}, WindowState={WindowState}, IsForegroundWindow={ActivationSignal.IsForegroundWindow(Handle)}, Focused={Focused}, ContainsFocus={ContainsFocus}, Handle={Handle}.");
             }
             catch
             {
