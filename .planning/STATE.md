@@ -5,16 +5,16 @@ milestone_name: Auto-Update, Single-Instance Guard & Smaller Footprint
 current_phase: 25
 current_phase_name: single-instance-guard
 status: executing
-stopped_at: Phase 25 context gathered
-last_updated: "2026-08-21T16:54:46.453Z"
-last_activity: 2026-08-20
+stopped_at: "Phase 25 Plan 04: Tasks 1-2 complete (CR-01/WR-02 fixed and committed); Task 3 blocking checkpoint reached, awaiting Windows rig verification"
+last_updated: "2026-08-21T18:27:08.371Z"
+last_activity: 2026-08-21
 last_activity_desc: Phase 25 execution started
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 1
-  percent: 33
+  completed_plans: 5
+  percent: 67
 ---
 
 # Project State
@@ -29,9 +29,9 @@ See: .planning/PROJECT.md (updated 2026-08-18)
 ## Current Position
 
 Phase: 25 (single-instance-guard) — EXECUTING
-Plan: 1 of 3
-Status: Ready to execute
-Last activity: 2026-08-20 — Phase 25 execution started
+Plan: 1 of 4
+Status: Executing Phase 25
+Last activity: 2026-08-21 — Phase 25 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -82,6 +82,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 23 P01 | 35min | 2 tasks | 9 files |
 | Phase 23 P02 | 25min | 3 tasks | 3 files |
 | Phase 23 P03 | 40min | 2 tasks | 1 files |
+| Phase 25 P04 | 40min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -105,6 +106,9 @@ Full decision log lives in PROJECT.md's Key Decisions table. v2.0's decisions (o
 - [Phase ?]: Phase 23 rig-verified 2026-08-17: all 15 checks PASS, all 3 success criteria PASS, THEME-09 ticked complete — check 12 (in-place Settings repaint) passed both halves, no gap-closure plan needed
 - [Roadmap/v2.2]: No new NuGet packages for any of the three v2.2 capabilities — auto-update (HttpClient + System.Text.Json), single-instance guard (named `System.Threading.Mutex`), and exe-size reduction (MSBuild feature switches only) all hand-rolled, matching this codebase's existing pattern (hand-rolled `IPolicyConfig` COM interop, `RegisterHotKey` P/Invoke)
 - [Roadmap/v2.2]: Single-instance guard sequenced before auto-update specifically so the internal-relaunch bypass (UPDATE-07) is built and rig-verified in isolation, not invented under pressure while also debugging the self-replace mechanism
+- [Phase ?]: Abandoned readiness-mutex wait treated as acquired=true (CR-01 fix) -- routes into existing release branch rather than re-abandoning the mutex for the next waiter
+- [Phase ?]: WR-02's readiness-mutex construction guarded with a broad catch, deliberately asymmetric to the main mutex's narrow catch, since the readiness mutex is a best-effort optimisation and the main mutex is correctness-critical
+- [Phase ?]: WR-01's cross-namespace probe explicitly deferred -- accepted as a known limitation at ASVS L1 for this single-user rig
 
 ### Pending Todos
 
@@ -123,6 +127,8 @@ Resolved 2026-08-16: Phase 22 rig verification originally FAILED (2026-08-15, re
 Resolved 2026-08-17: Research flagged Phase 21 (accent color) and Phase 23 (manual-override) as needing deeper research during planning — see `.planning/research/SUMMARY.md` "Research Flags". Both phases have since shipped and rig-verified with no unresolved accent-color or theme-sequencing gaps (Phase 21 complete 2026-08-11; Phase 23 complete 2026-08-17, all 15 rig checks PASS). No longer an open item.
 
 Open (carried from v2.2 research, `.planning/research/SUMMARY.md` "Gaps to Address"): the rename-while-running self-update mechanism, Mark-of-the-Web/SmartScreen behavior for HttpClient downloads, `mainForm.BeginInvoke`/`Handle` existence under `--tray` hidden startup, and the exact signal mechanism for single-instance activation (named pipe vs. `RegisterWindowMessage`) are all flagged MEDIUM confidence and not yet rig-verified — expected to be resolved during Phase 25/26 planning and rig checkpoints, not blocking roadmap creation.
+
+- Phase 25 Plan 04 Task 3 (blocking checkpoint) requires real Windows rig hardware: three consecutive dotnet test RigToggle.sln -c Release --no-build runs plus a real CR-01 (abandoned-mutex) reproduction. Not available in this Linux sandbox. Operator must build at commit 9d555f8 or later, run Task 3's checks in 25-04-PLAN.md, and report results to resume execution.
 
 ### Quick Tasks Completed
 
@@ -173,9 +179,9 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-20T11:02:14.629Z
-Stopped at: Phase 25 context gathered
-Resume file: /home/bpivk/moza/.planning/phases/25-single-instance-guard/25-CONTEXT.md
+Last session: 2026-08-21T18:27:00.479Z
+Stopped at: Phase 25 Plan 04: Tasks 1-2 complete (CR-01/WR-02 fixed and committed); Task 3 blocking checkpoint reached, awaiting Windows rig verification
+Resume file: .planning/phases/25-single-instance-guard/25-04-PLAN.md
 
 ## Operator Next Steps
 
