@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Threading;
 using RigToggle.Core;
+using RigToggle.Core.Models;
+using RigToggle.Core.Persistence;
 
 namespace RigToggle.App;
 
@@ -96,6 +98,14 @@ internal static class UpdateApplyEntryPoint
             return StartupArgs.ApplyUpdateBypassExitCode;
         }
 
+        // UPDATE-05/D-09: version numbers are read HERE, before either path is
+        // touched by a rename/move below -- stagedPath still holds the new exe and
+        // targetPath still holds the currently-running one. A read failure (e.g. no
+        // version resource embedded) degrades to "unknown" rather than aborting a
+        // swap that is otherwise fully validated and ready to proceed.
+        string newVersionForMarker = TryReadFileVersion(stagedPath);
+        string previousVersionForMarker = TryReadFileVersion(targetPath);
+
         // Fast-path only: wait for the original process to exit if it's still alive.
         // A reused or already-exited id must not be fatal -- the writable-poll below
         // is the real gate this method relies on for correctness.
@@ -146,11 +156,37 @@ internal static class UpdateApplyEntryPoint
             return StartupArgs.ApplyUpdateBypassExitCode;
         }
 
-        // Pitfall 5/9: '.bak' is deliberately left in place here, not deleted -- plan
-        // 26-03 owns its full retained-backup lifecycle (auto-rollback on a new exe
-        // that fails to reach confirmed-healthy). Deleting it eagerly here would
-        // remove the one thing that makes a next-launch rollback possible.
-        Log($"Run: swap complete -- '{targetPath}' now holds the staged exe; '.bak' left in place for plan 26-03.");
+        // Pitfall 5/9: '.bak' is deliberately left in place here, not deleted -- this
+        // task's UpdateRollbackChecker owns its full retained-backup lifecycle
+        // (auto-rollback on a new exe that fails to reach confirmed-healthy).
+        // Deleting it eagerly here would remove the one thing that makes a
+        // next-launch rollback possible.
+        Log($"Run: swap complete -- '{targetPath}' now holds the staged exe; '.bak' left in place.");
+
+        // UPDATE-05/D-09: record the applied-but-unconfirmed marker BEFORE the
+        // relaunch below, so a crash between this write and the new exe reaching
+        // confirmed-healthy is still detectable on the next launch. This helper
+        // computes the base path itself (rather than borrowing Program.cs's
+        // basePath local) because it runs above every Program.cs bootstrap step by
+        // contract (see this class's own doc comment). A marker-write failure must
+        // never abort a swap that already succeeded on disk -- log and continue.
+        try
+        {
+            var markerStore = new JsonUpdateAppliedMarkerStore(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "RigToggle",
+                "update-applied.json"));
+            markerStore.Save(new UpdateAppliedMarker(
+                newVersionForMarker,
+                previousVersionForMarker,
+                DateTimeOffset.UtcNow,
+                UpdateMarkerStage.Applied));
+            Log($"Run: wrote update-applied marker (new={newVersionForMarker}, previous={previousVersionForMarker}, stage=Applied).");
+        }
+        catch (Exception ex)
+        {
+            Log($"Run: writing update-applied marker failed: {ex.GetType().Name}: {ex.Message} -- continuing (swap already succeeded).");
+        }
 
         try
         {
@@ -207,6 +243,22 @@ internal static class UpdateApplyEntryPoint
             }
 
             Thread.Sleep(pollInterval);
+        }
+    }
+
+    // UPDATE-05/D-09: reads a file's FileVersionInfo.FileVersion, degrading to
+    // "unknown" on any failure (missing version resource, file removed out from
+    // under this read, etc.) -- never lets a version-string lookup abort an
+    // otherwise-valid swap.
+    private static string TryReadFileVersion(string path)
+    {
+        try
+        {
+            return FileVersionInfo.GetVersionInfo(path).FileVersion ?? "unknown";
+        }
+        catch
+        {
+            return "unknown";
         }
     }
 

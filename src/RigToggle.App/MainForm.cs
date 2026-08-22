@@ -2085,6 +2085,60 @@ namespace RigToggle.App
         }
 
         /// <summary>
+        /// UPDATE-05/D-09: starts a one-shot 10-second timer whose Tick is the
+        /// deliberate confirmed-healthy signal 26-CONTEXT.md's Claude's Discretion
+        /// note calls for -- a tick can only fire once this window's message pump is
+        /// genuinely running, so a process that starts and then crashes before that
+        /// never earns it, while "the process was created" would have. Invoked from
+        /// Program.cs, before either Application.Run branch, wrapping
+        /// UpdateRollbackChecker.ConfirmHealthy -- the sole commit point that
+        /// deletes the retained backup/failed files (PITFALLS.md Pitfall 5). Uses
+        /// System.Windows.Forms.Timer explicitly (this file also has `using
+        /// System.Threading;`, which would otherwise make a bare `Timer` ambiguous
+        /// with System.Threading.Timer).
+        /// </summary>
+        public void BeginUpdateHealthWatch(Action onConfirmedHealthy)
+        {
+            var timer = new System.Windows.Forms.Timer { Interval = 10000 };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                timer.Dispose();
+
+                try
+                {
+                    onConfirmedHealthy();
+                }
+                catch
+                {
+                    // The confirmed-healthy callback must never crash this form's
+                    // message loop -- a failure here just means the backup/marker
+                    // cleanup didn't happen this tick, not that the app should go
+                    // down.
+                }
+            };
+            timer.Start();
+        }
+
+        /// <summary>
+        /// UPDATE-05/D-09: the Warning-icon revert notification shown on the launch
+        /// that IS the restored previous version, naming both versions per the D-09
+        /// copy contract. Balloon only, never native chrome, matching every other
+        /// background-triggered notification in this file (never the Error-level icon).
+        /// </summary>
+        public void ShowUpdateRevertNotice(string message)
+        {
+            try
+            {
+                notifyIcon.ShowBalloonTip(3000, "Rig Toggle", ToggleResultFormatter.TruncateForBalloon(message), ToolTipIcon.Warning);
+            }
+            catch
+            {
+                // Cosmetic-only -- a notification failure must never crash startup.
+            }
+        }
+
+        /// <summary>
         /// TRIG-01/D-04: (re)registers the configured global hotkey on this window's
         /// handle, unregister-first so it is safe to call repeatedly -- this is what
         /// keeps both the D-04 Settings-Save path and the D-07 re-register-on-close path

@@ -127,6 +127,12 @@ namespace RigToggle.App
 
             var settingsStore = new JsonSettingsStore(Path.Combine(basePath, "settings.json"));
 
+            // UPDATE-05/D-09: constructed alongside settingsStore, immediately below
+            // it, so it is available both to the rollback check further down (before
+            // the guard) and to the health-watch wiring near the end of this method
+            // (after mainForm exists).
+            var updateMarkerStore = new JsonUpdateAppliedMarkerStore(Path.Combine(basePath, "update-applied.json"));
+
             // 25-03 Task 3 operator checkpoint (INSTANCE-02 restore investigation):
             // settings-loading and the trace-listener wiring below were originally
             // positioned AFTER the single-instance guard's early-return branch (further
@@ -193,6 +199,21 @@ namespace RigToggle.App
             if (applicationConfigurationRaceHit)
             {
                 TryLog("Program.Main: ApplicationConfiguration.Initialize() threw InvalidOperationException (SetColorMode/SystemEvents race, 25-03 Task 3) -- continued startup without crashing.");
+            }
+
+            // UPDATE-05/D-09 (PITFALLS.md Pitfall 4): the rollback check must run
+            // strictly BEFORE SingleInstanceGuard.Acquire() below, for the identical
+            // reason the --apply-update bypass branch above precedes it -- a
+            // FirstLaunchAttempted restore spawns a replacement process, and doing
+            // that while still holding the mutex would block the very relaunch this
+            // check exists to perform. A true return means this process already
+            // spawned its own replacement and must exit immediately without ever
+            // touching the guard. revertNotice (an out variable) stays in scope for
+            // the rest of this method -- surfaced via mainForm.ShowUpdateRevertNotice
+            // once mainForm exists, further down.
+            if (UpdateRollbackChecker.Run(updateMarkerStore, Environment.ProcessPath ?? string.Empty, out var revertNotice))
+            {
+                return;
             }
 
             // INSTANCE-01/D-02: the single-instance guard is acquired here, above every
@@ -334,6 +355,22 @@ namespace RigToggle.App
             // --tray the form's own Load event never fires since the form is never
             // shown, so tray state must not depend on it.
             mainForm.InitializeTrayState();
+
+            // UPDATE-05/D-09: wired here, before either Application.Run branch below
+            // -- BeginUpdateHealthWatch's timer only fires once the message pump is
+            // actually running, so constructing it now (while it cannot yet tick) is
+            // safe. The callback below is the sole commit point that deletes the
+            // retained backup/failed files (PITFALLS.md Pitfall 5) -- never merely
+            // because the swap's file move completed.
+            mainForm.BeginUpdateHealthWatch(() => UpdateRollbackChecker.ConfirmHealthy(updateMarkerStore, Environment.ProcessPath ?? string.Empty));
+
+            // D-09: this is the launch that IS the restored previous version --
+            // revertNotice was set by UpdateRollbackChecker.Run's Reverted branch
+            // above and is null on every other startup path.
+            if (revertNotice is not null)
+            {
+                mainForm.ShowUpdateRevertNotice(revertNotice);
+            }
 
             // TRIG-01/D-04: registers the configured global hotkey unconditionally for
             // BOTH the visible and --tray startup paths, exactly mirroring how
