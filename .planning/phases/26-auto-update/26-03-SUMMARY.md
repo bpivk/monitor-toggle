@@ -181,6 +181,10 @@ None - no external service configuration required.
 
 The three-stage marker/backup/rollback mechanism is fully wired and unit/integration-tested (compile-verified everywhere, execution-verified on the cross-platform 158/158 suite). Plan 26-05 (formatted release notes) — the phase's final plan and the one carrying the operator rig checkpoint — inherits a working, provably-swap-idempotent, always-recoverable update-apply path to build its remaining UI-facing work on top of, and owns the real deliberately-interrupted-update and reboot-autostart verification this plan's D5/D6 coverage entries defer to it. `UpdateRollbackChecker`'s three stages, `ConfirmHealthy`'s commit-point discipline, and the mutex-ordering guarantee are all ready for that real-hardware pass; no known blockers.
 
+## Self-Check: PASSED
+
+All 7 created/output files confirmed present on disk (6 source files + this SUMMARY). All 3 commits (`51f9e08`, `252fce1`, `3d981f0`) confirmed present in `git log --oneline --all`.
+
 ---
 *Phase: 26-auto-update*
 *Completed: 2026-08-22*
