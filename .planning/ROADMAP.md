@@ -147,7 +147,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
   4. If the update is interrupted partway (killed download, simulated disk-full/locked-file), the original exe is left intact and still launchable — the app is never stranded in a non-launchable state
   5. A manual "Check for Updates" entry in the app's menu triggers the same check on demand and reports when already up to date, independent of the automatic on-launch check
 
-**Plans**: 1/5 plans executed
+**Plans**: 3/5 plans executed
 **UI hint**: yes
 
 **Wave 1**
@@ -156,8 +156,8 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
 
 **Wave 2** *(blocked on Wave 1 completion; these two run in parallel — no file overlap)*
 
-- [ ] 26-02-PLAN.md — Download integrity: `release.yml` publishes a `.sha256`, and the updater verifies the downloaded exe against it before the swap touches anything, failing closed when it cannot (wave 2)
-- [ ] 26-03-PLAN.md — Never stranded: retained `.bak`, an applied-but-unconfirmed marker consumed across launches, confirmed-healthy commit on a real message-loop tick, above-the-guard auto-rollback, plus a real child-process proof of the swap (wave 2, blocking decision checkpoint on the one-way on-disk marker format)
+- [x] 26-02-PLAN.md — Download integrity: `release.yml` publishes a `.sha256`, and the updater verifies the downloaded exe against it before the swap touches anything, failing closed when it cannot (wave 2)
+- [x] 26-03-PLAN.md — Never stranded: retained `.bak`, an applied-but-unconfirmed marker consumed across launches, confirmed-healthy commit on a real message-loop tick, above-the-guard auto-rollback, plus a real child-process proof of the swap (wave 2, blocking decision checkpoint on the one-way on-disk marker format)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -196,7 +196,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
 | 23. Manual Light/Dark Override | v2.1 | 3/3 | Complete | 2026-08-17 |
 | 24. Self-Contained Exe Size Reduction | v2.2 | 1/1 | Complete    | 2026-08-19 |
 | 25. Single-Instance Guard | v2.2 | 4/4 | Complete    | 2026-08-21 |
-| 26. Auto-Update | v2.2 | 1/5 | In Progress|  |
+| 26. Auto-Update | v2.2 | 3/5 | In Progress|  |
 
 ## Backlog
 
