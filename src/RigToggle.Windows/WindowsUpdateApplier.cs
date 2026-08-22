@@ -47,6 +47,17 @@ public sealed class WindowsUpdateApplier : IUpdateApplier
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
     }
 
+    /// <summary>
+    /// Downloads the release asset to a staged path in the same directory as the running
+    /// exe, then verifies it (D-10/D-11) BEFORE returning -- no code path can reach
+    /// ApplyAndRelaunch with an unverified staged file, since verification happens here,
+    /// in the still-running old process with a working tray icon, rather than in the
+    /// UpdateApplyEntryPoint helper process. A mismatch there would produce a
+    /// half-swapped installation; a mismatch here throws and the old version keeps
+    /// running, surfacing through the exact same D-08 Warning toast an ordinary apply
+    /// failure already uses (deliberate -- do not "improve" this into a separate,
+    /// bespoke checksum-failure path).
+    /// </summary>
     /// <inheritdoc/>
     public async Task<string> DownloadAndStageAsync(ReleaseInfo release, CancellationToken cancellationToken)
     {
@@ -70,7 +81,28 @@ public sealed class WindowsUpdateApplier : IUpdateApplier
             await source.CopyToAsync(destination, cancellationToken).ConfigureAwait(false);
         }
 
-        Log($"DownloadAndStageAsync: staged '{stagedPath}'.");
+        Log($"DownloadAndStageAsync: staged '{stagedPath}', verifying checksum before returning.");
+
+        if (string.IsNullOrWhiteSpace(release.ChecksumDownloadUrl))
+        {
+            File.Delete(stagedPath);
+            throw new InvalidOperationException(
+                $"Release '{release.TagName}' published no checksum -- the update cannot be verified and will not be applied.");
+        }
+
+        string publishedChecksum = await _httpClient.GetStringAsync(release.ChecksumDownloadUrl, cancellationToken).ConfigureAwait(false);
+        string computedChecksum = UpdateChecksum.ComputeSha256(stagedPath);
+
+        if (!UpdateChecksum.Matches(computedChecksum, publishedChecksum))
+        {
+            File.Delete(stagedPath);
+            string expected = publishedChecksum.Length >= 16 ? publishedChecksum[..16] : publishedChecksum;
+            string actual = computedChecksum.Length >= 16 ? computedChecksum[..16] : computedChecksum;
+            throw new InvalidOperationException(
+                $"Checksum mismatch for release '{release.TagName}': expected {expected}..., got {actual}...");
+        }
+
+        Log($"DownloadAndStageAsync: checksum verified for '{stagedPath}'.");
         return stagedPath;
     }
 

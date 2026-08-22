@@ -30,7 +30,15 @@ jobs:
       - name: Publish self-contained single-file exe
         run: dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -p:PublishProfile=win-x64 -p:Version=${{ steps.resolve_version.outputs.version }}
 
+      - name: Compute SHA256 checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash -Algorithm SHA256 src/RigToggle.App/bin/publish/win-x64/RigToggle.App.exe).Hash.ToLower()
+          "$hash  RigToggle.App.exe" | Out-File -FilePath src/RigToggle.App/bin/publish/win-x64/RigToggle.App.exe.sha256 -Encoding ascii -NoNewline
+
       - name: Attach exe to GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          files: src/RigToggle.App/bin/publish/win-x64/RigToggle.App.exe
+          files: |
+            src/RigToggle.App/bin/publish/win-x64/RigToggle.App.exe
+            src/RigToggle.App/bin/publish/win-x64/RigToggle.App.exe.sha256

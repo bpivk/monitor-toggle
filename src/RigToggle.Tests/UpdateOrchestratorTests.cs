@@ -24,7 +24,8 @@ public class UpdateOrchestratorTests
         "https://github.com/bpivk/monitor-toggle/releases/tag/v2.2",
         DateTimeOffset.UtcNow,
         Prerelease: false,
-        Body: "Release notes.");
+        Body: "Release notes.",
+        ChecksumDownloadUrl: "https://objects.githubusercontent.com/asset.exe.sha256");
 
     private static readonly ReleaseInfo OlderRelease = NewerRelease with { TagName = "v2.0" };
 
