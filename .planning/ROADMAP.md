@@ -147,7 +147,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
   4. If the update is interrupted partway (killed download, simulated disk-full/locked-file), the original exe is left intact and still launchable — the app is never stranded in a non-launchable state
   5. A manual "Check for Updates" entry in the app's menu triggers the same check on demand and reports when already up to date, independent of the automatic on-launch check
 
-**Plans**: 4/5 plans executed
+**Plans**: 5/5 plans executed
 **UI hint**: yes
 
 **Wave 1**
@@ -165,7 +165,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 26-05-PLAN.md — Manual "Check for Updates" from both the tray menu and Settings, reporting honestly on success and failure, plus the blocking rig-verification checkpoint covering all five success criteria (wave 4)
+- [x] 26-05-PLAN.md — Manual "Check for Updates" from both the tray menu and Settings, reporting honestly on success and failure, plus the blocking rig-verification checkpoint covering all five success criteria (wave 4)
 
 ## Progress
 
@@ -196,7 +196,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
 | 23. Manual Light/Dark Override | v2.1 | 3/3 | Complete | 2026-08-17 |
 | 24. Self-Contained Exe Size Reduction | v2.2 | 1/1 | Complete    | 2026-08-19 |
 | 25. Single-Instance Guard | v2.2 | 4/4 | Complete    | 2026-08-21 |
-| 26. Auto-Update | v2.2 | 4/5 | In Progress|  |
+| 26. Auto-Update | v2.2 | 5/5 | In Progress|  |
 
 ## Backlog
 
