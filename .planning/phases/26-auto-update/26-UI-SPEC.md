@@ -1,10 +1,11 @@
 ---
 phase: 26
 slug: auto-update
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-08-22
+reviewed_at: 2026-08-22
 ---
 
 # Phase 26 — UI Design Contract
@@ -181,20 +182,28 @@ All toast bodies follow the existing `title="Rig Toggle"` convention already use
 > Empty-state and error-state COPY live in `## Copywriting Contract` above — this section covers
 > state coverage and REFERENCES those rows rather than restating the copy.
 
-Applicable state considerations resolved: 9 covered, 1 backstop, 0 unresolved.
+Probe run per-element (`E1` UpdatePromptDialog, `E2` tray menu item, `E3` Settings button, `E4` update-lifecycle toasts) against all 8 shape categories. Applicable state considerations resolved: 9 covered, 1 backstop, 0 unresolved; 18 rows resolved N/A with reasoning (a stateless trigger control or a single fixed-text notification has no content-shape states of its own).
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
-| empty | `rtbReleaseNotes` body (`UpdatePromptDialog`) | ✅ covered | A null/whitespace GitHub release body renders the "Empty state body" fallback copy above instead of a blank control |
-| loading | Confirm-to-relaunch interval | ✅ covered | Indeterminate "Updating…" toast (Info icon) per D-03 — no percentage/progress bar, no in-dialog progress control |
-| error | Manual "Check for Updates" failure | ✅ covered | Distinct Warning-icon toast copy, explicitly different from the up-to-date toast per D-07 |
+| empty | `rtbReleaseNotes` body (E1) | ✅ covered | A null/whitespace GitHub release body renders the "Empty state body" fallback copy above instead of a blank control |
+| empty | E2, E3, E4 | N/A | Menu item/button have fixed label text, no content to be empty; toasts are single fixed-text notifications, not a collection that can be empty |
+| loading | Confirm-to-relaunch interval (E4) | ✅ covered | Indeterminate "Updating…" toast (Info icon) per D-03 — no percentage/progress bar, no in-dialog progress control |
+| loading | E1, E2, E3 | N/A | `UpdatePromptDialog` is only constructed after `ReleaseInfo` has already been fetched — no in-dialog loading state exists; the menu item/button are static triggers, not data-bound |
+| error | Manual "Check for Updates" failure (E2, E3) | ✅ covered | Distinct Warning-icon toast copy, explicitly different from the up-to-date toast per D-07 — same toast path for both the tray item and the Settings button |
 | error | Automatic on-launch check failure | ✅ covered | Silent no-op — no toast, no dialog, matching the best-effort/never-block-startup posture already established for `RegisterHotkeyAtStartup` and `EnableDebugLogging` |
-| error | Download/apply failure (interrupted, disk-full, locked file, checksum mismatch) | ✅ covered | Warning-icon toast, app keeps running the old version, per D-08/D-11 |
-| partial | New exe crashes on its first startup after the swap | ✅ covered | Next launch auto-rolls back to the retained `.old` exe and shows the auto-rollback Warning toast, per D-09's confirmed-healthy marker |
-| populated | Release available, notes present | ✅ covered | `UpdatePromptDialog` shows headline + lightly-formatted release notes + three buttons |
-| long-text | `rtbReleaseNotes` body | ✅ covered | `ScrollBars=Vertical` inside a fixed, non-growing `ClientSize(440,460)` dialog — arbitrarily long notes scroll, they never expand the dialog frame |
-| overflow | Markdown constructs beyond the supported subset (tables, images, nested lists, links) | 🧪 backstop | Unsupported constructs are expected to degrade to plain unformatted text rather than break the hand-rolled formatter, but this has not been verified against a real GitHub release body containing rich formatting — verify with an actual/synthetic oversized release note during implementation or rig verification |
+| error | Download/apply failure (interrupted, disk-full, locked file, checksum mismatch) (E4) | ✅ covered | Warning-icon toast, app keeps running the old version, per D-08/D-11 |
+| error | E1 | N/A | The dialog itself cannot fail to render once shown — fetch errors occur before it exists (E2/E3/on-launch paths), and apply errors surface after it closes (E4 toast), not as a dialog-internal error state |
+| populated | Release available, notes present (E1) | ✅ covered | `UpdatePromptDialog` shows headline + lightly-formatted release notes + three buttons |
+| populated | E2, E3, E4 | N/A | No populated/empty distinction applies to a static menu label, a static button, or a single-fire toast |
+| partial | New exe crashes on its first startup after the swap | ✅ covered | Next launch auto-rolls back to the retained `.old` exe and shows the auto-rollback Warning toast (E4), per D-09's confirmed-healthy marker |
+| partial | E1, E2, E3 | N/A | This is a whole-update-flow state (some steps succeeded, one didn't), not a partial-data rendering state of the dialog or either trigger control |
+| overflow | Markdown constructs beyond the supported subset (tables, images, nested lists, links) (E1) | 🧪 backstop | Unsupported constructs are expected to degrade to plain unformatted text rather than break the hand-rolled formatter, but this has not been verified against a real GitHub release body containing rich formatting — verify with an actual/synthetic oversized release note during implementation or rig verification |
+| overflow | E2, E3, E4 | N/A | Fixed-length labels/toast bodies (toast bodies pass through `TruncateForBalloon`'s 250-char safety net, already documented) — no container-overflow concern beyond that existing truncation convention |
 | zero-one-many | Latest-release check result | ✅ covered | GitHub `/releases/latest` returns exactly one release or 404 — `UpdateOrchestrator` has exactly two branches (newer found / not found-or-unreachable), no list/collection UI is needed this phase |
+| zero-one-many | E1, E2, E3, E4 | N/A | None of these surfaces render a collection; `UpdatePromptDialog` only exists for the single "newer version found" case, and each trigger/toast is a singular, non-repeating element |
+| long-text | `rtbReleaseNotes` body (E1) | ✅ covered | `ScrollBars=Vertical` inside a fixed, non-growing `ClientSize(440,460)` dialog — arbitrarily long notes scroll, they never expand the dialog frame |
+| long-text | E2, E3, E4 | N/A | Menu/button labels are short fixed strings; toast bodies are bounded by the existing `TruncateForBalloon` convention, already covered under "overflow" above |
 
 <!-- Status vocabulary (locked by probe-core projectTruths):
      ✅ covered   → a plain truth string lifted into must_haves.truths
@@ -218,11 +227,11 @@ Not applicable — WinForms desktop app, no component registry/package-installer
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: FLAG (non-blocking — no explicit focal-point declaration for `UpdatePromptDialog`; `btnUpdateNow` is `AcceptButton` and `lblHeadline` uses the Heading role, which functionally establishes the anchor)
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: FLAG (non-blocking — 12px outer-margin exception is explicitly declared and justified, matching existing dialog convention)
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** APPROVED (gsd-ui-checker, 2026-08-22) — no BLOCKER issues; both FLAGs are non-blocking design-quality recommendations, accepted as-is.
