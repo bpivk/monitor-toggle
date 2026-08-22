@@ -22,8 +22,13 @@ jobs:
       - run: dotnet build --no-restore -c Release
       - run: dotnet test --no-build -c Release
 
+      - name: Resolve version from tag
+        id: resolve_version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
       - name: Publish self-contained single-file exe
-        run: dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -p:PublishProfile=win-x64
+        run: dotnet publish src/RigToggle.App/RigToggle.App.csproj -c Release -p:PublishProfile=win-x64 -p:Version=${{ steps.resolve_version.outputs.version }}
 
       - name: Attach exe to GitHub Release
         uses: softprops/action-gh-release@v3

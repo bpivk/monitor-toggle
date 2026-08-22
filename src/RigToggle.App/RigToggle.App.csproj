@@ -27,6 +27,15 @@
          number labels with CultureInfo.InvariantCulture explicitly, and the solution contains
          zero .resx files (18-RESEARCH.md Pitfall 3). -->
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- UPDATE-01: the FIRST version property of any kind in this solution's history
+         (PITFALLS.md Pitfall 2 — no Version/AssemblyVersion/FileVersion property
+         existed anywhere before this phase, so the compiled exe carried only
+         MSBuild's implicit 1.0.0.0). release.yml's "Resolve version from tag" step
+         overrides this checked-in value at publish time via a p:Version= argument
+         stripped of its leading v, so the shipped exe's embedded version always
+         matches the git tag it was actually released from — this checked-in "2.2"
+         is only what a local (non-release-pipeline) build carries. -->
+    <Version>2.2</Version>
   </PropertyGroup>
 
   <ItemGroup>
