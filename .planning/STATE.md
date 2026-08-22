@@ -5,8 +5,8 @@ milestone_name: Auto-Update, Single-Instance Guard & Smaller Footprint
 current_phase: 26
 current_phase_name: Auto-Update
 status: planning
-stopped_at: Phase 26 context gathered
-last_updated: "2026-08-22T13:01:08.754Z"
+stopped_at: Phase 26 UI-SPEC approved
+last_updated: "2026-08-22T13:17:21.283Z"
 last_activity: 2026-08-21
 last_activity_desc: Phase 25 Plan 04 Task 3 checkpoint closed by operator authorization on partial evidence
 progress:
@@ -182,9 +182,9 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-22T13:01:08.726Z
-Stopped at: Phase 26 context gathered
-Resume file: .planning/phases/26-auto-update/26-CONTEXT.md
+Last session: 2026-08-22T13:17:21.256Z
+Stopped at: Phase 26 UI-SPEC approved
+Resume file: .planning/phases/26-auto-update/26-UI-SPEC.md
 
 ## Operator Next Steps
 
