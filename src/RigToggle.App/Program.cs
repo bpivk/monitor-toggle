@@ -297,7 +297,7 @@ namespace RigToggle.App
             // rather than read inside Core (RigToggle.Core.csproj carries no version
             // of its own that would mean anything for this comparison).
             var runningVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(0, 0);
-            var updateOrchestrator = new UpdateOrchestrator(releaseFeed, updateApplier, runningVersion);
+            var updateOrchestrator = new UpdateOrchestrator(releaseFeed, updateApplier, settingsStore, runningVersion);
 
             // 12-02/THEME-01/02/03: composition-root-only construction (Anti-Pattern 2)
             // -- this is the ONE and only place the theme provider adapter is

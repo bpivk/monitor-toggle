@@ -40,6 +40,7 @@ namespace RigToggle.App
         {
             this.lblHeadline = new System.Windows.Forms.Label();
             this.rtbReleaseNotes = new System.Windows.Forms.RichTextBox();
+            this.btnSkip = new System.Windows.Forms.Button();
             this.btnLater = new System.Windows.Forms.Button();
             this.btnUpdateNow = new System.Windows.Forms.Button();
 
@@ -65,6 +66,19 @@ namespace RigToggle.App
             this.rtbReleaseNotes.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.rtbReleaseNotes.TabStop = false;
             this.rtbReleaseNotes.Name = "rtbReleaseNotes";
+
+            //
+            // btnSkip
+            //
+            this.btnSkip.Text = "Skip this version";
+            this.btnSkip.Location = new System.Drawing.Point(12, 424);
+            this.btnSkip.MinimumSize = new System.Drawing.Size(130, 32);
+            this.btnSkip.Height = 32;
+            this.btnSkip.AutoSize = true;
+            this.btnSkip.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.btnSkip.DialogResult = System.Windows.Forms.DialogResult.Ignore;
+            this.btnSkip.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnSkip.Name = "btnSkip";
 
             //
             // btnLater
@@ -108,6 +122,7 @@ namespace RigToggle.App
 
             this.Controls.Add(this.lblHeadline);
             this.Controls.Add(this.rtbReleaseNotes);
+            this.Controls.Add(this.btnSkip);
             this.Controls.Add(this.btnLater);
             this.Controls.Add(this.btnUpdateNow);
 
@@ -118,6 +133,7 @@ namespace RigToggle.App
 
         private System.Windows.Forms.Label lblHeadline;
         private System.Windows.Forms.RichTextBox rtbReleaseNotes;
+        private System.Windows.Forms.Button btnSkip;
         private System.Windows.Forms.Button btnLater;
         private System.Windows.Forms.Button btnUpdateNow;
     }

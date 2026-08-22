@@ -2045,15 +2045,15 @@ namespace RigToggle.App
                         try
                         {
                             using var dialog = new UpdatePromptDialog(release, _themeProvider);
-                            DialogResult dialogResult = Visible ? dialog.ShowDialog(this) : dialog.ShowDialog();
-                            return dialogResult == DialogResult.OK;
+                            _ = Visible ? dialog.ShowDialog(this) : dialog.ShowDialog();
+                            return dialog.Choice;
                         }
                         catch
                         {
                             // UPDATE-03: nothing downloads unconfirmed -- a dialog that
                             // cannot be shown for any reason is treated identically to
-                            // "declined."
-                            return false;
+                            // "declined" (Later), never "skipped."
+                            return UpdatePromptChoice.Later;
                         }
                     },
                     release =>
@@ -2065,6 +2065,7 @@ namespace RigToggle.App
                             ToolTipIcon.Info);
                     },
                     wasStartedHidden,
+                    honourSkippedVersion: true,
                     CancellationToken.None).ConfigureAwait(true);
 
                 if (outcome == UpdateCheckOutcome.Applying)
