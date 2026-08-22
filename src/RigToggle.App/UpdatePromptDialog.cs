@@ -35,9 +35,6 @@ namespace RigToggle.App
             InitializeComponent();
 
             lblHeadline.Text = $"Rig Toggle {release.TagName} is available";
-            rtbReleaseNotes.Text = string.IsNullOrWhiteSpace(release.Body)
-                ? "This release doesn't include notes. See the full release on GitHub for details."
-                : release.Body;
 
             this.AcceptButton = btnUpdateNow;
             this.CancelButton = btnLater;
@@ -54,6 +51,10 @@ namespace RigToggle.App
             ThemeApplier.ThemeButton(btnLater, IsDark);
             ThemeApplier.ThemeButton(btnUpdateNow, IsDark);
             ThemeApplier.ThemeRichTextBox(rtbReleaseNotes, IsDark);
+
+            // D-01: placed after ThemeRichTextBox so the run fonts this applies are
+            // painted over the already-themed colours, not the other way round.
+            ReleaseNotesRenderer.Render(rtbReleaseNotes, release.Body);
         }
 
         // Single source of truth for "is dark mode active right now," read fresh
