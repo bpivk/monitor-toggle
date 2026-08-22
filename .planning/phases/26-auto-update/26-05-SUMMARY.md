@@ -105,9 +105,14 @@ coverage:
     human_judgment: true
     rationale: "Task 3 is a blocking-human checkpoint requiring a real installed exe on real Windows hardware -- a genuine reboot, a real GitHub release tag/workflow run, SmartScreen absence, and a deliberately-interrupted update. This build sandbox is Linux; none of the 15 numbered rig steps can be produced or fabricated here. NOT PERFORMED this session -- returned as a checkpoint per the plan's own gate="blocking" designation."
 
-duration: ~25min (Tasks 1-2 only; Task 3 not started)
+duration: ~25min (Tasks 1-2 only; Task 3 closed by operator authorization, not by completing its how-to-verify steps)
 completed: 2026-08-22
-status: halted
+status: passed
+overrides:
+  - must_have: "Task 3: Rig verification of the whole auto-update feature (15-step checklist on real Windows hardware)"
+    reason: "This Linux build sandbox cannot produce or fabricate rig-only evidence (real installed exe, real GitHub release tag/workflow run, reboot, SmartScreen, deliberately-interrupted update). Operator explicitly authorized closing the checkpoint now on the build+test evidence already gathered (206/206 tests, clean solution build), with the intent to naturally exercise the real update path when the next real release (v2.2) is tagged and pushed -- at which point this build's own auto-update check will fire against a real prior version and the mechanism will be exercised in the field. See 'Task 3: Operator Verification' below for the verbatim authorization and exactly what remains open."
+    accepted_by: "Blaz Pivk"
+    accepted_at: "2026-08-22"
 ---
 
 # Phase 26 Plan 05: On-Demand "Check for Updates" (Tray + Settings) Summary
@@ -187,8 +192,32 @@ None - no external service configuration required for Tasks 1-2. Task 3 requires
 
 Phase 26's code is now feature-complete: version stamping, on-launch check, themed three-choice prompt with formatted release notes, checksum-verified download, rename-in-place self-replacement with relaunch, retained-backup auto-rollback, and now a manual "Check for Updates" from both the tray menu and Settings — all unit-tested at the Core boundary and building clean. Nothing further can be built without the rig; the only remaining work in this phase is Task 3's 15-step operator verification, which is this plan's (and the whole phase's) last blocking checkpoint. No code-level blockers.
 
-**Blocker/concern carried forward:** Task 3 (rig verification of the ENTIRE Phase 26 feature, not just this plan's own two tasks) is unperformed — genuinely blocked on real Windows hardware, not deferred by choice. This is a `gate="blocking"` checkpoint per the plan itself; it must not be auto-approved or waived by any automated process. Returned to the orchestrator as a checkpoint.
+**Blocker/concern carried forward:** Task 3 (rig verification of the ENTIRE Phase 26 feature, not just this plan's own two tasks) was not performed on real Windows hardware — closed instead by explicit operator authorization. See "Task 3: Operator Verification" below.
+
+## Task 3: Operator Verification — Closed on Partial Evidence
+
+Task 3 was authored as a `type="checkpoint:human-verify" gate="blocking"` task with a 15-step real-Windows-hardware checklist (publish + install v2.1, tag/push a real v2.2 release, confirm the themed prompt/formatted notes/three buttons, confirm the swap+relaunch with no SmartScreen interstitial, confirm `.bak` retention, confirm autostart survives a reboot, confirm auto-rollback on a killed relaunch, confirm interrupted-update recovery, confirm manual check from both entry points including a network-failure toast, confirm skip persistence).
+
+**Operator's verbatim response (via the orchestrator's checkpoint prompt):**
+
+> "We'll maek it as closed now. Once we push the latest version we will change it to 2.2 and it should count it as an update. We can go and fix it at a later date."
+
+**What this confirms, precisely:**
+- The solution builds successfully in this session (`dotnet build` → 0 errors, 6 pre-existing unrelated warnings) and the full cross-platform unit suite passes (206/206), including every acceptance-criteria grep across all 5 plans in this phase.
+- `RigToggle.Windows.Tests` (including the real child-process `UpdateApplyProcessTests` from plan 26-03) compiles cleanly; it is designed to execute in CI on `windows-latest`, per the Phase 25 precedent.
+- The operator has explicitly authorized closing this checkpoint now, with the stated intent to let the next real release cycle (tagging and pushing an actual v2.2, which this exact mechanism will then check for and offer to itself-update to) serve as the real-world exercise of the rig-only steps.
+
+**What this does NOT confirm — explicitly not performed:**
+- None of the 15 numbered rig-verification steps in `26-05-PLAN.md` Task 3 were run: no real installed exe was published/updated, no real GitHub release tag/workflow run was exercised end-to-end, no reboot-survival check, no SmartScreen-absence confirmation, no live auto-rollback-on-kill or interrupted-update recovery test, no live manual-check toast confirmation, no live skip-persistence confirmation.
+- The rename-while-running self-replace mechanism (`WindowsUpdateApplier`/`UpdateApplyEntryPoint`) has never been exercised against a real Windows file-lock on this specific `PublishSingleFile` + `IncludeNativeLibrariesForSelfExtract` publish mode — ARCHITECTURE.md flagged this explicitly as unverified, and it remains unverified after this closure.
+- `mainForm.BeginInvoke`'s handle-existence assumption under `--tray` hidden startup (ARCHITECTURE.md's other flagged open question) remains unverified.
+
+**Follow-up items (open, not fabricated as done):**
+
+1. When v2.2 is actually tagged and pushed, confirm the prior installed build (v2.1 or later) detects it, prompts, downloads, applies, and relaunches correctly — this is the operator's stated natural verification path.
+2. If that real-world run reveals any of the 15 checklist items failing, treat it as a live bug report against this phase, not a re-opening of planning.
+3. The SmartScreen-absence, reboot-survival, auto-rollback-on-kill, and interrupted-update-recovery steps specifically benefit from a deliberate rig pass at some point (not just an incidental real update) since they test failure paths a routine update won't naturally exercise — flagged for whenever the operator next has rig time, per their "fix it at a later date" framing.
 
 ---
 *Phase: 26-auto-update*
-*Completed (Tasks 1-2 only): 2026-08-22*
+*Completed (Tasks 1-2; Task 3 closed by operator authorization): 2026-08-22*
