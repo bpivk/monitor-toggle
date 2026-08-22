@@ -29,6 +29,17 @@ namespace RigToggle.Core;
 /// <see cref="ISettingsStore"/> is threaded through so a "Skip this version" choice
 /// can be persisted (and a persisted skip can be honoured on the automatic path)
 /// without either concern living in the App layer.
+///
+/// Plan 26-05/UPDATE-06/D-05/D-06/D-07: <see cref="CheckOnDemandAsync"/> shares this
+/// class's fetch/compare/confirm/apply sequencer with <see cref="CheckOnLaunchAsync"/>
+/// via the private <see cref="CheckAsync"/> body, parameterised by
+/// <c>honourSkippedVersion</c> (only the automatic path suppresses a previously
+/// skipped release; an explicit on-demand request always prompts, T-26-14 read
+/// together with D-02) and <c>reportFailures</c> (only the on-demand path converts a
+/// caught fetch/compare exception into the distinct
+/// <see cref="UpdateCheckOutcome.CheckFailed"/> outcome instead of collapsing it into
+/// <see cref="UpdateCheckOutcome.NotAvailable"/> -- D-07's whole premise is that a
+/// failed manual check must never look identical to "you're already up to date").
 /// </summary>
 public sealed class UpdateOrchestrator
 {
@@ -69,6 +80,62 @@ public sealed class UpdateOrchestrator
         bool honourSkippedVersion,
         CancellationToken cancellationToken)
     {
+        UpdateCheckResult result = await CheckAsync(
+            confirm,
+            onApplyStarting,
+            wasStartedHidden,
+            honourSkippedVersion,
+            reportFailures: false,
+            cancellationToken).ConfigureAwait(false);
+
+        return result.Outcome;
+    }
+
+    /// <summary>
+    /// UPDATE-06/D-05: the on-demand entry point reached from the tray menu's "Check
+    /// for Updates" item and Settings' "Check for Updates" button. Always passes
+    /// <c>honourSkippedVersion: false</c> -- an explicit request overrides a prior
+    /// skip, since D-02's suppression is about unprompted nagging, not about
+    /// refusing a direct question -- and <c>reportFailures: true</c>, so a caught
+    /// fetch/compare exception surfaces as the distinct
+    /// <see cref="UpdateCheckOutcome.CheckFailed"/> outcome (carrying the exception's
+    /// message as <see cref="UpdateCheckResult.FailureReason"/>) instead of the
+    /// automatic path's silent <see cref="UpdateCheckOutcome.NotAvailable"/> (D-07).
+    /// </summary>
+    public Task<UpdateCheckResult> CheckOnDemandAsync(
+        Func<ReleaseInfo, UpdatePromptChoice> confirm,
+        Action<ReleaseInfo> onApplyStarting,
+        bool wasStartedHidden,
+        CancellationToken cancellationToken)
+    {
+        return CheckAsync(
+            confirm,
+            onApplyStarting,
+            wasStartedHidden,
+            honourSkippedVersion: false,
+            reportFailures: true,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// The shared fetch -> compare -> (skip-check) -> confirm -> apply body both
+    /// public entry points delegate to, so the two never drift (Plan 26-05 Task 1(a)).
+    /// <paramref name="reportFailures"/> is the ONLY behavioral difference in the
+    /// fetch/compare segment's exception handling: false (the automatic path)
+    /// degrades any exception to NotAvailable exactly as before; true (the on-demand
+    /// path) converts it into CheckFailed carrying the reason. Every other branch
+    /// (skip-suppression, Later/Skip/UpdateNow) is byte-for-byte identical to plan
+    /// 26-04's original CheckOnLaunchAsync body, including the deliberately
+    /// UNWRAPPED post-confirm download/apply segment -- see class doc comment.
+    /// </summary>
+    private async Task<UpdateCheckResult> CheckAsync(
+        Func<ReleaseInfo, UpdatePromptChoice> confirm,
+        Action<ReleaseInfo> onApplyStarting,
+        bool wasStartedHidden,
+        bool honourSkippedVersion,
+        bool reportFailures,
+        CancellationToken cancellationToken)
+    {
         if (confirm is null)
         {
             throw new ArgumentNullException(nameof(confirm));
@@ -79,23 +146,32 @@ public sealed class UpdateOrchestrator
             throw new ArgumentNullException(nameof(onApplyStarting));
         }
 
+        // Major.Minor only, matching this project's own v{Major}.{Minor} tag scheme
+        // (UpdateVersionComparer's class doc comment) -- never the full four-component
+        // System.Version.ToString(), which would read "2.2.0.0" in a balloon.
+        string runningVersionText = $"{_runningVersion.Major}.{_runningVersion.Minor}";
+
         ReleaseInfo release;
         try
         {
             ReleaseInfo? fetched = await _releaseFeed.GetLatestReleaseAsync(cancellationToken).ConfigureAwait(false);
             if (fetched is null || !UpdateVersionComparer.IsNewer(_runningVersion, fetched.TagName))
             {
-                return UpdateCheckOutcome.NotAvailable;
+                return new UpdateCheckResult(UpdateCheckOutcome.NotAvailable, runningVersionText, FailureReason: null);
             }
 
             release = fetched;
         }
-        catch
+        catch (Exception ex)
         {
             // An automatic check must never surface anything (PITFALLS.md UX
             // Pitfalls table) -- degrade any fetch/compare-segment exception to
-            // NotAvailable, the same outcome as "no update exists."
-            return UpdateCheckOutcome.NotAvailable;
+            // NotAvailable, the same outcome as "no update exists," UNLESS the
+            // caller explicitly asked for failures to be reported (the on-demand
+            // path, D-07), in which case it becomes the distinct CheckFailed outcome.
+            return reportFailures
+                ? new UpdateCheckResult(UpdateCheckOutcome.CheckFailed, runningVersionText, ex.Message)
+                : new UpdateCheckResult(UpdateCheckOutcome.NotAvailable, runningVersionText, FailureReason: null);
         }
 
         if (honourSkippedVersion)
@@ -125,7 +201,7 @@ public sealed class UpdateOrchestrator
             {
                 // release.TagName is NOT strictly newer than the skipped tag --
                 // suppress without ever invoking confirm.
-                return UpdateCheckOutcome.Skipped;
+                return new UpdateCheckResult(UpdateCheckOutcome.Skipped, runningVersionText, FailureReason: null);
             }
         }
 
@@ -133,7 +209,7 @@ public sealed class UpdateOrchestrator
 
         if (choice == UpdatePromptChoice.Later)
         {
-            return UpdateCheckOutcome.Declined;
+            return new UpdateCheckResult(UpdateCheckOutcome.Declined, runningVersionText, FailureReason: null);
         }
 
         if (choice == UpdatePromptChoice.Skip)
@@ -151,7 +227,7 @@ public sealed class UpdateOrchestrator
                 // into a crash.
             }
 
-            return UpdateCheckOutcome.Skipped;
+            return new UpdateCheckResult(UpdateCheckOutcome.Skipped, runningVersionText, FailureReason: null);
         }
 
         onApplyStarting(release);
@@ -162,26 +238,44 @@ public sealed class UpdateOrchestrator
         string stagedPath = await _updateApplier.DownloadAndStageAsync(release, cancellationToken).ConfigureAwait(false);
         _updateApplier.ApplyAndRelaunch(stagedPath, wasStartedHidden);
 
-        return UpdateCheckOutcome.Applying;
+        return new UpdateCheckResult(UpdateCheckOutcome.Applying, runningVersionText, FailureReason: null);
     }
 }
 
 /// <summary>
-/// UpdateOrchestrator.CheckOnLaunchAsync's possible outcomes. <see cref="Failed"/> is
-/// reserved for a future/manual-check caller that wants to represent "the check
-/// itself failed" as a return value rather than a propagated exception (D-07,
-/// manual check must show a distinct failure toast) -- CheckOnLaunchAsync's own
-/// fetch/compare segment currently degrades every failure to
-/// <see cref="NotAvailable"/> (see class doc comment), so this member is not
-/// produced by that method today, but is declared now so callers can match
-/// exhaustively without a future breaking enum change.
+/// Plan 26-05: the result of a single fetch/compare/confirm/apply pass, returned by
+/// <see cref="UpdateOrchestrator.CheckOnDemandAsync"/> so the App layer's manual-check
+/// toast can distinguish "already up to date" from "the check itself failed" (D-06/
+/// D-07) -- a bare <see cref="UpdateCheckOutcome"/> enum member alone cannot carry the
+/// running-version text or a failure reason string.
+/// </summary>
+/// <param name="Outcome">Which branch the shared check sequencer took.</param>
+/// <param name="RunningVersionText">
+/// The currently-running build's Major.Minor version text (e.g. "2.2"), populated for
+/// every outcome; used by the "already on the latest version" toast (D-06).
+/// </param>
+/// <param name="FailureReason">
+/// Non-null only when <see cref="Outcome"/> is <see cref="UpdateCheckOutcome.CheckFailed"/>
+/// -- the caught exception's message, for the "Couldn't check for updates" toast (D-07).
+/// </param>
+public sealed record UpdateCheckResult(UpdateCheckOutcome Outcome, string? RunningVersionText, string? FailureReason);
+
+/// <summary>
+/// UpdateOrchestrator's possible outcomes. <see cref="CheckFailed"/> (Plan 26-05,
+/// renamed from the placeholder <c>Failed</c> member plan 26-04 declared in advance
+/// for exactly this purpose -- see git history) is produced only by
+/// <see cref="UpdateOrchestrator.CheckOnDemandAsync"/>'s fetch/compare segment: the
+/// on-demand path's manual-check toast must show a distinct failure state (D-07)
+/// rather than propagating an exception. <see cref="UpdateOrchestrator.CheckOnLaunchAsync"/>'s
+/// fetch/compare segment still degrades every failure to <see cref="NotAvailable"/>
+/// (see class doc comment) and never produces this member.
 /// </summary>
 public enum UpdateCheckOutcome
 {
     NotAvailable,
     Declined,
     Applying,
-    Failed,
+    CheckFailed,
     Skipped,
 }
 
