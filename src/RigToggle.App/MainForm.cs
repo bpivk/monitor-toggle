@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
+using System.Threading;
 using RigToggle.App.Controls;
 using RigToggle.Core;
 using RigToggle.Core.Abstractions;
@@ -40,6 +41,11 @@ namespace RigToggle.App
         private readonly IMonitorController _monitorController;
         private readonly Func<SettingsForm> _settingsFormFactory;
         private readonly IThemeProvider _themeProvider;
+
+        // UPDATE-02: null when the composition root doesn't wire one in (e.g. a
+        // future test harness constructing MainForm directly) -- optional constructor
+        // parameter, RunAutomaticUpdateCheckAsync() no-ops when this is null.
+        private readonly UpdateOrchestrator? _updateOrchestrator;
 
         // TILE-01: live tile instances, reconciled (not rebuilt) against monitor count
         // on every RefreshMonitorTiles() call -- see that method's own comment.
@@ -152,13 +158,15 @@ namespace RigToggle.App
             ISettingsStore settingsStore,
             IMonitorController monitorController,
             Func<SettingsForm> settingsFormFactory,
-            IThemeProvider themeProvider)
+            IThemeProvider themeProvider,
+            UpdateOrchestrator? updateOrchestrator = null)
         {
             _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
             _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
             _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
             _settingsFormFactory = settingsFormFactory ?? throw new ArgumentNullException(nameof(settingsFormFactory));
             _themeProvider = themeProvider ?? throw new ArgumentNullException(nameof(themeProvider));
+            _updateOrchestrator = updateOrchestrator;
 
             InitializeComponent();
 
@@ -1994,6 +2002,86 @@ namespace RigToggle.App
                 ToggleResultFormatter.FormatModeTitle(_orchestrator.IsInRigMode()),
                 ToggleResultFormatter.TruncateForBalloon(ToggleResultFormatter.FormatChecklist(result)),
                 result.Success ? ToolTipIcon.Info : ToolTipIcon.Warning);
+        }
+
+        /// <summary>
+        /// UPDATE-02/UPDATE-03/D-03: the on-launch update check, invoked (best-effort,
+        /// fire-and-forget) via mainForm.BeginInvoke from Program.cs after
+        /// guard.MarkReady() -- must never block or delay startup (PITFALLS.md UX
+        /// Pitfalls table). Returns immediately when no UpdateOrchestrator was wired
+        /// in.
+        ///
+        /// The confirm callback constructs a themed UpdatePromptDialog exactly like
+        /// OpenSettingsDialog's `using var ... ShowDialog` convention, owned by `this`
+        /// only when this form is currently visible -- under --tray hidden startup the
+        /// main window is never shown, and an owned modal on an invisible owner is
+        /// exactly the kind of WinForms timing assumption this project's history says
+        /// not to make. If the dialog cannot be shown for any reason, confirm returns
+        /// false -- nothing downloads unconfirmed is the entire point of UPDATE-03.
+        ///
+        /// When the outcome is Applying, Application.Exit() is called immediately
+        /// after the helper has been spawned so this process releases the
+        /// single-instance mutex right away (PITFALLS.md Pitfall 4's required
+        /// ordering) -- the freshly-relaunched instance must never find this
+        /// still-shutting-down process still holding the guard.
+        /// </summary>
+        public async Task RunAutomaticUpdateCheckAsync()
+        {
+            if (_updateOrchestrator is null)
+            {
+                return;
+            }
+
+            ReleaseInfo? releaseForFailureMessage = null;
+
+            try
+            {
+                bool wasStartedHidden = StartupArgs.ShouldStartHidden(Environment.GetCommandLineArgs());
+
+                UpdateCheckOutcome outcome = await _updateOrchestrator.CheckOnLaunchAsync(
+                    release =>
+                    {
+                        releaseForFailureMessage = release;
+                        try
+                        {
+                            using var dialog = new UpdatePromptDialog(release, _themeProvider);
+                            DialogResult dialogResult = Visible ? dialog.ShowDialog(this) : dialog.ShowDialog();
+                            return dialogResult == DialogResult.OK;
+                        }
+                        catch
+                        {
+                            // UPDATE-03: nothing downloads unconfirmed -- a dialog that
+                            // cannot be shown for any reason is treated identically to
+                            // "declined."
+                            return false;
+                        }
+                    },
+                    release =>
+                    {
+                        notifyIcon.ShowBalloonTip(
+                            3000,
+                            "Rig Toggle",
+                            ToggleResultFormatter.TruncateForBalloon("Downloading and installing update…"),
+                            ToolTipIcon.Info);
+                    },
+                    wasStartedHidden,
+                    CancellationToken.None).ConfigureAwait(true);
+
+                if (outcome == UpdateCheckOutcome.Applying)
+                {
+                    Application.Exit();
+                }
+            }
+            catch (Exception ex)
+            {
+                string versionTag = releaseForFailureMessage?.TagName ?? "the latest version";
+                string runningVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
+                notifyIcon.ShowBalloonTip(
+                    3000,
+                    "Rig Toggle",
+                    ToggleResultFormatter.TruncateForBalloon($"Update to {versionTag} failed to install ({ex.Message}) — you're still running v{runningVersion}."),
+                    ToolTipIcon.Warning);
+            }
         }
 
         /// <summary>

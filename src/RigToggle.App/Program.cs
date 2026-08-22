@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Http;
 using RigToggle.Core;
 using RigToggle.Core.Abstractions;
 using RigToggle.Core.Diagnostics;
@@ -262,6 +263,21 @@ namespace RigToggle.App
             var appController = new WindowsAppController();
             var autostartConfigurator = new WindowsAutostartConfigurator();
 
+            // UPDATE-01..04: composition-root-only construction (Anti-Pattern 2), same
+            // flat sequential-var style as the Windows adapters immediately above. No
+            // new NuGet packages -- HttpClient + System.Text.Json only (STACK.md §1).
+            var updateHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            var releaseFeed = new GitHubReleaseFeed(updateHttpClient, "bpivk", "monitor-toggle");
+            var updateApplier = new WindowsUpdateApplier(updateHttpClient);
+
+            // The entry assembly is RigToggle.App -- the only project carrying
+            // <Version> (UPDATE-01) -- which is why the running version is resolved
+            // here, at the composition root, and injected into UpdateOrchestrator
+            // rather than read inside Core (RigToggle.Core.csproj carries no version
+            // of its own that would mean anything for this comparison).
+            var runningVersion = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(0, 0);
+            var updateOrchestrator = new UpdateOrchestrator(releaseFeed, updateApplier, runningVersion);
+
             // 12-02/THEME-01/02/03: composition-root-only construction (Anti-Pattern 2)
             // -- this is the ONE and only place the theme provider adapter is
             // constructed anywhere in the solution. App-lifetime object; intentionally
@@ -312,7 +328,7 @@ namespace RigToggle.App
             MainForm mainForm = null!;
             SettingsForm SettingsFormFactory() => new SettingsForm(monitorController, audioController, settingsStore, autostartConfigurator, themeProvider, mainForm.TryRegisterConfiguredHotkey, mainForm.ApplyTrayVisibility, themeProvider.SetPreviewOverride, themeProvider.RefreshOverride);
 
-            mainForm = new MainForm(toggleOrchestrator, settingsStore, monitorController, SettingsFormFactory, themeProvider);
+            mainForm = new MainForm(toggleOrchestrator, settingsStore, monitorController, SettingsFormFactory, themeProvider, updateOrchestrator);
 
             // Pitfall 6: prime the tray icon/menu BEFORE either Run branch — under
             // --tray the form's own Load event never fires since the form is never
@@ -337,6 +353,24 @@ namespace RigToggle.App
             // creation and Application.Run below is not lost -- it queues on this
             // thread's message queue and is dispatched once the pump starts.
             guard.MarkReady();
+
+            // UPDATE-02: best-effort, fire-and-forget on-launch update check -- must
+            // never block or delay startup (PITFALLS.md UX Pitfalls table). The
+            // handle already exists at this point because InitializeTrayState() above
+            // forces its creation on BOTH the visible and --tray startup paths
+            // (MainForm.cs's ApplyDwmChrome doc comment states this explicitly) --
+            // ARCHITECTURE.md flags mainForm.BeginInvoke's pre-Application.Run safety
+            // under --tray as an open verification question; the documented fallback
+            // if it proves unsafe on real hardware is a one-shot
+            // System.Windows.Forms.Timer instead of BeginInvoke.
+            try
+            {
+                mainForm.BeginInvoke(new Action(() => _ = mainForm.RunAutomaticUpdateCheckAsync()));
+            }
+            catch (Exception ex)
+            {
+                TryLog($"Program.Main: failed to schedule RunAutomaticUpdateCheckAsync: {ex.GetType().Name}: {ex.Message}");
+            }
 
             // D-06, rig-corrected: 08-RESEARCH.md's original theory — that
             // `new ApplicationContext(mainForm)` (passing the form in) suppresses the

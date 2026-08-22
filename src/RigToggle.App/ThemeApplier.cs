@@ -193,6 +193,27 @@ namespace RigToggle.App
         }
 
         /// <summary>
+        /// rtbReleaseNotes theming (26-UI-SPEC.md Color table). RichTextBox is not
+        /// reached by Application.SetColorMode either -- the same category of gap this
+        /// class has already closed three times (grid, hotkey box, buttons, combo
+        /// box), so it gets the identical explicit-override treatment. Same literal
+        /// color pair as ThemeComboBox/ThemeMonitorGrid's cell background. Deliberately
+        /// does not set BorderStyle -- the Designer owns it (FixedSingle).
+        /// </summary>
+        public static void ThemeRichTextBox(RichTextBox rtb, bool dark)
+        {
+            try
+            {
+                rtb.BackColor = dark ? Color.FromArgb(45, 45, 48) : SystemColors.Window;
+                rtb.ForeColor = dark ? Color.FromArgb(240, 240, 240) : SystemColors.ControlText;
+            }
+            catch
+            {
+                // Cosmetic-only — leave the control unchanged on failure.
+            }
+        }
+
+        /// <summary>
         /// TILE-01/19-UI-SPEC.md Color table: the tile half of 19-RESEARCH.md Pitfall 1's
         /// two-call-site rule — both MainForm.OnThemeChanged AND
         /// MainForm.InitializeTrayState() must reach every live MonitorTile through this
