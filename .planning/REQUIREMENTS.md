@@ -13,8 +13,8 @@ Requirements for the "Auto-Update, Single-Instance Guard & Smaller Footprint" mi
 - [x] **UPDATE-02**: On launch, app checks GitHub Releases for a version newer than the running build
 - [x] **UPDATE-03**: When a newer version is found, user is prompted to confirm before anything is downloaded or applied
 - [x] **UPDATE-04**: Confirming downloads the new release exe, applies it in place, and relaunches on the new version
-- [ ] **UPDATE-05**: A failed update apply (interrupted download, disk full, locked file) leaves the original exe intact and runnable — never stranding the app in a non-launchable state
-- [ ] **UPDATE-06**: A manual "Check for Updates" action lets the user trigger the same check on demand, independent of the automatic on-launch check
+- [x] **UPDATE-05**: A failed update apply (interrupted download, disk full, locked file) leaves the original exe intact and runnable — never stranding the app in a non-launchable state
+- [x] **UPDATE-06**: A manual "Check for Updates" action lets the user trigger the same check on demand, independent of the automatic on-launch check
 - [x] **UPDATE-07**: The update-apply relaunch always succeeds despite the new single-instance guard being active (the guard must not block the app's own internal relaunch)
 
 ### Single-Instance Guard
@@ -62,8 +62,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UPDATE-02 | Phase 26 | Complete |
 | UPDATE-03 | Phase 26 | Complete |
 | UPDATE-04 | Phase 26 | Complete |
-| UPDATE-05 | Phase 26 | Pending |
-| UPDATE-06 | Phase 26 | Pending |
+| UPDATE-05 | Phase 26 | Complete |
+| UPDATE-06 | Phase 26 | Complete |
 | UPDATE-07 | Phase 25 | Complete |
 | INSTANCE-01 | Phase 25 | Complete |
 | INSTANCE-02 | Phase 25 | Complete |
