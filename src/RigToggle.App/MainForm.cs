@@ -47,6 +47,18 @@ namespace RigToggle.App
         // parameter, RunAutomaticUpdateCheckAsync() no-ops when this is null.
         private readonly UpdateOrchestrator? _updateOrchestrator;
 
+        // CR-01 (code review, 26-REVIEW.md): mutual-exclusion guard between
+        // RunAutomaticUpdateCheckAsync (on-launch) and PerformManualUpdateCheckAsync
+        // (tray/Settings) -- mirrors ToggleOrchestrator.BeginExclusiveMonitorAccess's
+        // own _busy pattern for the identical class of hazard. Without this, the
+        // nested message loop ShowUpdatePromptDialog's ShowDialog() pumps while the
+        // automatic check's dialog is open lets a user's tray "Check for Updates"
+        // click reenter and run a second concurrent check -- both racing on the same
+        // FileShare.None-locked staging path and both potentially reaching
+        // ApplyAndRelaunch/Application.Exit(). A second concurrent call now no-ops
+        // instead of proceeding.
+        private int _updateCheckInProgress;
+
         // TILE-01: live tile instances, reconciled (not rebuilt) against monitor count
         // on every RefreshMonitorTiles() call -- see that method's own comment.
         private readonly List<MonitorTile> _tiles = new();
@@ -2041,6 +2053,14 @@ namespace RigToggle.App
                 return;
             }
 
+            // CR-01: reject a concurrent call (see _updateCheckInProgress's own
+            // comment) -- if a manual check is already in flight, silently no-op
+            // rather than race it.
+            if (Interlocked.CompareExchange(ref _updateCheckInProgress, 1, 0) != 0)
+            {
+                return;
+            }
+
             ReleaseInfo? releaseForFailureMessage = null;
 
             try
@@ -2072,6 +2092,10 @@ namespace RigToggle.App
                     "Rig Toggle",
                     ToggleResultFormatter.TruncateForBalloon($"Update to {versionTag} failed to install ({ex.Message}) — you're still running v{runningVersion}."),
                     ToolTipIcon.Warning);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _updateCheckInProgress, 0);
             }
         }
 
@@ -2153,6 +2177,17 @@ namespace RigToggle.App
                 return;
             }
 
+            // CR-01: reject a concurrent call (see _updateCheckInProgress's own
+            // comment) -- if the automatic check (or another manual check) is
+            // already in flight, silently no-op rather than race it. A manual
+            // check's own reentrant trigger (the nested ShowDialog() message pump
+            // dispatching a second tray-menu click) is exactly the hazard this
+            // guards against.
+            if (Interlocked.CompareExchange(ref _updateCheckInProgress, 1, 0) != 0)
+            {
+                return;
+            }
+
             try
             {
                 bool wasStartedHidden = StartupArgs.ShouldStartHidden(Environment.GetCommandLineArgs());
@@ -2199,6 +2234,10 @@ namespace RigToggle.App
                     "Rig Toggle",
                     ToggleResultFormatter.TruncateForBalloon($"Couldn't check for updates — {ex.Message}. Try again from the tray menu or Settings."),
                     ToolTipIcon.Warning);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _updateCheckInProgress, 0);
             }
         }
 
