@@ -2,6 +2,7 @@ using System.Diagnostics;
 using RigToggle.Core;
 using RigToggle.Core.Abstractions;
 using RigToggle.Core.Models;
+using RigToggle.Windows;
 
 namespace RigToggle.App
 {
@@ -26,6 +27,12 @@ namespace RigToggle.App
         private const string FailedSuffix = ".failed";
         private const string TrayFlag = "--tray";
 
+        // WR-01 (code review, 26-REVIEW.md): a helper exe still genuinely mid-relaunch
+        // on THIS boot is freshly created and must never be swept -- only files old
+        // enough to be certainly finished (or orphaned by a helper/process that
+        // crashed before deleting itself, which nothing currently does) are removed.
+        private static readonly TimeSpan HelperSweepGracePeriod = TimeSpan.FromMinutes(10);
+
         /// <summary>
         /// Walks the marker's current stage forward exactly one step (or clears it)
         /// and returns true when Program.Main must return immediately -- this
@@ -37,6 +44,17 @@ namespace RigToggle.App
         internal static bool Run(IUpdateAppliedMarkerStore markerStore, string runningExePath, out string? revertNotice)
         {
             revertNotice = null;
+
+            // WR-01 (code review, 26-REVIEW.md): best-effort sweep of orphaned
+            // update-helper exes ApplyAndRelaunch (WindowsUpdateApplier.cs) leaves
+            // behind in %TEMP% -- nothing previously deleted them, leaving one
+            // orphaned ~150 MB file per applied update indefinitely. Runs
+            // unconditionally, before the marker-stage switch below, on every
+            // normal startup -- independent of marker state, mirroring the existing
+            // orphaned-.bak/.failed cleanup below but not gated on marker being
+            // null, since a helper exe can be orphaned by a swap that otherwise
+            // succeeded (marker present) just as easily as by one that didn't.
+            SweepOrphanedHelperExes();
 
             UpdateAppliedMarker? marker = markerStore.TryLoad();
             if (marker is null)
@@ -224,6 +242,41 @@ namespace RigToggle.App
 
             TryDelete(runningExePath + BackupSuffix);
             TryDelete(runningExePath + FailedSuffix);
+        }
+
+        // WR-01 (code review, 26-REVIEW.md): enumerates %TEMP% for orphaned
+        // update-helper exes (WindowsUpdateApplier.HelperFileSearchPattern) and
+        // deletes any older than HelperSweepGracePeriod. Individually try/caught
+        // per-file AND around the enumeration itself -- an inaccessible %TEMP%
+        // directory or a single locked/in-use file must never abort startup or
+        // block the rest of Run's marker-stage handling.
+        private static void SweepOrphanedHelperExes()
+        {
+            try
+            {
+                string tempPath = Path.GetTempPath();
+                DateTime cutoffUtc = DateTime.UtcNow - HelperSweepGracePeriod;
+
+                foreach (string path in Directory.EnumerateFiles(tempPath, WindowsUpdateApplier.HelperFileSearchPattern))
+                {
+                    try
+                    {
+                        if (File.GetLastWriteTimeUtc(path) < cutoffUtc)
+                        {
+                            File.Delete(path);
+                            Log($"SweepOrphanedHelperExes: deleted orphaned helper exe '{path}'.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"SweepOrphanedHelperExes: failed to delete '{path}': {ex.GetType().Name}: {ex.Message}.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"SweepOrphanedHelperExes: failed to resolve or enumerate the temp directory: {ex.GetType().Name}: {ex.Message}.");
+            }
         }
 
         private static void TryDelete(string path)

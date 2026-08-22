@@ -40,6 +40,14 @@ public sealed class WindowsUpdateApplier : IUpdateApplier
     private const string StagedFileName = "RigToggle.App.update.exe";
     private const string TrayToken = "--tray";
 
+    // WR-01 (code review, 26-REVIEW.md): shared prefix for the per-process-id
+    // %TEMP% helper exe ApplyAndRelaunch copies the running self-contained exe
+    // to (~150 MB per CLAUDE.md). Exposed publicly so UpdateRollbackChecker's
+    // best-effort orphan sweep (its own doc comment) can target exactly these
+    // files without duplicating the literal string in two places.
+    public const string HelperFileNamePrefix = "RigToggle-updater-";
+    public const string HelperFileSearchPattern = HelperFileNamePrefix + "*.exe";
+
     private readonly HttpClient _httpClient;
 
     public WindowsUpdateApplier(HttpClient httpClient)
@@ -120,7 +128,7 @@ public sealed class WindowsUpdateApplier : IUpdateApplier
             throw new InvalidOperationException("Could not resolve the running executable's path.");
         }
 
-        string helperPath = Path.Combine(Path.GetTempPath(), $"RigToggle-updater-{Environment.ProcessId}.exe");
+        string helperPath = Path.Combine(Path.GetTempPath(), $"{HelperFileNamePrefix}{Environment.ProcessId}.exe");
         File.Copy(runningExePath, helperPath, overwrite: true);
 
         // Fixed positional payload UpdateApplyEntryPoint.Run parses: staged path,
