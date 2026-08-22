@@ -36,6 +36,7 @@ namespace RigToggle.Core;
 public sealed class GitHubReleaseFeed : IReleaseFeed
 {
     private const string TargetAssetName = "RigToggle.App.exe";
+    private const string ChecksumAssetName = "RigToggle.App.exe.sha256";
 
     private static readonly string[] AllowedAssetHosts =
     {
@@ -103,13 +104,39 @@ public sealed class GitHubReleaseFeed : IReleaseFeed
                 return null;
             }
 
+            // D-10/D-11 (T-26-01, T-26-08): resolve the sidecar checksum asset through the
+            // SAME scheme/host allow-list as the exe asset. Its absence -- every release
+            // published before this phase -- does NOT discard the release; a null
+            // ChecksumDownloadUrl is passed through so WindowsUpdateApplier can fail closed
+            // (an update whose integrity cannot be established must not be applied) rather
+            // than this method silently making "no checksum published" indistinguishable
+            // from "no release found".
+            GitHubAssetDto? checksumAsset = dto.Assets?.Find(a => string.Equals(a.Name, ChecksumAssetName, StringComparison.Ordinal));
+            string? checksumDownloadUrl = null;
+            if (checksumAsset is not null && !string.IsNullOrWhiteSpace(checksumAsset.BrowserDownloadUrl))
+            {
+                if (IsAllowedAssetUrl(checksumAsset.BrowserDownloadUrl))
+                {
+                    checksumDownloadUrl = checksumAsset.BrowserDownloadUrl;
+                }
+                else
+                {
+                    Log($"GetLatestReleaseAsync: rejected checksum asset URL '{checksumAsset.BrowserDownloadUrl}' (scheme/host not on the T-26-01 allow-list).");
+                }
+            }
+            else
+            {
+                Log($"GetLatestReleaseAsync: release '{dto.TagName}' has no '{ChecksumAssetName}' asset -- update cannot be verified.");
+            }
+
             return new ReleaseInfo(
                 dto.TagName,
                 asset.BrowserDownloadUrl,
                 dto.HtmlUrl ?? string.Empty,
                 dto.PublishedAt,
                 dto.Prerelease,
-                dto.Body);
+                dto.Body,
+                checksumDownloadUrl);
         }
         catch (HttpRequestException ex)
         {
