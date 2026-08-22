@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using RigToggle.Core;
 using RigToggle.Core.Abstractions;
+using RigToggle.Core.Diagnostics;
 using RigToggle.Core.Models;
 using RigToggle.Core.Persistence;
 using RigToggle.Windows;
@@ -156,51 +157,33 @@ namespace RigToggle.App
             // already existed in ToggleService's best-effort catch blocks, and
             // WindowsAppController now has diagnostic logging around its window-focus P/Invoke
             // sequence, but nothing previously persisted Trace output anywhere a user running
-            // the self-contained .exe (no attached debugger) could read it. Wiring a
-            // TextWriterTraceListener here — best-effort, must never block startup — is the
-            // minimal change that makes existing and new Trace.WriteLine calls actually
-            // observable on the rig. Gated behind AppSettings.EnableDebugLogging (off by
-            // default) so the app does not write debug.log unconditionally on every run.
-            if (settings.EnableDebugLogging)
-            {
-                try
-                {
-                    Directory.CreateDirectory(basePath);
-
-                    // 25-03 Task 3 operator checkpoint investigation, second logging
-                    // gap: the path-based StreamWriter(path, append) constructor opens
-                    // its underlying FileStream with FileShare.Read only (confirmed --
-                    // this is documented .NET StreamWriter behavior), NOT
-                    // FileShare.ReadWrite. With the primary instance holding debug.log
-                    // open for its whole lifetime, a duplicate/loser process's own
-                    // attempt to open the SAME file for its own append-write would
-                    // throw a sharing-violation IOException -- silently swallowed by
-                    // the catch below, producing zero log output for the duplicate
-                    // process even though every other part of this fix (the ordering
-                    // fix, the Trace.WriteLine instrumentation) was working correctly.
-                    // Opening the FileStream explicitly with FileShare.ReadWrite lets
-                    // every process (primary and any number of duplicates) hold its
-                    // own writable handle to the same file concurrently. Interleaved
-                    // appends across processes are acceptable here -- this is a
-                    // diagnostic-only, human-read log, not a structured/parsed one, so
-                    // no cross-process locking or write-ordering coordination is
-                    // needed beyond what OS-level append semantics already provide.
-                    var logStream = new FileStream(
-                        Path.Combine(basePath, "debug.log"),
-                        FileMode.Append,
-                        FileAccess.Write,
-                        FileShare.ReadWrite);
-                    var traceWriter = new StreamWriter(logStream)
-                    {
-                        AutoFlush = true,
-                    };
-                    Trace.Listeners.Add(new TextWriterTraceListener(traceWriter));
-                }
-                catch
-                {
-                    // Diagnostic logging is best-effort only — never let it prevent startup.
-                }
-            }
+            // the self-contained .exe (no attached debugger) could read it. Wiring a file trace
+            // listener — best-effort, must never block startup — is the minimal change that
+            // makes existing and new Trace.WriteLine calls actually observable on the rig.
+            //
+            // Debug session monitor-enable-reactivates-others-again, round 4: this used to be
+            // an inline `if (settings.EnableDebugLogging) { ... wire listener ... }` block,
+            // wired exactly ONCE, here, at process startup (including the FileShare.ReadWrite
+            // fix from the 25-03 Task 3 investigation, now inside DebugLog.Configure below).
+            // Round 3's rig trial came back with a COMPLETELY empty debug.log despite the bug
+            // still reproducing — traced (by static reading; this sandbox has no Windows
+            // runtime to reproduce on) to that one-time wiring: this app runs tray-resident for
+            // long stretches, and SettingsForm.cs's Save handler wrote the new
+            // EnableDebugLogging value to settings.json but never told THIS already-running
+            // process to start listening. Enabling the checkbox mid-session (the natural
+            // workflow: open the already-running app, flip the box on, reproduce immediately)
+            // silently produced zero log output, no restart having occurred. DebugLog.Configure
+            // (RigToggle.Core.Diagnostics) is now the single, live-reconfigurable wiring point
+            // — called here at startup AND from SettingsForm.cs on every Save, so the checkbox
+            // takes effect immediately, no restart required, permanently closing this gap
+            // rather than just working around it once. WriteStartupBanner runs
+            // unconditionally, before Configure, so a future empty-log report is immediately
+            // diagnosable from the log itself: it records this process's exe path/on-disk
+            // build timestamp (stale-build check), the resolved log path (wrong-location
+            // check), and EnableDebugLogging as loaded (off-by-mistake check) — all
+            // independent of whether Configure below actually wires anything.
+            DebugLog.WriteStartupBanner(settings.EnableDebugLogging);
+            DebugLog.Configure(settings.EnableDebugLogging);
 
             // Logged here (not at the actual catch site above) so it is observable at
             // all -- the trace listener isn't wired up yet at the point the race can

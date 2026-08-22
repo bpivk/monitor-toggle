@@ -1,5 +1,6 @@
 using RigToggle.Core;
 using RigToggle.Core.Abstractions;
+using RigToggle.Core.Diagnostics;
 using RigToggle.Core.Models;
 using RigToggle.Windows;
 
@@ -1295,6 +1296,17 @@ namespace RigToggle.App
             // Discard/close requires no handler — CancelButton wiring (constructor)
             // produces DialogResult.Cancel with nothing persisted.
             _settingsStore.Save(settingsToSave);
+
+            // Debug session monitor-enable-reactivates-others-again, round 4: apply the
+            // debug-logging checkbox LIVE, the same instant it persists — same slot/reason as
+            // _applyTrayVisibility()/_applyThemeOverride() below. Previously this setting only
+            // took effect on the NEXT full app restart (Program.cs wired the file trace
+            // listener once, at process startup, and never again), which meant enabling this
+            // checkbox on an already-running (tray-resident) instance and testing immediately
+            // — the exact workflow this app is built for — silently produced zero log output.
+            // DebugLog.Configure is idempotent/safe to call unconditionally on every Save, not
+            // just when this field actually changed.
+            DebugLog.Configure(settingsToSave.EnableDebugLogging);
 
             // D-08: apply the derived tray-icon visibility live, the moment settings
             // persist — must run here (not gated behind the autostart/hotkey blocks
