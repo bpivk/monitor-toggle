@@ -59,6 +59,14 @@ namespace RigToggle.App
         // instead of proceeding.
         private int _updateCheckInProgress;
 
+        // CR-02 (code review, 26-REVIEW.md): the confirmed-healthy callback handed
+        // to BeginUpdateHealthWatch, retained so MainForm_FormClosing's genuine-exit
+        // fall-through can also invoke it (via ConfirmUpdateHealthyOnce) -- see that
+        // method's own comment for why a clean exit must not be conflated with a
+        // crash by the 10-second timer being the only path to "confirmed healthy."
+        private Action? _confirmUpdateHealthyAction;
+        private bool _updateHealthConfirmed;
+
         // TILE-01: live tile instances, reconciled (not rebuilt) against monitor count
         // on every RefreshMonitorTiles() call -- see that method's own comment.
         private readonly List<MonitorTile> _tiles = new();
@@ -1810,6 +1818,13 @@ namespace RigToggle.App
             // close proceeds. T-08-GHOST: belt-and-suspenders ghost-icon prevention
             // alongside the explicit notifyIcon.Visible = false already set in
             // TrayExitMenuItem_Click.
+            //
+            // CR-02 (code review, 26-REVIEW.md): every genuine-exit reason reaches
+            // this exact fall-through (it's the one place ALL of them converge --
+            // X-without-tray, tray Exit's ApplicationExitCall, WindowsShutDown,
+            // TaskManagerClosing), so this is the single correct spot to also treat
+            // a graceful exit as confirmed-healthy, not just the 10-second timer.
+            ConfirmUpdateHealthyOnce();
             notifyIcon.Visible = false;
         }
 
@@ -2262,28 +2277,65 @@ namespace RigToggle.App
         /// System.Windows.Forms.Timer explicitly (this file also has `using
         /// System.Threading;`, which would otherwise make a bare `Timer` ambiguous
         /// with System.Threading.Timer).
+        ///
+        /// CR-02 (code review, 26-REVIEW.md): the timer used to be the ONLY path to
+        /// confirmed-healthy, so a user who closed the app (tray Exit, X, Windows
+        /// shutdown/logoff) within the 10-second window was indistinguishable from a
+        /// crash and triggered a false auto-rollback on the next launch, with a
+        /// misleading "update failed to start" message. The callback is now also
+        /// stored (_confirmUpdateHealthyAction) and invoked from
+        /// MainForm_FormClosing's genuine-exit fall-through via
+        /// ConfirmUpdateHealthyOnce() -- a clean exit is itself strong evidence the
+        /// new build is not crash-looping, so it earns confirmed-healthy exactly
+        /// like the timer tick does. ConfirmUpdateHealthyOnce() is idempotent (the
+        /// underlying ConfirmHealthy is also independently idempotent -- clearing an
+        /// already-cleared marker and deleting already-deleted files are both
+        /// no-ops), so whichever of the timer or a graceful exit happens first wins
+        /// with no double-invoke hazard.
         /// </summary>
         public void BeginUpdateHealthWatch(Action onConfirmedHealthy)
         {
+            _confirmUpdateHealthyAction = onConfirmedHealthy;
+
             var timer = new System.Windows.Forms.Timer { Interval = 10000 };
             timer.Tick += (_, _) =>
             {
                 timer.Stop();
                 timer.Dispose();
-
-                try
-                {
-                    onConfirmedHealthy();
-                }
-                catch
-                {
-                    // The confirmed-healthy callback must never crash this form's
-                    // message loop -- a failure here just means the backup/marker
-                    // cleanup didn't happen this tick, not that the app should go
-                    // down.
-                }
+                ConfirmUpdateHealthyOnce();
             };
             timer.Start();
+        }
+
+        /// <summary>
+        /// CR-02 (code review, 26-REVIEW.md): the shared, idempotent confirmed-
+        /// healthy invocation point -- reached from either BeginUpdateHealthWatch's
+        /// 10-second timer Tick or MainForm_FormClosing's genuine-exit fall-through,
+        /// whichever happens first. Guarded by _updateHealthConfirmed so a graceful
+        /// exit that races the timer (or a FormClosing that somehow fires twice)
+        /// can never invoke the underlying callback more than once. No-ops when
+        /// BeginUpdateHealthWatch was never called (_confirmUpdateHealthyAction is
+        /// null) -- e.g. a future test harness constructing MainForm directly.
+        /// </summary>
+        private void ConfirmUpdateHealthyOnce()
+        {
+            if (_updateHealthConfirmed)
+            {
+                return;
+            }
+
+            _updateHealthConfirmed = true;
+
+            try
+            {
+                _confirmUpdateHealthyAction?.Invoke();
+            }
+            catch
+            {
+                // The confirmed-healthy callback must never crash this form's
+                // message loop -- a failure here just means the backup/marker
+                // cleanup didn't happen this time, not that the app should go down.
+            }
         }
 
         /// <summary>
