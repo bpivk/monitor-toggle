@@ -1899,6 +1899,15 @@ namespace RigToggle.App
         private void TraySettingsMenuItem_Click(object? sender, EventArgs e) => OpenSettingsDialog();
 
         /// <summary>
+        /// UPDATE-06/D-05: dispatches to PerformManualUpdateCheck, the shared body
+        /// SettingsForm's btnCheckForUpdates also invokes -- a one-line dispatch, not
+        /// a duplicated body, mirroring how TraySettingsMenuItem_Click above and
+        /// TrayToggleMenuItem_Click below both dispatch to a shared method rather
+        /// than holding logic of their own.
+        /// </summary>
+        private void TrayCheckUpdatesMenuItem_Click(object? sender, EventArgs e) => PerformManualUpdateCheck();
+
+        /// <summary>
         /// TRAY-03/D-04: explicitly hide the tray icon before Application.Exit() — an
         /// undisposed/still-visible NotifyIcon is a well-known WinForms bug (T-08-GHOST)
         /// that leaves a stale, unclickable ghost icon in the tray until the user
@@ -2042,28 +2051,9 @@ namespace RigToggle.App
                     release =>
                     {
                         releaseForFailureMessage = release;
-                        try
-                        {
-                            using var dialog = new UpdatePromptDialog(release, _themeProvider);
-                            _ = Visible ? dialog.ShowDialog(this) : dialog.ShowDialog();
-                            return dialog.Choice;
-                        }
-                        catch
-                        {
-                            // UPDATE-03: nothing downloads unconfirmed -- a dialog that
-                            // cannot be shown for any reason is treated identically to
-                            // "declined" (Later), never "skipped."
-                            return UpdatePromptChoice.Later;
-                        }
+                        return ShowUpdatePromptDialog(release);
                     },
-                    release =>
-                    {
-                        notifyIcon.ShowBalloonTip(
-                            3000,
-                            "Rig Toggle",
-                            ToggleResultFormatter.TruncateForBalloon("Downloading and installing update…"),
-                            ToolTipIcon.Info);
-                    },
+                    ShowUpdatingBalloon,
                     wasStartedHidden,
                     honourSkippedVersion: true,
                     CancellationToken.None).ConfigureAwait(true);
@@ -2084,6 +2074,142 @@ namespace RigToggle.App
                     ToolTipIcon.Warning);
             }
         }
+
+        /// <summary>
+        /// UPDATE-06/Plan 26-05 Task 1(b): the update-prompt dialog-construction body
+        /// shared by RunAutomaticUpdateCheckAsync's confirm callback and
+        /// PerformManualUpdateCheckAsync's confirm callback, extracted so both paths
+        /// construct the dialog identically and cannot drift -- the same DRY move
+        /// PerformBackgroundToggle already represents for the tray and hotkey toggle
+        /// triggers (see its doc comment). Constructed owned by `this` only when this
+        /// form is currently visible, mirroring OpenSettingsDialog's convention --
+        /// under --tray hidden startup the main window is never shown, and an owned
+        /// modal on an invisible owner is exactly the kind of WinForms timing
+        /// assumption this project's history says not to make. UPDATE-03: nothing
+        /// downloads unconfirmed -- a dialog that cannot be shown for any reason is
+        /// treated identically to "declined" (Later), never "skipped."
+        /// </summary>
+        private UpdatePromptChoice ShowUpdatePromptDialog(ReleaseInfo release)
+        {
+            try
+            {
+                using var dialog = new UpdatePromptDialog(release, _themeProvider);
+                _ = Visible ? dialog.ShowDialog(this) : dialog.ShowDialog();
+                return dialog.Choice;
+            }
+            catch
+            {
+                return UpdatePromptChoice.Later;
+            }
+        }
+
+        /// <summary>
+        /// D-03: the indeterminate "Downloading and installing update…" toast shown
+        /// once download/apply begins -- shared by both the automatic and manual
+        /// check paths' onApplyStarting callback (Plan 26-05 Task 1(b)) so the
+        /// wording/icon cannot drift between them.
+        /// </summary>
+        private void ShowUpdatingBalloon(ReleaseInfo release)
+        {
+            notifyIcon.ShowBalloonTip(
+                3000,
+                "Rig Toggle",
+                ToggleResultFormatter.TruncateForBalloon("Downloading and installing update…"),
+                ToolTipIcon.Info);
+        }
+
+        /// <summary>
+        /// UPDATE-06/D-05/D-06/D-07: the shared manual "Check for Updates" body
+        /// reached from both TrayCheckUpdatesMenuItem_Click and SettingsForm's
+        /// btnCheckForUpdates (threaded through Program.cs's SettingsFormFactory) --
+        /// one implementation, two entry points. Independent of
+        /// RunAutomaticUpdateCheckAsync: it can be run at any time, any number of
+        /// times, without a relaunch, and it always honours honourSkippedVersion:
+        /// false (an explicit request overrides a prior skip, D-02 read together with
+        /// D-06) via UpdateOrchestrator.CheckOnDemandAsync.
+        ///
+        /// Unlike the automatic path, a manual check always reports its result:
+        /// NotAvailable shows an Info-icon "already on the latest version" toast
+        /// naming the running version (D-06); CheckFailed, or any exception escaping
+        /// the call, shows a Warning-icon toast naming the reason (D-07) --
+        /// deliberately visibly different from the up-to-date toast, both in icon and
+        /// wording, so a failed manual check is never indistinguishable from a
+        /// successful one. Applying exits the app exactly like the automatic path.
+        /// Declined and Skipped show no toast -- the user just made that choice in a
+        /// dialog they were looking at, so re-announcing it is noise. Every toast
+        /// here uses notifyIcon.ShowBalloonTip with the literal title "Rig Toggle" and
+        /// an icon of Info or Warning only -- never Error, matching this file's
+        /// existing no-chrome guarantee for background-triggered feedback.
+        ///
+        /// Note: the check runs against the settings already persisted (skip state,
+        /// etc.), not against unsaved edits in an open Settings dialog -- the update
+        /// path reads settings.json through the same store, so a pending unsaved
+        /// change has no bearing on it.
+        /// </summary>
+        public async Task PerformManualUpdateCheckAsync()
+        {
+            if (_updateOrchestrator is null)
+            {
+                return;
+            }
+
+            try
+            {
+                bool wasStartedHidden = StartupArgs.ShouldStartHidden(Environment.GetCommandLineArgs());
+
+                UpdateCheckResult result = await _updateOrchestrator.CheckOnDemandAsync(
+                    ShowUpdatePromptDialog,
+                    ShowUpdatingBalloon,
+                    wasStartedHidden,
+                    CancellationToken.None).ConfigureAwait(true);
+
+                switch (result.Outcome)
+                {
+                    case UpdateCheckOutcome.NotAvailable:
+                        notifyIcon.ShowBalloonTip(
+                            3000,
+                            "Rig Toggle",
+                            ToggleResultFormatter.TruncateForBalloon($"You're already on the latest version (v{result.RunningVersionText})."),
+                            ToolTipIcon.Info);
+                        break;
+
+                    case UpdateCheckOutcome.CheckFailed:
+                        notifyIcon.ShowBalloonTip(
+                            3000,
+                            "Rig Toggle",
+                            ToggleResultFormatter.TruncateForBalloon($"Couldn't check for updates — {result.FailureReason}. Try again from the tray menu or Settings."),
+                            ToolTipIcon.Warning);
+                        break;
+
+                    case UpdateCheckOutcome.Applying:
+                        Application.Exit();
+                        break;
+
+                    case UpdateCheckOutcome.Declined:
+                    case UpdateCheckOutcome.Skipped:
+                        // No toast -- the user just made that choice in a dialog they
+                        // were looking at, so re-announcing it is noise.
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                notifyIcon.ShowBalloonTip(
+                    3000,
+                    "Rig Toggle",
+                    ToggleResultFormatter.TruncateForBalloon($"Couldn't check for updates — {ex.Message}. Try again from the tray menu or Settings."),
+                    ToolTipIcon.Warning);
+            }
+        }
+
+        /// <summary>
+        /// Synchronous fire-and-forget wrapper around PerformManualUpdateCheckAsync,
+        /// suitable for a WinForms event handler (TrayCheckUpdatesMenuItem_Click,
+        /// SettingsForm's btnCheckForUpdates), discarding the returned task.
+        /// PerformManualUpdateCheckAsync's own try/catch (plus ShowUpdatePromptDialog's
+        /// nested try/catch) means no exception can escape this fire-and-forget call.
+        /// </summary>
+        public void PerformManualUpdateCheck() => _ = PerformManualUpdateCheckAsync();
 
         /// <summary>
         /// UPDATE-05/D-09: starts a one-shot 10-second timer whose Tick is the

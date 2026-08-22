@@ -319,6 +319,95 @@ public class UpdateOrchestratorTests
         Assert.Empty(callLog);
     }
 
+    /// <summary>
+    /// UPDATE-06/D-02 read together: an explicit on-demand request overrides a prior
+    /// skip of that exact release -- CheckOnDemandAsync always passes
+    /// honourSkippedVersion: false, so confirm IS invoked even though the release's
+    /// tag exactly matches the persisted skip.
+    /// </summary>
+    [Fact]
+    public async Task CheckOnDemandAsync_ReleaseMatchesPersistedSkip_ConfirmIsInvokedAnyway()
+    {
+        var callLog = new List<string>();
+        var feed = new FakeReleaseFeed(release: NewerRelease);
+        var applier = new RecordingUpdateApplier(callLog);
+        var settingsStore = new InMemorySettingsStore(new AppSettings { SkippedUpdateVersion = NewerRelease.TagName });
+        var orchestrator = new UpdateOrchestrator(feed, applier, settingsStore, RunningVersion);
+        bool confirmCalled = false;
+
+        UpdateCheckResult result = await orchestrator.CheckOnDemandAsync(
+            confirm: _ => { confirmCalled = true; return UpdatePromptChoice.Later; },
+            onApplyStarting: _ => { },
+            wasStartedHidden: false,
+            cancellationToken: CancellationToken.None);
+
+        Assert.True(confirmCalled);
+        Assert.Equal(UpdateCheckOutcome.Declined, result.Outcome);
+    }
+
+    /// <summary>
+    /// D-06: an older-or-equal tag reads as NotAvailable, distinct from CheckFailed,
+    /// so the App layer can tell "you're already up to date" apart from "the check
+    /// itself failed."
+    /// </summary>
+    [Fact]
+    public async Task CheckOnDemandAsync_FeedReturnsOlderOrEqualTag_ReturnsNotAvailable_DistinctFromCheckFailed()
+    {
+        var callLog = new List<string>();
+        var feed = new FakeReleaseFeed(release: OlderRelease);
+        var applier = new RecordingUpdateApplier(callLog);
+        var orchestrator = new UpdateOrchestrator(feed, applier, new InMemorySettingsStore(), RunningVersion);
+        bool confirmCalled = false;
+
+        UpdateCheckResult result = await orchestrator.CheckOnDemandAsync(
+            confirm: _ => { confirmCalled = true; return UpdatePromptChoice.UpdateNow; },
+            onApplyStarting: _ => { },
+            wasStartedHidden: false,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Equal(UpdateCheckOutcome.NotAvailable, result.Outcome);
+        Assert.NotEqual(UpdateCheckOutcome.CheckFailed, result.Outcome);
+        Assert.False(confirmCalled);
+        Assert.Empty(callLog);
+    }
+
+    /// <summary>
+    /// D-07 (this pair is the automated guard for the paired distinctness
+    /// requirement): the SAME throwing feed yields UpdateCheckOutcome.NotAvailable on
+    /// the automatic launch path (silent, unchanged from plan 26-04) but
+    /// UpdateCheckOutcome.CheckFailed carrying the exception's message on the
+    /// on-demand path -- the manual path must be able to tell "no update" apart from
+    /// "couldn't check."
+    /// </summary>
+    [Fact]
+    public async Task CheckOnLaunchAndCheckOnDemand_SameThrowingFeed_YieldDistinctOutcomes()
+    {
+        var launchFeed = new FakeReleaseFeed(exceptionToThrow: new InvalidOperationException("simulated feed failure"));
+        var launchApplier = new RecordingUpdateApplier(new List<string>());
+        var launchOrchestrator = new UpdateOrchestrator(launchFeed, launchApplier, new InMemorySettingsStore(), RunningVersion);
+
+        UpdateCheckOutcome launchOutcome = await launchOrchestrator.CheckOnLaunchAsync(
+            confirm: _ => UpdatePromptChoice.UpdateNow,
+            onApplyStarting: _ => { },
+            wasStartedHidden: false,
+            honourSkippedVersion: true,
+            cancellationToken: CancellationToken.None);
+
+        var demandFeed = new FakeReleaseFeed(exceptionToThrow: new InvalidOperationException("simulated feed failure"));
+        var demandApplier = new RecordingUpdateApplier(new List<string>());
+        var demandOrchestrator = new UpdateOrchestrator(demandFeed, demandApplier, new InMemorySettingsStore(), RunningVersion);
+
+        UpdateCheckResult demandResult = await demandOrchestrator.CheckOnDemandAsync(
+            confirm: _ => UpdatePromptChoice.UpdateNow,
+            onApplyStarting: _ => { },
+            wasStartedHidden: false,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Equal(UpdateCheckOutcome.NotAvailable, launchOutcome);
+        Assert.Equal(UpdateCheckOutcome.CheckFailed, demandResult.Outcome);
+        Assert.Equal("simulated feed failure", demandResult.FailureReason);
+    }
+
     /// <summary>Fake IReleaseFeed configurable to return a supplied release, null, or throw.</summary>
     private sealed class FakeReleaseFeed : IReleaseFeed
     {
