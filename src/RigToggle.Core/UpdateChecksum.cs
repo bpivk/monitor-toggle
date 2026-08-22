@@ -46,7 +46,18 @@ public static class UpdateChecksum
             return false;
         }
 
-        ReadOnlySpan<char> trimmed = publishedText.AsSpan().TrimStart();
+        // WR-03 (code review, 26-REVIEW.md): this doc comment (and the class doc
+        // comment) claim support for a bare 64-hex-character digest, but TrimStart()
+        // alone never trimmed a trailing newline -- the typical shape of a hash
+        // written by `echo`, most text editors, or any tool other than this
+        // project's own `-NoNewline` PowerShell step in release.yml. A trailing `\n`
+        // made digestToken.Length equal to 65, tripping the `!= 64` check below and
+        // rejecting an otherwise-correct digest as unverifiable. Trim() (both ends)
+        // fixes this without changing behaviour for the "digest  filename" line
+        // case: the delimiting space/tab search below still runs on the
+        // now-fully-trimmed text, so an interior single space/tab between digest
+        // and filename is unaffected either way.
+        ReadOnlySpan<char> trimmed = publishedText.AsSpan().Trim();
         int whitespaceIndex = trimmed.IndexOfAny(' ', '\t');
         ReadOnlySpan<char> digestToken = whitespaceIndex >= 0 ? trimmed[..whitespaceIndex] : trimmed;
 
