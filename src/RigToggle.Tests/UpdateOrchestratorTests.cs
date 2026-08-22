@@ -3,16 +3,19 @@ using System.Threading.Tasks;
 using RigToggle.Core;
 using RigToggle.Core.Abstractions;
 using RigToggle.Core.Models;
+using RigToggle.Tests.Doubles;
 using Xunit;
 
 namespace RigToggle.Tests;
 
 /// <summary>
-/// Proves UpdateOrchestrator.CheckOnLaunchAsync's six decision branches using two
+/// Proves UpdateOrchestrator.CheckOnLaunchAsync's decision branches using three
 /// hand-rolled doubles (no mocking library, matching this project's existing
 /// FakeMonitorController/FakeAppController convention in Doubles/FakeControllers.cs):
-/// a configurable fake IReleaseFeed and a recording fake IUpdateApplier. Async
-/// Task test methods throughout, no blocking task operations (xUnit1031).
+/// a configurable fake IReleaseFeed, a recording fake IUpdateApplier, and the
+/// existing Doubles/InMemoryStores.cs ISettingsStore doubles
+/// (InMemorySettingsStore/ThrowingSettingsStore). Async Task test methods
+/// throughout, no blocking task operations (xUnit1031).
 /// </summary>
 public class UpdateOrchestratorTests
 {
@@ -36,13 +39,14 @@ public class UpdateOrchestratorTests
         var callLog = new List<string>();
         var feed = new FakeReleaseFeed(release: null);
         var applier = new RecordingUpdateApplier(callLog);
-        var orchestrator = new UpdateOrchestrator(feed, applier, RunningVersion);
+        var orchestrator = new UpdateOrchestrator(feed, applier, new InMemorySettingsStore(), RunningVersion);
         bool confirmCalled = false;
 
         UpdateCheckOutcome outcome = await orchestrator.CheckOnLaunchAsync(
-            confirm: _ => { confirmCalled = true; return true; },
+            confirm: _ => { confirmCalled = true; return UpdatePromptChoice.UpdateNow; },
             onApplyStarting: _ => { },
             wasStartedHidden: false,
+            honourSkippedVersion: true,
             cancellationToken: CancellationToken.None);
 
         Assert.Equal(UpdateCheckOutcome.NotAvailable, outcome);
@@ -60,13 +64,14 @@ public class UpdateOrchestratorTests
         var callLog = new List<string>();
         var feed = new FakeReleaseFeed(release: OlderRelease);
         var applier = new RecordingUpdateApplier(callLog);
-        var orchestrator = new UpdateOrchestrator(feed, applier, RunningVersion);
+        var orchestrator = new UpdateOrchestrator(feed, applier, new InMemorySettingsStore(), RunningVersion);
         bool confirmCalled = false;
 
         UpdateCheckOutcome outcome = await orchestrator.CheckOnLaunchAsync(
-            confirm: _ => { confirmCalled = true; return true; },
+            confirm: _ => { confirmCalled = true; return UpdatePromptChoice.UpdateNow; },
             onApplyStarting: _ => { },
             wasStartedHidden: false,
+            honourSkippedVersion: true,
             cancellationToken: CancellationToken.None);
 
         Assert.Equal(UpdateCheckOutcome.NotAvailable, outcome);
@@ -85,31 +90,33 @@ public class UpdateOrchestratorTests
         var callLog = new List<string>();
         var feed = new FakeReleaseFeed(exceptionToThrow: new InvalidOperationException("simulated feed failure"));
         var applier = new RecordingUpdateApplier(callLog);
-        var orchestrator = new UpdateOrchestrator(feed, applier, RunningVersion);
+        var orchestrator = new UpdateOrchestrator(feed, applier, new InMemorySettingsStore(), RunningVersion);
 
         UpdateCheckOutcome outcome = await orchestrator.CheckOnLaunchAsync(
-            confirm: _ => true,
+            confirm: _ => UpdatePromptChoice.UpdateNow,
             onApplyStarting: _ => { },
             wasStartedHidden: false,
+            honourSkippedVersion: true,
             cancellationToken: CancellationToken.None);
 
         Assert.Equal(UpdateCheckOutcome.NotAvailable, outcome);
         Assert.Empty(callLog);
     }
 
-    /// <summary>UPDATE-03: declining the confirm dialog must never touch the applier.</summary>
+    /// <summary>UPDATE-03: declining the confirm dialog ("Later") must never touch the applier.</summary>
     [Fact]
     public async Task CheckOnLaunchAsync_NewerTagConfirmDeclines_ReturnsDeclined_ApplierNeverInvoked()
     {
         var callLog = new List<string>();
         var feed = new FakeReleaseFeed(release: NewerRelease);
         var applier = new RecordingUpdateApplier(callLog);
-        var orchestrator = new UpdateOrchestrator(feed, applier, RunningVersion);
+        var orchestrator = new UpdateOrchestrator(feed, applier, new InMemorySettingsStore(), RunningVersion);
 
         UpdateCheckOutcome outcome = await orchestrator.CheckOnLaunchAsync(
-            confirm: _ => false,
+            confirm: _ => UpdatePromptChoice.Later,
             onApplyStarting: _ => { },
             wasStartedHidden: false,
+            honourSkippedVersion: true,
             cancellationToken: CancellationToken.None);
 
         Assert.Equal(UpdateCheckOutcome.Declined, outcome);
@@ -117,10 +124,10 @@ public class UpdateOrchestratorTests
     }
 
     /// <summary>
-    /// UPDATE-03/UPDATE-04: confirming triggers onApplyStarting exactly once, then
-    /// DownloadAndStageAsync, then ApplyAndRelaunch, in that exact order, with the
-    /// staged path returned by DownloadAndStageAsync threaded through unchanged into
-    /// ApplyAndRelaunch's argument.
+    /// UPDATE-03/UPDATE-04: confirming ("Update Now") triggers onApplyStarting exactly
+    /// once, then DownloadAndStageAsync, then ApplyAndRelaunch, in that exact order,
+    /// with the staged path returned by DownloadAndStageAsync threaded through
+    /// unchanged into ApplyAndRelaunch's argument.
     /// </summary>
     [Fact]
     public async Task CheckOnLaunchAsync_NewerTagConfirmed_InvokesApplyStartingThenDownloadThenApply_InThatOrder_ReturnsApplying()
@@ -129,17 +136,18 @@ public class UpdateOrchestratorTests
         const string stagedPath = "C:\\Program Files\\RigToggle\\RigToggle.App.update.exe";
         var feed = new FakeReleaseFeed(release: NewerRelease);
         var applier = new RecordingUpdateApplier(callLog, stagedPathToReturn: stagedPath);
-        var orchestrator = new UpdateOrchestrator(feed, applier, RunningVersion);
+        var orchestrator = new UpdateOrchestrator(feed, applier, new InMemorySettingsStore(), RunningVersion);
         int onApplyStartingCallCount = 0;
 
         UpdateCheckOutcome outcome = await orchestrator.CheckOnLaunchAsync(
-            confirm: _ => true,
+            confirm: _ => UpdatePromptChoice.UpdateNow,
             onApplyStarting: _ =>
             {
                 onApplyStartingCallCount++;
                 callLog.Add("onApplyStarting");
             },
             wasStartedHidden: false,
+            honourSkippedVersion: true,
             cancellationToken: CancellationToken.None);
 
         Assert.Equal(UpdateCheckOutcome.Applying, outcome);
@@ -162,15 +170,153 @@ public class UpdateOrchestratorTests
         var callLog = new List<string>();
         var feed = new FakeReleaseFeed(release: NewerRelease);
         var applier = new RecordingUpdateApplier(callLog, applyExceptionToThrow: new InvalidOperationException("simulated apply failure"));
-        var orchestrator = new UpdateOrchestrator(feed, applier, RunningVersion);
+        var orchestrator = new UpdateOrchestrator(feed, applier, new InMemorySettingsStore(), RunningVersion);
 
         InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(() => orchestrator.CheckOnLaunchAsync(
-            confirm: _ => true,
+            confirm: _ => UpdatePromptChoice.UpdateNow,
             onApplyStarting: _ => { },
             wasStartedHidden: false,
+            honourSkippedVersion: true,
             cancellationToken: CancellationToken.None));
 
         Assert.Equal("simulated apply failure", ex.Message);
+    }
+
+    /// <summary>
+    /// Prohibition (T-26-14): the automatic path honours a persisted skip whose tag
+    /// exactly equals the latest release -- suppressed before confirm is ever invoked.
+    /// </summary>
+    [Fact]
+    public async Task CheckOnLaunchAsync_HonourSkippedVersion_LatestTagEqualsSkippedVersion_ReturnsSkipped_ConfirmNeverInvoked()
+    {
+        var callLog = new List<string>();
+        var feed = new FakeReleaseFeed(release: NewerRelease);
+        var applier = new RecordingUpdateApplier(callLog);
+        var settingsStore = new InMemorySettingsStore(new AppSettings { SkippedUpdateVersion = NewerRelease.TagName });
+        var orchestrator = new UpdateOrchestrator(feed, applier, settingsStore, RunningVersion);
+        bool confirmCalled = false;
+
+        UpdateCheckOutcome outcome = await orchestrator.CheckOnLaunchAsync(
+            confirm: _ => { confirmCalled = true; return UpdatePromptChoice.UpdateNow; },
+            onApplyStarting: _ => { },
+            wasStartedHidden: false,
+            honourSkippedVersion: true,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Equal(UpdateCheckOutcome.Skipped, outcome);
+        Assert.False(confirmCalled);
+        Assert.Empty(callLog);
+    }
+
+    /// <summary>
+    /// Prohibition (T-26-14): a release strictly newer than the previously-skipped
+    /// tag must still prompt -- a skip suppresses exactly one version, never every
+    /// future one. Proves the branch compares numerically (UpdateVersionComparer)
+    /// rather than string-matching the skipped tag.
+    /// </summary>
+    [Fact]
+    public async Task CheckOnLaunchAsync_HonourSkippedVersion_LatestTagStrictlyNewerThanSkippedVersion_StillInvokesConfirm()
+    {
+        var callLog = new List<string>();
+        var evenNewerRelease = NewerRelease with { TagName = "v2.3" };
+        var feed = new FakeReleaseFeed(release: evenNewerRelease);
+        var applier = new RecordingUpdateApplier(callLog);
+        var settingsStore = new InMemorySettingsStore(new AppSettings { SkippedUpdateVersion = NewerRelease.TagName });
+        var orchestrator = new UpdateOrchestrator(feed, applier, settingsStore, RunningVersion);
+        bool confirmCalled = false;
+
+        UpdateCheckOutcome outcome = await orchestrator.CheckOnLaunchAsync(
+            confirm: _ => { confirmCalled = true; return UpdatePromptChoice.Later; },
+            onApplyStarting: _ => { },
+            wasStartedHidden: false,
+            honourSkippedVersion: true,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Equal(UpdateCheckOutcome.Declined, outcome);
+        Assert.True(confirmCalled);
+    }
+
+    /// <summary>UPDATE-06/D-02: "Skip" persists the release tag and never touches the applier.</summary>
+    [Fact]
+    public async Task CheckOnLaunchAsync_PromptReturnsSkip_PersistsSkippedVersion_ApplierNeverInvoked_ReturnsSkipped()
+    {
+        var callLog = new List<string>();
+        var feed = new FakeReleaseFeed(release: NewerRelease);
+        var applier = new RecordingUpdateApplier(callLog);
+        var settingsStore = new InMemorySettingsStore();
+        var orchestrator = new UpdateOrchestrator(feed, applier, settingsStore, RunningVersion);
+
+        UpdateCheckOutcome outcome = await orchestrator.CheckOnLaunchAsync(
+            confirm: _ => UpdatePromptChoice.Skip,
+            onApplyStarting: _ => { },
+            wasStartedHidden: false,
+            honourSkippedVersion: true,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Equal(UpdateCheckOutcome.Skipped, outcome);
+        Assert.Equal(NewerRelease.TagName, settingsStore.Current.SkippedUpdateVersion);
+        Assert.Empty(callLog);
+    }
+
+    /// <summary>
+    /// UPDATE-06/D-02: "Later" persists nothing, never touches the applier, and a
+    /// second check under identical conditions prompts again (not silently equivalent
+    /// to Skip).
+    /// </summary>
+    [Fact]
+    public async Task CheckOnLaunchAsync_PromptReturnsLater_PersistsNothing_ApplierNeverInvoked_ReturnsDeclined_SecondCheckPromptsAgain()
+    {
+        var callLog = new List<string>();
+        var feed = new FakeReleaseFeed(release: NewerRelease);
+        var applier = new RecordingUpdateApplier(callLog);
+        var settingsStore = new InMemorySettingsStore();
+        var orchestrator = new UpdateOrchestrator(feed, applier, settingsStore, RunningVersion);
+        int confirmCallCount = 0;
+
+        UpdateCheckOutcome firstOutcome = await orchestrator.CheckOnLaunchAsync(
+            confirm: _ => { confirmCallCount++; return UpdatePromptChoice.Later; },
+            onApplyStarting: _ => { },
+            wasStartedHidden: false,
+            honourSkippedVersion: true,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Equal(UpdateCheckOutcome.Declined, firstOutcome);
+        Assert.Null(settingsStore.Current.SkippedUpdateVersion);
+        Assert.Empty(callLog);
+
+        UpdateCheckOutcome secondOutcome = await orchestrator.CheckOnLaunchAsync(
+            confirm: _ => { confirmCallCount++; return UpdatePromptChoice.Later; },
+            onApplyStarting: _ => { },
+            wasStartedHidden: false,
+            honourSkippedVersion: true,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Equal(UpdateCheckOutcome.Declined, secondOutcome);
+        Assert.Equal(2, confirmCallCount);
+    }
+
+    /// <summary>
+    /// A settings-store failure while persisting a skip must not propagate -- the
+    /// skip is best-effort and must not turn a declined update into a crash.
+    /// </summary>
+    [Fact]
+    public async Task CheckOnLaunchAsync_SettingsSaveThrowsWhilePersistingSkip_DoesNotPropagate_ReturnsSkipped()
+    {
+        var callLog = new List<string>();
+        var feed = new FakeReleaseFeed(release: NewerRelease);
+        var applier = new RecordingUpdateApplier(callLog);
+        var settingsStore = new ThrowingSettingsStore();
+        var orchestrator = new UpdateOrchestrator(feed, applier, settingsStore, RunningVersion);
+
+        UpdateCheckOutcome outcome = await orchestrator.CheckOnLaunchAsync(
+            confirm: _ => UpdatePromptChoice.Skip,
+            onApplyStarting: _ => { },
+            wasStartedHidden: false,
+            honourSkippedVersion: true,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Equal(UpdateCheckOutcome.Skipped, outcome);
+        Assert.Empty(callLog);
     }
 
     /// <summary>Fake IReleaseFeed configurable to return a supplied release, null, or throw.</summary>

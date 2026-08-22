@@ -18,6 +18,12 @@ namespace RigToggle.Core.Models;
 /// ThemeOverride null = follow the live Windows theme (System, THEME-01..06 unchanged);
 /// AppTheme.Light/AppTheme.Dark locks the app's effective theme regardless of the live
 /// OS signal (THEME-09, D-04) -- resolved by RigToggle.Core.OverridableThemeProvider.
+/// SkippedUpdateVersion null = no version has been skipped; a non-null value is the
+/// exact release tag (e.g. "v2.3") the user chose to skip via UpdatePromptDialog's
+/// "Skip this version" button (D-02, UPDATE-06). Any release whose version compares
+/// strictly newer than that tag (via UpdateVersionComparer, never a string match)
+/// still prompts on the next automatic launch -- a skip suppresses exactly one
+/// version, never every future one.
 /// </summary>
 public sealed class AppSettings
 {
@@ -39,4 +45,5 @@ public sealed class AppSettings
     public int? HotkeyModifiers { get; set; }
     public int? HotkeyKey { get; set; }
     public AppTheme? ThemeOverride { get; set; }
+    public string? SkippedUpdateVersion { get; set; }
 }
