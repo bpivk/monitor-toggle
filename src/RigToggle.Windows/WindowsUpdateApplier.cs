@@ -83,35 +83,60 @@ public sealed class WindowsUpdateApplier : IUpdateApplier
         string stagedPath = Path.Combine(exeDirectory, StagedFileName);
         Log($"DownloadAndStageAsync: downloading '{release.AssetDownloadUrl}' to '{stagedPath}'.");
 
-        using Stream source = await _httpClient.GetStreamAsync(release.AssetDownloadUrl, cancellationToken).ConfigureAwait(false);
-        await using (FileStream destination = new(stagedPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        // WR-02 (code review, 26-REVIEW.md): the staged file used to be explicitly
+        // deleted only on the two checksum-specific failure branches below (missing
+        // checksum URL, checksum mismatch) -- an exception thrown by the initial
+        // download (CopyToAsync: network drop, cancellation) or the checksum fetch
+        // (GetStringAsync: network error) propagated unwrapped (by design, per this
+        // class's own doc comment) while leaving the partially-downloaded or
+        // fully-downloaded-but-unverified exe on disk at stagedPath. Wrapping the
+        // whole download+verify body in this try/catch makes cleanup unconditional
+        // on ANY failure, not just the two checksum branches, while still
+        // preserving the original exception (bare `throw;`) for every caller
+        // downstream (D-08's Warning toast).
+        try
         {
-            await source.CopyToAsync(destination, cancellationToken).ConfigureAwait(false);
+            using Stream source = await _httpClient.GetStreamAsync(release.AssetDownloadUrl, cancellationToken).ConfigureAwait(false);
+            await using (FileStream destination = new(stagedPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                await source.CopyToAsync(destination, cancellationToken).ConfigureAwait(false);
+            }
+
+            Log($"DownloadAndStageAsync: staged '{stagedPath}', verifying checksum before returning.");
+
+            if (string.IsNullOrWhiteSpace(release.ChecksumDownloadUrl))
+            {
+                throw new InvalidOperationException(
+                    $"Release '{release.TagName}' published no checksum -- the update cannot be verified and will not be applied.");
+            }
+
+            string publishedChecksum = await _httpClient.GetStringAsync(release.ChecksumDownloadUrl, cancellationToken).ConfigureAwait(false);
+            string computedChecksum = UpdateChecksum.ComputeSha256(stagedPath);
+
+            if (!UpdateChecksum.Matches(computedChecksum, publishedChecksum))
+            {
+                string expected = publishedChecksum.Length >= 16 ? publishedChecksum[..16] : publishedChecksum;
+                string actual = computedChecksum.Length >= 16 ? computedChecksum[..16] : computedChecksum;
+                throw new InvalidOperationException(
+                    $"Checksum mismatch for release '{release.TagName}': expected {expected}..., got {actual}...");
+            }
+
+            Log($"DownloadAndStageAsync: checksum verified for '{stagedPath}'.");
+            return stagedPath;
         }
-
-        Log($"DownloadAndStageAsync: staged '{stagedPath}', verifying checksum before returning.");
-
-        if (string.IsNullOrWhiteSpace(release.ChecksumDownloadUrl))
+        catch
         {
-            File.Delete(stagedPath);
-            throw new InvalidOperationException(
-                $"Release '{release.TagName}' published no checksum -- the update cannot be verified and will not be applied.");
+            try
+            {
+                File.Delete(stagedPath);
+            }
+            catch (Exception deleteEx)
+            {
+                Log($"DownloadAndStageAsync: failed to delete '{stagedPath}' during failure cleanup: {deleteEx.GetType().Name}: {deleteEx.Message}.");
+            }
+
+            throw;
         }
-
-        string publishedChecksum = await _httpClient.GetStringAsync(release.ChecksumDownloadUrl, cancellationToken).ConfigureAwait(false);
-        string computedChecksum = UpdateChecksum.ComputeSha256(stagedPath);
-
-        if (!UpdateChecksum.Matches(computedChecksum, publishedChecksum))
-        {
-            File.Delete(stagedPath);
-            string expected = publishedChecksum.Length >= 16 ? publishedChecksum[..16] : publishedChecksum;
-            string actual = computedChecksum.Length >= 16 ? computedChecksum[..16] : computedChecksum;
-            throw new InvalidOperationException(
-                $"Checksum mismatch for release '{release.TagName}': expected {expected}..., got {actual}...");
-        }
-
-        Log($"DownloadAndStageAsync: checksum verified for '{stagedPath}'.");
-        return stagedPath;
     }
 
     /// <inheritdoc/>
