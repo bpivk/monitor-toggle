@@ -166,3 +166,7 @@ The verify-before-swap insertion point (`WindowsUpdateApplier.DownloadAndStageAs
 ---
 *Phase: 26-auto-update*
 *Completed: 2026-08-22*
+
+## Self-Check: PASSED
+
+All files created/modified verified present on disk; commits `89caf96` (Task 1) and `df6a4c6` (Task 2) both found in `git log --oneline`.
