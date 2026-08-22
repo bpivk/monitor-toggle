@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Auto-Update, Single-Instance Guard & Smaller Footprint
 current_phase: 26
-current_phase_name: Auto-Update
+current_phase_name: auto-update
 status: executing
 stopped_at: Phase 26 UI-SPEC approved
-last_updated: "2026-08-22T13:53:15.763Z"
-last_activity: 2026-08-21
-last_activity_desc: Phase 25 Plan 04 Task 3 checkpoint closed by operator authorization on partial evidence
+last_updated: "2026-08-22T13:54:58.322Z"
+last_activity: 2026-08-22
+last_activity_desc: Phase 26 execution started
 progress:
   total_phases: 3
   completed_phases: 2
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-18)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably applies Normal mode's own explicitly configured monitor/audio state on toggle-back (revised at v2.0 — see DISPLAY-10/AUDIO-04).
-**Current focus:** Phase 25 — single-instance-guard
+**Current focus:** Phase 26 — auto-update
 
 ## Current Position
 
-Phase: 26 — Auto-Update
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-08-21 — Phase 25 complete, transitioned to Phase 26
+Phase: 26 (auto-update) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 26
+Last activity: 2026-08-22 — Phase 26 execution started
 
 Progress: [██████████] 100%
 
