@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-28T09:28:47.339Z",
+  "phase": "26",
+  "phase_name": "auto-update",
+  "phase_dir": ".planning/phases/26-auto-update",
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": "phase-26-execution", "name": "Phase 26 all 5 plans executed, code-reviewed, fixed, verified (human_needed), pushed to origin/master", "status": "done"},
+    {"id": "debug-monitor-position", "name": "Symptom 1 (monitor position reset on disable/re-enable) root-caused and fixed", "status": "done", "commit": "confirmed by operator on rig"}
+  ],
+  "remaining_tasks": [
+    {"id": "phase-26-uat", "name": "Rig-test Phase 26's 5 human-verify items in 26-UAT.md, then run /gsd-verify-work 26", "status": "not_started"},
+    {"id": "debug-monitor-swap", "name": "Continue monitor-position-resets-to-de debug session (Symptom 2: Rig/Normal toggle unreliable) — round 5", "status": "in_progress"}
+  ],
+  "blockers": [
+    {"description": "Symptom 2 root cause narrowed to CCD SetDisplayConfig path-array semantics: neither 'include all survivors' (round 1) nor 'exclude disable-set entirely' (round 3) produces a valid/reliable ApplyPathInfos call. Round 4 hypothesis: needs one explicit call with target=active, disable-set=explicitly-inactive (not omitted), other survivors=active with cached mode — requires WindowsDisplayAPI PathInfo struct-level research on representing an explicitly-inactive path.", "type": "technical", "workaround": "none yet — resume via /gsd-debug continue monitor-position-resets-to-de"}
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {"action": "Rig-test 26-UAT.md's 5 items (real exe swap+relaunch, interrupted-update recovery, auto-rollback timing, on-launch check under both startup modes, real release-notes rendering)", "context": "Phase 26 verification status is human_needed; code-level checks all pass but runtime evidence on real Windows is still required", "blocking": true},
+    {"action": "Continue rig-testing the monitor-swap fix through more debug rounds", "context": "4 rounds so far, each round's fix partially worked then revealed a new CCD API edge case", "blocking": true}
+  ],
+  "decisions": [
+    {"decision": "Pushed 130 unpushed commits (Phases 24-26) to origin/master", "rationale": "CI had never run against this milestone's code; needed real Windows CI execution as evidence", "phase": "26"},
+    {"decision": "Marked REQUIREMENTS.md UPDATE-05/UPDATE-06 as complete", "rationale": "Implemented + unit-tested; rig verification tracked separately in 26-UAT.md", "phase": "26"},
+    {"decision": "Debug session fix code stays uncommitted until operator confirms it works on the rig", "rationale": "Established project convention for CCD/monitor-control fixes (see .planning/debug/resolved/monitor-enable-reactivates-others-again.md)", "phase": null}
+  ],
+  "uncommitted_files": [
+    "src/RigToggle.App/MainForm.cs",
+    "src/RigToggle.Core/Abstractions/IMonitorController.cs",
+    "src/RigToggle.Core/ToggleService.cs",
+    "src/RigToggle.Tests/Doubles/BlockingMonitorController.cs",
+    "src/RigToggle.Tests/Doubles/FakeControllers.cs",
+    "src/RigToggle.Tests/ToggleServiceTests.cs",
+    "src/RigToggle.Windows/WindowsMonitorController.cs"
+  ],
+  "next_action": "Run /gsd-debug continue monitor-position-resets-to-de to resume the monitor-swap investigation (round 5), reading the file's 'Current Focus (round 4)' section first. In parallel, whenever convenient, rig-test 26-UAT.md's items.",
+  "context_notes": "This session ran the full discuss->plan->execute chain for Phase 26 (auto-update), then pivoted to a user-reported bug (monitor position reset + Rig/Normal toggle failure) via /gsd-debug. Symptom 1 fixed and confirmed. Symptom 2 has been genuinely hard — each fix round revealed a new CCD SetDisplayConfig path-array edge case rather than a simple logic bug. The debug session file has the complete evidence trail; do not restart evidence gathering from scratch."
+}
