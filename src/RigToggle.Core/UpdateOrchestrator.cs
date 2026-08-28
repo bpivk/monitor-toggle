@@ -146,10 +146,12 @@ public sealed class UpdateOrchestrator
             throw new ArgumentNullException(nameof(onApplyStarting));
         }
 
-        // Major.Minor only, matching this project's own v{Major}.{Minor} tag scheme
-        // (UpdateVersionComparer's class doc comment) -- never the full four-component
-        // System.Version.ToString(), which would read "2.2.0.0" in a balloon.
-        string runningVersionText = $"{_runningVersion.Major}.{_runningVersion.Minor}";
+        // Three-component Major.Minor.Patch, matching this project's own vX.Y.Z tag
+        // scheme (UpdateVersionComparer's class doc comment) -- never the full
+        // four-component System.Version.ToString(), which would read "2.2.1.0" in a
+        // balloon. Build is normalized via Math.Max(..., 0) since a two-component
+        // running Version reports Build == -1 (see UpdateVersionComparer).
+        string runningVersionText = $"{_runningVersion.Major}.{_runningVersion.Minor}.{Math.Max(_runningVersion.Build, 0)}";
 
         ReleaseInfo release;
         try
@@ -178,12 +180,16 @@ public sealed class UpdateOrchestrator
         {
             // Prohibition (T-26-14): "Skip this version" must never become "never
             // check for updates again." Comparing the persisted skipped tag against
-            // this release's tag via UpdateVersionComparer (numeric Major.Minor)
-            // rather than a string match is what lets a strictly-newer release still
-            // prompt after an earlier skip -- a string-equality check would suppress
-            // only the exact skipped tag by coincidence, with no principled way to
-            // let a genuinely newer release through except reimplementing this same
-            // numeric comparison. Best-effort read: an unreadable settings file must
+            // this release's tag via UpdateVersionComparer (numeric
+            // Major.Minor.Patch, three-component) rather than a string match is what
+            // lets a strictly-newer release still prompt after an earlier skip -- a
+            // string-equality check would suppress only the exact skipped tag by
+            // coincidence, with no principled way to let a genuinely newer release
+            // through except reimplementing this same numeric comparison. Carrying
+            // the patch through here matters: without it, a skip of a two-segment
+            // tag like "v2.2" would round-trip as X.Y.0 and swallow every later
+            // point release of that same minor (the exact T-26-14 prohibition this
+            // comment invokes). Best-effort read: an unreadable settings file must
             // not block an otherwise-valid prompt, so it degrades to "nothing skipped."
             string? skippedVersion = null;
             try
@@ -196,8 +202,8 @@ public sealed class UpdateOrchestrator
             }
 
             if (!string.IsNullOrEmpty(skippedVersion)
-                && UpdateVersionComparer.TryParseTag(skippedVersion, out int skippedMajor, out int skippedMinor)
-                && !UpdateVersionComparer.IsNewer(new Version(skippedMajor, skippedMinor), release.TagName))
+                && UpdateVersionComparer.TryParseTag(skippedVersion, out int skippedMajor, out int skippedMinor, out int skippedPatch)
+                && !UpdateVersionComparer.IsNewer(new Version(skippedMajor, skippedMinor, skippedPatch), release.TagName))
             {
                 // release.TagName is NOT strictly newer than the skipped tag --
                 // suppress without ever invoking confirm.
@@ -251,8 +257,8 @@ public sealed class UpdateOrchestrator
 /// </summary>
 /// <param name="Outcome">Which branch the shared check sequencer took.</param>
 /// <param name="RunningVersionText">
-/// The currently-running build's Major.Minor version text (e.g. "2.2"), populated for
-/// every outcome; used by the "already on the latest version" toast (D-06).
+/// The currently-running build's Major.Minor.Patch version text (e.g. "2.2.1"),
+/// populated for every outcome; used by the "already on the latest version" toast (D-06).
 /// </param>
 /// <param name="FailureReason">
 /// Non-null only when <see cref="Outcome"/> is <see cref="UpdateCheckOutcome.CheckFailed"/>

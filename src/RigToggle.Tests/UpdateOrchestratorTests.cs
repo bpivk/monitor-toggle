@@ -236,6 +236,64 @@ public class UpdateOrchestratorTests
         Assert.True(confirmCalled);
     }
 
+    /// <summary>
+    /// UPDATE-02 point-release regression (the reason this task exists): a persisted
+    /// skip of "v2.2" (two-segment, patch 0) must not suppress a later point release
+    /// "v2.2.1" of that same X.Y -- proves the skip round-trip carries the patch
+    /// component through (TryParseTag -> new Version(major, minor, patch) -> IsNewer),
+    /// not just Major.Minor. Today (before this fix) that release is silently
+    /// suppressed.
+    /// </summary>
+    [Fact]
+    public async Task CheckOnLaunchAsync_HonourSkippedVersion_PointReleaseStrictlyNewerThanSkippedMinor_StillInvokesConfirm()
+    {
+        var callLog = new List<string>();
+        var pointRelease = NewerRelease with { TagName = "v2.2.1" };
+        var feed = new FakeReleaseFeed(release: pointRelease);
+        var applier = new RecordingUpdateApplier(callLog);
+        var settingsStore = new InMemorySettingsStore(new AppSettings { SkippedUpdateVersion = "v2.2" });
+        var orchestrator = new UpdateOrchestrator(feed, applier, settingsStore, RunningVersion);
+        bool confirmCalled = false;
+
+        UpdateCheckOutcome outcome = await orchestrator.CheckOnLaunchAsync(
+            confirm: _ => { confirmCalled = true; return UpdatePromptChoice.Later; },
+            onApplyStarting: _ => { },
+            wasStartedHidden: false,
+            honourSkippedVersion: true,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Equal(UpdateCheckOutcome.Declined, outcome);
+        Assert.True(confirmCalled);
+    }
+
+    /// <summary>
+    /// Sibling of the point-release regression test above: an EQUAL patch-level skip
+    /// ("v2.2.1" skipped, release also "v2.2.1") must still suppress -- proves the
+    /// point-release fix doesn't accidentally turn "skip" into "never suppress."
+    /// </summary>
+    [Fact]
+    public async Task CheckOnLaunchAsync_HonourSkippedVersion_LatestTagEqualsSkippedPatchVersion_ReturnsSkipped_ConfirmNeverInvoked()
+    {
+        var callLog = new List<string>();
+        var pointRelease = NewerRelease with { TagName = "v2.2.1" };
+        var feed = new FakeReleaseFeed(release: pointRelease);
+        var applier = new RecordingUpdateApplier(callLog);
+        var settingsStore = new InMemorySettingsStore(new AppSettings { SkippedUpdateVersion = "v2.2.1" });
+        var orchestrator = new UpdateOrchestrator(feed, applier, settingsStore, RunningVersion);
+        bool confirmCalled = false;
+
+        UpdateCheckOutcome outcome = await orchestrator.CheckOnLaunchAsync(
+            confirm: _ => { confirmCalled = true; return UpdatePromptChoice.UpdateNow; },
+            onApplyStarting: _ => { },
+            wasStartedHidden: false,
+            honourSkippedVersion: true,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Equal(UpdateCheckOutcome.Skipped, outcome);
+        Assert.False(confirmCalled);
+        Assert.Empty(callLog);
+    }
+
     /// <summary>UPDATE-06/D-02: "Skip" persists the release tag and never touches the applier.</summary>
     [Fact]
     public async Task CheckOnLaunchAsync_PromptReturnsSkip_PersistsSkippedVersion_ApplierNeverInvoked_ReturnsSkipped()
