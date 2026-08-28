@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-08-18)
 Phase: 26 (auto-update) — EXECUTING
 Plan: 1 of 5
 Status: Executing Phase 26
-Last activity: 2026-08-22 — Phase 26 execution started
+Last activity: 2026-08-28 - Completed quick task 260828-vit: Extend UpdateVersionComparer to three-component semver patch versions, bump to 2.2.1, tag/push v2.2.1 for Phase 26 UAT
 
 Progress: [██████████] 100%
 
@@ -140,6 +140,7 @@ Resolved 2026-08-21 (partial): Phase 25 Plan 04 Task 3's blocking checkpoint (re
 | 260728-qj1 | Fix WindowsMonitorController.GetAllMonitors() duplicate-row/dual-primary bug found during Phase 6's 06-06 rig checkpoint | 2026-07-28 | fe0aee7 | [260728-qj1-fix-windowsmonitorcontroller-getallmonit](./quick/260728-qj1-fix-windowsmonitorcontroller-getallmonit/) |
 | 260728-rmp | Relabel Settings monitor grid columns (Disable/Enable -> Off (Rig)/On (Rig)) with tooltips and a permanent explanation label, clarifying the grid only configures the transition into Rig Mode | 2026-07-28 | d76b5db | [260728-rmp-improve-settings-monitor-grid-clarity-re](./quick/260728-rmp-improve-settings-monitor-grid-clarity-re/) |
 | 260804-9rt | Fix UF-14-01 and UF-14-02 from Phase 14 security audit: add least-privilege `permissions: contents: read` to build.yml, add restore/build/test gate before publish in release.yml | 2026-08-04 | dd974e3 | [260804-9rt-fix-uf-14-01-and-uf-14-02-from-phase-14-](./quick/260804-9rt-fix-uf-14-01-and-uf-14-02-from-phase-14-/) |
+| 260828-vit | Extend UpdateVersionComparer to three-component semver (vX.Y.Z) patch comparison, fix a latent phantom-update trap and a skip-tracking patch-discard bug found along the way, bump RigToggle.App to 2.2.1, and tag/push v2.2.1 to cut a real release for Phase 26 UAT testing | 2026-08-28 | 8087afd | [260828-vit-extend-updateversioncomparer-to-support-](./quick/260828-vit-extend-updateversioncomparer-to-support-/) |
 
 ## Deferred Items
 
