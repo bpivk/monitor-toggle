@@ -2,6 +2,9 @@ using System.Drawing;
 using System.Linq;
 using RigToggle.Core.Models;
 using RigToggle.Windows;
+using WindowsDisplayAPI;
+using WindowsDisplayAPI.DisplayConfig;
+using WindowsDisplayAPI.Native.DisplayConfig;
 using Xunit;
 
 namespace RigToggle.Windows.Tests;
@@ -221,6 +224,83 @@ public class WindowsMonitorControllerTests
         Assert.Empty(result);
     }
 
+    // Covers the debug-session monitor-position-resets-to-de round-7 fix: the MIRROR
+    // IMAGE of ComputeUnexpectedlyActivated above. Rig-reproduced scenario (round-6
+    // checkpoint response, finding 6): a plain, non-swap ActivateMonitors(DEV2) call
+    // (DEV1 already active, not part of any disable-set) has its scoped ApplyPathInfos
+    // throw, falls back to whole-topology Extend, and Extend's own opaque persisted
+    // layout does not include DEV1 -- DEV1 (active going in, never requested to be
+    // touched, not in any disable-set) silently drops out. ComputeUnexpectedlyDeactivated
+    // is the pure seam that detects this so the caller can correct it via a nested
+    // ActivateMonitors call.
+    [Fact]
+    public void ComputeUnexpectedlyDeactivated_RigRegressionScenario_ExtendDropsUnrelatedActiveSurvivor_FlagsIt()
+    {
+        var preActive = new HashSet<string> { "DEV1" };
+        var postActive = new HashSet<string> { "DEV2" };
+        var monitorSwapDisableSet = new HashSet<string>();
+
+        var result = WindowsMonitorController.ComputeUnexpectedlyDeactivated(preActive, postActive, monitorSwapDisableSet);
+
+        Assert.Single(result);
+        Assert.Contains("DEV1", result);
+    }
+
+    [Fact]
+    public void ComputeUnexpectedlyDeactivated_SurvivorStaysActive_ReturnsEmpty()
+    {
+        // The common, well-behaved case: DEV1 was active before this call and is still
+        // active after -- no correction needed.
+        var preActive = new HashSet<string> { "DEV1" };
+        var postActive = new HashSet<string> { "DEV1", "DEV2" };
+        var monitorSwapDisableSet = new HashSet<string>();
+
+        var result = WindowsMonitorController.ComputeUnexpectedlyDeactivated(preActive, postActive, monitorSwapDisableSet);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void ComputeUnexpectedlyDeactivated_DeliberateSwapExclusion_NotFlaggedEvenThoughInactive()
+    {
+        // A path in monitorSwapDisableSet going inactive is the INTENDED outcome of a
+        // Rig/Normal swap (fix A) -- must never be flagged as an unexpected drop.
+        var preActive = new HashSet<string> { "DEV1", "DEV2" };
+        var postActive = new HashSet<string> { "DEV3" };
+        var monitorSwapDisableSet = new HashSet<string> { "DEV1", "DEV2" };
+
+        var result = WindowsMonitorController.ComputeUnexpectedlyDeactivated(preActive, postActive, monitorSwapDisableSet);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void ComputeUnexpectedlyDeactivated_MixedSwapAndNonSwapSurvivors_OnlyFlagsTheNonSwapOne()
+    {
+        // DEV1 is deliberately excluded (swap); DEV2 is a plain, unrelated survivor that
+        // should have stayed active but didn't -- only DEV2 is flagged.
+        var preActive = new HashSet<string> { "DEV1", "DEV2" };
+        var postActive = new HashSet<string> { "DEV3" };
+        var monitorSwapDisableSet = new HashSet<string> { "DEV1" };
+
+        var result = WindowsMonitorController.ComputeUnexpectedlyDeactivated(preActive, postActive, monitorSwapDisableSet);
+
+        Assert.Single(result);
+        Assert.Contains("DEV2", result);
+    }
+
+    [Fact]
+    public void ComputeUnexpectedlyDeactivated_NoPriorActiveSurvivors_ReturnsEmpty()
+    {
+        var preActive = new HashSet<string>();
+        var postActive = new HashSet<string> { "DEV1" };
+        var monitorSwapDisableSet = new HashSet<string>();
+
+        var result = WindowsMonitorController.ComputeUnexpectedlyDeactivated(preActive, postActive, monitorSwapDisableSet);
+
+        Assert.Empty(result);
+    }
+
     // Covers the debug session toggle-false-incomplete-error fix: DeactivateMonitors'
     // pre-mutation guard previously conflated "requested but already inactive"
     // (already satisfies the disable postcondition — not an error) with "requested
@@ -284,5 +364,103 @@ public class WindowsMonitorControllerTests
         var result = WindowsMonitorController.ComputeUndetectedDevicePaths(requested, available);
 
         Assert.Empty(result);
+    }
+
+    // Covers the debug session monitor-position-resets-to-de round-4 fix: GDI requires exactly
+    // one ACTIVE path in any supplied topology to sit at the desktop origin (0,0) -- a
+    // requirement round 3's scoped-activation plan could silently violate whenever the swap's
+    // disable-set excluded the current primary and left no other survivor to inherit that role.
+    // PromoteToOriginIfNeeded is the pure seam that normalizes the final active-entry set, same
+    // "pure logic only, no live CCD hardware" discipline as the rest of this file --
+    // PathDisplaySource/PathDisplayAdapter/LUID all have public, hardware-independent
+    // constructors, so no real CCD query is needed to build these fixtures.
+    private static PathDisplaySource Source(uint sourceId) =>
+        new(new PathDisplayAdapter(default), sourceId);
+
+    private static PathInfo WithMode(uint sourceId, int x, int y, int width = 1920, int height = 1080) =>
+        new(Source(sourceId), new Point(x, y), new Size(width, height), DisplayConfigPixelFormat.PixelFormat32Bpp);
+
+    private static PathInfo NoMode(uint sourceId) => new(Source(sourceId));
+
+    [Fact]
+    public void PromoteToOriginIfNeeded_KeptSurvivorAlreadyAtOrigin_NoRepositioning()
+    {
+        var keptActiveSurvivors = new[] { WithMode(1, 0, 0) };
+        var newPaths = new[] { WithMode(2, 999, 999) };
+
+        IReadOnlyList<PathInfo> result = WindowsMonitorController.PromoteToOriginIfNeeded(keptActiveSurvivors, newPaths);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, p => p.Position == new Point(0, 0));
+        Assert.Contains(result, p => p.Position == new Point(999, 999));
+    }
+
+    [Fact]
+    public void PromoteToOriginIfNeeded_NewPathAlreadyAtOrigin_NoRepositioning()
+    {
+        var keptActiveSurvivors = Array.Empty<PathInfo>();
+        var newPaths = new[] { WithMode(1, 0, 0) };
+
+        IReadOnlyList<PathInfo> result = WindowsMonitorController.PromoteToOriginIfNeeded(keptActiveSurvivors, newPaths);
+
+        Assert.Single(result);
+        Assert.Equal(new Point(0, 0), result[0].Position);
+    }
+
+    [Fact]
+    public void PromoteToOriginIfNeeded_SoleNewTargetHasStaleNonOriginPosition_PromotedToOrigin()
+    {
+        // Mirrors the round-4 rig repro exactly: every kept survivor was excluded by the swap's
+        // disable-set (empty here), and the sole newly-activated target's cached mode is a
+        // stale, non-origin position from when it was previously a non-primary monitor.
+        var keptActiveSurvivors = Array.Empty<PathInfo>();
+        var newPaths = new[] { WithMode(1, 1920, 0) };
+
+        IReadOnlyList<PathInfo> result = WindowsMonitorController.PromoteToOriginIfNeeded(keptActiveSurvivors, newPaths);
+
+        PathInfo promoted = Assert.Single(result);
+        Assert.Equal(new Point(0, 0), promoted.Position);
+    }
+
+    [Fact]
+    public void PromoteToOriginIfNeeded_NoEntryAtOrigin_KeptSurvivorPromotedOverNewTarget_OthersShiftedBySameDelta()
+    {
+        var keptActiveSurvivors = new[] { WithMode(1, 1920, 0) };
+        var newPaths = new[] { WithMode(2, 3840, 0) };
+
+        IReadOnlyList<PathInfo> result = WindowsMonitorController.PromoteToOriginIfNeeded(keptActiveSurvivors, newPaths);
+
+        Assert.Equal(2, result.Count);
+        PathInfo promotedSurvivor = result.Single(p => p.DisplaySource.Equals(Source(1)));
+        PathInfo shiftedNewTarget = result.Single(p => p.DisplaySource.Equals(Source(2)));
+        Assert.Equal(new Point(0, 0), promotedSurvivor.Position);
+        Assert.Equal(new Point(1920, 0), shiftedNewTarget.Position);
+    }
+
+    [Fact]
+    public void PromoteToOriginIfNeeded_NoEntryHasCachedMode_LeftUntouched()
+    {
+        var keptActiveSurvivors = Array.Empty<PathInfo>();
+        var newPaths = new[] { NoMode(1) };
+
+        IReadOnlyList<PathInfo> result = WindowsMonitorController.PromoteToOriginIfNeeded(keptActiveSurvivors, newPaths);
+
+        PathInfo sole = Assert.Single(result);
+        Assert.False(sole.IsModeInformationAvailable);
+    }
+
+    [Fact]
+    public void PromoteToOriginIfNeeded_ModelessNewTargetAlongsideRepositionedEntries_ModelessLeftUntouched()
+    {
+        var keptActiveSurvivors = new[] { WithMode(1, 1920, 0) };
+        var newPaths = new[] { NoMode(2) };
+
+        IReadOnlyList<PathInfo> result = WindowsMonitorController.PromoteToOriginIfNeeded(keptActiveSurvivors, newPaths);
+
+        Assert.Equal(2, result.Count);
+        PathInfo promotedSurvivor = result.Single(p => p.DisplaySource.Equals(Source(1)));
+        PathInfo modeless = result.Single(p => p.DisplaySource.Equals(Source(2)));
+        Assert.Equal(new Point(0, 0), promotedSurvivor.Position);
+        Assert.False(modeless.IsModeInformationAvailable);
     }
 }

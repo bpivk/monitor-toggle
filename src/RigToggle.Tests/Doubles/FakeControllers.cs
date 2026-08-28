@@ -57,9 +57,16 @@ public sealed class FakeMonitorController : IMonitorController
             "\\\\?\\DISPLAY#FAKE");
     }
 
-    public void ActivateMonitors(IReadOnlySet<string> monitorDevicePaths)
+    public void ActivateMonitors(IReadOnlySet<string> monitorDevicePaths, IReadOnlySet<string> monitorSwapDisableSet)
     {
-        _callLog.Add($"monitor.ActivateMonitors:{string.Join(",", monitorDevicePaths)}");
+        // Debug session monitor-position-resets-to-de (Symptom 2, round 3): the derived
+        // isPartOfMonitorSwap flag is recorded as its own suffix (not folded into the
+        // device-path list), matching WindowsMonitorController's own
+        // monitorSwapDisableSet.Count > 0 derivation, so ToggleServiceTests can assert on
+        // ToggleService's routing decision precisely, while every existing
+        // `entry.StartsWith("monitor.ActivateMonitors")` / `EndsWith("isPartOfMonitorSwap=...")`
+        // assertion still matches unchanged.
+        _callLog.Add($"monitor.ActivateMonitors:{string.Join(",", monitorDevicePaths)}|isPartOfMonitorSwap={monitorSwapDisableSet.Count > 0}");
     }
 
     public void DeactivateMonitors(IReadOnlySet<string> monitorDevicePaths)

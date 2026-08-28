@@ -415,6 +415,82 @@ public class ToggleServiceTests : IDisposable
         Assert.True(activateIndex < deactivateIndex, "ActivateMonitors must run before DeactivateMonitors.");
     }
 
+    // --- Debug session monitor-position-resets-to-de, Symptom 2: WindowsMonitorController's
+    // round-5 scoped-activation path is rig-confirmed unreliable for a full Rig/Normal
+    // monitor swap (silently reverted by the OS/driver seconds after an apparently-
+    // successful apply, or an outright PathChangeException on the reverse direction).
+    // ToggleService signals "skip scoped activation, go straight to Extend" via
+    // isPartOfMonitorSwap, computed from whether a DeactivateMonitors call follows in the
+    // same Monitor step (disableSet.Count > 0). This routing decision is the one part of
+    // the fix that is genuinely testable without live CCD hardware -- WindowsMonitorController
+    // itself remains rig-verify-only (see its own class remarks). ---
+
+    [Fact]
+    public void ToggleToRigMode_MarksActivateAsPartOfSwap_WhenDisableSetNonEmpty()
+    {
+        var settings = new AppSettings
+        {
+            MonitorsToDisable = ConfiguredSettings.MonitorsToDisable,
+            MonitorsToEnable = new List<string> { "\\\\?\\DISPLAY#RIG" },
+            NormalAudioDeviceId = ConfiguredSettings.NormalAudioDeviceId,
+            RigAudioDeviceId = ConfiguredSettings.RigAudioDeviceId,
+            CompanionAppPath = ExistingCompanionAppPath,
+        };
+        var (service, callLog, _) = CreateService(settings);
+
+        service.ToggleToRigMode();
+
+        var activateEntry = callLog.First(entry => entry.StartsWith("monitor.ActivateMonitors"));
+        Assert.EndsWith("isPartOfMonitorSwap=True", activateEntry);
+    }
+
+    [Fact]
+    public void ToggleToRigMode_MarksActivateAsNotPartOfSwap_WhenDisableSetEmpty()
+    {
+        // D-07 enable-only configuration: no DeactivateMonitors call follows in the same
+        // Monitor step, so round-5 scoped activation's flash-avoidance benefit should
+        // still apply -- this is the narrower single-target case it was built for.
+        var settings = new AppSettings
+        {
+            MonitorsToDisable = null,
+            MonitorsToEnable = new List<string> { "\\\\?\\DISPLAY#RIG" },
+            NormalAudioDeviceId = ConfiguredSettings.NormalAudioDeviceId,
+            RigAudioDeviceId = ConfiguredSettings.RigAudioDeviceId,
+            CompanionAppPath = ExistingCompanionAppPath,
+        };
+        var (service, callLog, _) = CreateService(settings);
+
+        service.ToggleToRigMode();
+
+        var activateEntry = callLog.First(entry => entry.StartsWith("monitor.ActivateMonitors"));
+        Assert.EndsWith("isPartOfMonitorSwap=False", activateEntry);
+    }
+
+    [Fact]
+    public void ToggleToNormalMode_MarksActivateAsPartOfSwap_WhenNormalDisableSetNonEmpty()
+    {
+        // Reverse-direction call -- this is the exact rig log's PathChangeException
+        // repro shape (Normal-mode ActivateMonitors immediately followed by
+        // DeactivateMonitors of a different set within the same Monitor step).
+        var settings = new AppSettings
+        {
+            MonitorsToDisable = ConfiguredSettings.MonitorsToDisable,
+            NormalMonitorsToDisable = new List<string> { "\\\\?\\DISPLAY#NORMAL" },
+            NormalMonitorsToEnable = new List<string> { "\\\\?\\DISPLAY#RIG" },
+            NormalAudioDeviceId = ConfiguredSettings.NormalAudioDeviceId,
+            RigAudioDeviceId = ConfiguredSettings.RigAudioDeviceId,
+            CompanionAppPath = ExistingCompanionAppPath,
+        };
+        var (service, callLog, _) = CreateService(settings);
+        service.ToggleToRigMode();
+        callLog.Clear();
+
+        service.ToggleToNormalMode();
+
+        var activateEntry = callLog.First(entry => entry.StartsWith("monitor.ActivateMonitors"));
+        Assert.EndsWith("isPartOfMonitorSwap=True", activateEntry);
+    }
+
     [Fact]
     public void Constructor_Throws_WhenAnyDependencyIsNull()
     {

@@ -106,22 +106,27 @@ namespace RigToggle.App
         // post-action watchdog living in this handler, the ONE place in the app that
         // already observes every live CCD topology change regardless of what caused it.
         //
-        // _lastUserIntent snapshots which device paths the user's last deliberate tile
-        // action actually wanted active/inactive, taken from _lastKnownMonitors AFTER
-        // that action's own RefreshMonitorTiles() call (see ArmIntentGuard()). While the
-        // guard is armed, a hotplug-driven OnDisplaySettingsChanged compares its fresh
-        // RefreshMonitorTiles() read against that snapshot and reactively re-runs
-        // DeactivateMonitors ONLY on a device path the snapshot says should be inactive
-        // but is now active -- never the reverse direction (an intent-active path that
-        // went inactive is left alone; nothing here re-enables anything), and never a
-        // device path absent from the snapshot entirely (a genuinely new hotplugged
-        // monitor has no intent entry and is therefore never fought -- explicit caution
-        // raised in this round's checkpoint response). Bounded on two axes so a
-        // persistently flapping driver cannot turn this into a fight-forever loop: a
+        // _lastUserIntent snapshots which device paths the user's last deliberate action
+        // (a tile click OR, as of round 3 part 2, a Rig/Normal toggle) actually wanted
+        // active/inactive, taken from _lastKnownMonitors AFTER that action's own
+        // RefreshMonitorTiles() call (see ArmIntentGuard()). While the guard is armed, a
+        // hotplug-driven OnDisplaySettingsChanged compares its fresh RefreshMonitorTiles()
+        // read against that snapshot and reactively re-runs DeactivateMonitors on any
+        // device path the snapshot says should be inactive but is now active, AND (round 3
+        // part 2) ActivateMonitors on any device path the snapshot says should be active
+        // but is now inactive -- symmetric, since a third rig test showed the delayed
+        // OS-level revert this guard already corrects in one direction (see
+        // WindowsMonitorController's class remarks for the rig-log evidence) also occurs
+        // in the OTHER direction (a just-activated monitor silently going back inactive a
+        // couple of seconds later), independent of which CCD API activated it. Still never
+        // touches a device path absent from the snapshot entirely (a genuinely new
+        // hotplugged monitor has no intent entry and is therefore never fought -- explicit
+        // caution raised in round 3's checkpoint response, unchanged). Bounded on two axes
+        // so a persistently flapping driver cannot turn this into a fight-forever loop: a
         // fixed time window (IntentGuardWindow) and a fixed correction-attempt cap
         // (MaxReactiveCorrections) per armed window -- once either is exhausted, this
         // handler goes back to being purely observational (its pre-existing behavior)
-        // until the next deliberate tile action re-arms it.
+        // until the next deliberate action re-arms it.
         private static readonly TimeSpan IntentGuardWindow = TimeSpan.FromSeconds(8);
         private const int MaxReactiveCorrections = 2;
         private Dictionary<string, bool>? _lastUserIntent;
@@ -631,6 +636,16 @@ namespace RigToggle.App
 
                 RefreshUi();
 
+                // Debug session monitor-position-resets-to-de, round 3 part 2: arm the
+                // same bounded reactive guard OnTileAction already arms after a deliberate
+                // monitor action -- a third rig test showed the delayed OS-level revert
+                // this guard corrects also affects a full Rig/Normal toggle, not just a
+                // single tile click (see field comments near _lastUserIntent). Must run
+                // AFTER a fresh RefreshMonitorTiles() so the intent snapshot reflects the
+                // real post-toggle state, matching OnTileAction's own ordering discipline.
+                RefreshMonitorTiles();
+                ArmIntentGuard();
+
                 if (result is not null && !result.Success)
                 {
                     // CORE-04: per-step checklist for a partial failure. State may have
@@ -727,10 +742,42 @@ namespace RigToggle.App
             }
             catch (Exception ex)
             {
-                // Defensive: enumeration must never crash the form -- degrade to the
-                // empty state and leave a diagnostic trail (WR-02 convention).
-                System.Diagnostics.Trace.WriteLine($"MainForm.RefreshMonitorTiles: GetAllMonitors failed: {ex}");
-                _lastKnownMonitors = Array.Empty<MonitorInfo>();
+                // Debug session monitor-position-resets-to-de, round 6 (checkpoint response,
+                // item 4b): a rig trial observed GetAllMonitors() throw a transient
+                // System.ComponentModel.Win32Exception(87) from PathInfo.GetPathInfos ->
+                // GetActivePaths, coinciding with a moment a CCD topology mutation was still
+                // in flight elsewhere -- querying mid-transition can transiently fail even
+                // though the underlying topology is fine a moment later. Before this fix, a
+                // single failed query here unconditionally degraded _lastKnownMonitors to
+                // Array.Empty<MonitorInfo>() with no retry, which not only blanked the tile
+                // dashboard but (more importantly) made TryReactivelyCorrectAgainstLastIntent
+                // iterate an EMPTY list, find zero reactivated/wentInactive paths by
+                // construction, and log a FALSE "no unexpected drift detected" -- silently
+                // skipping a real reactive-correction opportunity at exactly the moment a
+                // transient query failure coincided with an armed guard window (rig-confirmed,
+                // round-6 checkpoint response). One retry, after a short backoff matching this
+                // codebase's own existing settle-poll cadence convention (WindowsMonitorController's
+                // SettlePollDelay), converts a same-instant re-query's spurious failure into a
+                // successful read on the common case, without attempting a broader retry-loop
+                // redesign. If the retry ALSO fails, behavior is unchanged from before this fix
+                // (empty-state degrade below) -- this can only convert some previously-total
+                // failures into successes, never regress the pre-existing fallback.
+                System.Diagnostics.Trace.WriteLine($"MainForm.RefreshMonitorTiles: GetAllMonitors failed, retrying once after backoff: {ex}");
+
+                try
+                {
+                    Thread.Sleep(150);
+                    _lastKnownMonitors = _monitorController.GetAllMonitors()
+                        .OrderBy(m => m.DevicePath, StringComparer.Ordinal)
+                        .ToList();
+                }
+                catch (Exception retryEx)
+                {
+                    // Defensive: enumeration must never crash the form -- degrade to the
+                    // empty state and leave a diagnostic trail (WR-02 convention).
+                    System.Diagnostics.Trace.WriteLine($"MainForm.RefreshMonitorTiles: GetAllMonitors retry also failed: {retryEx}");
+                    _lastKnownMonitors = Array.Empty<MonitorInfo>();
+                }
             }
 
             if (_lastKnownMonitors.Count == 0)
@@ -870,14 +917,25 @@ namespace RigToggle.App
         }
 
         /// <summary>
-        /// Debug session monitor-enable-reactivates-others-again, round 3: the reactive
-        /// half of the bounded post-action watchdog (see field comments near
-        /// _lastUserIntent for the full rig-log-confirmed rationale). Called from
-        /// OnDisplaySettingsChanged AFTER that handler's own RefreshMonitorTiles() has
-        /// already run, so it observes the real post-hotplug state. Every branch is
-        /// defensive on its own terms, matching OnDisplaySettingsChanged's existing
-        /// never-crash-on-hotplug rule -- a failure here must never crash the form or
-        /// propagate out of a SystemEvents callback.
+        /// Debug session monitor-enable-reactivates-others-again, round 3 (extended by
+        /// monitor-position-resets-to-de round 3 part 2 to be bidirectional -- see field
+        /// comments near _lastUserIntent): the reactive half of the bounded post-action
+        /// watchdog. Called from OnDisplaySettingsChanged AFTER that handler's own
+        /// RefreshMonitorTiles() has already run, so it observes the real post-hotplug
+        /// state. Every branch is defensive on its own terms, matching
+        /// OnDisplaySettingsChanged's existing never-crash-on-hotplug rule -- a failure
+        /// here must never crash the form or propagate out of a SystemEvents callback.
+        ///
+        /// Round 5 (rig-confirmed): a mixed drift event -- reactivated AND wentInactive
+        /// both non-empty at once -- is corrected as ONE atomic, swap-aware
+        /// ActivateMonitors(wentInactive, monitorSwapDisableSet: reactivated) call instead
+        /// of two separate, order-dependent DeactivateMonitors-then-ActivateMonitors
+        /// calls. The prior two-step version could hit DeactivateMonitors' own
+        /// zero-survivors guard when wentInactive's target was the only active survivor
+        /// not in reactivated, then fall through to a non-swap-aware ActivateMonitors call
+        /// that inherited the same scoped-plan fragility documented in
+        /// WindowsMonitorController's class remarks -- see the correction block below for
+        /// the full rig evidence.
         /// </summary>
         private void TryReactivelyCorrectAgainstLastIntent()
         {
@@ -915,35 +973,49 @@ namespace RigToggle.App
                 return;
             }
 
-            // Only a path the last deliberate action's intent snapshot says should be
-            // INACTIVE but is now active qualifies -- never the reverse direction, and
-            // never a device path absent from the snapshot (a genuinely new hotplugged
-            // monitor has no intent entry and is therefore never fought).
+            // A path the last deliberate action's intent snapshot says should be INACTIVE
+            // but is now active qualifies for correction via DeactivateMonitors. Round 3
+            // part 2: symmetrically, a path the snapshot says should be ACTIVE but is now
+            // inactive qualifies for correction via ActivateMonitors -- a third rig test
+            // showed the delayed OS-level revert this guard was built to catch is not
+            // one-directional (see field comments near _lastUserIntent). Never the
+            // "genuinely new hotplugged monitor" case in either direction -- a device path
+            // absent from the snapshot entirely has no intent entry and is therefore never
+            // fought (TryGetValue returning false skips it).
             var reactivated = new HashSet<string>();
+            var wentInactive = new HashSet<string>();
             foreach (MonitorInfo monitor in _lastKnownMonitors)
             {
-                if (monitor.IsActive
-                    && _lastUserIntent.TryGetValue(monitor.DevicePath, out bool shouldBeActive)
-                    && !shouldBeActive)
+                if (!_lastUserIntent.TryGetValue(monitor.DevicePath, out bool shouldBeActive))
+                {
+                    continue;
+                }
+
+                if (monitor.IsActive && !shouldBeActive)
                 {
                     reactivated.Add(monitor.DevicePath);
                 }
+                else if (!monitor.IsActive && shouldBeActive)
+                {
+                    wentInactive.Add(monitor.DevicePath);
+                }
             }
 
-            if (reactivated.Count == 0)
+            if (reactivated.Count == 0 && wentInactive.Count == 0)
             {
                 System.Diagnostics.Trace.WriteLine(
                     $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.TryReactivelyCorrectAgainstLastIntent: " +
                     "guard armed and active, checked current state against last intent -- no unexpected " +
-                    "reactivation detected.");
+                    "drift detected in either direction.");
                 return;
             }
 
             System.Diagnostics.Trace.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.OnDisplaySettingsChanged: detected " +
-                $"unexpected reactivation against last known intent -- [{string.Join(", ", reactivated)}] " +
-                $"should be inactive per the last deliberate tile action. Attempting reactive " +
-                $"correction (attempt {_reactiveCorrectionsUsed + 1}/{MaxReactiveCorrections}).");
+                $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.OnDisplaySettingsChanged: detected unexpected " +
+                $"drift against last known intent -- reactivated=[{string.Join(", ", reactivated)}] " +
+                $"(should be inactive), wentInactive=[{string.Join(", ", wentInactive)}] (should be " +
+                $"active) per the last deliberate action. Attempting reactive correction " +
+                $"(attempt {_reactiveCorrectionsUsed + 1}/{MaxReactiveCorrections}).");
 
             IDisposable lease;
             try
@@ -951,9 +1023,9 @@ namespace RigToggle.App
                 // Shares the exact same _busy flag as every other monitor mutation
                 // (ToggleOrchestrator.BeginExclusiveMonitorAccess) -- if a deliberate
                 // tile action or toggle is already in flight, do not fight it or queue
-                // behind it. If the reactivation is still present once whatever's
-                // running finishes, either that action's own RefreshMonitorTiles/
-                // ArmIntentGuard call supersedes this stale intent snapshot, or a later
+                // behind it. If the drift is still present once whatever's running
+                // finishes, either that action's own RefreshMonitorTiles/ArmIntentGuard
+                // call supersedes this stale intent snapshot, or a later
                 // OnDisplaySettingsChanged firing gets another chance while this guard
                 // window is still open.
                 lease = _orchestrator.BeginExclusiveMonitorAccess();
@@ -970,17 +1042,71 @@ namespace RigToggle.App
 
             using (lease)
             {
-                try
+                // Round 5 (rig-confirmed this round): when BOTH directions of drift are
+                // present in the SAME event -- a monitor unexpectedly went inactive AND a
+                // DIFFERENT one unexpectedly came back active, in the same
+                // RefreshMonitorTiles snapshot -- correcting them as two separate,
+                // uncoordinated calls (DeactivateMonitors(reactivated) FIRST, then a
+                // completely separate, non-swap-aware ActivateMonitors(wentInactive)
+                // second) is not just inefficient but actively WRONG whenever
+                // wentInactive's target is the only currently-active survivor NOT in
+                // reactivated: deactivating reactivated first would leave zero active
+                // displays, which DeactivateMonitors' own zero-survivors guard correctly
+                // refuses ("Cannot disable all configured monitors -- at least one active
+                // display must remain"), so reactivated is never actually turned off, and
+                // the subsequent bare ActivateMonitors(wentInactive) call -- issued with an
+                // EMPTY monitorSwapDisableSet, i.e. never told about reactivated at all --
+                // either produces an unwanted transient 3-active-monitor state (rig-
+                // confirmed, first occurrence this round) or hits the exact same scoped-
+                // plan/PathChangeException fragility TryBuildScopedActivationPlan's own
+                // class remarks document (rig-confirmed, second occurrence this round,
+                // where the Extend fallback then failed to activate the target at all) --
+                // leaving the correction in the WRONG final state with no further automatic
+                // recovery (D-05). Fix: whenever wentInactive is non-empty, issue exactly
+                // ONE atomic, swap-aware ActivateMonitors call with reactivated as its
+                // monitorSwapDisableSet -- the SAME primitive and the SAME "one CCD call
+                // both activates the target(s) and implicitly deactivates the disable-set"
+                // pattern ToggleService's own Rig/Normal swap already uses (see
+                // WindowsMonitorController's class remarks) -- so reactivated is
+                // deactivated as a side effect of the SAME call that activates wentInactive,
+                // never as a separate, order-dependent step that can hit the zero-survivors
+                // guard. When wentInactive is empty (the original, still-correct,
+                // reactivated-only single-direction case), this reduces to the previous,
+                // unchanged plain DeactivateMonitors call.
+                if (wentInactive.Count > 0)
                 {
-                    // Reuses the same already rig-proven CCD-removal path every other
-                    // deliberate deactivation uses -- never a manual reconstruction.
-                    _monitorController.DeactivateMonitors(reactivated);
+                    try
+                    {
+                        // Round 3 part 2 / round 5: reuses the already rig-proven
+                        // ActivateMonitors path every other deliberate activation uses,
+                        // never a manual reconstruction -- now made swap-aware by passing
+                        // reactivated as monitorSwapDisableSet whenever it is non-empty
+                        // (an empty reactivated set here degrades byte-for-byte to round
+                        // 3 part 2's original wentInactive-only behavior).
+                        _monitorController.ActivateMonitors(wentInactive, monitorSwapDisableSet: reactivated);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Trace.WriteLine(
+                            $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.OnDisplaySettingsChanged: reactive " +
+                            $"ActivateMonitors({string.Join(", ", wentInactive)}, monitorSwapDisableSet=" +
+                            $"[{string.Join(", ", reactivated)}]) failed: {ex}");
+                    }
                 }
-                catch (Exception ex)
+                else if (reactivated.Count > 0)
                 {
-                    System.Diagnostics.Trace.WriteLine(
-                        $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.OnDisplaySettingsChanged: reactive " +
-                        $"DeactivateMonitors({string.Join(", ", reactivated)}) failed: {ex}");
+                    try
+                    {
+                        // Reuses the same already rig-proven CCD-removal path every other
+                        // deliberate deactivation uses -- never a manual reconstruction.
+                        _monitorController.DeactivateMonitors(reactivated);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Trace.WriteLine(
+                            $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.OnDisplaySettingsChanged: reactive " +
+                            $"DeactivateMonitors({string.Join(", ", reactivated)}) failed: {ex}");
+                    }
                 }
             }
 
@@ -1130,7 +1256,13 @@ namespace RigToggle.App
                     {
                         System.Diagnostics.Trace.WriteLine(
                             $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.OnTileAction: calling ActivateMonitors({devicePath}).");
-                        _monitorController.ActivateMonitors(new HashSet<string> { devicePath });
+                        // Debug session monitor-position-resets-to-de (Symptom 2):
+                        // monitorSwapDisableSet is empty -- a single dashboard-tile enable
+                        // action has no immediately-following DeactivateMonitors call, so
+                        // scoped activation's flash-avoidance benefit still applies here
+                        // (the narrower single-target case it was built for and remains
+                        // rig-validated on). See IMonitorController's doc comment.
+                        _monitorController.ActivateMonitors(new HashSet<string> { devicePath }, monitorSwapDisableSet: new HashSet<string>());
                         System.Diagnostics.Trace.WriteLine(
                             $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.OnTileAction: ActivateMonitors({devicePath}) returned without throwing.");
                     }
@@ -2032,6 +2164,13 @@ namespace RigToggle.App
             }
 
             RefreshUi();
+
+            // Debug session monitor-position-resets-to-de, round 3 part 2: same guard-
+            // arming as ToggleSwitch_ActionRequested's success path -- the tray/hotkey
+            // toggle trigger must get the same delayed-revert protection as the switch UI
+            // and the dashboard tiles (see field comments near _lastUserIntent).
+            RefreshMonitorTiles();
+            ArmIntentGuard();
 
             notifyIcon.ShowBalloonTip(
                 3000,

@@ -40,7 +40,7 @@ public sealed class BlockingMonitorController : IMonitorController
             new List<MonitorPathSnapshot> { new("\\\\?\\DISPLAY#FAKE", "Fake Monitor", 0, 0, 1920, 1080, 0, 0, 0, 0, 60000UL, 0, true) },
             "\\\\?\\DISPLAY#FAKE");
 
-    public void ActivateMonitors(IReadOnlySet<string> monitorDevicePaths)
+    public void ActivateMonitors(IReadOnlySet<string> monitorDevicePaths, IReadOnlySet<string> monitorSwapDisableSet)
     {
         // No-op — the reentrancy test only needs DeactivateMonitors to block.
     }

@@ -100,7 +100,15 @@ public sealed class ToggleService
         // (Phase 5 per-step, not per-sub-action, granularity).
         if (!TryExecuteStep("Monitor", () =>
             {
-                _monitorController.ActivateMonitors(enableSet);
+                // Debug session monitor-position-resets-to-de (Symptom 2, round 3):
+                // monitorSwapDisableSet is passed through as-is whenever this ActivateMonitors
+                // call is immediately followed, right here, by a DeactivateMonitors call
+                // against a non-empty (largely-disjoint) set — the ordinary Rig-mode full-swap
+                // shape. See IMonitorController's doc comment for the full rig-log-confirmed
+                // rationale (the implementation now excludes this set from the survivors it
+                // preserves, so one scoped ApplyPathInfos call both activates the enable-set
+                // and implicitly deactivates the disable-set).
+                _monitorController.ActivateMonitors(enableSet, monitorSwapDisableSet: disableSet);
                 _monitorController.DeactivateMonitors(disableSet);
             }, steps))
         {
@@ -364,8 +372,13 @@ public sealed class ToggleService
         try
         {
             // Same 06-RESEARCH.md Pitfall 2 ordering constraint as ToggleToRigMode's
-            // Monitor step: ActivateMonitors MUST run BEFORE DeactivateMonitors.
-            _monitorController.ActivateMonitors(enableSet);
+            // Monitor step: ActivateMonitors MUST run BEFORE DeactivateMonitors. Same
+            // monitor-position-resets-to-de (Symptom 2, round 3) monitorSwapDisableSet signal
+            // as ToggleToRigMode's Monitor step above — this is the reverse-direction call
+            // where the rig log showed both the round-5 scoped path throwing PathChangeException
+            // outright AND (round 3) the Extend fallback it led to failing to activate the
+            // requested target while reactivating an unrelated, independently-disabled one.
+            _monitorController.ActivateMonitors(enableSet, monitorSwapDisableSet: disableSet);
             _monitorController.DeactivateMonitors(disableSet);
         }
         catch (Exception ex)
