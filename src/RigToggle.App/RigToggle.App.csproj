@@ -33,9 +33,9 @@
          MSBuild's implicit 1.0.0.0). release.yml's "Resolve version from tag" step
          overrides this checked-in value at publish time via a p:Version= argument
          stripped of its leading v, so the shipped exe's embedded version always
-         matches the git tag it was actually released from — this checked-in "2.2"
+         matches the git tag it was actually released from — this checked-in "2.2.1"
          is only what a local (non-release-pipeline) build carries. -->
-    <Version>2.2</Version>
+    <Version>2.2.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
