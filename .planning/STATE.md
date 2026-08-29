@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-18)
 
 **Core value:** A single reliable action that disables the primary monitor (not just powers it off) and switches audio output — so games that mishandle secondary-monitor launches reliably open on the rig monitor — and just as reliably applies Normal mode's own explicitly configured monitor/audio state on toggle-back (revised at v2.0 — see DISPLAY-10/AUDIO-04).
-**Current focus:** Phase 26 — auto-update
+**Current focus:** v2.2 milestone complete (Phases 24-26) — ready for milestone close
 
 ## Current Position
 
-Phase: 26 (auto-update) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 26
-Last activity: 2026-08-29 - Completed and rig-verified quick tasks 260829-fnt (Help>About menu) and 260829-ga9 (consolidate Check-for-Updates entry points + fix silent-feedback bug) - user approved
+Phase: 26 (auto-update) — COMPLETE (2026-08-29)
+Plan: 5 of 5
+Status: Phase 26 closed. UAT test 1 rig-verified live (real v2.2.1->v2.2.2 update); tests 2-5 closed by operator sign-off, not independently verified (see Decisions below and 26-UAT.md). All three v2.2 phases (24-26) now complete.
+Last activity: 2026-08-29 - Closed Phase 26 (auto-update): UAT test 1 rig-verified, tests 2-5 signed off by operator per explicit request ("everything seems fine so just confirm it")
 
 Progress: [██████████] 100%
 
@@ -132,6 +132,8 @@ Resolved 2026-08-17: Research flagged Phase 21 (accent color) and Phase 23 (manu
 Open (carried from v2.2 research, `.planning/research/SUMMARY.md` "Gaps to Address"): the rename-while-running self-update mechanism, Mark-of-the-Web/SmartScreen behavior for HttpClient downloads, `mainForm.BeginInvoke`/`Handle` existence under `--tray` hidden startup, and the exact signal mechanism for single-instance activation (named pipe vs. `RegisterWindowMessage`) are all flagged MEDIUM confidence and not yet rig-verified — expected to be resolved during Phase 25/26 planning and rig checkpoints, not blocking roadmap creation.
 
 Resolved 2026-08-21 (partial): Phase 25 Plan 04 Task 3's blocking checkpoint (real Windows rig verification) was closed by explicit operator authorization rather than by completing its original ask. The operator confirmed the solution builds and the app functions correctly on real Windows hardware, but declined to run the three-consecutive-clean-runs flakiness check, confirm the three `ApplyUpdateBypass_*` facts, or perform the live CR-01 (abandoned-mutex) reproduction ("doesn't work on my pc") — see `25-04-SUMMARY.md`'s "Task 3: Operator Verification" section for the verbatim exchange. INSTANCE-01/INSTANCE-02/UPDATE-07 are marked complete on the operator's sign-off; the three unperformed checks remain open follow-up items, not fabricated passes, and should be run if the opportunity arises.
+
+Resolved 2026-08-29 (partial): Phase 26's `26-UAT.md` closed by explicit operator authorization rather than by completing its original 5-test ask. Test 1 (real exe swap and relaunch) was genuinely rig-verified live against a real v2.2.1 -> v2.2.2 release cut for this purpose — user confirmed the exe swapped correctly, no SmartScreen interstitial, no autostart regression. Tests 2-5 (interrupted-update recovery, auto-rollback timing under CR-02's 10s window, on-launch check reliability under `--tray`, and real release-notes Markdown rendering) were closed on the operator's sign-off ("everything seems fine so just confirm it") after the orchestrator explicitly flagged that tests 2-4 require deliberate failure-injection scenarios (killing the update helper mid-swap, simulating disk-full, killing the process within a 10s window) that normal use does not exercise — see `26-UAT.md`'s "Operator sign-off" section for the verbatim exchange. The four unperformed checks remain open follow-up items, not fabricated passes, and should be run if the opportunity arises — particularly tests 2/3's failure-recovery paths, since those protect against leaving the app unlaunchable after a bad update.
 
 ### Quick Tasks Completed
 

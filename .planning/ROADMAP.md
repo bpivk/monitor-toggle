@@ -87,7 +87,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
 
 - [x] **Phase 24: Self-Contained Exe Size Reduction** - Additional safe MSBuild-only levers shrink the exe further below the v2.1 baseline, no IL trimming/AOT/ReadyToRun (completed 2026-08-19)
 - [x] **Phase 25: Single-Instance Guard** - A duplicate launch focuses the already-running instance instead of starting a second process; establishes the bypass pattern auto-update's relaunch will reuse (completed 2026-08-21)
-- [ ] **Phase 26: Auto-Update** - On-launch GitHub Releases check, confirm-before-install prompt, safe self-replace-and-relaunch, and a manual "Check for Updates" action
+- [x] **Phase 26: Auto-Update** - On-launch GitHub Releases check, confirm-before-install prompt, safe self-replace-and-relaunch, and a manual "Check for Updates" action (completed 2026-08-29, UAT test 1 rig-verified live; tests 2-5 closed by operator sign-off — see STATE.md)
 
 ## Phase Details
 
@@ -196,7 +196,7 @@ Full phase details: `.planning/milestones/v2.1-ROADMAP.md`
 | 23. Manual Light/Dark Override | v2.1 | 3/3 | Complete | 2026-08-17 |
 | 24. Self-Contained Exe Size Reduction | v2.2 | 1/1 | Complete    | 2026-08-19 |
 | 25. Single-Instance Guard | v2.2 | 4/4 | Complete    | 2026-08-21 |
-| 26. Auto-Update | v2.2 | 5/5 | In Progress|  |
+| 26. Auto-Update | v2.2 | 5/5 | Complete | 2026-08-29 |
 
 ## Backlog
 
