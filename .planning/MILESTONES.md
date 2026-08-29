@@ -1,5 +1,24 @@
 # Milestones
 
+## v2.2 Auto-Update, Single-Instance Guard & Smaller Footprint (Shipped: 2026-08-29)
+
+**Phases completed:** 3 phases, 10 plans, 26 tasks
+
+**Key accomplishments:**
+
+- Added one MSBuild deny-list target excluding 7 unused WinForms Design/VB assemblies, cutting the self-contained exe by 2,596,463 bytes (5.26%) — all three tasks complete, including operator rig verification on real Windows hardware.
+- Named cross-process Mutex single-instance guard with a level-triggered Mutex-based readiness handshake (RegisterWindowMessage/PostMessage(HWND_BROADCAST) activation signal, 3x retry) closing Pitfall 8's startup race — built cross-platform-testable after discovering named EventWaitHandle/Semaphore are Windows-only in .NET.
+- `--apply-update` startup-gate bypass: `StartupArgs.TryGetApplyUpdateArgs` (opaque trailing-payload parse contract, option-a) checked as the first branch in `Main()`, transferring control to a deliberately empty `UpdateApplyEntryPoint.Run` before the single-instance guard is ever touched.
+- Real child-process xUnit suite proving INSTANCE-01/INSTANCE-02/UPDATE-07 end-to-end, plus two real production bugs found and fixed during the Task 3 operator checkpoint: a SetColorMode/SystemEvents race crashing duplicate launches, and a foreground-activation grant (`AllowSetForegroundWindow`) that was silently ineffective.
+- `WaitForInstanceReady` now catches `AbandonedMutexException` and treats an abandoned-but-acquired wait as success, closing the phase's one blocking crash gap; `Acquire()`'s readiness-mutex construction can no longer escape as an unhandled exception. Task 3's blocking checkpoint was closed by explicit operator authorization on PARTIAL evidence — build succeeds and the app functions normally on real Windows hardware, but the specific flakiness check and live CR-01 repro this task originally asked for were not run. See "Task 3: Operator Verification" below for the exact evidence and what remains open.
+- End-to-end GitHub-release auto-update slice — version-stamped exe queries `/releases/latest`, shows a themed confirm dialog, downloads the asset, self-replaces at its original path via a temp-copy helper, and relaunches — proven end-to-end and covered by 31 new automated tests.
+- Publishes a SHA256 checksum alongside every release exe and verifies it in the still-running old process before any code path can reach the swap step — a mismatch or missing checksum now surfaces as the same D-08 Warning toast as any other apply failure.
+- Retained-backup + applied-but-unconfirmed marker + above-the-guard auto-rollback state machine, so a failed or crash-looping update can never leave the app stranded (UPDATE-05, D-09) — proven by 6 marker-store unit tests and 4 real child-process swap tests.
+- Three-way Update Now/Later/Skip prompt result with a per-version persisted skip (compared numerically, never by string) threaded through UpdateOrchestrator, plus a hand-rolled Markdown-lite formatter/renderer pair that turns a GitHub release body into styled RichTextBox runs with a verbatim empty-notes fallback.
+- UpdateOrchestrator.CheckOnDemandAsync shares CheckOnLaunchAsync's fetch/compare/confirm/apply sequencer via a new private CheckAsync body, always overriding a prior skip and always surfacing a distinct CheckFailed outcome; MainForm.PerformManualUpdateCheck is the one shared body reached from a new tray menu item and a new Settings button, reporting honest Info/Warning-icon toasts.
+
+---
+
 ## v2.1 Modern UI Redesign & Theme Backlog (Shipped: 2026-08-17)
 
 **Phases completed:** 5 phases, 19 plans, 36 tasks

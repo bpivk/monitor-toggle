@@ -2,11 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Auto-Update, Single-Instance Guard & Smaller Footprint
-current_phase: 26
-current_phase_name: auto-update
-status: executing
+status: Awaiting next milestone
 stopped_at: context exhaustion at 75% (2026-08-28)
-last_updated: "2026-08-29T12:09:27.944Z"
+last_updated: "2026-08-29T12:24:59.490Z"
 last_activity: 2026-08-29
 last_activity_desc: Completed and rig-verified quick tasks 260829-fnt (Help>About menu) and 260829-ga9 (consolidate Check-for-Updates entry points + fix silent-feedback bug) - user approved
 progress:
@@ -15,6 +13,8 @@ progress:
   total_plans: 10
   completed_plans: 10
   percent: 100
+current_phase: 26
+current_phase_name: auto-update
 ---
 
 # Project State
@@ -28,12 +28,10 @@ See: .planning/PROJECT.md (updated 2026-08-18)
 
 ## Current Position
 
-Phase: 26 (auto-update) — COMPLETE (2026-08-29)
-Plan: 5 of 5
-Status: Phase 26 closed. UAT test 1 rig-verified live (real v2.2.1->v2.2.2 update); tests 2-5 closed by operator sign-off, not independently verified (see Decisions below and 26-UAT.md). All three v2.2 phases (24-26) now complete.
-Last activity: 2026-08-29 - Closed Phase 26 (auto-update): UAT test 1 rig-verified, tests 2-5 signed off by operator per explicit request ("everything seems fine so just confirm it")
-
-Progress: [██████████] 100%
+Phase: Milestone v2.2 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-08-29 — Milestone v2.2 completed and archived
 
 ## Performance Metrics
 
@@ -202,5 +200,4 @@ Resume file: .planning/phases/26-auto-update/26-UI-SPEC.md
 
 ## Operator Next Steps
 
-- Review the v2.2 roadmap draft (`.planning/ROADMAP.md`) and requirements traceability (`.planning/REQUIREMENTS.md`)
-- Once approved: `/gsd-plan-phase 24`
+- Start the next milestone with /gsd-new-milestone
