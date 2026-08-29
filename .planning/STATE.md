@@ -6,9 +6,9 @@ current_phase: 26
 current_phase_name: auto-update
 status: executing
 stopped_at: context exhaustion at 75% (2026-08-28)
-last_updated: "2026-08-28T09:27:47.522Z"
-last_activity: 2026-08-22
-last_activity_desc: Phase 26 execution started
+last_updated: "2026-08-29T12:09:27.944Z"
+last_activity: 2026-08-29
+last_activity_desc: Completed and rig-verified quick tasks 260829-fnt (Help>About menu) and 260829-ga9 (consolidate Check-for-Updates entry points + fix silent-feedback bug) - user approved
 progress:
   total_phases: 3
   completed_phases: 3
@@ -143,6 +143,7 @@ Resolved 2026-08-21 (partial): Phase 25 Plan 04 Task 3's blocking checkpoint (re
 | 260828-vit | Extend UpdateVersionComparer to three-component semver (vX.Y.Z) patch comparison, fix a latent phantom-update trap and a skip-tracking patch-discard bug found along the way, bump RigToggle.App to 2.2.1, and tag/push v2.2.1 to cut a real release for Phase 26 UAT testing | 2026-08-28 | 8087afd | [260828-vit-extend-updateversioncomparer-to-support-](./quick/260828-vit-extend-updateversioncomparer-to-support-/) |
 | 260829-fnt | Add a MenuStrip Help > About entry point on MainForm opening a themed AboutForm (name, version, Check for Updates); extract shared FormatDisplayVersion/RunningVersionText formatter. Rig-verification checkpoint superseded by 260829-ga9 (not verified as-is; see that task) | 2026-08-29 | 04d765b | [260829-fnt-add-a-menustrip-help-about-item-to-mainf](./quick/260829-fnt-add-a-menustrip-help-about-item-to-mainf/) |
 | 260829-ga9 | Remove the redundant tray and Settings "Check for Updates" entry points (About dialog becomes the sole manual entry point); fix a real silent-feedback bug where manual checks relied exclusively on notifyIcon.ShowBalloonTip (a no-op when the tray icon is hidden, the default) by giving the About dialog its own reliable inline status label via a new shared UpdateCheckMessageFormatter. Rig-verified and approved 2026-08-29 | 2026-08-29 | 5f3f577 | [260829-ga9-remove-tray-settings-check-for-updates-e](./quick/260829-ga9-remove-tray-settings-check-for-updates-e/) |
+| 7 | Bump RigToggle.App to 2.2.2 and tag/push v2.2.2 to cut a real newer release for testing the update flow against the currently-installed 2.2.1 build | 2026-08-29 | 24b0867 | — |
 
 ## Deferred Items
 
