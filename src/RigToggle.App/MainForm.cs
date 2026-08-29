@@ -2077,34 +2077,25 @@ namespace RigToggle.App
         private void TraySettingsMenuItem_Click(object? sender, EventArgs e) => OpenSettingsDialog();
 
         /// <summary>
-        /// UPDATE-06/D-05: dispatches to PerformManualUpdateCheck, the shared body
-        /// SettingsForm's btnCheckForUpdates also invokes -- a one-line dispatch, not
-        /// a duplicated body, mirroring how TraySettingsMenuItem_Click above and
-        /// TrayToggleMenuItem_Click below both dispatch to a shared method rather
-        /// than holding logic of their own.
-        /// </summary>
-        private void TrayCheckUpdatesMenuItem_Click(object? sender, EventArgs e) => PerformManualUpdateCheck();
-
-        /// <summary>
-        /// UPDATE-06/quick-260829-fnt: the Help &gt; About menu item's handler --
+        /// UPDATE-06/quick-260829-ga9: the Help &gt; About menu item's handler --
         /// a one-line dispatch, not a duplicated body, mirroring
-        /// TrayCheckUpdatesMenuItem_Click above.
+        /// TraySettingsMenuItem_Click above.
         /// </summary>
         private void HelpAboutMenuItem_Click(object? sender, EventArgs e) => ShowAboutDialog();
 
         /// <summary>
-        /// UPDATE-06/quick-260829-fnt: constructs and shows the About dialog, a
-        /// third, more discoverable manual "Check for Updates" entry point
-        /// alongside the tray item and the Settings button. The running-version text
-        /// is read from _updateOrchestrator.RunningVersionText when available; the
-        /// null-orchestrator case (e.g. a test harness constructing MainForm
-        /// directly) mirrors Program.cs's own running-version resolution exactly
-        /// (GetEntryAssembly().GetName().Version, falling back to new Version(0, 0)),
-        /// via the same UpdateOrchestrator.FormatDisplayVersion the orchestrator
-        /// itself uses -- so the two paths can never disagree. Constructed owned by
-        /// `this` only when this form is currently Visible, mirroring
-        /// ShowUpdatePromptDialog's convention -- under --tray hidden startup the
-        /// main window is never shown. Wrapped in try/catch: opening an
+        /// UPDATE-06/quick-260829-ga9: constructs and shows the About dialog, now the
+        /// sole manual "Check for Updates" entry point (the tray item and the
+        /// Settings button were removed as redundant, silently-broken surfaces). The
+        /// running-version text is read from _updateOrchestrator.RunningVersionText
+        /// when available; the null-orchestrator case (e.g. a test harness
+        /// constructing MainForm directly) mirrors Program.cs's own running-version
+        /// resolution exactly (GetEntryAssembly().GetName().Version, falling back to
+        /// new Version(0, 0)), via the same UpdateOrchestrator.FormatDisplayVersion
+        /// the orchestrator itself uses -- so the two paths can never disagree.
+        /// Constructed owned by `this` only when this form is currently Visible,
+        /// mirroring ShowUpdatePromptDialog's convention -- under --tray hidden
+        /// startup the main window is never shown. Wrapped in try/catch: opening an
         /// informational dialog must never crash the toggle flow, matching this
         /// file's existing convention for cosmetic/non-critical failures.
         /// </summary>
@@ -2116,9 +2107,9 @@ namespace RigToggle.App
                     ?? UpdateOrchestrator.FormatDisplayVersion(
                         System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(0, 0));
 
-                Action? performManualUpdateCheck = _updateOrchestrator is null ? null : PerformManualUpdateCheck;
+                Func<Task<UpdateCheckResult?>>? checkForUpdatesAsync = _updateOrchestrator is null ? null : PerformManualUpdateCheckAsync;
 
-                using var dialog = new AboutForm(versionText, _themeProvider, performManualUpdateCheck);
+                using var dialog = new AboutForm(versionText, _themeProvider, checkForUpdatesAsync);
                 _ = Visible ? dialog.ShowDialog(this) : dialog.ShowDialog();
             }
             catch (Exception ex)
@@ -2358,49 +2349,53 @@ namespace RigToggle.App
         }
 
         /// <summary>
-        /// UPDATE-06/D-05/D-06/D-07: the shared manual "Check for Updates" body
-        /// reached from both TrayCheckUpdatesMenuItem_Click and SettingsForm's
-        /// btnCheckForUpdates (threaded through Program.cs's SettingsFormFactory) --
-        /// one implementation, two entry points. Independent of
-        /// RunAutomaticUpdateCheckAsync: it can be run at any time, any number of
-        /// times, without a relaunch, and it always honours honourSkippedVersion:
-        /// false (an explicit request overrides a prior skip, D-02 read together with
-        /// D-06) via UpdateOrchestrator.CheckOnDemandAsync.
+        /// UPDATE-06/D-05/D-06/D-07: the manual "Check for Updates" body -- after
+        /// quick-260829-ga9, reached solely from the Help &gt; About dialog (the tray
+        /// menu item and the Settings button were removed as redundant, silently-
+        /// broken entry points). Independent of RunAutomaticUpdateCheckAsync: it can
+        /// be run at any time, any number of times, without a relaunch, and it always
+        /// honours honourSkippedVersion: false (an explicit request overrides a prior
+        /// skip, D-02 read together with D-06) via UpdateOrchestrator.CheckOnDemandAsync.
         ///
-        /// Unlike the automatic path, a manual check always reports its result:
-        /// NotAvailable shows an Info-icon "already on the latest version" toast
-        /// naming the running version (D-06); CheckFailed, or any exception escaping
-        /// the call, shows a Warning-icon toast naming the reason (D-07) --
-        /// deliberately visibly different from the up-to-date toast, both in icon and
-        /// wording, so a failed manual check is never indistinguishable from a
-        /// successful one. Applying exits the app exactly like the automatic path.
-        /// Declined and Skipped show no toast -- the user just made that choice in a
-        /// dialog they were looking at, so re-announcing it is noise. Every toast
-        /// here uses notifyIcon.ShowBalloonTip with the literal title "Rig Toggle" and
-        /// an icon of Info or Warning only -- never Error, matching this file's
-        /// existing no-chrome guarantee for background-triggered feedback.
+        /// Returns the produced <see cref="UpdateCheckResult"/> (or
+        /// <see langword="null"/> when no outcome was produced -- the CR-01
+        /// reentrancy guard rejected this call because a check is already in flight)
+        /// so the caller can render the result itself. The About dialog's inline
+        /// status label -- not the balloon below -- is now the reliable channel:
+        /// notifyIcon.ShowBalloonTip is a silent no-op whenever notifyIcon.Visible is
+        /// false, which is the default (both CloseMinimizesToTray and MinimizeToTray
+        /// default to false), so the label is what actually guarantees NotAvailable
+        /// (D-06) and CheckFailed (D-07) stay visibly distinguishable from each other.
+        /// The balloon remains as an additive secondary channel, sharing its wording
+        /// with the label via UpdateCheckMessageFormatter.FormatStatus so the two
+        /// channels can never drift. Applying exits the app exactly like the
+        /// automatic path. Declined and Skipped show no toast and format to
+        /// string.Empty -- the user just made that choice in a dialog they were
+        /// looking at, so re-announcing it is noise. Every toast here uses
+        /// notifyIcon.ShowBalloonTip with the literal title "Rig Toggle" and an icon
+        /// of Info or Warning only -- never Error, matching this file's existing
+        /// no-chrome guarantee for background-triggered feedback.
         ///
         /// Note: the check runs against the settings already persisted (skip state,
         /// etc.), not against unsaved edits in an open Settings dialog -- the update
         /// path reads settings.json through the same store, so a pending unsaved
         /// change has no bearing on it.
         /// </summary>
-        public async Task PerformManualUpdateCheckAsync()
+        public async Task<UpdateCheckResult?> PerformManualUpdateCheckAsync()
         {
             if (_updateOrchestrator is null)
             {
-                return;
+                return null;
             }
 
             // CR-01: reject a concurrent call (see _updateCheckInProgress's own
             // comment) -- if the automatic check (or another manual check) is
-            // already in flight, silently no-op rather than race it. A manual
-            // check's own reentrant trigger (the nested ShowDialog() message pump
-            // dispatching a second tray-menu click) is exactly the hazard this
-            // guards against.
+            // already in flight, return null rather than race it. A manual check's
+            // own reentrant trigger (the nested ShowDialog() message pump
+            // dispatching a second click) is exactly the hazard this guards against.
             if (Interlocked.CompareExchange(ref _updateCheckInProgress, 1, 0) != 0)
             {
-                return;
+                return null;
             }
 
             try
@@ -2419,7 +2414,7 @@ namespace RigToggle.App
                         notifyIcon.ShowBalloonTip(
                             3000,
                             "Rig Toggle",
-                            ToggleResultFormatter.TruncateForBalloon($"You're already on the latest version (v{result.RunningVersionText})."),
+                            ToggleResultFormatter.TruncateForBalloon(UpdateCheckMessageFormatter.FormatStatus(result)),
                             ToolTipIcon.Info);
                         break;
 
@@ -2427,7 +2422,7 @@ namespace RigToggle.App
                         notifyIcon.ShowBalloonTip(
                             3000,
                             "Rig Toggle",
-                            ToggleResultFormatter.TruncateForBalloon($"Couldn't check for updates — {result.FailureReason}. Try again from the tray menu or Settings."),
+                            ToggleResultFormatter.TruncateForBalloon(UpdateCheckMessageFormatter.FormatStatus(result)),
                             ToolTipIcon.Warning);
                         break;
 
@@ -2441,14 +2436,23 @@ namespace RigToggle.App
                         // were looking at, so re-announcing it is noise.
                         break;
                 }
+
+                return result;
             }
             catch (Exception ex)
             {
+                UpdateCheckResult failureResult = new(
+                    UpdateCheckOutcome.CheckFailed,
+                    _updateOrchestrator.RunningVersionText,
+                    ex.Message);
+
                 notifyIcon.ShowBalloonTip(
                     3000,
                     "Rig Toggle",
-                    ToggleResultFormatter.TruncateForBalloon($"Couldn't check for updates — {ex.Message}. Try again from the tray menu or Settings."),
+                    ToggleResultFormatter.TruncateForBalloon(UpdateCheckMessageFormatter.FormatStatus(failureResult)),
                     ToolTipIcon.Warning);
+
+                return failureResult;
             }
             finally
             {
@@ -2458,8 +2462,11 @@ namespace RigToggle.App
 
         /// <summary>
         /// Synchronous fire-and-forget wrapper around PerformManualUpdateCheckAsync,
-        /// suitable for a WinForms event handler (TrayCheckUpdatesMenuItem_Click,
-        /// SettingsForm's btnCheckForUpdates), discarding the returned task.
+        /// retained as the void fire-and-forget entry point for callers that don't
+        /// need the result (none remain in this codebase after quick-260829-ga9, but
+        /// the wrapper is kept for API symmetry/future callers). The About dialog
+        /// awaits the async form directly instead, so it can render the returned
+        /// <see cref="UpdateCheckResult"/> in its own status label.
         /// PerformManualUpdateCheckAsync's own try/catch (plus ShowUpdatePromptDialog's
         /// nested try/catch) means no exception can escape this fire-and-forget call.
         /// </summary>

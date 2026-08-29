@@ -40,6 +40,7 @@ namespace RigToggle.App
         {
             this.lblAppName = new System.Windows.Forms.Label();
             this.lblVersion = new System.Windows.Forms.Label();
+            this.lblUpdateStatus = new System.Windows.Forms.Label();
             this.btnCheckForUpdates = new System.Windows.Forms.Button();
             this.btnClose = new System.Windows.Forms.Button();
 
@@ -62,6 +63,21 @@ namespace RigToggle.App
             this.lblVersion.Size = new System.Drawing.Size(336, 20);
             this.lblVersion.AutoSize = false;
             this.lblVersion.Name = "lblVersion";
+
+            //
+            // lblUpdateStatus
+            //
+            // Quick-260829-ga9: always-visible inline status line for manual-check
+            // outcomes (D-06/D-07). AutoEllipsis lets a long exception message wrap
+            // to ~two lines then ellipsis rather than overflow this fixed-size
+            // dialog. No per-label theming call -- it inherits the form surface
+            // exactly like lblAppName/lblVersion (ThemeApplier has no label API).
+            this.lblUpdateStatus.Location = new System.Drawing.Point(12, 70);
+            this.lblUpdateStatus.Size = new System.Drawing.Size(336, 34);
+            this.lblUpdateStatus.AutoSize = false;
+            this.lblUpdateStatus.AutoEllipsis = true;
+            this.lblUpdateStatus.Text = string.Empty;
+            this.lblUpdateStatus.Name = "lblUpdateStatus";
 
             //
             // btnCheckForUpdates
@@ -104,6 +120,7 @@ namespace RigToggle.App
 
             this.Controls.Add(this.lblAppName);
             this.Controls.Add(this.lblVersion);
+            this.Controls.Add(this.lblUpdateStatus);
             this.Controls.Add(this.btnCheckForUpdates);
             this.Controls.Add(this.btnClose);
 
@@ -114,6 +131,7 @@ namespace RigToggle.App
 
         private System.Windows.Forms.Label lblAppName;
         private System.Windows.Forms.Label lblVersion;
+        private System.Windows.Forms.Label lblUpdateStatus;
         private System.Windows.Forms.Button btnCheckForUpdates;
         private System.Windows.Forms.Button btnClose;
     }

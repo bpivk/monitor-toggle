@@ -30,12 +30,6 @@ namespace RigToggle.App
         private readonly Action<AppTheme?> _previewThemeOverride;
         private readonly Action _applyThemeOverride;
 
-        // UPDATE-06/D-05: threaded through Program.cs's SettingsFormFactory exactly
-        // like _tryRegisterConfiguredHotkey/_applyTrayVisibility above -- invokes the
-        // same shared manual-check body MainForm's trayCheckUpdatesMenuItem also
-        // dispatches to, so the two entry points share one implementation.
-        private readonly Action _performManualUpdateCheck;
-
         private AppSettings _settings = new();
 
         // TRIG-01/D-01: the working (not-yet-saved) hotkey combo, initialized from
@@ -98,7 +92,7 @@ namespace RigToggle.App
         // 12-02: ctor param + field only in this plan -- SettingsForm's own
         // subscribe/OnThemeChanged/per-control theming lands in plan 12-03. Threaded
         // here so the composition root (Program.cs SettingsFormFactory) compiles.
-        public SettingsForm(IMonitorController monitorController, IAudioController audioController, ISettingsStore settingsStore, IAutostartConfigurator autostartConfigurator, IThemeProvider themeProvider, Func<bool> tryRegisterConfiguredHotkey, Action applyTrayVisibility, Action<AppTheme?> previewThemeOverride, Action applyThemeOverride, Action performManualUpdateCheck)
+        public SettingsForm(IMonitorController monitorController, IAudioController audioController, ISettingsStore settingsStore, IAutostartConfigurator autostartConfigurator, IThemeProvider themeProvider, Func<bool> tryRegisterConfiguredHotkey, Action applyTrayVisibility, Action<AppTheme?> previewThemeOverride, Action applyThemeOverride)
         {
             _monitorController = monitorController ?? throw new ArgumentNullException(nameof(monitorController));
             _audioController = audioController ?? throw new ArgumentNullException(nameof(audioController));
@@ -109,7 +103,6 @@ namespace RigToggle.App
             _applyTrayVisibility = applyTrayVisibility ?? throw new ArgumentNullException(nameof(applyTrayVisibility));
             _previewThemeOverride = previewThemeOverride ?? throw new ArgumentNullException(nameof(previewThemeOverride));
             _applyThemeOverride = applyThemeOverride ?? throw new ArgumentNullException(nameof(applyThemeOverride));
-            _performManualUpdateCheck = performManualUpdateCheck ?? throw new ArgumentNullException(nameof(performManualUpdateCheck));
 
             InitializeComponent();
 
@@ -312,9 +305,6 @@ namespace RigToggle.App
                 ThemeApplier.ThemeButton(btnClearAppPath, IsDarkTheme);
                 ThemeApplier.ThemeButton(btnSaveSettings, IsDarkTheme);
                 ThemeApplier.ThemeButton(btnDiscardChanges, IsDarkTheme);
-                // Plan 26-05: follows the same all-buttons-re-themed-on-every-flip
-                // discipline as the four calls above.
-                ThemeApplier.ThemeButton(btnCheckForUpdates, IsDarkTheme);
 
                 // 12-05/CR-03: re-theme both audio combos on every live flip.
                 ThemeApplier.ThemeComboBox(cboAudioNormal, IsDarkTheme);
@@ -346,9 +336,6 @@ namespace RigToggle.App
             ThemeApplier.ThemeButton(btnClearAppPath, IsDarkTheme);
             ThemeApplier.ThemeButton(btnSaveSettings, IsDarkTheme);
             ThemeApplier.ThemeButton(btnDiscardChanges, IsDarkTheme);
-            // Plan 26-05: follows the same all-buttons-themed-at-load discipline as
-            // the four calls above.
-            ThemeApplier.ThemeButton(btnCheckForUpdates, IsDarkTheme);
 
             PopulateAudioPickers();
             PopulateAppPathField();
@@ -1207,17 +1194,6 @@ namespace RigToggle.App
             path = candidate;
             return true;
         }
-
-        /// <summary>
-        /// UPDATE-06/D-05: dispatches to the shared _performManualUpdateCheck
-        /// callback threaded in from Program.cs's SettingsFormFactory -- the
-        /// identical shared check the tray menu's "Check for Updates" item invokes.
-        /// The check runs against the settings already persisted (settings.json
-        /// through the same store MainForm/UpdateOrchestrator read), not against any
-        /// unsaved edits currently pending in this open dialog -- a pending unsaved
-        /// change here has no bearing on it.
-        /// </summary>
-        private void BtnCheckForUpdates_Click(object? sender, EventArgs e) => _performManualUpdateCheck();
 
         private void BtnSaveSettings_Click(object? sender, EventArgs e)
         {

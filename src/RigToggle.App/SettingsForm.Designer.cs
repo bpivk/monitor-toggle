@@ -75,11 +75,8 @@ namespace RigToggle.App
             // 22-02/D-05/D-06: right-aligned Save/Discard button row.
             this.flpButtons = new System.Windows.Forms.FlowLayoutPanel();
 
-            // Plan 26-05/26-UI-SPEC.md Component Specification item 3: secondary
-            // "Check for Updates" action, bottom-left, standing alongside (not
-            // inside) flpButtons via a new two-column tlpButtonRow container.
+            // tlpRoot's bottom button row container, wrapping flpButtons.
             this.tlpButtonRow = new System.Windows.Forms.TableLayoutPanel();
-            this.btnCheckForUpdates = new System.Windows.Forms.Button();
 
             this.pnlMonitor = new System.Windows.Forms.Panel();
             this.lblMonitorCaption = new System.Windows.Forms.Label();
@@ -968,35 +965,13 @@ namespace RigToggle.App
             this.btnSaveSettings.Click += new System.EventHandler(this.BtnSaveSettings_Click);
 
             //
-            // btnCheckForUpdates (UPDATE-06/26-UI-SPEC.md Component Specification
-            // item 3: secondary action, bottom-left, NOT inside flpButtons -- which
-            // stays exactly Discard Changes / Save Settings, right-aligned, per the
-            // existing 22-UI-SPEC layout.)
+            // tlpButtonRow (single-column container wrapping the unchanged
+            // right-aligned flpButtons -- quick-260829-ga9 removed the secondary
+            // update-check action button that previously occupied a second,
+            // left-hand column here.)
             //
-            this.btnCheckForUpdates.Text = "Check for Updates";
-            this.btnCheckForUpdates.AutoSize = true;
-            this.btnCheckForUpdates.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
-            this.btnCheckForUpdates.MinimumSize = new System.Drawing.Size(140, 32);
-            this.btnCheckForUpdates.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
-            this.btnCheckForUpdates.Margin = new System.Windows.Forms.Padding(0);
-            this.btnCheckForUpdates.TabIndex = 0;
-            this.btnCheckForUpdates.Name = "btnCheckForUpdates";
-            // 12-05/THEME-05 (12-REVIEW.md CR-02): see btnBrowse's comment above for the
-            // full rig-finding + #13897 rationale.
-            this.btnCheckForUpdates.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnCheckForUpdates.Click += new System.EventHandler(this.BtnCheckForUpdates_Click);
-
-            //
-            // tlpButtonRow (Plan 26-05: converts tlpRoot's bottom button row into a
-            // two-column container -- left cell holds btnCheckForUpdates left-anchored,
-            // right cell holds the unchanged flpButtons right-anchored, mirroring the
-            // common "secondary action bottom-left, primary actions bottom-right"
-            // convention. tlpRoot's own row count/Percent-100 row-0 sizing is
-            // untouched -- only this bottom row's contents changed.)
-            //
-            this.tlpButtonRow.ColumnCount = 2;
+            this.tlpButtonRow.ColumnCount = 1;
             this.tlpButtonRow.RowCount = 1;
-            this.tlpButtonRow.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.AutoSize));
             this.tlpButtonRow.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.tlpButtonRow.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
             this.tlpButtonRow.AutoSize = true;
@@ -1006,8 +981,7 @@ namespace RigToggle.App
             this.tlpButtonRow.Padding = new System.Windows.Forms.Padding(0);
             this.tlpButtonRow.TabIndex = 2;
             this.tlpButtonRow.Name = "tlpButtonRow";
-            this.tlpButtonRow.Controls.Add(this.btnCheckForUpdates, 0, 0);
-            this.tlpButtonRow.Controls.Add(this.flpButtons, 1, 0);
+            this.tlpButtonRow.Controls.Add(this.flpButtons, 0, 0);
 
             //
             // dlgOpenExe
@@ -1152,7 +1126,6 @@ namespace RigToggle.App
         private System.Windows.Forms.RadioButton rdoThemeDark;
         private System.Windows.Forms.FlowLayoutPanel flpButtons;
         private System.Windows.Forms.TableLayoutPanel tlpButtonRow;
-        private System.Windows.Forms.Button btnCheckForUpdates;
 
         private System.Windows.Forms.Panel pnlMonitor;
         private System.Windows.Forms.Label lblMonitorCaption;
