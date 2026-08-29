@@ -367,5 +367,56 @@ namespace RigToggle.App
                 // Cosmetic-only — leave the form's surface color unchanged on failure.
             }
         }
+
+        /// <summary>
+        /// quick-260829-fnt/UPDATE-06: themes MainForm's Help menu bar. BackColor
+        /// uses the same two literals ThemeFormSurface uses (so the bar reads as
+        /// part of the window surface) and ForeColor uses the same two literals
+        /// ThemeButton uses (so menu text matches button text). Deliberately a
+        /// shallow, exhaustive two-level walk (top-level items, then each
+        /// ToolStripMenuItem's DropDown and its DropDownItems) rather than the
+        /// recursive Controls-tree walk this class's own doc comment forbids -- this
+        /// is correct and sufficient specifically because this menu's shape (one
+        /// top-level Help item, one About child) is fixed and known, not because a
+        /// deeper menu would also be safe to walk this way.
+        ///
+        /// Known limitation, accepted: like trayContextMenu (MainForm.Designer.cs),
+        /// a live theme flip can leave the dropdown's separator/arrow glyphs a
+        /// stale color (dotnet/winforms#12027, no clean first-party fix). Do not
+        /// chase this with a custom ToolStripRenderer.
+        /// </summary>
+        public static void ThemeMenuStrip(MenuStrip menu, bool dark)
+        {
+            try
+            {
+                Color backColor = dark ? Color.FromArgb(32, 32, 32) : SystemColors.Control;
+                Color foreColor = dark ? Color.FromArgb(240, 240, 240) : SystemColors.ControlText;
+
+                menu.BackColor = backColor;
+                menu.ForeColor = foreColor;
+
+                foreach (ToolStripItem item in menu.Items)
+                {
+                    item.BackColor = backColor;
+                    item.ForeColor = foreColor;
+
+                    if (item is ToolStripMenuItem menuItem)
+                    {
+                        menuItem.DropDown.BackColor = backColor;
+                        menuItem.DropDown.ForeColor = foreColor;
+
+                        foreach (ToolStripItem dropDownItem in menuItem.DropDownItems)
+                        {
+                            dropDownItem.BackColor = backColor;
+                            dropDownItem.ForeColor = foreColor;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Cosmetic-only — leave the menu strip's coloring unchanged on failure.
+            }
+        }
     }
 }
