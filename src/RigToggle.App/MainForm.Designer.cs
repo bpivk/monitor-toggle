@@ -75,7 +75,6 @@ namespace RigToggle.App
             this.trayContextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.trayToggleMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.traySettingsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.trayCheckUpdatesMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.traySeparator = new System.Windows.Forms.ToolStripSeparator();
             this.trayExitMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 
@@ -192,9 +191,9 @@ namespace RigToggle.App
             //
             // helpAboutMenuItem
             //
-            // quick-260829-fnt/UPDATE-06: a third, more discoverable manual "Check for
-            // Updates" entry point (via the About dialog it opens), alongside the tray
-            // item and the Settings button.
+            // UPDATE-06/quick-260829-ga9: the sole manual "Check for Updates" entry
+            // point (via the About dialog it opens) -- the tray item and the
+            // Settings button were removed as redundant, silently-broken surfaces.
             this.helpAboutMenuItem.Text = "About";
             this.helpAboutMenuItem.Name = "helpAboutMenuItem";
             this.helpAboutMenuItem.Click += new System.EventHandler(this.HelpAboutMenuItem_Click);
@@ -234,16 +233,6 @@ namespace RigToggle.App
             this.traySettingsMenuItem.Click += new System.EventHandler(this.TraySettingsMenuItem_Click);
 
             //
-            // trayCheckUpdatesMenuItem
-            //
-            // UPDATE-06/D-05/26-UI-SPEC.md Component Specification item 2: dispatches
-            // to the same shared PerformManualUpdateCheck the Settings button (Plan
-            // 26-05 Task 2) invokes -- one implementation, two entry points.
-            this.trayCheckUpdatesMenuItem.Text = "Check for Updates";
-            this.trayCheckUpdatesMenuItem.Name = "trayCheckUpdatesMenuItem";
-            this.trayCheckUpdatesMenuItem.Click += new System.EventHandler(this.TrayCheckUpdatesMenuItem_Click);
-
-            //
             // traySeparator
             //
             this.traySeparator.Name = "traySeparator";
@@ -266,17 +255,12 @@ namespace RigToggle.App
             //
             // trayContextMenu
             //
-            // Exact order per TRAY-03/08-UI-SPEC.md (as extended by Plan 26-05's
-            // 26-UI-SPEC.md Component Specification item 2): Switch mode -> Settings
-            // -> Check for Updates -> separator -> Exit. The new Check for Updates
-            // item slots directly above the separator/Exit, matching the menu's
-            // existing descending-frequency convention (toggle = daily use,
-            // Settings = occasional, Check for Updates = rare).
+            // Exact order per TRAY-03/08-UI-SPEC.md: Switch mode -> Settings ->
+            // separator -> Exit.
             this.trayContextMenu.Name = "trayContextMenu";
             this.trayContextMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
                 this.trayToggleMenuItem,
                 this.traySettingsMenuItem,
-                this.trayCheckUpdatesMenuItem,
                 this.traySeparator,
                 this.trayExitMenuItem});
 
@@ -349,7 +333,6 @@ namespace RigToggle.App
         private System.Windows.Forms.ContextMenuStrip trayContextMenu;
         private System.Windows.Forms.ToolStripMenuItem trayToggleMenuItem;
         private System.Windows.Forms.ToolStripMenuItem traySettingsMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem trayCheckUpdatesMenuItem;
         private System.Windows.Forms.ToolStripSeparator traySeparator;
         private System.Windows.Forms.ToolStripMenuItem trayExitMenuItem;
     }

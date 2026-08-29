@@ -2077,18 +2077,9 @@ namespace RigToggle.App
         private void TraySettingsMenuItem_Click(object? sender, EventArgs e) => OpenSettingsDialog();
 
         /// <summary>
-        /// UPDATE-06/D-05: dispatches to PerformManualUpdateCheck, the shared body
-        /// SettingsForm's btnCheckForUpdates also invokes -- a one-line dispatch, not
-        /// a duplicated body, mirroring how TraySettingsMenuItem_Click above and
-        /// TrayToggleMenuItem_Click below both dispatch to a shared method rather
-        /// than holding logic of their own.
-        /// </summary>
-        private void TrayCheckUpdatesMenuItem_Click(object? sender, EventArgs e) => PerformManualUpdateCheck();
-
-        /// <summary>
-        /// UPDATE-06/quick-260829-fnt: the Help &gt; About menu item's handler --
+        /// UPDATE-06/quick-260829-ga9: the Help &gt; About menu item's handler --
         /// a one-line dispatch, not a duplicated body, mirroring
-        /// TrayCheckUpdatesMenuItem_Click above.
+        /// TraySettingsMenuItem_Click above.
         /// </summary>
         private void HelpAboutMenuItem_Click(object? sender, EventArgs e) => ShowAboutDialog();
 
