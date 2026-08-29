@@ -3,24 +3,24 @@ status: testing
 phase: 26-auto-update
 source: [26-VERIFICATION.md]
 started: 2026-08-23T00:00:00Z
-updated: 2026-08-23T00:00:00Z
+updated: 2026-08-29T00:00:00Z
 ---
 
 ## Current Test
 
-number: 1
-name: Real exe swap and relaunch (SC3 / UPDATE-04)
+number: 2
+name: Interrupted-update recovery (SC4 / UPDATE-05)
 expected: |
-  Publish and install a build, tag/push a real newer release, click "Update Now."
-  The exe at the original install path is now the new version; no SmartScreen
-  interstitial; autostart still works without re-toggling.
+  Deliberately interrupt an update (kill the helper mid-swap, or simulate
+  disk-full/locked-file). A launchable exe still exists at the original path
+  afterward; a Warning balloon explains the failure.
 awaiting: user response
 
 ## Tests
 
 ### 1. Real exe swap and relaunch (SC3 / UPDATE-04)
 expected: The exe at the original install path is now the new version; no SmartScreen interstitial; autostart still works without re-toggling.
-result: [pending]
+result: pass — user tested live against real v2.2.1 -> v2.2.2 release (tagged/pushed 2026-08-29), triggered via the new About dialog's Check for Updates, confirmed "It works great." User did not separately flag a SmartScreen prompt or an autostart regression; treated as passing on the user's affirmation, note here if either surfaces later.
 
 ### 2. Interrupted-update recovery (SC4 / UPDATE-05)
 expected: Deliberately interrupt an update (kill the helper mid-swap, or simulate disk-full/locked-file). A launchable exe still exists at the original path afterward; a Warning balloon explains the failure.
@@ -41,9 +41,9 @@ result: [pending]
 ## Summary
 
 total: 5
-passed: 0
+passed: 1
 issues: 0
-pending: 5
+pending: 4
 skipped: 0
 blocked: 0
 
