@@ -466,6 +466,57 @@ public class UpdateOrchestratorTests
         Assert.Equal("simulated feed failure", demandResult.FailureReason);
     }
 
+    /// <summary>
+    /// UPDATE-06/quick-260829-fnt: the About dialog and the update balloon must
+    /// render the identical three-component Major.Minor.Patch string, so this is
+    /// the single implementation both read from.
+    /// </summary>
+    [Theory]
+    [InlineData(2, 2, 1, "2.2.1")]
+    [InlineData(2, 2, -1, "2.2.0")]
+    [InlineData(0, 0, -1, "0.0.0")]
+    public void FormatDisplayVersion_NormalizesToThreeComponents(int major, int minor, int build, string expected)
+    {
+        Version version = build >= 0 ? new Version(major, minor, build) : new Version(major, minor);
+
+        string result = UpdateOrchestrator.FormatDisplayVersion(version);
+
+        Assert.Equal(expected, result);
+    }
+
+    /// <summary>The fourth (revision) component must be dropped, never surfaced.</summary>
+    [Fact]
+    public void FormatDisplayVersion_FourComponentVersion_DropsRevision()
+    {
+        string result = UpdateOrchestrator.FormatDisplayVersion(new Version(2, 2, 1, 7));
+
+        Assert.Equal("2.2.1", result);
+    }
+
+    /// <summary>A null version is a programming error, not a display edge case.</summary>
+    [Fact]
+    public void FormatDisplayVersion_NullVersion_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => UpdateOrchestrator.FormatDisplayVersion(null!));
+    }
+
+    /// <summary>
+    /// RunningVersionText must read from FormatDisplayVersion for the orchestrator's
+    /// own constructor-supplied running version -- proves the property and the
+    /// static formatter can never disagree.
+    /// </summary>
+    [Fact]
+    public void RunningVersionText_ReflectsFormatDisplayVersionOfConstructorVersion()
+    {
+        var orchestrator = new UpdateOrchestrator(
+            new FakeReleaseFeed(release: null),
+            new RecordingUpdateApplier(new List<string>()),
+            new InMemorySettingsStore(),
+            RunningVersion);
+
+        Assert.Equal(UpdateOrchestrator.FormatDisplayVersion(RunningVersion), orchestrator.RunningVersionText);
+    }
+
     /// <summary>Fake IReleaseFeed configurable to return a supplied release, null, or throw.</summary>
     private sealed class FakeReleaseFeed : IReleaseFeed
     {
