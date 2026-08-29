@@ -59,18 +59,21 @@ coverage:
   - id: D2
     description: "AboutForm's inline status label reports a manual check's real outcome, and the tray context menu / Settings dialog no longer offer a Check for Updates entry point, on real Windows rig hardware"
     requirement: "UPDATE-06"
-    verification: []
+    verification:
+      - kind: human
+        ref: "User rig verification, 2026-08-29: tray menu order (Switch/Settings/Exit, no Check for Updates), Settings layout with button removed, About dialog inline status message on manual check, both themes legible, automatic on-launch path unaffected"
+        status: pass
     human_judgment: true
-    rationale: "This is a WinForms app that cannot be run or visually inspected in the Linux sandbox where it was written -- Task 3's checkpoint requires eyes on a real Windows rig (tray icon visibility toggling, dialog rendering in both themes, an actual update-check round trip)."
+    rationale: "This is a WinForms app that cannot be run or visually inspected in the Linux sandbox where it was written -- Task 3's checkpoint required eyes on a real Windows rig (tray icon visibility toggling, dialog rendering in both themes, an actual update-check round trip). User replied 'approved' confirming all checkpoint items held."
 
 duration: 35min
 completed: 2026-08-29
-status: incomplete
+status: complete
 ---
 
 # Quick Task 260829-ga9: Consolidate manual update-check entry points Summary
 
-**New Core `UpdateCheckMessageFormatter` feeding an always-visible About-dialog status label, plus removal of the redundant tray-menu and Settings-dialog Check-for-Updates surfaces — Tasks 1-2 complete and self-verified; Task 3's real-rig checkpoint is pending.**
+**New Core `UpdateCheckMessageFormatter` feeding an always-visible About-dialog status label, plus removal of the redundant tray-menu and Settings-dialog Check-for-Updates surfaces — all 3 tasks complete, rig-verified and approved by the user on 2026-08-29.**
 
 ## Performance
 
