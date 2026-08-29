@@ -20,7 +20,7 @@ awaiting: user response
 
 ### 1. Real exe swap and relaunch (SC3 / UPDATE-04)
 expected: The exe at the original install path is now the new version; no SmartScreen interstitial; autostart still works without re-toggling.
-result: pass — user tested live against real v2.2.1 -> v2.2.2 release (tagged/pushed 2026-08-29), triggered via the new About dialog's Check for Updates, confirmed "It works great." User did not separately flag a SmartScreen prompt or an autostart regression; treated as passing on the user's affirmation, note here if either surfaces later.
+result: pass — user tested live against real v2.2.1 -> v2.2.2 release (tagged/pushed 2026-08-29), triggered via the new About dialog's Check for Updates, confirmed "It works great." User explicitly confirmed no SmartScreen interstitial appeared and no autostart regression occurred.
 
 ### 2. Interrupted-update recovery (SC4 / UPDATE-05)
 expected: Deliberately interrupt an update (kill the helper mid-swap, or simulate disk-full/locked-file). A launchable exe still exists at the original path afterward; a Warning balloon explains the failure.
