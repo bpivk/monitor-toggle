@@ -63,6 +63,13 @@ namespace RigToggle.App
             this.tileStrip = new System.Windows.Forms.FlowLayoutPanel();
             this.lblNoMonitors = new System.Windows.Forms.Label();
             this.btnIdentify = new System.Windows.Forms.Button();
+            // quick-260829-fnt/UPDATE-06: menuStrip is a Control (unlike
+            // notifyIcon/trayContextMenu below), so it is added to this.Controls and
+            // disposed with the form -- do NOT pass this.components to its
+            // constructor.
+            this.menuStrip = new System.Windows.Forms.MenuStrip();
+            this.helpMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.helpAboutMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.tileToolTip = new System.Windows.Forms.ToolTip(this.components);
             this.notifyIcon = new System.Windows.Forms.NotifyIcon(this.components);
             this.trayContextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
@@ -183,6 +190,32 @@ namespace RigToggle.App
             this.btnIdentify.Leave += new System.EventHandler(this.BtnIdentify_Leave);
 
             //
+            // helpAboutMenuItem
+            //
+            // quick-260829-fnt/UPDATE-06: a third, more discoverable manual "Check for
+            // Updates" entry point (via the About dialog it opens), alongside the tray
+            // item and the Settings button.
+            this.helpAboutMenuItem.Text = "About";
+            this.helpAboutMenuItem.Name = "helpAboutMenuItem";
+            this.helpAboutMenuItem.Click += new System.EventHandler(this.HelpAboutMenuItem_Click);
+
+            //
+            // helpMenuItem
+            //
+            this.helpMenuItem.Text = "Help";
+            this.helpMenuItem.Name = "helpMenuItem";
+            this.helpMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+                this.helpAboutMenuItem});
+
+            //
+            // menuStrip
+            //
+            this.menuStrip.Name = "menuStrip";
+            this.menuStrip.Dock = System.Windows.Forms.DockStyle.Top;
+            this.menuStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+                this.helpMenuItem});
+
+            //
             // trayToggleMenuItem
             //
             // Text left at a safe default; RefreshUi() computes this text directly from
@@ -278,6 +311,7 @@ namespace RigToggle.App
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Rig Toggle";
             this.Name = "MainForm";
+            this.MainMenuStrip = this.menuStrip;
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
             this.Resize += new System.EventHandler(this.MainForm_Resize);
 
@@ -291,6 +325,12 @@ namespace RigToggle.App
             this.Controls.Add(this.toggleSwitch);
             this.Controls.Add(this.btnSettings);
 
+            // quick-260829-fnt/UPDATE-06: menuStrip is appended LAST, deliberately,
+            // so the D-09 reading/tab order above (tiles, Identify, toggle, Settings
+            // gear) is left byte-for-byte untouched -- Controls.Add order, not
+            // Dock/Location, is what determines that order.
+            this.Controls.Add(this.menuStrip);
+
             this.ResumeLayout(false);
         }
 
@@ -301,6 +341,9 @@ namespace RigToggle.App
         private System.Windows.Forms.FlowLayoutPanel tileStrip;
         private System.Windows.Forms.Label lblNoMonitors;
         private System.Windows.Forms.Button btnIdentify;
+        private System.Windows.Forms.MenuStrip menuStrip;
+        private System.Windows.Forms.ToolStripMenuItem helpMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem helpAboutMenuItem;
         private System.Windows.Forms.ToolTip tileToolTip;
         private System.Windows.Forms.NotifyIcon notifyIcon;
         private System.Windows.Forms.ContextMenuStrip trayContextMenu;

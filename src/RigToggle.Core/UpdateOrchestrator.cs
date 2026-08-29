@@ -57,6 +57,36 @@ public sealed class UpdateOrchestrator
     }
 
     /// <summary>
+    /// Formats <paramref name="version"/> as the project's own three-component
+    /// Major.Minor.Patch display string, matching this project's vX.Y.Z tag scheme
+    /// (see <see cref="UpdateVersionComparer"/>'s class doc comment) -- never the
+    /// full four-component <see cref="Version.ToString()"/>, which would read as a
+    /// four-segment string (e.g. "2.2.1.0") in a balloon or dialog. The third
+    /// component (<see cref="Version.Build"/>) is normalized via
+    /// <c>Math.Max(..., 0)</c> because a two-component running <see cref="Version"/>
+    /// (e.g. <c>new Version(2, 2)</c>) reports <c>Build == -1</c>, which must never
+    /// render as "2.2.-1". The fourth (<see cref="Version.Revision"/>) component is
+    /// always dropped.
+    /// </summary>
+    public static string FormatDisplayVersion(Version version)
+    {
+        if (version is null)
+        {
+            throw new ArgumentNullException(nameof(version));
+        }
+
+        return $"{version.Major}.{version.Minor}.{Math.Max(version.Build, 0)}";
+    }
+
+    /// <summary>
+    /// The running version formatted via <see cref="FormatDisplayVersion(Version)"/>,
+    /// so this and the "already on the latest version" balloon (produced inside
+    /// <see cref="CheckAsync"/>) and any other display surface (e.g. the About
+    /// dialog's version label) can never drift from one another.
+    /// </summary>
+    public string RunningVersionText => FormatDisplayVersion(_runningVersion);
+
+    /// <summary>
     /// Sequences: fetch the latest release, return <see cref="UpdateCheckOutcome.NotAvailable"/>
     /// on a null/not-newer result (or any exception from that segment -- see class
     /// doc comment). When <paramref name="honourSkippedVersion"/> is true (the
@@ -146,12 +176,9 @@ public sealed class UpdateOrchestrator
             throw new ArgumentNullException(nameof(onApplyStarting));
         }
 
-        // Three-component Major.Minor.Patch, matching this project's own vX.Y.Z tag
-        // scheme (UpdateVersionComparer's class doc comment) -- never the full
-        // four-component System.Version.ToString(), which would read "2.2.1.0" in a
-        // balloon. Build is normalized via Math.Max(..., 0) since a two-component
-        // running Version reports Build == -1 (see UpdateVersionComparer).
-        string runningVersionText = $"{_runningVersion.Major}.{_runningVersion.Minor}.{Math.Max(_runningVersion.Build, 0)}";
+        // Single shared implementation -- see FormatDisplayVersion's doc comment for
+        // the three-component Major.Minor.Patch rationale and the Build normalization.
+        string runningVersionText = RunningVersionText;
 
         ReleaseInfo release;
         try

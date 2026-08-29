@@ -1415,7 +1415,21 @@ namespace RigToggle.App
                 // mode readout (D-06), an empty gap there would read as an unexplained
                 // layout hole, so the tile strip now starts flush with the top margin
                 // and the window stays exactly as tall as its content needs.
-                int stripTop = margin;
+                //
+                // quick-260829-fnt/UPDATE-06: a Dock=Top MenuStrip occupies the top of
+                // the CLIENT area, but every control below uses an explicit
+                // client-relative Location -- WinForms does not shift absolutely
+                // positioned siblings out from under a docked control, so stripTop
+                // must absorb the menu bar's height or the tile row renders underneath
+                // it. Read via Math.Max(menuStrip.Height, menuStrip.PreferredSize.Height),
+                // not Height alone, for the same reason the `count > 0` rig fix above
+                // exists: InitializeTrayState() runs this method before the form has
+                // ever been shown on every startup path including --tray, so a layout
+                // pass may not yet have resolved the strip's autosized Height, whereas
+                // PreferredSize is computed on demand from the items and font. Not
+                // wrapped in Scaled() -- the strip already autosizes with the form
+                // font, so scaling it again would double-count.
+                int stripTop = margin + Math.Max(menuStrip.Height, menuStrip.PreferredSize.Height);
 
                 tileStrip.Size = new Size(stripW, stripH);
                 tileStrip.Location = new Point(margin + (contentWidth - stripW) / 2, stripTop);
@@ -1491,6 +1505,11 @@ namespace RigToggle.App
         {
             ThemeApplier.ApplyEffectiveColorMode(IsDark);
             ThemeApplier.ThemeFormSurface(this, IsDark);
+            // quick-260829-fnt/UPDATE-06: goes in THIS helper and nowhere else --
+            // that is precisely what keeps the two theming call sites (OnThemeChanged
+            // and InitializeTrayState()) structurally unable to drift, per the
+            // 19-RESEARCH.md Pitfall 1 rule this method's own doc comment states.
+            ThemeApplier.ThemeMenuStrip(menuStrip, IsDark);
 
             foreach (MonitorTile tile in _tiles)
             {
@@ -2065,6 +2084,48 @@ namespace RigToggle.App
         /// than holding logic of their own.
         /// </summary>
         private void TrayCheckUpdatesMenuItem_Click(object? sender, EventArgs e) => PerformManualUpdateCheck();
+
+        /// <summary>
+        /// UPDATE-06/quick-260829-fnt: the Help &gt; About menu item's handler --
+        /// a one-line dispatch, not a duplicated body, mirroring
+        /// TrayCheckUpdatesMenuItem_Click above.
+        /// </summary>
+        private void HelpAboutMenuItem_Click(object? sender, EventArgs e) => ShowAboutDialog();
+
+        /// <summary>
+        /// UPDATE-06/quick-260829-fnt: constructs and shows the About dialog, a
+        /// third, more discoverable manual "Check for Updates" entry point
+        /// alongside the tray item and the Settings button. The running-version text
+        /// is read from _updateOrchestrator.RunningVersionText when available; the
+        /// null-orchestrator case (e.g. a test harness constructing MainForm
+        /// directly) mirrors Program.cs's own running-version resolution exactly
+        /// (GetEntryAssembly().GetName().Version, falling back to new Version(0, 0)),
+        /// via the same UpdateOrchestrator.FormatDisplayVersion the orchestrator
+        /// itself uses -- so the two paths can never disagree. Constructed owned by
+        /// `this` only when this form is currently Visible, mirroring
+        /// ShowUpdatePromptDialog's convention -- under --tray hidden startup the
+        /// main window is never shown. Wrapped in try/catch: opening an
+        /// informational dialog must never crash the toggle flow, matching this
+        /// file's existing convention for cosmetic/non-critical failures.
+        /// </summary>
+        private void ShowAboutDialog()
+        {
+            try
+            {
+                string versionText = _updateOrchestrator?.RunningVersionText
+                    ?? UpdateOrchestrator.FormatDisplayVersion(
+                        System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(0, 0));
+
+                Action? performManualUpdateCheck = _updateOrchestrator is null ? null : PerformManualUpdateCheck;
+
+                using var dialog = new AboutForm(versionText, _themeProvider, performManualUpdateCheck);
+                _ = Visible ? dialog.ShowDialog(this) : dialog.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"MainForm.ShowAboutDialog failed: {ex}");
+            }
+        }
 
         /// <summary>
         /// TRAY-03/D-04: explicitly hide the tray icon before Application.Exit() — an
