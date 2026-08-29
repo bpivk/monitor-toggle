@@ -1,16 +1,14 @@
 ---
 phase: 26-auto-update
 verified: 2026-08-22T23:59:00Z
-status: human_needed
-score: 6/6 truths code-verified (5 present-but-behavior-unverified for real-Windows runtime evidence)
-behavior_unverified: 5
-overrides_applied: 0
-re_verification: null
+status: closed_by_signoff
+closed: 2026-08-29T00:00:00Z
+score: 6/6 truths code-verified; 1/5 behavior items live-rig-verified (SC3); 4/5 closed by operator sign-off without independent verification
+behavior_unverified: 4
+overrides_applied: 4
+re_verification: "2026-08-29 — see 'Post-Verification Update' section below and .planning/phases/26-auto-update/26-UAT.md"
+behavior_unverified_items_note: "SC3 (exe swap and relaunch) was originally listed here as unverified; it was genuinely resolved on 2026-08-29 via a live rig test against a real v2.2.1 -> v2.2.2 release, NOT by sign-off — removed from this list, see 'Post-Verification Update' section below. The 4 remaining items were closed by operator sign-off without independent verification; see the same section."
 behavior_unverified_items:
-  - truth: "SC3: Confirming the prompt downloads the release, renames the running self-contained single-file exe in place at its original path, and relaunches on the new version, with autostart still pointed at the correct path."
-    test: "On real Windows hardware, install a build, tag/push a newer release, click Update Now, and confirm the exe swap+relaunch succeeds at the identical install path with no SmartScreen interstitial and no autostart re-registration needed."
-    expected: "The exe at the original HKCU-Run-key path is now the new version; no crash, no SmartScreen prompt, no manual re-toggle of autostart required."
-    why_human: "Renaming a running PublishSingleFile+IncludeNativeLibrariesForSelfExtract exe is explicitly flagged in ARCHITECTURE.md as never yet verified for this project's specific publish mode. No automated test in this repo (Linux sandbox) can exercise it, the Windows-only child-process tests (UpdateApplyProcessTests) only compile here and have never actually run in CI (see Anti-Patterns/Gaps below — the branch containing this code was never pushed to origin, so windows-latest CI has not executed against it either), and the rig checkpoint designed to prove this (26-05-PLAN.md Task 3, steps 5-8) was closed by operator authorization without being run."
   - truth: "SC4 / UPDATE-05: A failed or interrupted update apply (killed download, disk-full/locked-file, or a swap interrupted mid-rename) always leaves a launchable exe at the original path — never neither the original nor a working replacement."
     test: "On real Windows hardware, deliberately interrupt an update (kill the helper mid-swap, mark the install folder read-only, or fill the disk) and confirm a launchable exe still exists afterward, with a Warning balloon explaining the failure."
     expected: "Exactly one launchable exe exists at the target path after the interruption; a Warning-icon toast names the failure; no crash loop."
@@ -33,8 +31,8 @@ behavior_unverified_items:
 
 **Phase Goal:** Users are notified when a newer release is available and can install it with one confirmation, without ever being left with a broken or non-launchable app.
 **Verified:** 2026-08-22T23:59:00Z
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Status:** closed_by_signoff (see "Post-Verification Update" section below, 2026-08-29)
+**Re-verification:** Yes — see "Post-Verification Update" (2026-08-29)
 
 ## Goal Achievement
 
@@ -44,7 +42,7 @@ behavior_unverified_items:
 |---|---------------------|--------|----------|
 | 1 | The running build carries a version identifier reflecting the actual released git tag; on launch, the app checks GitHub Releases and detects when a newer version is available | ✓ VERIFIED (code) / ⚠️ partial behavior-unverified | `<Version>2.2</Version>` in `RigToggle.App.csproj`; `release.yml`'s `Resolve version from tag` step strips leading `v` and passes `-p:Version=` to `dotnet publish`; `GitHubReleaseFeed` queries `/releases/latest` with a `User-Agent` header and a host allow-list (`objects.githubusercontent.com` etc. present); `UpdateVersionComparer` numeric-not-lexical comparison covered by 14+ passing tests including the `v2.9`/`v2.10` and 4-vs-2-component guards; `Program.cs` wires `mainForm.BeginInvoke(... RunAutomaticUpdateCheckAsync ...)` after `guard.MarkReady()`. **Caveat:** the `BeginInvoke`-before-Handle-exists timing assumption is explicitly unresolved per 26-01-PLAN.md and untestable outside real Windows — see behavior_unverified_items. |
 | 2 | When a newer version is found, the user sees a confirmation prompt naming the new version before any download or apply happens — nothing installs silently | ✓ VERIFIED | `UpdatePromptDialog` is a themed `Form` (never `MessageBox` — grep confirms zero matches), headline is `Rig Toggle {release.TagName} is available`; `UpdateOrchestrator.CheckAsync` invokes `confirm` and only proceeds to `DownloadAndStageAsync`/`ApplyAndRelaunch` when the result is `UpdateNow`; unit tests assert the applier is never invoked when confirm returns `Later`/`Skip`. `UpdatePromptDialog.Choice` maps `OK→UpdateNow`, `Ignore→Skip`, everything else (Esc, close-X, Cancel)`→Later` — confirmed in source, matching D-02's "closing is never silently a skip" requirement. |
-| 3 | Confirming the prompt downloads the new release, applies it in place, and the app relaunches running the new version, with autostart still pointed at the correct exe path | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | All code artifacts present and wired: `WindowsUpdateApplier.DownloadAndStageAsync` (checksum-verify-before-return), `ApplyAndRelaunch` (temp-copy helper spawn), `UpdateApplyEntryPoint.Run` (wait-writable → rename-to-`.bak` → move staged into place → relaunch, with rollback-on-second-move-failure). This is the phase's single riskiest one-way mechanism (renaming a running `PublishSingleFile` exe) and has **never actually executed on Windows** — see behavior_unverified_items and the CI-never-ran finding below. |
+| 3 | Confirming the prompt downloads the new release, applies it in place, and the app relaunches running the new version, with autostart still pointed at the correct exe path | ✓ VERIFIED (live, 2026-08-29) | Genuinely rig-verified: a real v2.2.1 -> v2.2.2 release was tagged/pushed, the user triggered the check via the About dialog, and confirmed the exe swapped at its original path, relaunched successfully, with no SmartScreen interstitial and no autostart regression. See `26-UAT.md` Test 1 and STATE.md's 2026-08-29 entry. |
 | 4 | If the update is interrupted partway (killed download, simulated disk-full/locked-file), the original exe is left intact and still launchable — the app is never stranded | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | Code present: rename-not-overwrite ordering, immediate `.bak`-restore-on-throw in `UpdateApplyEntryPoint`, retained-backup + `Applied`/`FirstLaunchAttempted`/`Reverted` marker state machine in `UpdateRollbackChecker`, `SweepOrphanedHelperExes` cleanup (WR-01 fix). This is 26-03-PLAN.md's own explicit `verification: backstop` truth — not provable by any automated test, deferred entirely to the rig checkpoint's steps 9-10, which were never run. |
 | 5 | A manual "Check for Updates" entry in the app's menu triggers the same check on demand and reports when already up to date, independent of the automatic on-launch check | ✓ VERIFIED | `trayCheckUpdatesMenuItem` present in `MainForm.Designer.cs`'s `AddRange` array between `traySettingsMenuItem` and `traySeparator` (confirmed via `awk`); `btnCheckForUpdates` present in `SettingsForm.Designer.cs`, outside `flpButtons`; both wired to the identical `MainForm.PerformManualUpdateCheck`. `UpdateOrchestrator.CheckOnDemandAsync` always passes `honourSkippedVersion: false` (unit-tested: confirm invoked even when the release matches a persisted skip) and `reportFailures: true` (unit-tested: the paired `CheckOnLaunchAndCheckOnDemand_SameThrowingFeed_YieldDistinctOutcomes` test proves the same throwing feed yields `NotAvailable` on launch vs `CheckFailed` on-demand — the D-07 distinctness guard). Verbatim UI-SPEC copy strings ("You're already on the latest version", "Couldn't check for updates") grep-confirmed in `MainForm.cs`. |
 
@@ -144,31 +142,31 @@ None blocking. No `TBD`/`FIXME`/`XXX`/`TODO`/`HACK`/`PLACEHOLDER` debt markers i
 
 The five items below are the highest-value subset of the original 26-05-PLAN.md Task 3 15-step rig checklist (closed by operator authorization without being run) plus the CR-02 fix's own explicitly-requested follow-up, re-derived from what this verification pass found to still require real Windows hardware evidence. Full detail and step numbering for the complete original checklist remains in `26-05-PLAN.md`'s Task 3 and `26-05-SUMMARY.md`'s "Task 3: Operator Verification" section.
 
-### 1. Real exe swap and relaunch (SC3 / UPDATE-04)
+### 1. Real exe swap and relaunch (SC3 / UPDATE-04) — RESOLVED 2026-08-29
 
 **Test:** Publish and install a build, tag/push a real newer release, click "Update Now."
 **Expected:** The exe at the original install path is now the new version; no SmartScreen interstitial; autostart still works without re-toggling.
-**Why human:** Never executed on Windows anywhere — not in this sandbox, not in CI (unpushed), not on the rig (checkpoint closed unrun). This is the phase's single riskiest one-way mechanism.
+**Result:** ✓ PASS, live-verified. See "Post-Verification Update" section above and `26-UAT.md` Test 1.
 
-### 2. Interrupted-update recovery (SC4 / UPDATE-05)
+### 2. Interrupted-update recovery (SC4 / UPDATE-05) — CLOSED BY SIGN-OFF 2026-08-29, not independently verified
 
 **Test:** Deliberately interrupt an update (kill the helper mid-swap, or simulate disk-full/locked-file).
 **Expected:** A launchable exe still exists at the original path afterward; a Warning balloon explains the failure.
 **Why human:** Explicitly authored as a `verification: backstop` truth in 26-03-PLAN.md — "cannot kill a process mid-rename or fill a disk" via automated coverage.
 
-### 3. Auto-rollback timing correctness, including CR-02's fix (D-09 / UPDATE-05)
+### 3. Auto-rollback timing correctness, including CR-02's fix (D-09 / UPDATE-05) — CLOSED BY SIGN-OFF 2026-08-29, not independently verified
 
 **Test:** Apply an update, then (a) exit gracefully within 10 seconds via tray Exit/window close/shutdown and confirm NO false revert on next launch; (b) kill the process within 10 seconds and confirm a correct, single (non-looping) revert with the right balloon text.
 **Expected:** Graceful exits never trigger a false "reverted to v{previous}" message; only genuine crashes do, exactly once.
 **Why human:** State-machine timing invariant across real `FormClosing`/process-exit paths; 26-REVIEW-FIX.md's own note for this exact fix requests real-hardware confirmation.
 
-### 4. On-launch check reliability under both startup modes (SC1)
+### 4. On-launch check reliability under both startup modes (SC1) — CLOSED BY SIGN-OFF 2026-08-29, not independently verified
 
 **Test:** Launch normally and via `--tray`; confirm the automatic update check fires in both cases.
 **Expected:** No silently-dropped `BeginInvoke` call in either mode.
 **Why human:** 26-01-PLAN.md's own must_haves.assumptions flags `mainForm.Handle` existence at this call site as an open verification question, with a documented Timer-based fallback if it proves unsafe.
 
-### 5. Real release-notes rendering (UI-SPEC backstop)
+### 5. Real release-notes rendering (UI-SPEC backstop) — CLOSED BY SIGN-OFF 2026-08-29, not independently verified
 
 **Test:** View the actual next release's notes in the update dialog.
 **Expected:** Any unsupported Markdown constructs (tables, links, images, nested lists) render as readable plain text, not garbled output.
@@ -180,7 +178,18 @@ No FAILED truths, missing artifacts, broken key links, or blocking anti-patterns
 
 The gap is entirely in **runtime evidence**, not implementation: this phase's core value proposition — "install with one confirmation, without ever being left with a broken or non-launchable app" — hinges on a rename-while-running self-replace mechanism, a crash-detection auto-rollback state machine, and interrupted-update recovery, none of which have ever executed on a real Windows process. The 26-05-PLAN.md Task 3 rig checkpoint was purpose-built to supply exactly this evidence and was explicitly closed by the operator without being run, with the stated intent to exercise it naturally when v2.2 is actually tagged and released. That is a reasonable, well-disclosed engineering tradeoff — but it means the phase goal is **not yet independently confirmed true**, only confirmed *implemented*. Routing to human_needed rather than accepting a blanket override reflects that the deferred evidence spans the phase's central risk (self-replace-while-running) and its central promise (never-stranded recovery), not a peripheral or cosmetic item.
 
+## Post-Verification Update (2026-08-29)
+
+This report's original `human_needed` status and 5 behavior-unverified items (above) reflected the state as of 2026-08-22, before the v2.2 milestone was ever pushed to GitHub or tested on real hardware. Since then:
+
+**Item 1 (SC3, exe swap and relaunch) — genuinely resolved, not signed off.** A real `v2.2.1 -> v2.2.2` release was cut for this exact purpose (quick tasks `260828-vit` and a follow-up version bump), and the user tested the live update flow via the new About dialog's "Check for Updates" button. Confirmed: the exe swapped correctly at its original install path, relaunched on the new version, no SmartScreen interstitial, no autostart re-registration needed. This closes the phase's single riskiest, highest-consequence unverified mechanism (renaming a running self-contained single-file exe) with real evidence, not an override. See `26-UAT.md` Test 1.
+
+**Items 2-5 (interrupted-update recovery, auto-rollback/CR-02 timing, `--tray` on-launch check, real release-notes rendering) — closed by explicit operator sign-off, not independently verified.** The orchestrator flagged before this closure that items 2-4 specifically require deliberate failure-injection scenarios (killing the update helper mid-swap, simulating disk-full, killing the process within CR-02's 10-second window) that normal use does not exercise, and that item 5's actual release notes for `v2.2.2` contained no complex Markdown to exercise the rendering path. The user's explicit choice, given this tradeoff, was to sign off without running them ("everything seems fine so just confirm it"). These four remain genuinely open — not fabricated passes — should the opportunity arise to run them for real. See `26-UAT.md`'s "Operator sign-off" section and `STATE.md`'s 2026-08-29 entry for the verbatim record, matching the precedent set by Phase 25 Plan 04 Task 3's own operator-signoff closure.
+
+Also note: this report's "CI has never executed against any Phase 26 code" finding (local master 127 commits ahead of `origin/master` as of 2026-08-22) is now stale — all Phase 26 work, plus the subsequent quick tasks built on top of it, has since been pushed to `origin/master` and the `.github/workflows/release.yml` pipeline has run successfully multiple times against it (confirmed via `gh run watch` for the `v2.2.1` and `v2.2.2` tag pushes), producing real, checksum-verified releases. The CI-never-ran gap this report flagged as material is closed.
+
 ---
 
 _Verified: 2026-08-22T23:59:00Z_
-_Verifier: Claude (gsd-verifier)_
+_Post-verification update: 2026-08-29T00:00:00Z_
+_Verifier: Claude (gsd-verifier); post-verification update by orchestrator per user's explicit milestone-close sign-off_
