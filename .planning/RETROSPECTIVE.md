@@ -154,6 +154,35 @@
 
 ---
 
+## Milestone: v2.2 — Auto-Update, Single-Instance Guard & Smaller Footprint
+
+**Shipped:** 2026-08-29
+**Phases:** 3 | **Plans:** 10 | **Timeline:** 2026-08-18 → 2026-08-29 (11 days), 153 commits, 112 files, +20,821/-150 lines
+
+### What Was Built
+Exe size cut a further 5.26% via MSBuild deny-listing; a named-Mutex single-instance guard with focus-the-existing-instance behavior; end-to-end GitHub-release auto-update (SHA256-verified download, self-replace-in-place, relaunch) with a retained-backup/auto-rollback safety net; and, via two post-phase quick tasks, a `Help > About` dialog that became the sole manual update-check entry point with guaranteed-visible inline feedback (replacing a tray-balloon mechanism that silently no-op'd by default).
+
+### What Worked
+- Cutting a real `v2.2.1 -> v2.2.2` release specifically to rig-test the update flow turned the milestone's single riskiest, most code-reviewed-but-never-executed mechanism into genuinely observed evidence, not just structural confidence.
+- The operator-sign-off pattern established at Phase 25 (record exactly what wasn't tested, why, and what the user explicitly chose) repeated cleanly at Phase 26's UAT close — an honest, auditable way to ship without gold-plating every edge case.
+- Treating a user bug report ("the button doesn't do anything") as a real diagnosis-first investigation surfaced a genuine, previously-invisible design gap (tray-balloon feedback silently depending on a setting that's off by default) rather than papering over the symptom.
+
+### What Was Inefficient
+- The original Phase 26 rig-verification checkpoint (26-05-PLAN.md Task 3) was closed by operator authorization without being run, and the resulting `26-VERIFICATION.md` sat stale (still `human_needed`, still describing a "CI never ran" gap that was no longer true) for a full week until milestone close forced a reconciliation pass. Reconciling stale verification artifacts against actual outcomes should happen closer to when the outcome actually changes, not batched at milestone close.
+- Two separate debugging threads (the 8-round monitor-swap CCD investigation, and the update-check feedback bug) both ran concurrently with active feature work in this milestone's tail end — coherent in hindsight, but the session juggled a lot of parallel context.
+
+### Patterns Established
+- Manual-check outcome copy lives in exactly one shared formatter (`UpdateCheckMessageFormatter`) consumed by every UI surface, so the label and any toast can't drift out of sync again.
+- Version-comparison logic gets its own dedicated unit-tested class with an explicit doc-comment warning about the exact pitfall it was built to avoid (`System.Version.CompareTo`'s component-count mismatch) — worth revisiting whenever the versioning scheme itself changes, which it did mid-milestone.
+
+### Key Lessons
+- When a user says "everything seems fine so just confirm it" for scenarios that specifically require deliberate failure injection, surface the gap explicitly and let them choose — don't silently upgrade "seems fine" into "verified."
+- A stale verification/UAT artifact is worse than a missing one: it actively claims a state ("CI never ran," "human_needed") that may no longer be true. Reconcile it at the moment new evidence appears, not just at milestone close.
+
+### Cost Observations
+- Sessions: 1 (this session spanned closing the prior debug investigation, three quick tasks, UAT closure, and milestone archival)
+- Notable: three `/gsd-quick` invocations in sequence (version comparer, About dialog, update-check consolidation) each built directly on the previous one's committed state — no rework needed across the chain.
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
