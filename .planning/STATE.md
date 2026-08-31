@@ -3,18 +3,17 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Auto-Update, Single-Instance Guard & Smaller Footprint
 status: Awaiting next milestone
-stopped_at: context exhaustion at 75% (2026-08-28)
-last_updated: "2026-08-29T12:24:59.490Z"
+stopped_at: Phase 27 Plan 01 paused at Task 3 (rig-hardware checkpoint) after Task 2 committed (6b3058b)
+last_updated: "2026-08-31T12:57:00.834Z"
 last_activity: 2026-08-29
 last_activity_desc: Completed and rig-verified quick tasks 260829-fnt (Help>About menu) and 260829-ga9 (consolidate Check-for-Updates entry points + fix silent-feedback bug) - user approved
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 10
-  completed_plans: 10
-  percent: 100
-current_phase: 26
-current_phase_name: auto-update
+  total_phases: 1
+  completed_phases: 0
+  total_plans: 3
+  completed_plans: 1
+current_phase: 27
+current_phase_name: monitor-activation-logic-redesign
 ---
 
 # Project State
@@ -28,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-08-18)
 
 ## Current Position
 
-Phase: Milestone v2.2 complete
-Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-08-29 — Milestone v2.2 completed and archived
+Phase: 27 - Monitor Activation Logic Redesign
+Plan: 27-01 (paused at Task 3 — rig-hardware checkpoint, blocking)
+Status: In progress — Task 2 committed (6b3058b), awaiting operator rig verification
+Last activity: 2026-08-31 — ActivateMonitorsCore collapsed to single-pass Extend-only shape; solution builds clean, RigToggle.Tests 249/249; Task 3 (real-rig Checks A-E) not yet performed
 
 ## Performance Metrics
 
@@ -88,6 +87,7 @@ Last activity: 2026-08-29 — Milestone v2.2 completed and archived
 
 ### Roadmap Evolution
 
+- Phase 27 added 2026-08-31: Monitor Activation Logic Redesign — post-v2.2 ad-hoc phase (not part of a milestone), scoped directly via `/gsd-phase` at user request following a reopened debug session (`.planning/debug/resolved/monitor-position-regre.md`, 22 rounds) that diagnosed the SAM7489/Odyssey G5 monitor's persistent activation flakiness as symptomatic of an overbuilt correction/retry architecture (15 independently-added mechanisms across 20+ incremental rounds) rather than a single fixable bug. User chose redesign over further incremental patching; full target-architecture proposal is written into that debug file's Resolution (round 22) section for this phase's planning to consume.
 - Phase 11 edited: edited fields: title, goal, depends_on (corrected from Phase 10 to Phase 8)
 - v1.2 roadmap created 2026-08-02: 3 phases derived from THEME/ICON/DOCS requirement categories (coarse granularity). Phase 12 (Theme Infrastructure) sequenced first per research risk-priority (highest-novelty work; live-update gap and `--tray` handle-timing risk). Phase 13 (Tray & App Icon Redesign) is architecturally independent of Phase 12 but sequenced second by convention, not dependency. Phase 14 (README) sequenced last, depends on both since it documents/screenshots the finished visual result. Rig-only-catchable risks (live theme flip while running, both taskbar themes, extended-session GDI handle stability, `--tray` hidden-start timing, Windows 10 fallback) were folded into Phase 12/13 success criteria and plan-level human verification rather than a separate verification phase, consistent with this project's established UAT-per-phase pattern (Phase 8, 9, 11).
 - v2.0 roadmap created 2026-08-04: 4 phases (15-18) derived from the 19 v2.0 requirements (coarse granularity), continuing numbering from v1.2's Phase 14. Structure follows research/SUMMARY.md's proposed sequencing closely: Phase 15 (optional App/Audio targets) first as lowest-risk, no-prerequisite validation-gate relaxation; Phase 16 (Normal-mode explicit monitor config + mode-store redesign) second as the core, highest-risk piece — forces `IsInRigMode()` off snapshot-file-presence onto an explicit persisted flag, landed alongside the monitor-set rewrite per research's Pitfall 4/5 warnings; Phase 17 (manual monitor panel + shared safety guard) third, depends on Phase 16's controller-call unification so the panel doesn't introduce a second implementation of "toggle a monitor." DISPLAY-12 (safety guard enforced identically across Rig toggle, Normal toggle, and the manual panel) was assigned to Phase 17 rather than Phase 16 since full three-way enforcement can only be verified once the panel (the third path) exists. Phase 18 (cleanup + exe-size reduction) last, since the snapshot/restore subsystem is only confirmed genuinely dead once Phase 16 ships. DISPLAY-13 (crash-recovery marker) and PANEL-04/05 (confirmation gate, Identify action) — both resolved into requirements after research/SUMMARY.md was written — were folded into Phase 16 and Phase 17 respectively, consistent with the research's existing rationale for those phases.
@@ -110,6 +110,7 @@ Full decision log lives in PROJECT.md's Key Decisions table. v2.0's decisions (o
 - [Phase ?]: WR-02's readiness-mutex construction guarded with a broad catch, deliberately asymmetric to the main mutex's narrow catch, since the readiness mutex is a best-effort optimisation and the main mutex is correctness-critical
 - [Phase ?]: WR-01's cross-namespace probe explicitly deferred -- accepted as a known limitation at ASVS L1 for this single-user rig
 - [Phase ?]: Phase 25 Plan 04 Task 3 closed by explicit operator authorization on partial evidence (build succeeds + app works on real hardware); the three-run flakiness check, ApplyUpdateBypass_* confirmation, and live CR-01 repro were NOT performed and remain open follow-up items
+- [Phase ?]: [Phase 27 Plan 01]: ActivateMonitorsCore collapsed to single-pass Extend-only shape (no scoped-plan branch, no retry loop); orphaned scoped-activation helpers left in place per operator's option-c staged-removal decision, pending Task 3's real-rig verification before Plan 02 deletes them
 
 ### Pending Todos
 
@@ -132,6 +133,8 @@ Open (carried from v2.2 research, `.planning/research/SUMMARY.md` "Gaps to Addre
 Resolved 2026-08-21 (partial): Phase 25 Plan 04 Task 3's blocking checkpoint (real Windows rig verification) was closed by explicit operator authorization rather than by completing its original ask. The operator confirmed the solution builds and the app functions correctly on real Windows hardware, but declined to run the three-consecutive-clean-runs flakiness check, confirm the three `ApplyUpdateBypass_*` facts, or perform the live CR-01 (abandoned-mutex) reproduction ("doesn't work on my pc") — see `25-04-SUMMARY.md`'s "Task 3: Operator Verification" section for the verbatim exchange. INSTANCE-01/INSTANCE-02/UPDATE-07 are marked complete on the operator's sign-off; the three unperformed checks remain open follow-up items, not fabricated passes, and should be run if the opportunity arises.
 
 Resolved 2026-08-29 (partial): Phase 26's `26-UAT.md` closed by explicit operator authorization rather than by completing its original 5-test ask. Test 1 (real exe swap and relaunch) was genuinely rig-verified live against a real v2.2.1 -> v2.2.2 release cut for this purpose — user confirmed the exe swapped correctly, no SmartScreen interstitial, no autostart regression. Tests 2-5 (interrupted-update recovery, auto-rollback timing under CR-02's 10s window, on-launch check reliability under `--tray`, and real release-notes Markdown rendering) were closed on the operator's sign-off ("everything seems fine so just confirm it") after the orchestrator explicitly flagged that tests 2-4 require deliberate failure-injection scenarios (killing the update helper mid-swap, simulating disk-full, killing the process within a 10s window) that normal use does not exercise — see `26-UAT.md`'s "Operator sign-off" section for the verbatim exchange. The four unperformed checks remain open follow-up items, not fabricated passes, and should be run if the opportunity arises — particularly tests 2/3's failure-recovery paths, since those protect against leaving the app unlaunchable after a bad update.
+
+- Phase 27 Plan 01 Task 3 (blocking checkpoint) requires real Windows rig hardware verification of the Extend-only ActivateMonitorsCore redesign (Checks A-E: single-tile enable, position preservation, full swap ordering, Odyssey G5 flakiness x3, failure surfacing). Not available in this build environment. Task 2's commit (6b3058b) built and tested clean (RigToggle.Tests 249/249). Operator must build RigToggle.App.exe natively on Windows from this commit, run Task 3's checks, and report results verbatim to resume execution.
 
 ### Quick Tasks Completed
 
@@ -194,9 +197,9 @@ Resolved 2026-08-08: Phase 16's `16-HUMAN-UAT.md` (2 pending items — DISPLAY-1
 
 ## Session Continuity
 
-Last session: 2026-08-28T09:27:47.487Z
-Stopped at: context exhaustion at 75% (2026-08-28)
-Resume file: .planning/phases/26-auto-update/26-UI-SPEC.md
+Last session: 2026-08-31T12:56:53.256Z
+Stopped at: Phase 27 Plan 01 paused at Task 3 (rig-hardware checkpoint) after Task 2 committed (6b3058b)
+Resume file: .planning/phases/27-monitor-activation-logic-redesign/27-01-PLAN.md
 
 ## Operator Next Steps
 
