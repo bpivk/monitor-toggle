@@ -47,29 +47,39 @@ static void ListPaths()
         .Select(t => t.DisplayTarget.DevicePath)
         .ToHashSet();
 
-    Console.WriteLine($"GetAllPaths() returned {allPaths.Length} path(s):");
+    Console.WriteLine($"GetAllPaths() returned {allPaths.Length} path(s) (includes stale/historical CCD database entries -- most targets will be unavailable; that's normal).");
     Console.WriteLine();
+
+    int unavailableCount = 0;
 
     foreach (PathInfo path in allPaths)
     {
         foreach (PathTargetInfo target in path.TargetsInfo)
         {
+            // IsAvailable MUST be checked before touching DevicePath/FriendlyName -- both throw
+            // TargetNotAvailableException on an unavailable target (WindowsDisplayAPI 1.3.0.13).
+            // Mirrors the same discipline WindowsMonitorController.cs's own GetAllMonitors() uses.
+            if (!target.DisplayTarget.IsAvailable)
+            {
+                unavailableCount++;
+                continue;
+            }
+
             string devicePath = target.DisplayTarget.DevicePath;
-            bool isAvailable = target.DisplayTarget.IsAvailable;
-            string friendlyName = isAvailable
-                ? (target.DisplayTarget.FriendlyName ?? "(unknown display)")
-                : "(unavailable target -- no FriendlyName)";
+            string friendlyName = target.DisplayTarget.FriendlyName ?? "(unknown display)";
             bool isActive = activeDevicePaths.Contains(devicePath);
 
             Console.WriteLine($"  DevicePath : {devicePath}");
             Console.WriteLine($"  Friendly   : {friendlyName}");
-            Console.WriteLine($"  Available  : {isAvailable}");
+            Console.WriteLine($"  Available  : True");
             Console.WriteLine($"  PathActive : {target.IsPathActive}");
             Console.WriteLine($"  LiveActive : {isActive}  (in GetActivePaths() result)");
             Console.WriteLine($"  Source     : {path.DisplaySource}");
             Console.WriteLine();
         }
     }
+
+    Console.WriteLine($"({unavailableCount} unavailable/stale target(s) skipped)");
 }
 
 static void RunExtend(string? targetSubstring)
