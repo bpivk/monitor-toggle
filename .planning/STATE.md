@@ -122,6 +122,29 @@ None.
 
 ### Blockers/Concerns
 
+Open (2026-08-31): Post-Phase-27-revert, the restored scoped-activation path was found to have a
+real, reproducible bug (not external nondeterminism): `PromoteToOriginIfNeeded` in
+`WindowsMonitorController.cs` only checked whether AT LEAST ONE entry claimed the desktop origin
+(0,0), not whether TWO did — a monitor's cached position can equal (0,0) simply because it was
+solo-active (e.g. right after a Rig-mode toggle) when that mode was captured, and re-adding it
+alongside a currently-genuinely-primary survivor submitted a plan with two origin claims, which
+Windows rejected with `PathChangeException: Invalid paths information` every single time, clearing
+only on app restart. Fixed same day (commit `14e2943`) — see
+`.planning/debug/knowledge-base.md`'s `promote-to-origin-collision-not-resolved` entry for the full
+diagnosis (found via direct rig-log correlation, not guessed). Also flipped the scoped
+`ApplyPathInfos` call's `allowChanges` from `true` to `false` as a diagnostic (commit `a305055`,
+never previously tried per the original debug session's own round-21 recommendation) — this is what
+turned Windows' silent substitution attempt into the loud `PathChangeException` that made the
+origin-collision bug visible in the log at all; kept as a permanent improvement (fail loudly on an
+invalid plan rather than risk a silent, unpredictable substitution). Separately, fixed a real
+Settings UI gap: stale/permanently-gone monitor device paths could never be cleared through the UI
+(only ever re-merged back in on every Save, by design, to protect against transient disconnection)
+— added a "Forget these entries" link to the existing stale-monitor warning (commit `62820f2`).
+**Status: fixes committed, NOT yet rig-verified.** Operator needs to pull latest, rebuild, and
+re-test: (1) the Rig/Normal toggle sequence that previously got the Odyssey G5 stuck, repeated
+several times, to confirm the origin-collision fix holds; (2) Settings' new "Forget" link actually
+clears the stale `SAM748A`/`DELA0B8` entries and Save persists that removal.
+
 Resolved 2026-08-31: Phase 27 (monitor-activation-logic-redesign) — Plan 01 Task 3's real-rig
 verification checkpoint FAILED. The Extend-only redesign (whole-topology `PathInfo.ApplyTopology
 (Extend)` as the sole activation mechanism, commit `6b3058b`) reliably FAILED to activate the

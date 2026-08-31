@@ -59,4 +59,58 @@ Resolved debug sessions. Used by `gsd-debugger` to surface known-pattern hypothe
 - **Files changed:** src/RigToggle.Windows/WindowsMonitorController.cs (rewritten then reverted -- net change: none, back to pre-Phase-27 state), tools/DisplayProbe/ (new standalone diagnostic CLI, NOT part of RigToggle.sln or the shipped app -- retained in the repo for any future CCD-level investigation needing a bare, app-free repro harness).
 - **Why not caught before implementation:** The round-22 redesign proposal was itself honest about this exact risk (`root_cause (2)` was named and cited in its own §22.3), but treated it as a plausible-but-unconfirmed trade-off rather than a known-blocking one, because no round of the original two debug sessions had specifically re-tested bare `Extend` against SAM7489/SAM748A in isolation since round 3 (which found the same failure for the differently-numbered device path `SAM748A` -- likely the same physical monitor after a Windows CCD re-enumeration changed its last few device-path hex digits). The redesign's own rig-gate design (Plan 01 Task 3, `gate="blocking"`, halts before Plan 02) is precisely the safety mechanism that caught this before any code was deleted -- it worked as designed.
 - **Recurrence guard:** This entry, plus the re-confirmation note appended to `monitor-enable-reactivates-others-again` above, so a future Phase-0 recall for any monitor-activation work surfaces "an Extend-only redesign was already tried and conclusively rig-rejected for this exact monitor (SAM7489/Odyssey G5) -- do not re-attempt without new hardware, a new driver, or a different monitor" before re-deriving the same conclusion from scratch. `tools/DisplayProbe` (retained in the repo, not part of the shipped app) is available for any future investigator who needs to test a raw CCD call against real hardware without spinning up the full app -- run `dotnet run --project tools/DisplayProbe -- list` to enumerate available targets and `dotnet run --project tools/DisplayProbe -- extend <device-path-substring>` to test bare `Extend` activation in isolation.
+- **Follow-up 2026-08-31, same day, post-revert:** the reverted scoped-activation path was ALSO
+  found to be genuinely broken in a specific, reproducible way -- see the new
+  `promote-to-origin-collision-not-resolved` entry below. This is unrelated to Extend; it is a real
+  bug in `PromoteToOriginIfNeeded` that the revert restored (it predates Phase 27 entirely) and that
+  this same session went on to fix. Root_cause (8)/(2)'s "cached-mode Position/Resolution mismatch"
+  candidate -- named as unconfirmed since round 11 of the original investigation -- is now
+  CONFIRMED, at least for this specific collision shape, not merely suspected.
+---
+
+## promote-to-origin-collision-not-resolved — Re-adding a monitor that was previously solo-active alongside another monitor threw PathChangeException every time, permanently, until app restart
+- **Date:** 2026-08-31
+- **Error patterns:** PathChangeException Invalid paths information, monitor stuck after Rig mode toggle, scoped activation fails after using Rig/Normal toggle switch, manual tile re-enable fails repeatedly, works after app restart then breaks again, TryBuildScopedActivationPlan modeInfoAvailable=True position=(0,0) for two different sources, PromoteToOriginIfNeeded, origin collision, cached mode Position mismatch
+- **Root cause:** `PromoteToOriginIfNeeded`'s guard (`if (keptActiveSurvivors.Any(IsAtOrigin) ||
+  newPaths.Any(IsAtOrigin)) return ... unchanged;`) only ever checked "does AT LEAST ONE entry
+  across both lists claim the desktop origin (0,0)" -- it never checked for TWO independent
+  claimants. A device's cached live-mode position (`_lastKnownActiveModeByDevicePath`) can equal
+  (0,0) simply because it was SOLO-ACTIVE the last time its mode was captured (trivially at the
+  origin, since nothing else was on screen) -- e.g. immediately after a Rig-mode toggle where one
+  monitor is the only one enabled. When that monitor is later re-added alongside a DIFFERENT
+  monitor that is CURRENTLY, genuinely primary at (0,0), the scoped plan submits BOTH entries with
+  `modeInfoAvailable=True position=(0,0)` simultaneously -- confirmed directly in a real-rig debug
+  log's own `TryBuildScopedActivationPlan` entry dump, not inferred. `SetDisplayConfig` requires
+  exactly one active path at the origin and rejects a plan violating that with
+  `PathChangeException("Invalid paths information.")`, which fell through to the already-confirmed-
+  broken `Extend` fallback (see `monitor-activation-extend-only-redesign-rejected` above), producing
+  a D-05 `InvalidOperationException` the app surfaced to the user. This reproduced 100% of the time
+  after using the Rig/Normal toggle switch, and cleared only on a full app restart (which discards
+  the in-memory `_lastKnownActiveModeByDevicePath` cache) -- the restart-clears-it behavior is what
+  distinguished this from genuine external driver nondeterminism and pointed straight at an
+  in-process cache bug.
+- **Fix:** `PromoteToOriginIfNeeded` (`src/RigToggle.Windows/WindowsMonitorController.cs`): when a
+  kept survivor already holds the origin, any `newPaths` entry that ALSO independently claims it
+  now has its stale cached mode dropped to blank (same effect as if no cache entry existed), letting
+  the driver pick a fresh position for it instead of colliding. The kept survivor's claim wins
+  because it reflects the CURRENT arrangement; the new target's cached claim reflects a different,
+  unrelated prior arrangement -- the same principle this method's own pre-existing remarks already
+  applied to cached positions generally, just not to this specific two-claimant case.
+- **Files changed:** `src/RigToggle.Windows/WindowsMonitorController.cs`,
+  `src/RigToggle.Windows.Tests/WindowsMonitorControllerTests.cs` (new test
+  `PromoteToOriginIfNeeded_SurvivorAndNewTargetBothClaimOrigin_NewTargetsStaleClaimDropped`).
+- **Why not caught:** `PromoteToOriginIfNeeded` has 6 pre-existing unit tests (added round 4 of the
+  original `monitor-position-resets-to-de` session) covering "nobody at origin" and "exactly one
+  entry at origin" shapes, but none exercised "two independent entries both at origin" -- the
+  specific shape this bug lives in. `ActivateMonitors`/`DeactivateMonitors` themselves are excluded
+  from unit testing (live CCD calls, no injectable seam), so this was only reachable via a real rig
+  trial with a specific history (solo-active, then re-added alongside another monitor) that the
+  original round-4 rig verification never happened to exercise.
+- **Recurrence guard:** The new test above locks in the fix. This entry, so a future Phase-0 recall
+  surfaces "a newly-reactivated target's cached position can collide with a currently-active
+  survivor's real origin claim if the target was previously solo-active -- `PromoteToOriginIfNeeded`
+  must resolve ties, not just detect their absence" before re-deriving this from scratch. If a
+  similar `PathChangeException: Invalid paths information` recurs for a DIFFERENT repro shape, check
+  whether it is a third, still-undiscovered origin-collision variant before assuming it is the
+  already-fixed one.
 ---
