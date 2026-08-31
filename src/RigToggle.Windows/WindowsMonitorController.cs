@@ -511,6 +511,15 @@ public sealed class WindowsMonitorController : IMonitorController
     // directly for the user's own request" -- the SAME distinguishing mechanism item B's
     // CollateralMonitorRestoreFailedException relies on, per this round's own design
     // constraint to share one mechanism rather than inventing two.
+    // Phase 27 (monitor-activation-logic-redesign): replaced the scoped-primary/Extend-fallback
+    // split with unconditional whole-topology ApplyTopology(Extend) as the sole activation
+    // mechanism -- no scoped-plan branch, no primary/fallback split, no outer retry loop. The
+    // in-call settle-poll-then-correct loop below, together with MainForm's separate
+    // out-of-call OS-event watchdog, are now the sole safety nets against any unexpected
+    // reactivation or dropped survivor. The cosmetic flash that the removed scoped path was
+    // originally built to eliminate is an accepted, expected tradeoff of this redesign, not a
+    // regression to chase further. See .planning/debug/monitor-position-regre.md §22.1 (target
+    // architecture) and §22.3 (honest risk/migration note) for the full rationale and evidence.
     private void ActivateMonitorsCore(IReadOnlySet<string> monitorDevicePaths, IReadOnlySet<string> monitorSwapDisableSet, bool isNestedCorrectionCall)
     {
         // Debug session monitor-position-resets-to-de, round 3: isPartOfMonitorSwap is now
@@ -562,369 +571,186 @@ public sealed class WindowsMonitorController : IMonitorController
 
         Log($"ActivateMonitors: requested=[{string.Join(", ", monitorDevicePaths)}] preExtendActive=[{string.Join(", ", currentlyActiveDevicePaths)}].");
 
-        // Debug session monitor-enable-reactivates-others-again, round 5: round 4's rig trial (full
-        // verbatim debug.log reviewed this round) confirmed the round 2/3 detect-and-correct machinery
-        // below is working exactly as designed -- the FINAL settled CCD state after the tile click is
-        // unambiguously correct (SAM748A inactive, held stable across three further
-        // OnDisplaySettingsChanged firings). The operator's "still not fixed" this round refutes neither
-        // that mechanism nor its correctness; verified against the log, SAM748A's active-path flips
-        // active-then-corrected TWICE within ~5.6s (once during the Extend call itself at
-        // 37.778-40.106, once again externally at 42.930-43.368) before settling -- i.e. by construction,
-        // a detect-AFTER-the-fact design can only shorten how long an unrequested monitor's CCD path (and,
-        // per the operator's own round-1 report of literally watching "the monitor turns on", very likely
-        // its physical signal/backlight) is active; it can never prevent that window from opening at all.
-        // Only not asking the OS to consider SAM748A as a topology candidate in the first place can do
-        // that -- which a whole-topology ApplyTopology(Extend) call structurally cannot do (Extend has no
-        // per-target scoping; this is the same limitation the round-2 fix's own class remarks document).
-        //
-        // TryBuildScopedActivationPlan below constructs an explicit PathInfo[] -- every already-active
-        // survivor path plus one newly-active PathInfo per requested device path -- that never references
-        // SAM748A (or any other currently-inactive monitor not in this call's request) at all, and applies
-        // it via the same SDC_USE_SUPPLIED_DISPLAY_CONFIG mechanism DeactivateMonitors below already uses
-        // successfully (ApplyPathInfos), just inverted (adding a target instead of removing one), with
-        // forceModeEnumeration:true so the driver -- not this code -- fills in the newly-activated
-        // target's mode information. Confirmed against Microsoft's own SetDisplayConfig documentation
-        // (not just this wrapper library): supplying an explicit path array where some paths carry a valid
-        // mode index and others (the target being newly activated) carry
-        // DISPLAYCONFIG_PATH_MODE_IDX_INVALID, combined with SDC_FORCE_MODE_ENUMERATION, is a documented,
-        // intended scenario -- "SetDisplayConfig uses best mode logic to create the source and target mode
-        // information" for the invalid-index paths -- not an undocumented hack. This sidesteps the THREE
-        // separate rig-proven manual-reconstruction failures recorded in ccd-topology-restore-findings:
-        // none of this PathInfo's resolution/position/pixelFormat/rotation/scaling/frequency fields are
-        // ever manually filled in here -- the driver picks them, which is exactly the "let Windows figure
-        // out the mode" capability that was missing when those three attempts hand-filled mode fields from
-        // stale/default reads instead. The one field that DOES need correcting on a reused, freshly-queried
-        // (never stale/cached) PathTargetInfo is IsPathActive (false on an inactive GetAllPaths() entry,
-        // needed true here) -- there is no public API to set it, so this reuses the exact same
-        // reflection-patch-a-readonly-backing-field technique ccd-topology-restore-findings finding 1
-        // already rig-proved for OutputTechnology (a different field, same technique, same library
-        // version), and throws loudly (never silently no-ops) if that backing field is ever not found by a
-        // future WindowsDisplayAPI upgrade -- per that finding's own explicit recommendation.
-        //
-        // This is new, sandbox-unverifiable-on-real-CCD-hardware territory, so it is attempted FIRST but
-        // never trusted blindly. ApplyPathInfos validates the supplied array (SDC_VALIDATE) before ever
-        // touching live topology and throws cleanly if invalid, so a bad plan never reaches the hardware;
-        // any failure to build a valid scoped plan (e.g. no unclaimed PathDisplaySource is available for a
-        // requested target -- ccd-topology-restore-findings finding 2's source-collision rule, adapted) or
-        // any exception from ApplyPathInfos itself falls back to the exact same, already rig-confirmed
-        // ApplyTopology(Extend) call this method used before round 5 -- so this round can only ever IMPROVE
-        // on today's behavior (no more visible flash) or leave it byte-for-byte unchanged (silent, logged
-        // fallback); it cannot regress it. The settle-poll-then-correct loop immediately below and
-        // MainForm's out-of-call reactive watchdog (rounds 2/3) are deliberately left fully unchanged,
-        // regardless of which path is taken here -- they remain the safety net against any OTHER
-        // reactivation mechanism (e.g. round 3's own finding that an independent OS/driver-level
-        // auto-extend can fire seconds later, unrelated to which CCD call this method makes).
-        // Debug session monitor-position-regre, round 14 (fix A): bounded automatic retry for the
-        // "requested target itself never settles active despite the scoped ApplyPathInfos call
-        // reporting success" failure shape -- root_cause (8)'s third observed shape (round 10),
-        // directly proved recoverable by round 13's rig evidence (a byte-for-byte identical
-        // scoped plan failed once, then succeeded 7 seconds later, with nothing else changed).
-        // Wraps the ENTIRE scoped build+apply+settle+correct+verify sequence below in a small,
-        // bounded retry loop -- distinct from, and layered OUTSIDE, fix H's existing lost-
-        // survivor correction loop further down (ComputeUnexpectedlyDeactivated's nested
-        // ActivateMonitors call handles a DIFFERENT case: an unrelated survivor accidentally
-        // dropped by the Extend fallback -- that logic is completely unchanged by this round and
-        // still runs, unaffected, inside EACH attempt of this new outer loop; see
-        // ShouldRetryScopedActivation's own remarks for fix A's exact, narrow trigger condition).
-        // MaxScopedActivationRetryAttempts bounds this to a small, FIXED number of additional
-        // attempts -- never unbounded. Every variable this loop body reads or writes that
-        // reflects live CCD state (activePathsForScopedPlan, devicePathsToActivate,
-        // usedScopedActivation, postCorrectionActiveDevicePaths, stillInactive) is freshly
-        // recomputed each iteration -- a genuine re-attempt against CURRENT live state, exactly
-        // what a second, manual tile click would do, just performed automatically and logged as
-        // such (never silently indistinguishable from a user-initiated retry: a user-initiated
-        // retry always produces its own brand-new "ActivateMonitors: ENTER ..." log line, logged
-        // exactly once above, before this loop -- this internal loop never repeats it). Behavior
-        // is byte-for-byte unchanged for the overwhelmingly common case (the first attempt
-        // succeeds): the loop body is identical to the pre-round-14 code, and `break` fires on
-        // the very first iteration whenever stillInactive is empty, before any retry-specific
-        // logic runs.
-        const int MaxScopedActivationRetryAttempts = 2;
+        PathInfo[] activePathsBeforeMutation = PathInfo.GetActivePaths(virtualModeAware: false);
 
-        HashSet<string> postCorrectionActiveDevicePaths = new();
-        string[] stillInactive = Array.Empty<string>();
+        // Debug session monitor-position-regre (regression of monitor-position-resets-to-de):
+        // round 3's original CacheLiveModes call below only covered monitorSwapDisableSet's
+        // deliberately-excluded survivors -- the ones THIS call intentionally deactivates as
+        // part of a swap. Round 7's fix H (ComputeUnexpectedlyDeactivated + the nested
+        // ActivateMonitors correction call further down) added a SECOND way a previously-active
+        // survivor can go inactive during this call: an ACCIDENTAL drop, as an unrequested side
+        // effect of the Extend call. Caching EVERY currently-active path's live mode here -- not
+        // just monitorSwapDisableSet's -- closes this gap: any survivor this call's mutation
+        // happens to drop, whether deliberately excluded or accidentally lost, now has a cache
+        // entry available the moment a correction (fix H) needs to restore it. Strictly additive
+        // over the prior, narrower call (monitorSwapDisableSet's paths are always a subset of
+        // activePathsBeforeMutation), so the swap case is byte-for-byte unchanged.
+        CacheLiveModes(activePathsBeforeMutation);
+        Log($"ActivateMonitors: cached live mode for all currently-active paths=[{string.Join(", ", activePathsBeforeMutation.SelectMany(p => p.TargetsInfo).Select(t => t.DisplayTarget.DevicePath))}] before any topology mutation -- covers both a deliberate swap-exclusion and an accidental drop (fix H's correction target) equally.");
 
-        for (int attemptNumber = 1; attemptNumber <= MaxScopedActivationRetryAttempts + 1; attemptNumber++)
+        // Phase 27: ApplyTopology(Extend) is now the sole, unconditional activation call --
+        // no scoped-plan branch, no primary/fallback split. See the class-level remark above
+        // this method for the full rationale.
+        Log("ActivateMonitors: calling whole-topology PathInfo.ApplyTopology(Extend) -- Phase 27: the sole activation mechanism.");
+        PathInfo.ApplyTopology(DisplayConfigTopologyId.Extend, allowPersistence: false);
+
+        // Debug session monitor-enable-reactivates-others-again, round 2: round 1's
+        // fix (a single settle-poll then a single correction pass) did not hold up on
+        // a live rig re-test. Reported symptom: the unexpectedly-activated monitor's
+        // tile transiently disappeared, then reappeared ACTIVE. A single settle+correct
+        // pass cannot defend against either mechanism that explains that: (a)
+        // PollUntilStableActiveDevicePaths' "two consecutive reads agree" criterion can
+        // report a false-positive "stable" reading during a mid-ramp plateau -- if a
+        // still-negotiating target (EDID/HDCP renegotiation after Extend, timing wholly
+        // undocumented by Microsoft, see ccd-topology-restore-findings) happens not to
+        // change between two successive 150ms-spaced reads, the poll concludes "stable"
+        // before that target has actually finished coming online, making it invisible
+        // to ComputeUnexpectedlyActivated for that round; or (b) the target genuinely
+        // gets corrected off, then comes back on by itself moments later (e.g. this
+        // rig's signal chain re-triggering Windows' own "new display connected"
+        // auto-extend once the target's handshake finishes, independent of and after
+        // this method's own correction call). Both look identical to the caller: "the
+        // correction looked fine but the monitor is on anyway." Re-run the whole
+        // settle+correct cycle for a bounded number of rounds, and only trust a
+        // "nothing unexpected" verdict once it holds for two CONSECUTIVE rounds
+        // (mirroring the settle-poll's own stability idiom one level up) -- so a
+        // late-arriving activation that slipped past an earlier round's premature
+        // "stable" read, or one that reappeared after an earlier round's correction, is
+        // still observed and corrected within this same ActivateMonitors call.
+        const int RequiredConsecutiveCleanRounds = 2;
+        int consecutiveCleanRounds = 0;
+
+        for (int round = 1; round <= MaxCorrectionRounds; round++)
         {
-            var devicePathsToActivate = monitorDevicePaths.Where(dp => !currentlyActiveDevicePaths.Contains(dp)).ToHashSet();
-            PathInfo[] activePathsForScopedPlan = PathInfo.GetActivePaths(virtualModeAware: false);
-            bool usedScopedActivation = false;
+            var settledActiveDevicePaths = PollUntilStableActiveDevicePaths();
 
-            // Debug session monitor-position-regre (regression of monitor-position-resets-to-de):
-            // round 3's original CacheLiveModes call below only covered monitorSwapDisableSet's
-            // deliberately-excluded survivors -- the ones THIS call intentionally deactivates as
-            // part of a swap. Round 7's fix H (ComputeUnexpectedlyDeactivated + the nested
-            // ActivateMonitors correction call further down) added a SECOND way a previously-active
-            // survivor can go inactive during this call: an ACCIDENTAL drop, as an unrequested side
-            // effect of the Extend fallback. Because that survivor is (by ComputeUnexpectedlyDeactivated's
-            // own definition) never in monitorSwapDisableSet, the old isPartOfMonitorSwap-gated cache
-            // call never ran for it, and DeactivateMonitors is never invoked for it either (Extend
-            // mutates the topology directly, with no DeactivateMonitors call in between) -- so by the
-            // time fix H's correction loop notices it missing and nested-reactivates it, no cached
-            // mode exists at all, and TryBuildScopedActivationPlan falls back to its blank-mode
-            // branch, letting the driver pick a default position. This silently resurrected Symptom 1
-            // (position resets to a driver default) via a code path that fix never anticipated
-            // covering -- confirmed "immediate" (not delayed), since it happens synchronously inside
-            // this same ActivateMonitors call's own correction loop, before it ever returns.
-            // Caching EVERY currently-active path's live mode here -- not just monitorSwapDisableSet's
-            // -- closes this gap: any survivor this call's mutation (scoped or Extend) happens to
-            // drop, whether deliberately excluded or accidentally lost, now has a cache entry
-            // available the moment a correction (fix H) needs to restore it. Strictly additive over
-            // the prior, narrower call (monitorSwapDisableSet's paths are always a subset of
-            // activePathsForScopedPlan), so the swap case is byte-for-byte unchanged. Round 14: this
-            // now (re-)runs on every fix-A retry attempt too, against each attempt's own fresh live
-            // query -- harmless and idempotent, and correct: a retry attempt's scoped plan must be
-            // built from CURRENT live state, not a snapshot from an earlier, failed attempt.
-            CacheLiveModes(activePathsForScopedPlan);
-            Log($"ActivateMonitors: cached live mode for all currently-active paths=[{string.Join(", ", activePathsForScopedPlan.SelectMany(p => p.TargetsInfo).Select(t => t.DisplayTarget.DevicePath))}] before any topology mutation -- covers both a deliberate swap-exclusion and an accidental drop (fix H's correction target) equally." + (attemptNumber > 1 ? $" (round 14 fix-A automatic retry attempt {attemptNumber}/{MaxScopedActivationRetryAttempts + 1})" : ""));
+            // Whole-topology correction (rig-confirmed, see class-level remarks above):
+            // Extend can reactivate device paths beyond the requested set. Any device
+            // path that is active now, was NOT active before this call, and was NOT
+            // requested must be turned back off — otherwise a single-tile "enable one
+            // monitor" action could silently reactivate an unrelated, deliberately-
+            // disabled monitor. Always compared against the ORIGINAL pre-Extend active
+            // set and the original requested set (not a round-local baseline), so a
+            // monitor corrected in an earlier round and still off is never re-flagged.
+            IReadOnlySet<string> unexpectedlyActivated = ComputeUnexpectedlyActivated(
+                currentlyActiveDevicePaths, settledActiveDevicePaths, monitorDevicePaths);
 
-            if (isPartOfMonitorSwap)
+            // Debug session monitor-position-resets-to-de, round 7: the MIRROR IMAGE
+            // correction -- rig-confirmed (checkpoint response, finding 6): a plain,
+            // non-swap Extend call's own opaque persisted layout did not include a
+            // monitor (SAM748A) that was active BEFORE this call and was never any part
+            // of this call's disable-set -- it silently dropped out. Before this fix,
+            // only "gained an unwanted activation" was ever corrected; "lost an
+            // activation nobody asked to lose" had no correction path at all, so
+            // ActivateMonitors reported EXIT success with a WRONG final state (see
+            // ComputeUnexpectedlyDeactivated's own remarks for the full mechanism).
+            // Always compared against the ORIGINAL pre-call active set and
+            // monitorSwapDisableSet (not a round-local baseline), mirroring
+            // unexpectedlyActivated's own convention above.
+            IReadOnlySet<string> unexpectedlyDeactivated = ComputeUnexpectedlyDeactivated(
+                currentlyActiveDevicePaths, settledActiveDevicePaths, monitorSwapDisableSet);
+
+            Log($"ActivateMonitors: correction round {round}/{MaxCorrectionRounds} postExtendSettledActive=[{string.Join(", ", settledActiveDevicePaths)}] unexpectedlyActivated=[{string.Join(", ", unexpectedlyActivated)}] unexpectedlyDeactivated=[{string.Join(", ", unexpectedlyDeactivated)}]");
+
+            if (unexpectedlyActivated.Count > 0 || unexpectedlyDeactivated.Count > 0)
             {
-                Log($"ActivateMonitors: isPartOfMonitorSwap=true -- monitorSwapDisableSet=[{string.Join(", ", monitorSwapDisableSet)}] will be excluded from the scoped activation plan below so the same ApplyPathInfos call both activates the new target(s) and implicitly deactivates them (live mode already cached above).");
-            }
+                consecutiveCleanRounds = 0;
 
-            if (TryBuildScopedActivationPlan(devicePathsToActivate, activePathsForScopedPlan, monitorSwapDisableSet, out PathInfo[] scopedPlan, out string scopedFailureReason))
-            {
-                Log($"ActivateMonitors: round 5 -- scoped activation plan built for targets=[{string.Join(", ", devicePathsToActivate)}], planPaths=[{string.Join(", ", scopedPlan.SelectMany(p => p.TargetsInfo).Select(t => t.DisplayTarget.DevicePath))}] -- attempting scoped PathInfo.ApplyPathInfos(forceModeEnumeration: true) INSTEAD OF whole-topology ApplyTopology(Extend).");
-                Log($"ActivateMonitors: round 11 -- scoped plan entry detail (logged regardless of whether the ApplyPathInfos call below throws or succeeds, so a failing plan's shape can be hand-compared against a succeeding one for the same pairing): [{string.Join("; ", scopedPlan.Select(DescribeScopedPathEntry))}].");
-
-                try
+                if (unexpectedlyActivated.Count > 0)
                 {
-                    PathInfo.ApplyPathInfos(scopedPlan, allowChanges: true, saveToDatabase: false, forceModeEnumeration: true);
-                    usedScopedActivation = true;
-                    Log("ActivateMonitors: round 5 -- scoped activation ApplyPathInfos completed without throwing.");
+                    // Reuses the already rig-proven CCD-removal path (repositioning-aware
+                    // ApplyPathInfos + its own verify-and-throw) — never a manual
+                    // PathTargetInfo/mode reconstruction (see class-level remarks).
+                    DeactivateMonitors(unexpectedlyActivated);
+                    Log($"ActivateMonitors: correction round {round}/{MaxCorrectionRounds} DeactivateMonitors({string.Join(", ", unexpectedlyActivated)}) completed without throwing.");
                 }
-                catch (Exception ex)
+
+                if (unexpectedlyDeactivated.Count > 0)
                 {
-                    Log($"ActivateMonitors: round 5 -- scoped activation ApplyPathInfos threw ({ex.GetType().Name}: {ex.Message}) -- falling back to whole-topology ApplyTopology(Extend). Round 3: this fallback is now KNOWN unreliable for correctly targeting a specific monitor (it may fail to activate the requested target and/or reactivate an unrelated, independently-disabled one) -- used here only because no better option remains.");
+                    // Round 7: reuses this SAME public method (a plain, non-swap-aware
+                    // re-activation of exactly the dropped survivor(s)) rather than a new
+                    // primitive — mirrors DeactivateMonitors' reuse above. Not unbounded
+                    // recursion: each nested call only ever targets device paths this
+                    // round found genuinely inactive, and the OUTER MaxCorrectionRounds/
+                    // RequiredConsecutiveCleanRounds bound still governs how many rounds
+                    // this loop keeps re-checking, exactly as for the opposite direction.
+                    // Debug session monitor-position-regre, round 20 (item A / Option A2,
+                    // user-approved checkpoint decision): calls ActivateMonitorsCore
+                    // directly (isNestedCorrectionCall: true) instead of recursing through
+                    // the public ActivateMonitors wrapper -- this is the ONLY call site in
+                    // this file that ever passes isNestedCorrectionCall: true. Still not
+                    // unbounded recursion: unchanged from round 7, each nested call only
+                    // ever targets device paths this round found genuinely inactive, and
+                    // the OUTER MaxCorrectionRounds/RequiredConsecutiveCleanRounds bound
+                    // still governs how many rounds this loop keeps re-checking.
+                    ActivateMonitorsCore(unexpectedlyDeactivated, monitorSwapDisableSet: new HashSet<string>(), isNestedCorrectionCall: true);
+                    Log($"ActivateMonitors: correction round {round}/{MaxCorrectionRounds} nested ActivateMonitors({string.Join(", ", unexpectedlyDeactivated)}) completed without throwing.");
                 }
             }
             else
             {
-                Log($"ActivateMonitors: round 5 -- scoped activation plan not available ({scopedFailureReason}) -- falling back to whole-topology ApplyTopology(Extend). Round 3: this fallback is now KNOWN unreliable for correctly targeting a specific monitor (it may fail to activate the requested target and/or reactivate an unrelated, independently-disabled one) -- used here only because no better option remains.");
-            }
-
-            if (!usedScopedActivation)
-            {
-                Log("ActivateMonitors: calling whole-topology PathInfo.ApplyTopology(Extend).");
-                PathInfo.ApplyTopology(DisplayConfigTopologyId.Extend, allowPersistence: false);
-            }
-
-            // Debug session monitor-enable-reactivates-others-again, round 2: round 1's
-            // fix (a single settle-poll then a single correction pass) did not hold up on
-            // a live rig re-test. Reported symptom: the unexpectedly-activated monitor's
-            // tile transiently disappeared, then reappeared ACTIVE. A single settle+correct
-            // pass cannot defend against either mechanism that explains that: (a)
-            // PollUntilStableActiveDevicePaths' "two consecutive reads agree" criterion can
-            // report a false-positive "stable" reading during a mid-ramp plateau -- if a
-            // still-negotiating target (EDID/HDCP renegotiation after Extend, timing wholly
-            // undocumented by Microsoft, see ccd-topology-restore-findings) happens not to
-            // change between two successive 150ms-spaced reads, the poll concludes "stable"
-            // before that target has actually finished coming online, making it invisible
-            // to ComputeUnexpectedlyActivated for that round; or (b) the target genuinely
-            // gets corrected off, then comes back on by itself moments later (e.g. this
-            // rig's signal chain re-triggering Windows' own "new display connected"
-            // auto-extend once the target's handshake finishes, independent of and after
-            // this method's own correction call). Both look identical to the caller: "the
-            // correction looked fine but the monitor is on anyway." Re-run the whole
-            // settle+correct cycle for a bounded number of rounds, and only trust a
-            // "nothing unexpected" verdict once it holds for two CONSECUTIVE rounds
-            // (mirroring the settle-poll's own stability idiom one level up) -- so a
-            // late-arriving activation that slipped past an earlier round's premature
-            // "stable" read, or one that reappeared after an earlier round's correction, is
-            // still observed and corrected within this same ActivateMonitors call.
-            const int RequiredConsecutiveCleanRounds = 2;
-            int consecutiveCleanRounds = 0;
-
-            for (int round = 1; round <= MaxCorrectionRounds; round++)
-            {
-                var settledActiveDevicePaths = PollUntilStableActiveDevicePaths();
-
-                // Whole-topology correction (rig-confirmed, see class-level remarks above):
-                // Extend can reactivate device paths beyond the requested set. Any device
-                // path that is active now, was NOT active before this call, and was NOT
-                // requested must be turned back off — otherwise a single-tile "enable one
-                // monitor" action could silently reactivate an unrelated, deliberately-
-                // disabled monitor. Always compared against the ORIGINAL pre-Extend active
-                // set and the original requested set (not a round-local baseline), so a
-                // monitor corrected in an earlier round and still off is never re-flagged.
-                IReadOnlySet<string> unexpectedlyActivated = ComputeUnexpectedlyActivated(
-                    currentlyActiveDevicePaths, settledActiveDevicePaths, monitorDevicePaths);
-
-                // Debug session monitor-position-resets-to-de, round 7: the MIRROR IMAGE
-                // correction -- rig-confirmed (checkpoint response, finding 6): a plain,
-                // non-swap scoped ApplyPathInfos call threw PathChangeException, fell back to
-                // whole-topology ApplyTopology(Extend), and Extend's own opaque persisted
-                // layout did not include a monitor (SAM748A) that was active BEFORE this call
-                // and was never any part of this call's disable-set -- it silently dropped
-                // out. Before this fix, only "gained an unwanted activation" was ever
-                // corrected; "lost an activation nobody asked to lose" had no correction path
-                // at all, so ActivateMonitors reported EXIT success with a WRONG final state
-                // (see ComputeUnexpectedlyDeactivated's own remarks for the full mechanism).
-                // Always compared against the ORIGINAL pre-call active set and
-                // monitorSwapDisableSet (not a round-local baseline), mirroring
-                // unexpectedlyActivated's own convention above.
-                IReadOnlySet<string> unexpectedlyDeactivated = ComputeUnexpectedlyDeactivated(
-                    currentlyActiveDevicePaths, settledActiveDevicePaths, monitorSwapDisableSet);
-
-                Log($"ActivateMonitors: correction round {round}/{MaxCorrectionRounds} postExtendSettledActive=[{string.Join(", ", settledActiveDevicePaths)}] unexpectedlyActivated=[{string.Join(", ", unexpectedlyActivated)}] unexpectedlyDeactivated=[{string.Join(", ", unexpectedlyDeactivated)}]");
-
-                if (unexpectedlyActivated.Count > 0 || unexpectedlyDeactivated.Count > 0)
+                consecutiveCleanRounds++;
+                if (consecutiveCleanRounds >= RequiredConsecutiveCleanRounds)
                 {
-                    consecutiveCleanRounds = 0;
-
-                    if (unexpectedlyActivated.Count > 0)
-                    {
-                        // Reuses the already rig-proven CCD-removal path (repositioning-aware
-                        // ApplyPathInfos + its own verify-and-throw) — never a manual
-                        // PathTargetInfo/mode reconstruction (see class-level remarks).
-                        DeactivateMonitors(unexpectedlyActivated);
-                        Log($"ActivateMonitors: correction round {round}/{MaxCorrectionRounds} DeactivateMonitors({string.Join(", ", unexpectedlyActivated)}) completed without throwing.");
-                    }
-
-                    if (unexpectedlyDeactivated.Count > 0)
-                    {
-                        // Round 7: reuses this SAME public method (a plain, non-swap-aware
-                        // re-activation of exactly the dropped survivor(s)) rather than a new
-                        // primitive — mirrors DeactivateMonitors' reuse above. Not unbounded
-                        // recursion: each nested call only ever targets device paths this
-                        // round found genuinely inactive, and the OUTER MaxCorrectionRounds/
-                        // RequiredConsecutiveCleanRounds bound still governs how many rounds
-                        // this loop keeps re-checking, exactly as for the opposite direction.
-                        // Debug session monitor-position-regre, round 20 (item A / Option A2,
-                        // user-approved checkpoint decision): calls ActivateMonitorsCore
-                        // directly (isNestedCorrectionCall: true) instead of recursing through
-                        // the public ActivateMonitors wrapper -- this is the ONLY call site in
-                        // this file that ever passes isNestedCorrectionCall: true, so this
-                        // nested correction call (and ONLY this one) is now eligible for the
-                        // extended, nested-only retry rule below
-                        // (ShouldRetryNestedCorrectionActivation) and throws
-                        // CollateralMonitorRestoreFailedException (not a plain
-                        // InvalidOperationException) if its own retry budget is exhausted --
-                        // see both methods' own remarks for the full rationale. Still not
-                        // unbounded recursion: unchanged from round 7, each nested call only
-                        // ever targets device paths this round found genuinely inactive, and
-                        // the OUTER MaxCorrectionRounds/RequiredConsecutiveCleanRounds bound
-                        // still governs how many rounds this loop keeps re-checking.
-                        ActivateMonitorsCore(unexpectedlyDeactivated, monitorSwapDisableSet: new HashSet<string>(), isNestedCorrectionCall: true);
-                        Log($"ActivateMonitors: correction round {round}/{MaxCorrectionRounds} nested ActivateMonitors({string.Join(", ", unexpectedlyDeactivated)}) completed without throwing.");
-                    }
-                }
-                else
-                {
-                    consecutiveCleanRounds++;
-                    if (consecutiveCleanRounds >= RequiredConsecutiveCleanRounds)
-                    {
-                        break;
-                    }
+                    break;
                 }
             }
-
-            // Verify-and-throw (D-03/D-04 discipline): re-query, confirm every requested
-            // device path is now active AND (round 7) every device path that was active
-            // BEFORE this call and is not in monitorSwapDisableSet is STILL active — the
-            // correction loop above should already have restored it within its bounded
-            // rounds, but if it could not (correction budget exhausted, or the nested
-            // ActivateMonitors retry itself failed), this must surface as a thrown
-            // exception, never a silently-wrong EXIT success (D-05: no further automatic
-            // recovery is attempted, but a genuine failure must never be reported as
-            // success). Never trust a non-throwing return alone, never use Screen.AllScreens
-            // as the oracle. Round 14: `requestedStillInactive` is now named/computed
-            // separately from the combined `stillInactive` set (still identical in final
-            // content to the pre-round-14 single expression) so ShouldRetryScopedActivation
-            // below can distinguish "the call's OWN requested target(s) never came active"
-            // (fix A's narrow retry trigger) from "an unrelated survivor is still missing"
-            // (fix H's own, unchanged, different correction mechanism -- never retried by
-            // fix A).
-            PathInfo[] postCorrection = PathInfo.GetActivePaths(virtualModeAware: false);
-            postCorrectionActiveDevicePaths = postCorrection.SelectMany(p => p.TargetsInfo).Select(t => t.DisplayTarget.DevicePath).ToHashSet();
-            var requestedStillInactive = monitorDevicePaths.Except(postCorrectionActiveDevicePaths).ToArray();
-            var survivorStillInactive = currentlyActiveDevicePaths.Where(dp => !monitorSwapDisableSet.Contains(dp) && !postCorrectionActiveDevicePaths.Contains(dp));
-            stillInactive = requestedStillInactive.Concat(survivorStillInactive).Distinct().ToArray();
-
-            if (stillInactive.Length == 0)
-            {
-                break;
-            }
-
-            bool retryEligibleTopLevel = ShouldRetryScopedActivation(usedScopedActivation, requestedStillInactive.Length, attemptNumber, MaxScopedActivationRetryAttempts);
-
-            // Debug session monitor-position-regre, round 20 (item A / Option A2,
-            // user-approved checkpoint decision): a SEPARATE, additional eligibility rule
-            // that applies ONLY to fix H's own nested correction call -- see
-            // ShouldRetryNestedCorrectionActivation's own remarks for the full rationale.
-            // Short-circuited (never evaluated) whenever retryEligibleTopLevel is already
-            // true, and always false for the top-level call (isNestedCorrectionCall is
-            // always false there) -- so this can never change the TOP-LEVEL call's own retry
-            // decision; ShouldRetryScopedActivation above remains the ONLY thing that decides
-            // it, byte-for-byte unchanged.
-            bool retryEligibleNestedOnly = !retryEligibleTopLevel && ShouldRetryNestedCorrectionActivation(isNestedCorrectionCall, requestedStillInactive.Length, attemptNumber, MaxScopedActivationRetryAttempts);
-
-            if (retryEligibleTopLevel || retryEligibleNestedOnly)
-            {
-                Log($"ActivateMonitors: round 14 (fix A) -- INTERNAL automatic retry {attemptNumber}/{MaxScopedActivationRetryAttempts}: requested target(s) [{string.Join(", ", requestedStillInactive)}] still inactive despite scoped ApplyPathInfos reporting success -- re-running the ENTIRE scoped build+apply+settle+correct sequence before surfacing D-05 (round 13 rig evidence: a byte-for-byte identical retry recovered this exact shape 7 seconds later). This is an automatic, in-process retry -- NOT a user-initiated tile re-click (a manual retry would instead produce its own fresh 'ActivateMonitors: ENTER ...' log line above)." + (retryEligibleNestedOnly ? " (round 20 item A/fix A2: retry-eligibility EXTENDED to cover this attempt's own Extend-fallback -- usedScopedActivation=false -- specifically because isNestedCorrectionCall=true; this is fix H's own internal cleanup call, not the user's direct request, so ShouldRetryScopedActivation's own top-level-only gate was bypassed here via ShouldRetryNestedCorrectionActivation instead.)" : ""));
-
-                // Round 18 (item 3, fix K / Option 3B): actively poll (bounded) for the
-                // still-inactive requested target(s) to report themselves reachable again
-                // BEFORE this loop `continue`s into the retry attempt -- see
-                // PollUntilTargetsReachable's own remarks for the full round-15/17
-                // evidence and design rationale. This changes ONLY the timing/gating
-                // before the retry fires; ShouldRetryScopedActivation's own decision above
-                // and MaxScopedActivationRetryAttempts' fixed budget are both unchanged.
-                // Round 20: applies identically regardless of WHICH gate
-                // (retryEligibleTopLevel or retryEligibleNestedOnly) made this retry
-                // eligible -- no separate poll bound or retry-count budget was introduced
-                // for the newly-eligible nested-only path.
-                var reachabilityPollStopwatch = Stopwatch.StartNew();
-                bool becameReachableWithinBudget = PollUntilTargetsReachable(requestedStillInactive.ToHashSet());
-                reachabilityPollStopwatch.Stop();
-                Log($"ActivateMonitors: round 18 (fix K / poll-until-reachable) -- waited {reachabilityPollStopwatch.Elapsed.TotalMilliseconds:F0}ms before retry attempt {attemptNumber}/{MaxScopedActivationRetryAttempts}; target(s) [{string.Join(", ", requestedStillInactive)}] becameReachableWithinBudget={becameReachableWithinBudget} (bounded window: up to {MaxReachabilityPollAttempts} attempts x {SettlePollDelay.TotalMilliseconds:F0}ms). Proceeding to the retry attempt regardless of the outcome -- see the next 'TryBuildScopedActivationPlan' log line(s) below for this retry attempt's own candidate-source count, directly comparable against round 15/17's '0 candidates' data points.");
-
-                continue;
-            }
-
-            string exitThrowMessage =
-                $"Monitor enable did not take effect: {string.Join(", ", stillInactive)}. " +
-                "No further automatic recovery is attempted (D-05).";
-
-            if (isNestedCorrectionCall)
-            {
-                // Debug session monitor-position-regre, round 20 (item B / Option B1,
-                // user-approved checkpoint decision): this is fix H's own nested correction
-                // call (restoring a survivor collaterally dropped as a side effect of the
-                // OUTER call's own request) -- even with item A's extended retry, its budget
-                // can still be exhausted (e.g. the target never becomes reachable within
-                // PollUntilTargetsReachable's own bound). Throws
-                // CollateralMonitorRestoreFailedException (a plain InvalidOperationException
-                // subclass -- confirmed by direct read of MainForm.cs lines 1293/1350 that no
-                // existing catch clause depends on the exact concrete type) instead of the
-                // bare InvalidOperationException every OTHER throw site in this method still
-                // uses, so a caller several frames up (MainForm.OnTileAction) can build a
-                // clarified message distinguishing "your own request succeeded" from "a
-                // collateral side-effect restoration failed" without parsing this message's
-                // text. AffectedDevicePaths carries stillInactive (this frame's OWN
-                // requested target(s) -- the survivor fix H is trying to restore) since the
-                // OUTER call's own originally-requested device path is NOT in scope in this
-                // frame; the caller (MainForm) already has that from its own devicePath
-                // local.
-                Log($"ActivateMonitors: EXIT throwing -- still inactive after correction: [{string.Join(", ", stillInactive)}]." + (attemptNumber > 1 ? $" (round 14 fix-A automatic retry budget exhausted after {attemptNumber} total attempts.)" : "") + " (round 20 item B/fix B1: isNestedCorrectionCall=true -- throwing CollateralMonitorRestoreFailedException instead of a plain InvalidOperationException.)");
-                throw new CollateralMonitorRestoreFailedException(exitThrowMessage, stillInactive);
-            }
-
-            Log($"ActivateMonitors: EXIT throwing -- still inactive after correction: [{string.Join(", ", stillInactive)}]." + (attemptNumber > 1 ? $" (round 14 fix-A automatic retry budget exhausted after {attemptNumber} total attempts.)" : ""));
-            throw new InvalidOperationException(exitThrowMessage);
         }
 
-        // Round 7: reuses postCorrectionActiveDevicePaths (computed above for the
-        // extended verify-and-throw check) instead of re-deriving an identical set —
-        // no behavior change, just removes a duplicate computation. Round 14: may now
-        // reflect a fix-A automatic retry attempt rather than the first attempt -- this
-        // EXIT success line is intentionally the same either way (the outcome is
-        // unambiguously a success at this point); look at the correction-round and
-        // fix-A retry log lines above it in the same debug.log excerpt to see how many
-        // attempts it took.
-        Log($"ActivateMonitors: EXIT success -- all requested paths active. finalActive=[{string.Join(", ", postCorrectionActiveDevicePaths)}].");
-        ObservePostApplyStability("ActivateMonitors", postCorrectionActiveDevicePaths);
+        // Verify-and-throw (D-03/D-04 discipline): re-query, confirm every requested
+        // device path is now active AND (round 7) every device path that was active
+        // BEFORE this call and is not in monitorSwapDisableSet is STILL active — the
+        // correction loop above should already have restored it within its bounded
+        // rounds, but if it could not (correction budget exhausted, or the nested
+        // ActivateMonitors retry itself failed), this must surface as a thrown
+        // exception, never a silently-wrong EXIT success (D-05: no further automatic
+        // recovery is attempted, but a genuine failure must never be reported as
+        // success). Never trust a non-throwing return alone, never use Screen.AllScreens
+        // as the oracle.
+        PathInfo[] postCorrection = PathInfo.GetActivePaths(virtualModeAware: false);
+        HashSet<string> postCorrectionActiveDevicePaths = postCorrection.SelectMany(p => p.TargetsInfo).Select(t => t.DisplayTarget.DevicePath).ToHashSet();
+        var requestedStillInactive = monitorDevicePaths.Except(postCorrectionActiveDevicePaths).ToArray();
+        var survivorStillInactive = currentlyActiveDevicePaths.Where(dp => !monitorSwapDisableSet.Contains(dp) && !postCorrectionActiveDevicePaths.Contains(dp));
+        string[] stillInactive = requestedStillInactive.Concat(survivorStillInactive).Distinct().ToArray();
+
+        if (stillInactive.Length == 0)
+        {
+            // Round 7: reuses postCorrectionActiveDevicePaths (computed above for the
+            // extended verify-and-throw check) instead of re-deriving an identical set —
+            // no behavior change, just removes a duplicate computation.
+            Log($"ActivateMonitors: EXIT success -- all requested paths active. finalActive=[{string.Join(", ", postCorrectionActiveDevicePaths)}].");
+            ObservePostApplyStability("ActivateMonitors", postCorrectionActiveDevicePaths);
+            return;
+        }
+
+        string exitThrowMessage =
+            $"Monitor enable did not take effect: {string.Join(", ", stillInactive)}. " +
+            "No further automatic recovery is attempted (D-05).";
+
+        if (isNestedCorrectionCall)
+        {
+            // Debug session monitor-position-regre, round 20 (item B / Option B1,
+            // user-approved checkpoint decision): this is fix H's own nested correction
+            // call (restoring a survivor collaterally dropped as a side effect of the
+            // OUTER call's own request) -- its correction budget can still be exhausted.
+            // Throws CollateralMonitorRestoreFailedException (a plain
+            // InvalidOperationException subclass -- confirmed by direct read of
+            // MainForm.cs lines 1293/1350 that no existing catch clause depends on the
+            // exact concrete type) instead of the bare InvalidOperationException every
+            // OTHER throw site in this method still uses, so a caller several frames up
+            // (MainForm.OnTileAction) can build a clarified message distinguishing "your
+            // own request succeeded" from "a collateral side-effect restoration failed"
+            // without parsing this message's text. AffectedDevicePaths carries
+            // stillInactive (this frame's OWN requested target(s) -- the survivor fix H
+            // is trying to restore) since the OUTER call's own originally-requested
+            // device path is NOT in scope in this frame; the caller (MainForm) already
+            // has that from its own devicePath local.
+            Log($"ActivateMonitors: EXIT throwing -- still inactive after correction: [{string.Join(", ", stillInactive)}]. (round 20 item B/fix B1: isNestedCorrectionCall=true -- throwing CollateralMonitorRestoreFailedException instead of a plain InvalidOperationException.)");
+            throw new CollateralMonitorRestoreFailedException(exitThrowMessage, stillInactive);
+        }
+
+        Log($"ActivateMonitors: EXIT throwing -- still inactive after correction: [{string.Join(", ", stillInactive)}].");
+        throw new InvalidOperationException(exitThrowMessage);
     }
 
     // Debug session monitor-position-resets-to-de, round 3: shared "cache each of these
