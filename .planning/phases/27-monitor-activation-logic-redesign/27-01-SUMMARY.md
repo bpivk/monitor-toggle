@@ -20,9 +20,9 @@ key-files:
 decisions:
   - "Operator selected option-c (staged two-commit removal with rig gate between commits) via AskUserQuestion presented by the orchestrator before this executor was dispatched"
 metrics:
-  duration: "~35min (Tasks 1-2 only; Task 3 not attempted, see below)"
+  duration: "~35min (Tasks 1-2) + rig verification round-trip"
   completed: 2026-08-31
-status: in-progress
+status: halted
 actuals:
   tokens: 46000
   tasks: 2
@@ -147,16 +147,43 @@ this exclusion, the swap's own disable-set target would be wrongly "corrected" b
 self-defeating loop this exclusion has always existed to prevent, and continues to prevent
 identically post-redesign.
 
-## Task 3: Rig-Hardware Verification (checkpoint:human-verify) — NOT PERFORMED THIS SESSION
+## Task 3: Rig-Hardware Verification (checkpoint:human-verify) — PERFORMED, RESULT: FAIL
 
-**Status: not attempted.** This executor runs in a Linux sandbox with no Windows CCD API access
-and cannot build/run `RigToggle.App.exe` or exercise live display hardware. Per this session's
-explicit instructions, Task 3 was not attempted, not guessed at, and not marked passed. It is
-returned to the orchestrator as a checkpoint for the operator to perform on the real Windows rig.
-Checks A-E (single-tile enable/collateral-activation, position preservation, full swap ordering,
-the Odyssey G5 flaky monitor x3, and failure-dialog surfacing) remain fully unanswered as of this
-summary. **PLAN 27-01 IS NOT YET COMPLETE** — Task 3 must be answered by the operator before this
-plan (and REDESIGN-04) can be marked done, and before Plan 02 proceeds with helper deletion.
+**Status: FAILED.** The operator (Blaz Pivk) built and ran `RigToggle.App.exe` on the real Windows
+rig from this plan's commit (`6b3058b`) and ran Checks A-E with debug logging enabled. Results,
+recorded verbatim from the operator's report and the attached `debug.log` excerpts and dialog
+screenshot (`1.png`):
+
+| Check | Result | Evidence |
+|---|---|---|
+| **A** — single-tile enable of Odyssey G5 (SAM7489), no collateral activation | **FAIL** | `ApplyTopology(Extend)` called; two settle-poll attempts and two correction rounds both showed only the other two monitors active (`ACI24A4`, `DELA0BC`) — SAM7489 never appeared active, not even briefly (no flash: `unexpectedlyActivated=[]`/`unexpectedlyDeactivated=[]` every round). `ActivateMonitors` threw `InvalidOperationException: Monitor enable did not take effect` at `WindowsMonitorController.cs:753`. |
+| **B** — position preservation on re-enable | **Not evaluable** | The monitor never successfully activates under Extend-only, so there is no "re-enabled position" to compare against its pre-disable position. Operator did not report a position observation; none is possible given Check A's failure. |
+| **C** — full swap ordering via the Rig/Normal toggle switch | **FAIL (enable direction)** | Toggling to Rig mode with SAM7489 in the enable-set (`isPartOfMonitorSwap=True`, `monitorSwapDisableSet=[ACI24A4, DELA0BC]`) hit the identical failure: `ApplyTopology(Extend)` called, two correction rounds, still inactive, threw `InvalidOperationException`. `ToggleService.TryExecuteStep` correctly caught it and logged "Monitor step failed with no observable topology change; mode flag deliberately left at its prior value" — the fail-safe held, no corrupted state, but the toggle did not complete. Normal-mode disable direction was not separately exercised since the Rig-mode leg never succeeded. |
+| **D** — repeat Odyssey G5 activation 3x | **FAIL, and then some** — the operator repeated far more than 3 times (6 total activation attempts logged across two sessions: 1 in the first log, 5 consecutive in the second) | **0 of 6 attempts succeeded.** Every attempt produced the identical `ApplyTopology(Extend)` -> 2 correction rounds -> `InvalidOperationException` sequence, back-to-back within seconds of each other. This rules out a timing/flakiness explanation — it is a hard, 100%-reproducible failure to activate this specific monitor via whole-topology Extend on this rig's hardware/driver combination. |
+| **E** — failure dialog text | **Captured** | Screenshot `1.png` (repo root) shows: "Monitor enable did not take effect: \\?\DISPLAY#SAM7489#7&16485deb&0&UID516#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}. No further automatic recovery is attempted (D-05)." — matches the logged exception message exactly. |
+
+**Debug log:** two session excerpts pasted by the operator (19:35-19:40 and 20:25-20:26 local
+time on the rig), both showing the same failure signature. Not attached as a file to this repo;
+quoted inline in the session transcript that produced this summary.
+
+**Interpretation:** This is exactly `root_cause (2)` flagged as a known, real risk in
+`.planning/debug/monitor-position-regre.md` §22.3 — "Extend failing to activate the requested
+target" — now confirmed, not hypothetical, on this rig's Odyssey G5 (SAM7489). The
+scoped-`ApplyPathInfos` activation path this plan bypassed (still physically present in the file,
+Plan 02 has not run) previously handled this monitor; whole-topology Extend cannot.
+
+**Per this plan's own acceptance criteria:** "If Check A, C, or D fails, execution HALTS here and
+does not proceed to Plan 02 — the Task 2 commit is the designated revert point per Task 1
+option-c." All three failed. **Phase 27 execution is halted at this checkpoint. Plan 02 and Plan
+03 do not run.**
+
+**Disposition (operator decision):** Presented with the choice to (a) revert commit `6b3058b` and
+restore the scoped-activation path, or (b) leave the Extend-only code in place as-is and stop
+without deciding yet, the operator chose **(b) — stop here, do not revert yet**. The Extend-only
+rewrite therefore remains live in the working tree in its currently broken state for this monitor;
+no revert has been performed. This is a deliberate, recorded choice, not an oversight — do not
+auto-revert or otherwise "clean this up" in a future session without the operator's explicit
+go-ahead.
 
 ## Deviations from Plan
 

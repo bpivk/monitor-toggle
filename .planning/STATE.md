@@ -122,6 +122,23 @@ None.
 
 ### Blockers/Concerns
 
+Open (2026-08-31): Phase 27 (monitor-activation-logic-redesign) HALTED at Plan 01 Task 3's real-rig
+verification checkpoint. The Extend-only redesign (whole-topology `PathInfo.ApplyTopology(Extend)`
+as the sole activation mechanism, commit `6b3058b`) reliably FAILS to activate the Samsung Odyssey
+G5 (device path SAM7489) — confirmed on real rig hardware across 6 consecutive attempts, 0
+successes, identical `InvalidOperationException: Monitor enable did not take effect` every time
+(dialog text captured, debug.log captured — see `27-01-SUMMARY.md`'s Task 3 section for full
+detail). This is exactly `root_cause (2)` flagged as a known risk in
+`.planning/debug/monitor-position-regre.md` §22.3, now confirmed rather than hypothetical. Per the
+plan's own acceptance criteria, a Check A/C/D failure halts execution and Plan 02/03 do not run —
+they remain blocked (`27-01-SUMMARY.md` frontmatter `status: halted`). The operator was offered the
+choice to revert commit `6b3058b` (restoring the still-intact scoped-activation path, which
+previously handled this monitor) or leave the Extend-only code in place unresolved, and explicitly
+chose the latter — **no revert has been performed; this is a deliberate pause, not an oversight.**
+Next step is the operator's call: revert and close Phase 27 as "redesign rejected by rig evidence,"
+or investigate further (e.g. whether Extend-only can be salvaged for this specific monitor) before
+deciding. Do not proceed to Plan 02 or auto-revert without further explicit operator direction.
+
 Open: Phase 24 Plan 01 Task 3 (blocking checkpoint) requires real Windows rig hardware verification — not available in this build environment. Operator must build `RigToggle.App.exe` natively on Windows at commit `67f4bfd`, run the six checks in `24-01-PLAN.md` Task 3, and report results to resume execution. PERF-03 is not yet marked complete and Phase 24 is not yet closed pending this.
 
 Resolved 2026-08-16: Phase 22 rig verification originally FAILED (2026-08-15, recorded in `22-03-SUMMARY.md`, commit a40e173) — Check 1 (monitor grid/audio ComboBox absent) and Check 3 (manual resize not working). Gap-closure plans 22-04/22-05 fixed both root causes (`Percent 100F` `TableLayoutPanel` row collapsing inside `AutoSize=true` containers; `Form.AutoSize` fighting manual `WM_SIZING`); a second rig pass (22-05) confirmed all 17 checks PASS on Windows 11 25H2 at 100/125/150% scale. Phase 22 is complete (`ROADMAP.md`, `PROJECT.md` Validated (v2.1) section). No longer an open item.
