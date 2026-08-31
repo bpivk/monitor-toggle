@@ -690,7 +690,21 @@ public sealed class WindowsMonitorController : IMonitorController
 
                 try
                 {
-                    PathInfo.ApplyPathInfos(scopedPlan, allowChanges: true, saveToDatabase: false, forceModeEnumeration: true);
+                    // Debug session monitor-position-regre, round 21.4 (Option R2, never previously
+                    // tried -- the redesign path was chosen instead, then rig-rejected in Phase 27):
+                    // allowChanges flipped from true to false as a diagnostic. true maps to
+                    // SDC_ALLOW_CHANGES, whose documented purpose is letting Windows silently deviate
+                    // from the literal request to "create a functional display path set" when the
+                    // exact configuration isn't possible -- round 21.4 found a rig trial where this
+                    // scoped call reported success while an unlisted third monitor came active as a
+                    // side effect, consistent with (but not proven to be caused by) this flag. false
+                    // makes an unsatisfiable request fail loudly via the catch block below (falling
+                    // back to whole-topology Extend, same as any other scoped-plan failure) instead of
+                    // silently doing something unrequested. Does not claim to fix root_cause (8)/(2)'s
+                    // intermittent-failure-to-activate shape -- round 13's own controlled comparison
+                    // already narrowed that specific shape to genuine external CCD/driver timing
+                    // nondeterminism, independent of this flag. This is a diagnostic, not a fix.
+                    PathInfo.ApplyPathInfos(scopedPlan, allowChanges: false, saveToDatabase: false, forceModeEnumeration: true);
                     usedScopedActivation = true;
                     Log("ActivateMonitors: round 5 -- scoped activation ApplyPathInfos completed without throwing.");
                 }
