@@ -438,6 +438,28 @@ public class WindowsMonitorControllerTests
     }
 
     [Fact]
+    public void PromoteToOriginIfNeeded_SurvivorAndNewTargetBothClaimOrigin_NewTargetsStaleClaimDropped()
+    {
+        // Real-rig repro (2026-08-31): the new target was solo-active the last time its mode was
+        // cached (trivially at (0,0) with nothing else on screen), then gets re-added alongside a
+        // survivor that is CURRENTLY, genuinely primary at (0,0). Before the fix, both entries kept
+        // their origin claim and Windows rejected the plan outright (PathChangeException). The
+        // survivor's claim must win; the new target's stale cached mode must be dropped to blank
+        // (IsModeInformationAvailable=false), not merely repositioned elsewhere.
+        var keptActiveSurvivors = new[] { WithMode(1, 0, 0) };
+        var newPaths = new[] { WithMode(2, 0, 0) };
+
+        IReadOnlyList<PathInfo> result = WindowsMonitorController.PromoteToOriginIfNeeded(keptActiveSurvivors, newPaths);
+
+        Assert.Equal(2, result.Count);
+        PathInfo survivor = result.Single(p => p.DisplaySource.Equals(Source(1)));
+        PathInfo newTarget = result.Single(p => p.DisplaySource.Equals(Source(2)));
+        Assert.Equal(new Point(0, 0), survivor.Position);
+        Assert.True(survivor.IsModeInformationAvailable);
+        Assert.False(newTarget.IsModeInformationAvailable);
+    }
+
+    [Fact]
     public void PromoteToOriginIfNeeded_NoEntryHasCachedMode_LeftUntouched()
     {
         var keptActiveSurvivors = Array.Empty<PathInfo>();

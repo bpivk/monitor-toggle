@@ -1277,6 +1277,26 @@ public sealed class WindowsMonitorController : IMonitorController
     {
         bool IsAtOrigin(PathInfo p) => p.IsModeInformationAvailable && p.Position.IsEmpty;
 
+        // Follow-up fix (found via real-rig repro + tools/DisplayProbe correlation, 2026-08-31):
+        // a newPaths entry's cached mode can independently equal (0,0) whenever that target was
+        // SOLO-active the last time its live mode was captured -- trivially the origin, since
+        // nothing else was on screen. That is a stale artifact of a different, unrelated prior
+        // arrangement (the exact caveat this method's own remarks already apply to a newly-
+        // activated target's position generally). If a KEPT SURVIVOR also currently, genuinely
+        // holds the origin, its claim is authoritative -- so drop any newPaths entry's stale
+        // origin-claiming cached mode in that case (falling back to blank mode, i.e. exactly as
+        // if no cache entry had existed) rather than submitting two conflicting origin claims in
+        // the same plan. Windows rejects such a plan outright with
+        // PathChangeException("Invalid paths information") -- rig-confirmed reproducible 100% of
+        // the time immediately after a monitor is solo-active (e.g. Rig mode with one monitor)
+        // and then re-added alongside another, genuinely-primary survivor.
+        if (keptActiveSurvivors.Any(IsAtOrigin))
+        {
+            newPaths = newPaths
+                .Select(p => IsAtOrigin(p) ? new PathInfo(p.DisplaySource, p.TargetsInfo) : p)
+                .ToArray();
+        }
+
         if (keptActiveSurvivors.Any(IsAtOrigin) || newPaths.Any(IsAtOrigin))
         {
             return keptActiveSurvivors.Concat(newPaths).ToArray();
