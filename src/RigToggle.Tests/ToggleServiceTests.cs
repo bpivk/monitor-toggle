@@ -50,7 +50,9 @@ public class ToggleServiceTests : IDisposable
         bool monitorThrowsOnDisable = false,
         bool monitorMutatesBeforeThrowingOnDisable = false,
         bool appThrowsOnMinimize = false,
-        bool audioDeviceMissing = false)
+        bool audioDeviceMissing = false,
+        IReadOnlyList<string>? liveDevicePaths = null,
+        bool monitorThrowsOnGetAllMonitors = false)
     {
         var callLog = new List<string>();
         var settingsStore = new InMemorySettingsStore(settings ?? ConfiguredSettings);
@@ -58,7 +60,9 @@ public class ToggleServiceTests : IDisposable
         var monitorController = new FakeMonitorController(
             callLog,
             throwOnDisable: monitorThrowsOnDisable,
-            mutatesBeforeThrowingOnDisable: monitorMutatesBeforeThrowingOnDisable);
+            mutatesBeforeThrowingOnDisable: monitorMutatesBeforeThrowingOnDisable,
+            liveDevicePaths: liveDevicePaths,
+            throwOnGetAllMonitors: monitorThrowsOnGetAllMonitors);
         var audioController = new FakeAudioController(callLog, deviceExists: !audioDeviceMissing);
         var appController = new FakeAppController(callLog, throwOnMinimize: appThrowsOnMinimize);
 
@@ -645,5 +649,108 @@ public class ToggleServiceTests : IDisposable
         Assert.Equal(ToggleStepOutcome.Succeeded, result.Steps.Single(s => s.StepName == "Monitor").Outcome);
         Assert.Equal(ToggleStepOutcome.Skipped, result.Steps.Single(s => s.StepName == "Audio").Outcome);
         Assert.Equal(ToggleStepOutcome.Skipped, result.Steps.Single(s => s.StepName == "App").Outcome);
+    }
+
+    // --- Debug session monitor-position-regre, round 18 (item 1a): ToggleService now
+    // live-filters MonitorsToDisable/MonitorsToEnable (and the Normal-mode equivalents)
+    // against IMonitorController.GetAllMonitors() before ever calling
+    // ActivateMonitors/DeactivateMonitors, instead of passing a stale saved device path
+    // through unfiltered and letting the whole Monitor step fail on WindowsMonitorController's
+    // own opaque "not detected" guard (round 17 rig evidence: SAM748A/DELA0B8). ---
+
+    [Fact]
+    public void ToggleToRigMode_FiltersStaleDisableSetEntry_AndStillActivatesLiveEnableSet()
+    {
+        // A stale entry in MonitorsToDisable ("\\?\DISPLAY#GHOST", never live-enumerated
+        // by GetAllMonitors) must not block the still-live MonitorsToDisable/MonitorsToEnable
+        // entries from being applied -- per the round-18 design decision, the toggle
+        // proceeds with whatever remains live rather than throwing over the ghost entry.
+        var settings = new AppSettings
+        {
+            MonitorsToDisable = new List<string> { "\\\\?\\DISPLAY#PRIMARY", "\\\\?\\DISPLAY#GHOST" },
+            MonitorsToEnable = new List<string> { "\\\\?\\DISPLAY#RIG" },
+            NormalAudioDeviceId = ConfiguredSettings.NormalAudioDeviceId,
+            RigAudioDeviceId = ConfiguredSettings.RigAudioDeviceId,
+            CompanionAppPath = ExistingCompanionAppPath,
+        };
+        var (service, callLog, _) = CreateService(settings);
+
+        var result = service.ToggleToRigMode();
+
+        Assert.True(result.Success);
+        Assert.Equal(ToggleStepOutcome.Succeeded, result.Steps.Single(s => s.StepName == "Monitor").Outcome);
+        Assert.Contains("monitor.DeactivateMonitors:\\\\?\\DISPLAY#PRIMARY", callLog);
+        Assert.DoesNotContain(callLog, entry => entry.Contains("GHOST"));
+        Assert.Single(result.StaleMonitorsSkipped);
+        Assert.Equal("\\\\?\\DISPLAY#GHOST", result.StaleMonitorsSkipped[0]);
+    }
+
+    [Fact]
+    public void ToggleToRigMode_NoStaleEntries_ReturnsEmptyStaleMonitorsSkipped()
+    {
+        var (service, _, _) = CreateService();
+
+        var result = service.ToggleToRigMode();
+
+        Assert.Empty(result.StaleMonitorsSkipped);
+    }
+
+    [Fact]
+    public void ToggleToNormalMode_FiltersStaleNormalDisableSetEntry_AndStillAppliesLiveSet()
+    {
+        var settings = new AppSettings
+        {
+            MonitorsToDisable = ConfiguredSettings.MonitorsToDisable,
+            NormalMonitorsToDisable = new List<string> { "\\\\?\\DISPLAY#NORMAL", "\\\\?\\DISPLAY#GHOST" },
+            NormalMonitorsToEnable = new List<string> { "\\\\?\\DISPLAY#RIG" },
+            NormalAudioDeviceId = ConfiguredSettings.NormalAudioDeviceId,
+            RigAudioDeviceId = ConfiguredSettings.RigAudioDeviceId,
+            CompanionAppPath = ExistingCompanionAppPath,
+        };
+        var (service, callLog, _) = CreateService(settings);
+        service.ToggleToRigMode();
+        callLog.Clear();
+
+        var result = service.ToggleToNormalMode();
+
+        Assert.True(result.Success);
+        Assert.Contains("monitor.DeactivateMonitors:\\\\?\\DISPLAY#NORMAL", callLog);
+        Assert.DoesNotContain(callLog, entry => entry.Contains("GHOST"));
+        Assert.Single(result.StaleMonitorsSkipped);
+        Assert.Equal("\\\\?\\DISPLAY#GHOST", result.StaleMonitorsSkipped[0]);
+    }
+
+    [Fact]
+    public void ToggleToRigMode_AllRequestedPathsStale_MonitorStepStillSucceeds_AsANoOp()
+    {
+        // Degenerate edge case: every configured monitor is stale. ActivateMonitors/
+        // DeactivateMonitors both already no-op safely on an empty request set (see
+        // WindowsMonitorController's own "EXIT no-op (empty request set)" behavior) --
+        // LiveFilterMonitorSets does not need any special-case handling for this, and the
+        // Monitor step reports Succeeded (nothing to fail), with every requested path
+        // surfaced as stale.
+        var (service, callLog, _) = CreateService(liveDevicePaths: Array.Empty<string>());
+
+        var result = service.ToggleToRigMode();
+
+        Assert.Equal(ToggleStepOutcome.Succeeded, result.Steps.Single(s => s.StepName == "Monitor").Outcome);
+        Assert.DoesNotContain(callLog, entry => entry.StartsWith("monitor.DeactivateMonitors:\\"));
+        Assert.Contains("\\\\?\\DISPLAY#PRIMARY", result.StaleMonitorsSkipped);
+    }
+
+    [Fact]
+    public void ToggleToRigMode_GetAllMonitorsThrows_DegradesToUnfilteredBehavior_AndStillDeactivatesConfiguredSet()
+    {
+        // LiveFilterMonitorSets' own defensive fallback: an enumeration hiccup must never
+        // block or partially break the toggle -- it degrades to "treat every requested
+        // path as live" (the exact pre-round-18 behavior), unfiltered, rather than either
+        // throwing itself or silently treating everything as stale.
+        var (service, callLog, _) = CreateService(monitorThrowsOnGetAllMonitors: true);
+
+        var result = service.ToggleToRigMode();
+
+        Assert.True(result.Success);
+        Assert.Empty(result.StaleMonitorsSkipped);
+        Assert.Contains($"monitor.DeactivateMonitors:{string.Join(",", ConfiguredSettings.MonitorsToDisable!)}", callLog);
     }
 }

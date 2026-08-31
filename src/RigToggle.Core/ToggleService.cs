@@ -90,6 +90,11 @@ public sealed class ToggleService
         var disableSet = (settings.MonitorsToDisable ?? new List<string>()).ToHashSet();
         var enableSet = (settings.MonitorsToEnable ?? new List<string>()).ToHashSet();
 
+        // Debug session monitor-position-regre, round 18 (item 1a): live-filter BEFORE
+        // handing either set to ActivateMonitors/DeactivateMonitors — see
+        // LiveFilterMonitorSets' own remarks for the full round-17/18 rationale.
+        (disableSet, enableSet, IReadOnlyList<string> staleDevicePaths) = LiveFilterMonitorSets(disableSet, enableSet);
+
         // 06-RESEARCH.md Pitfall 2: ActivateMonitors MUST run BEFORE DeactivateMonitors.
         // ApplyTopology(Extend) (used internally by ActivateMonitors) restores the CCD
         // persistence database's last-known extend layout, which still contains the
@@ -124,7 +129,7 @@ public sealed class ToggleService
             // claims a mode the display didn't actually reach.
             ReconcileModeAfterMonitorFailure(monitorState);
 
-            return new ToggleResult(steps);
+            return new ToggleResult(steps) { StaleMonitorsSkipped = staleDevicePaths };
         }
 
         // Mode is written only after a confirmed successful Monitor step (Pattern 2),
@@ -148,7 +153,7 @@ public sealed class ToggleService
             }, steps))
         {
             steps.Add(new ToggleStepResult("App", ToggleStepOutcome.NotAttempted, null));
-            return new ToggleResult(steps);
+            return new ToggleResult(steps) { StaleMonitorsSkipped = staleDevicePaths };
         }
 
         TryExecuteOptionalStep("App", settings.CompanionAppPath, path =>
@@ -167,7 +172,7 @@ public sealed class ToggleService
                 _appController.LaunchOrFocus(path);
             }, steps);
 
-        return new ToggleResult(steps);
+        return new ToggleResult(steps) { StaleMonitorsSkipped = staleDevicePaths };
     }
 
     /// <summary>
@@ -218,6 +223,73 @@ public sealed class ToggleService
         }
 
         return TryExecuteStep(stepName, () => action(configuredValue), steps);
+    }
+
+    /// <summary>
+    /// Debug session monitor-position-regre, round 18 (item 1a): live-filters
+    /// <paramref name="disableSet"/>/<paramref name="enableSet"/> against a fresh
+    /// IMonitorController.GetAllMonitors() enumeration BEFORE either set is ever handed to
+    /// ActivateMonitors/DeactivateMonitors. Round 17 confirmed, by direct code read, that
+    /// both ToggleToRigMode and ToggleToNormalMode previously passed settings.json's raw
+    /// MonitorsToDisable/MonitorsToEnable (or NormalMonitorsToDisable/NormalMonitorsToEnable)
+    /// straight through with no live check of any kind — WindowsMonitorController's own
+    /// early-availability guard then throws IMMEDIATELY the instant ANY requested path
+    /// isn't currently detected, which — combined with the Monitor step being a single
+    /// atomic unit — blocked the ENTIRE toggle (including every still-live monitor in the
+    /// same batch) over one stale entry (round 17: SAM748A/DELA0B8, superseded identities
+    /// SettingsForm's own deliberate union-merge design preserves forever with no in-app
+    /// removal control — see SettingsForm.GetStaleSavedDevicePaths/ShowStaleMonitorWarning).
+    ///
+    /// Design decision (round 18, documented in the debug file): filter out the stale
+    /// path(s) and PROCEED with whatever remains live, rather than failing the whole
+    /// action — this matches SettingsForm's own already-established, non-blocking
+    /// "settings preserved; reconnect the display to manage it here" philosophy for a
+    /// stale entry (it never blocks Save over a stale monitor either), and keeps the
+    /// legitimate, still-live monitors working, which is what matters day-to-day. The
+    /// caller (ToggleToRigMode/ToggleToNormalMode) surfaces the returned stale list via
+    /// ToggleResult.StaleMonitorsSkipped so the UI can name exactly which path(s) were
+    /// skipped, instead of the previous opaque "not detected" exception message.
+    ///
+    /// GetAllMonitors() returns active AND currently OS-disabled-but-available displays
+    /// (IMonitorController's own doc comment) — a monitor that is merely OS-disabled right
+    /// now (not physically gone) is correctly still treated as live here, exactly matching
+    /// WindowsMonitorController's own IsAvailable-based "is this device known to Windows at
+    /// all" oracle. If GetAllMonitors() itself throws (an enumeration hiccup, matching
+    /// MainForm's own defensive posture for the identical call in
+    /// ToggleSwitch_ActionRequested's confirm-dialog name-resolution), this degrades to
+    /// "treat every requested path as live" — i.e. skip filtering entirely and fall
+    /// through to the exact pre-round-18 behavior for this call — rather than let a
+    /// transient enumeration failure block or partially break the toggle on its own.
+    /// </summary>
+    private (HashSet<string> LiveDisableSet, HashSet<string> LiveEnableSet, IReadOnlyList<string> StaleDevicePaths) LiveFilterMonitorSets(
+        HashSet<string> disableSet, HashSet<string> enableSet)
+    {
+        HashSet<string> livePaths;
+        try
+        {
+            livePaths = _monitorController.GetAllMonitors().Select(m => m.DevicePath).ToHashSet();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"LiveFilterMonitorSets: GetAllMonitors failed, skipping stale-path filtering for this call (falls through to pre-round-18 behavior unfiltered): {ex}");
+            return (disableSet, enableSet, Array.Empty<string>());
+        }
+
+        var staleDevicePaths = disableSet.Concat(enableSet).Where(dp => !livePaths.Contains(dp)).Distinct().ToArray();
+
+        if (staleDevicePaths.Length == 0)
+        {
+            return (disableSet, enableSet, Array.Empty<string>());
+        }
+
+        System.Diagnostics.Trace.WriteLine(
+            $"LiveFilterMonitorSets: filtering stale device path(s) not currently detected: [{string.Join(", ", staleDevicePaths)}] -- proceeding with the remaining live monitor(s) only, instead of blocking the whole toggle.");
+
+        return (
+            disableSet.Where(livePaths.Contains).ToHashSet(),
+            enableSet.Where(livePaths.Contains).ToHashSet(),
+            staleDevicePaths);
     }
 
     /// <summary>
@@ -368,6 +440,14 @@ public sealed class ToggleService
         var disableSet = (settings.NormalMonitorsToDisable ?? new List<string>()).ToHashSet();
         var enableSet = (settings.NormalMonitorsToEnable ?? new List<string>()).ToHashSet();
 
+        // Debug session monitor-position-regre, round 18 (item 1a): same live-filter as
+        // ToggleToRigMode above — confirmed (round 17/18) this Normal-mode Monitor step
+        // reads settings.NormalMonitorsToDisable/NormalMonitorsToEnable via the identical
+        // unfiltered-pass-to-ActivateMonitors/DeactivateMonitors shape, so it is equally
+        // exposed to a stale device path blocking the whole toggle. See
+        // LiveFilterMonitorSets' own remarks for the full rationale.
+        (disableSet, enableSet, IReadOnlyList<string> staleDevicePaths) = LiveFilterMonitorSets(disableSet, enableSet);
+
         Exception? monitorFailure = null;
         try
         {
@@ -403,7 +483,7 @@ public sealed class ToggleService
             ReconcileModeAfterMonitorFailure(monitorState);
             steps.Add(new ToggleStepResult("Audio", ToggleStepOutcome.NotAttempted, null));
             steps.Add(new ToggleStepResult("App", ToggleStepOutcome.NotAttempted, null));
-            return new ToggleResult(steps);
+            return new ToggleResult(steps) { StaleMonitorsSkipped = staleDevicePaths };
         }
 
         // Mode is written only after a confirmed successful Monitor step (Pattern 2),
@@ -473,7 +553,7 @@ public sealed class ToggleService
             steps.Add(new ToggleStepResult("App", ToggleStepOutcome.Skipped, null));
         }
 
-        return new ToggleResult(steps);
+        return new ToggleResult(steps) { StaleMonitorsSkipped = staleDevicePaths };
     }
 
     /// <summary>

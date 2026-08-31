@@ -643,8 +643,53 @@ namespace RigToggle.App
                 // single tile click (see field comments near _lastUserIntent). Must run
                 // AFTER a fresh RefreshMonitorTiles() so the intent snapshot reflects the
                 // real post-toggle state, matching OnTileAction's own ordering discipline.
+                //
+                // Debug session monitor-position-regre, round 18 (item 1b): mirrors
+                // OnTileAction's round-9 Fix J EXACTLY -- ArmIntentGuard() must only bake in
+                // the post-action state as "the deliberately-intended new state" when the
+                // underlying toggle actually succeeded. Round 17 rig evidence confirmed this
+                // exact call site was still unconditional -- the one open gap round 9's own
+                // blind_spots explicitly flagged ("...the Rig/Normal toggle switch handler's
+                // own separate ArmIntentGuard call site, not touched this round... flagged as
+                // an open item for a future round if a toggle-triggered... recurrence is
+                // reported") -- and directly observed it firing after a failed toggle (this
+                // round's stale-device-path defect, item 1a). A failed attempt's accidental
+                // (unchanged) live state was being baked in as "intended," permanently
+                // blinding TryReactivelyCorrectAgainstLastIntent to any real drift for the
+                // rest of the guard window -- the toggle-switch's own version of the exact
+                // bug OnTileAction already got fixed for. RefreshMonitorTiles() still always
+                // runs unconditionally (so the tile dashboard itself stays accurate on both
+                // success and failure) -- only the intent-guard re-arm is now gated on
+                // result.Success.
                 RefreshMonitorTiles();
-                ArmIntentGuard();
+                if (result is not null && result.Success)
+                {
+                    ArmIntentGuard();
+                }
+                else
+                {
+                    System.Diagnostics.Trace.WriteLine(
+                        $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.ToggleSwitch_ActionRequested: ArmIntentGuard SKIPPED -- " +
+                        "the toggle did not fully succeed, so the observed state cannot be treated as the " +
+                        "deliberately-intended one; leaving any previously-armed guard in place.");
+                }
+
+                // Debug session monitor-position-regre, round 18 (item 1a): a stale
+                // device path is not itself a step failure (the Monitor step still records
+                // Succeeded for whatever remained live) -- so this is a separate,
+                // non-blocking informational note, shown regardless of result.Success,
+                // naming exactly which previously-configured monitor(s) were skipped
+                // because they are no longer detected. See ToggleService.LiveFilterMonitorSets
+                // for the full round-17/18 rationale.
+                if (result is not null && result.StaleMonitorsSkipped.Count > 0)
+                {
+                    MessageBox.Show(
+                        this,
+                        ToggleResultFormatter.FormatStaleMonitorNote(result.StaleMonitorsSkipped),
+                        "Rig Toggle",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
 
                 if (result is not null && !result.Success)
                 {
@@ -1210,6 +1255,27 @@ namespace RigToggle.App
                         }
                     }
 
+                    // Debug session monitor-position-regre, round 9 (regression follow-up,
+                    // hypothesis 2): tracks whether DeactivateMonitors actually completed
+                    // without throwing -- a fresh rig debug.log showed ActivateMonitors (the
+                    // enable branch's mirror-image call, same pattern) can throw an UNCAUGHT
+                    // exception (round 9's WindowsMonitorController fix addresses the specific
+                    // cause found there), and this handler's finally block used to call
+                    // ArmIntentGuard() UNCONDITIONALLY regardless of whether the try block
+                    // above actually succeeded. ArmIntentGuard() snapshots whatever
+                    // RefreshMonitorTiles() just observed as "the deliberately-intended final
+                    // state" -- but when the underlying call threw, that observed state is
+                    // whatever the topology ACCIDENTALLY ended up in, not what the user asked
+                    // for. Rig-log-confirmed: re-arming on a failed call baked in a WRONG state
+                    // (the target still off, an unrelated survivor unexpectedly back on) as if
+                    // it were correct, permanently blinding TryReactivelyCorrectAgainstLastIntent
+                    // to that exact drift for the rest of the guard window -- a second,
+                    // independent way (distinct from WindowsMonitorController's own fix-H gap)
+                    // a wrong final state can be silently and permanently accepted. On failure,
+                    // this now leaves any previously-armed guard untouched instead of overwriting
+                    // it with the failed action's accidental result -- RefreshMonitorTiles()
+                    // still always runs so the tile dashboard itself stays accurate either way.
+                    bool deactivateSucceeded = false;
                     try
                     {
                         System.Diagnostics.Trace.WriteLine(
@@ -1220,6 +1286,7 @@ namespace RigToggle.App
                         // zero-survivors guard lives solely in
                         // WindowsMonitorController.DeactivateMonitors (DISPLAY-12).
                         _monitorController.DeactivateMonitors(new HashSet<string> { devicePath });
+                        deactivateSucceeded = true;
                         System.Diagnostics.Trace.WriteLine(
                             $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.OnTileAction: DeactivateMonitors({devicePath}) returned without throwing.");
                     }
@@ -1244,14 +1311,27 @@ namespace RigToggle.App
                     finally
                     {
                         RefreshMonitorTiles();
-                        // round 3: arm the bounded reactive guard against a delayed
-                        // OS-level reactivation of THIS monitor too, symmetric with the
-                        // enable branch below (see field comments above).
-                        ArmIntentGuard();
+                        if (deactivateSucceeded)
+                        {
+                            // round 3: arm the bounded reactive guard against a delayed
+                            // OS-level reactivation of THIS monitor too, symmetric with the
+                            // enable branch below (see field comments above).
+                            ArmIntentGuard();
+                        }
+                        else
+                        {
+                            System.Diagnostics.Trace.WriteLine(
+                                $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.OnTileAction: ArmIntentGuard SKIPPED -- " +
+                                $"DeactivateMonitors({devicePath}) threw, so the observed state cannot be treated " +
+                                "as the deliberately-intended one; leaving any previously-armed guard in place.");
+                        }
                     }
                 }
                 else
                 {
+                    // See the disable branch's identical deactivateSucceeded tracking above --
+                    // same round-9 rationale, mirrored for the enable direction.
+                    bool activateSucceeded = false;
                     try
                     {
                         System.Diagnostics.Trace.WriteLine(
@@ -1263,6 +1343,7 @@ namespace RigToggle.App
                         // (the narrower single-target case it was built for and remains
                         // rig-validated on). See IMonitorController's doc comment.
                         _monitorController.ActivateMonitors(new HashSet<string> { devicePath }, monitorSwapDisableSet: new HashSet<string>());
+                        activateSucceeded = true;
                         System.Diagnostics.Trace.WriteLine(
                             $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.OnTileAction: ActivateMonitors({devicePath}) returned without throwing.");
                     }
@@ -1270,7 +1351,16 @@ namespace RigToggle.App
                     {
                         System.Diagnostics.Trace.WriteLine(
                             $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.OnTileAction: ActivateMonitors({devicePath}) threw InvalidOperationException: {ex.Message}");
-                        MessageBox.Show(this, ex.Message, "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        // Debug session monitor-position-regre, round 20 (item B / Option B1,
+                        // user-approved checkpoint decision): MonitorEnableFailureMessageBuilder
+                        // distinguishes "your click failed" from "fix H's own internal cleanup,
+                        // restoring an unrelated monitor collaterally dropped as a side effect
+                        // of your click, failed" using the exception's concrete type
+                        // (CollateralMonitorRestoreFailedException) -- see its own remarks for
+                        // the full rationale. devicePath (the user's own, actually-succeeded
+                        // target) is already in scope here; the dialog text is byte-for-byte
+                        // unchanged (ex.Message verbatim) for every OTHER failure shape.
+                        MessageBox.Show(this, MonitorEnableFailureMessageBuilder.Build(devicePath, ex), "Rig Toggle", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                     catch (Exception ex)
                     {
@@ -1281,13 +1371,23 @@ namespace RigToggle.App
                     finally
                     {
                         RefreshMonitorTiles();
-                        // Debug session monitor-enable-reactivates-others-again, round 3:
-                        // arm the bounded reactive guard against a delayed OS-level
-                        // re-extend AFTER ActivateMonitors has already returned (rig-log
-                        // confirmed -- see field comments above). Must run AFTER
-                        // RefreshMonitorTiles() so the intent snapshot reflects the real
-                        // post-action state.
-                        ArmIntentGuard();
+                        if (activateSucceeded)
+                        {
+                            // Debug session monitor-enable-reactivates-others-again, round 3:
+                            // arm the bounded reactive guard against a delayed OS-level
+                            // re-extend AFTER ActivateMonitors has already returned (rig-log
+                            // confirmed -- see field comments above). Must run AFTER
+                            // RefreshMonitorTiles() so the intent snapshot reflects the real
+                            // post-action state.
+                            ArmIntentGuard();
+                        }
+                        else
+                        {
+                            System.Diagnostics.Trace.WriteLine(
+                                $"[{DateTime.Now:HH:mm:ss.fff}] MainForm.OnTileAction: ArmIntentGuard SKIPPED -- " +
+                                $"ActivateMonitors({devicePath}) threw, so the observed state cannot be treated " +
+                                "as the deliberately-intended one; leaving any previously-armed guard in place.");
+                        }
                     }
                 }
             }

@@ -12,19 +12,41 @@ namespace RigToggle.Tests.Doubles;
 /// </summary>
 public sealed class FakeMonitorController : IMonitorController
 {
+    // Debug session monitor-position-regre, round 18 (item 1a): ToggleService now calls
+    // GetAllMonitors() to live-filter a stale device path before it ever reaches
+    // ActivateMonitors/DeactivateMonitors -- this default set covers every device path
+    // literal ToggleServiceTests.cs already uses (DISPLAY#PRIMARY/NORMAL/RIG, plus this
+    // fake's own pre-existing DISPLAY#FAKE), so every pre-round-18 test keeps passing
+    // unmodified (nothing it configures is treated as "stale" by default). Tests that
+    // specifically exercise the new stale-path behavior pass a narrower liveDevicePaths
+    // set via the new constructor parameter below.
+    private static readonly IReadOnlyList<string> DefaultLiveDevicePaths = new[]
+    {
+        "\\\\?\\DISPLAY#FAKE",
+        "\\\\?\\DISPLAY#PRIMARY",
+        "\\\\?\\DISPLAY#NORMAL",
+        "\\\\?\\DISPLAY#RIG",
+    };
+
     private readonly List<string> _callLog;
     private readonly bool _throwOnDisable;
     private readonly bool _mutatesBeforeThrowingOnDisable;
+    private readonly IReadOnlyList<string> _liveDevicePaths;
+    private readonly bool _throwOnGetAllMonitors;
     private bool _disableWasCalled;
 
     public FakeMonitorController(
         List<string> callLog,
         bool throwOnDisable = false,
-        bool mutatesBeforeThrowingOnDisable = false)
+        bool mutatesBeforeThrowingOnDisable = false,
+        IReadOnlyList<string>? liveDevicePaths = null,
+        bool throwOnGetAllMonitors = false)
     {
         _callLog = callLog;
         _throwOnDisable = throwOnDisable;
         _mutatesBeforeThrowingOnDisable = mutatesBeforeThrowingOnDisable;
+        _liveDevicePaths = liveDevicePaths ?? DefaultLiveDevicePaths;
+        _throwOnGetAllMonitors = throwOnGetAllMonitors;
     }
 
     public IReadOnlyList<MonitorInfo> GetActiveMonitors()
@@ -36,7 +58,17 @@ public sealed class FakeMonitorController : IMonitorController
     public IReadOnlyList<MonitorInfo> GetAllMonitors()
     {
         _callLog.Add("monitor.GetAllMonitors");
-        return new List<MonitorInfo> { new("\\\\?\\DISPLAY#FAKE", "Fake Monitor", true, IsActive: true) };
+
+        if (_throwOnGetAllMonitors)
+        {
+            // Debug session monitor-position-regre, round 18 (item 1a) test support:
+            // simulates the enumeration hiccup LiveFilterMonitorSets' own defensive
+            // fallback exists for -- proves a throwing GetAllMonitors degrades to
+            // "treat every requested path as live" instead of blocking the toggle.
+            throw new InvalidOperationException("Fake GetAllMonitors failure (simulated enumeration hiccup).");
+        }
+
+        return _liveDevicePaths.Select(dp => new MonitorInfo(dp, dp, IsPrimary: false, IsActive: true)).ToList();
     }
 
     public MonitorState CaptureState()

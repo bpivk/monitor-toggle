@@ -45,6 +45,19 @@ public static class ToggleResultFormatter
         isInRigMode ? "Switched to Rig Mode" : "Switched to Normal Mode";
 
     /// <summary>
+    /// Debug session monitor-position-regre, round 18 (item 1a): human-readable note for
+    /// ToggleResult.StaleMonitorsSkipped, naming exactly which previously-configured
+    /// monitor(s) were skipped this toggle because they are no longer live-detected —
+    /// deliberately worded to echo SettingsForm's own established
+    /// "settings preserved; reconnect the display to manage it here" staleness wording
+    /// (ShowStaleMonitorWarning), so the toggle-time message and the Settings-screen
+    /// message describe the identical concept consistently, rather than inventing new
+    /// phrasing for the same situation.
+    /// </summary>
+    public static string FormatStaleMonitorNote(IReadOnlyList<string> staleDevicePaths) =>
+        $"The following previously configured monitor(s) were skipped because they are no longer detected: {string.Join(", ", staleDevicePaths)}. The rest of the toggle completed normally — settings preserved; reconnect the display to manage it again.";
+
+    /// <summary>
     /// Truncates text to at most maxLength characters, appending an ellipsis marker
     /// when truncation occurs, so a verbose failure reason cannot silently vanish mid-
     /// word inside a balloon notification's hard character limit. Never throws on

@@ -463,4 +463,214 @@ public class WindowsMonitorControllerTests
         Assert.Equal(new Point(0, 0), promotedSurvivor.Position);
         Assert.False(modeless.IsModeInformationAvailable);
     }
+
+    // Debug session monitor-position-regre, round 11 (reopened deep investigation into the
+    // resolved session's still-open Resolution.root_cause (8)): DescribeSource is the new
+    // diagnostic-only PathDisplaySource identifier logged by TryBuildScopedActivationPlan so a
+    // rig log can show which GPU adapter/source pairing gets chosen for a target across
+    // successive activation attempts. Pure formatting, hardware-independent construction (same
+    // Source(uint) fixture helper used by the PromoteToOriginIfNeeded tests above) -- unlike
+    // DescribeScopedPathEntry (not unit-tested this round, see its own remarks: its per-target
+    // DevicePath read requires a live CCD query).
+    [Fact]
+    public void DescribeSource_IncludesAdapterAndSourceIdentity()
+    {
+        string description = WindowsMonitorController.DescribeSource(Source(3));
+
+        Assert.Contains("adapter=", description);
+        Assert.Contains("sourceId=3", description);
+    }
+
+    [Fact]
+    public void DescribeSource_DifferentSourceIds_ProduceDistinguishableDescriptions()
+    {
+        string first = WindowsMonitorController.DescribeSource(Source(1));
+        string second = WindowsMonitorController.DescribeSource(Source(2));
+
+        Assert.NotEqual(first, second);
+    }
+
+    // Debug session monitor-position-regre, round 14 (fix B): SelectSourceForActivation is the
+    // pure "prefer reclaiming a target's own previously-cached PathDisplaySource" decision
+    // extracted from TryBuildScopedActivationPlan's per-target candidate selection -- closes
+    // round 8's own long-documented, never-fixed source-claim-greediness blind spot. Same
+    // hardware-independent Source(uint) fixture helper used by the PromoteToOriginIfNeeded and
+    // DescribeSource tests above -- no live CCD hardware needed.
+    [Fact]
+    public void SelectSourceForActivation_CachedSourcePresentAndUnclaimed_PrefersReclaimingIt()
+    {
+        // Mirrors round 13's evidence entry 2 exactly: the target's own previously-cached
+        // source (sourceId=2) is present among the unclaimed candidates alongside another
+        // (sourceId=1) that a purely greedy "first unclaimed" pick would have chosen instead.
+        var unclaimedCandidates = new[] { Source(1), Source(2) };
+
+        PathDisplaySource? selected = WindowsMonitorController.SelectSourceForActivation(unclaimedCandidates, Source(2));
+
+        Assert.Equal(Source(2), selected);
+    }
+
+    [Fact]
+    public void SelectSourceForActivation_NoCacheEntry_FallsBackToFirstUnclaimed_GreedyBehaviorUnchanged()
+    {
+        var unclaimedCandidates = new[] { Source(1), Source(2) };
+
+        PathDisplaySource? selected = WindowsMonitorController.SelectSourceForActivation(unclaimedCandidates, previouslyCachedSource: null);
+
+        Assert.Equal(Source(1), selected);
+    }
+
+    [Fact]
+    public void SelectSourceForActivation_CachedSourceNoLongerUnclaimed_FallsBackToFirstUnclaimed()
+    {
+        // The cached source (sourceId=2) is not present in this call's own unclaimed candidate
+        // list (e.g. already claimed by an active survivor or another target this same batch) --
+        // must fall back to the greedy first-unclaimed pick exactly as before round 14, never
+        // fail or throw.
+        var unclaimedCandidates = new[] { Source(1), Source(3) };
+
+        PathDisplaySource? selected = WindowsMonitorController.SelectSourceForActivation(unclaimedCandidates, Source(2));
+
+        Assert.Equal(Source(1), selected);
+    }
+
+    [Fact]
+    public void SelectSourceForActivation_NoUnclaimedCandidatesAtAll_ReturnsNull()
+    {
+        // The existing "no unclaimed PathDisplaySource found" failure case -- unchanged by
+        // round 14, whether or not a cache entry exists.
+        PathDisplaySource? selected = WindowsMonitorController.SelectSourceForActivation(
+            Array.Empty<PathDisplaySource>(), Source(2));
+
+        Assert.Null(selected);
+    }
+
+    [Fact]
+    public void SelectSourceForActivation_CachedSourceIsSoleUnclaimedCandidate_Reclaimed()
+    {
+        var unclaimedCandidates = new[] { Source(5) };
+
+        PathDisplaySource? selected = WindowsMonitorController.SelectSourceForActivation(unclaimedCandidates, Source(5));
+
+        Assert.Equal(Source(5), selected);
+    }
+
+    // Debug session monitor-position-regre, round 14 (fix A): ShouldRetryScopedActivation is the
+    // pure "should ActivateMonitors' bounded automatic retry fire" decision extracted from its
+    // own retry loop -- deliberately narrow, per round 13's own evidence: only true when the
+    // scoped ApplyPathInfos call reported success (no exception), at least one of the CALL'S OWN
+    // requested targets is still inactive after the full settle-poll+correction budget, and the
+    // retry budget is not yet exhausted.
+    [Fact]
+    public void ShouldRetryScopedActivation_ScopedSucceededButRequestedTargetStillInactive_BudgetRemains_ReturnsTrue()
+    {
+        // Mirrors round 10/13's rig-confirmed D-05 shape exactly: scoped ApplyPathInfos reported
+        // success, but the requested target never settled active.
+        bool result = WindowsMonitorController.ShouldRetryScopedActivation(
+            usedScopedActivation: true, requestedStillInactiveCount: 1, attemptNumber: 1, maxRetryAttempts: 2);
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void ShouldRetryScopedActivation_ExtendFallbackWasUsedInstead_NeverRetried()
+    {
+        // A scoped-plan PathChangeException + Extend-fallback failure (root_cause (8)'s FIRST
+        // observed shape) is a DIFFERENT failure shape than round 13 proved recoverable -- fix A
+        // must never retry it, even if a requested target is still inactive and budget remains.
+        bool result = WindowsMonitorController.ShouldRetryScopedActivation(
+            usedScopedActivation: false, requestedStillInactiveCount: 1, attemptNumber: 1, maxRetryAttempts: 2);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void ShouldRetryScopedActivation_OnlyAnUnrelatedSurvivorStillInactive_NeverRetried()
+    {
+        // Fix H's lost-survivor correction handles this DIFFERENT case -- fix A's retry is scoped
+        // strictly to the CALL'S OWN requested target(s), never to a leftover survivor.
+        bool result = WindowsMonitorController.ShouldRetryScopedActivation(
+            usedScopedActivation: true, requestedStillInactiveCount: 0, attemptNumber: 1, maxRetryAttempts: 2);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void ShouldRetryScopedActivation_RetryBudgetExhausted_ReturnsFalse_NeverUnbounded()
+    {
+        bool result = WindowsMonitorController.ShouldRetryScopedActivation(
+            usedScopedActivation: true, requestedStillInactiveCount: 1, attemptNumber: 3, maxRetryAttempts: 2);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void ShouldRetryScopedActivation_LastAllowedAttemptNumber_StillReturnsTrue()
+    {
+        // attemptNumber == maxRetryAttempts is still within budget (the NEXT attempt would be
+        // attemptNumber + 1, i.e. the (maxRetryAttempts + 1)th total attempt -- the final one).
+        bool result = WindowsMonitorController.ShouldRetryScopedActivation(
+            usedScopedActivation: true, requestedStillInactiveCount: 1, attemptNumber: 2, maxRetryAttempts: 2);
+
+        Assert.True(result);
+    }
+
+    // Debug session monitor-position-regre, round 20 (item A / Option A2 -- user-approved
+    // checkpoint decision): ShouldRetryNestedCorrectionActivation is the pure "should THIS
+    // nested fix-H correction call get the extended retry" decision, extracted the same way
+    // ShouldRetryScopedActivation above was. Deliberately mirrors that method's (b)/(c)
+    // conditions exactly -- only (a) differs (isNestedCorrectionCall instead of
+    // usedScopedActivation) -- per round 19's own evidence and round 20's explicit design
+    // constraint: extend retry-eligibility ONLY for fix H's own internal cleanup calls, never
+    // for the top-level, directly-user-requested call.
+    [Fact]
+    public void ShouldRetryNestedCorrectionActivation_NestedCallExtendFallback_StillInactive_BudgetRemains_ReturnsTrue()
+    {
+        // Round 19's exact rig shape: the NESTED call's own scoped ApplyPathInfos ALSO threw
+        // and fell back to Extend (usedScopedActivation would be false) -- but because this
+        // is fix H's own cleanup call (isNestedCorrectionCall=true), it is now retried anyway.
+        bool result = WindowsMonitorController.ShouldRetryNestedCorrectionActivation(
+            isNestedCorrectionCall: true, requestedStillInactiveCount: 1, attemptNumber: 1, maxRetryAttempts: 2);
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void ShouldRetryNestedCorrectionActivation_TopLevelCall_NeverRetried_EvenWithExtendFallback()
+    {
+        // isNestedCorrectionCall=false (the top-level, directly-user-requested call) must
+        // NEVER become eligible via this gate -- ShouldRetryScopedActivation's own,
+        // already-approved exclusion for the top-level case remains the ONLY thing that
+        // governs it.
+        bool result = WindowsMonitorController.ShouldRetryNestedCorrectionActivation(
+            isNestedCorrectionCall: false, requestedStillInactiveCount: 1, attemptNumber: 1, maxRetryAttempts: 2);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void ShouldRetryNestedCorrectionActivation_NestedCall_NothingStillInactive_ReturnsFalse()
+    {
+        bool result = WindowsMonitorController.ShouldRetryNestedCorrectionActivation(
+            isNestedCorrectionCall: true, requestedStillInactiveCount: 0, attemptNumber: 1, maxRetryAttempts: 2);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void ShouldRetryNestedCorrectionActivation_NestedCall_RetryBudgetExhausted_ReturnsFalse_NeverUnbounded()
+    {
+        bool result = WindowsMonitorController.ShouldRetryNestedCorrectionActivation(
+            isNestedCorrectionCall: true, requestedStillInactiveCount: 1, attemptNumber: 3, maxRetryAttempts: 2);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void ShouldRetryNestedCorrectionActivation_NestedCall_LastAllowedAttemptNumber_StillReturnsTrue()
+    {
+        bool result = WindowsMonitorController.ShouldRetryNestedCorrectionActivation(
+            isNestedCorrectionCall: true, requestedStillInactiveCount: 1, attemptNumber: 2, maxRetryAttempts: 2);
+
+        Assert.True(result);
+    }
 }
