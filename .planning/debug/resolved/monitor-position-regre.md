@@ -1,5 +1,5 @@
 ---
-status: superseded-by-redesign
+status: resolved
 trigger: "The windows position bug is back"
 created: 2026-08-29T00:00:00Z
 updated: 2026-08-31T00:00:00Z
@@ -37,6 +37,33 @@ risk/migration note).**
 confirmed fixed end-to-end via human verification, so the `resolved/` convention this project
 uses for confirmed fixes does not apply. This file is the handoff artifact for a future
 `/gsd-plan-phase` redesign effort, per this repo's own GSD workflow enforcement (CLAUDE.md).
+
+## CLOSURE (2026-08-31) -- redesign implemented, rig-tested, and rejected; moved to resolved/
+
+Phase 27 implemented the round-22 proposal below (Plan 01: `ActivateMonitorsCore` rewritten to
+call `ApplyTopology(Extend)` as the sole activation mechanism, commit `6b3058b`) and rig-tested it
+exactly as Plan 01 Task 3 specified. Result: **conclusively rejected.** Whole-topology `Extend`
+failed to activate the Samsung Odyssey G5 (`SAM7489`) in 6 of 6 real-app attempts, and a follow-up
+standalone diagnostic CLI (`tools/DisplayProbe`) reproduced the identical failure with zero
+RigToggle code involved -- confirming this is a raw Windows CCD/driver-level incompatibility, not
+anything about this app's execution context. This is `root_cause (2)`, named as a risk in this
+file's own §22.3, now confirmed rather than hypothetical. The monitor also has no power-saving
+settings and is DisplayPort-only, closing off the two alternative experiments §21.5 suggested.
+
+Commit `6b3058b` was reverted (revert commit `fd9f49b`), restoring the scoped-`ApplyPathInfos`-
+primary architecture this session's own investigation (rounds 1-20) built and rig-proved across
+two prior debug sessions. Plans 02 and 03 never ran -- both were gated behind Plan 01's rig
+checkpoint by deliberate design specifically so this outcome would have a clean single-commit
+revert point. Full evidence trail: `.planning/phases/27-monitor-activation-logic-redesign/27-01-
+SUMMARY.md` and `.planning/debug/knowledge-base.md`'s `monitor-activation-extend-only-redesign-
+rejected` entry.
+
+**Disposition:** `status: resolved`. This IS a resolution, not an abandonment: the round-22
+proposal's central open question -- "is Extend-only viable for this monitor?" -- now has a
+definitive, evidence-backed answer ("no"), where it previously had only a plausible-but-untested
+risk note. The codebase is back to the last known-working, rig-confirmed architecture
+(`monitor-enable-reactivates-others-again`'s resolution), unchanged. Moved to
+`.planning/debug/resolved/` accordingly.
 
 ## Symptoms
 

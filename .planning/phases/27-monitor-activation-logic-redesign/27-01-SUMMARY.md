@@ -177,13 +177,28 @@ does not proceed to Plan 02 — the Task 2 commit is the designated revert point
 option-c." All three failed. **Phase 27 execution is halted at this checkpoint. Plan 02 and Plan
 03 do not run.**
 
-**Disposition (operator decision):** Presented with the choice to (a) revert commit `6b3058b` and
-restore the scoped-activation path, or (b) leave the Extend-only code in place as-is and stop
-without deciding yet, the operator chose **(b) — stop here, do not revert yet**. The Extend-only
-rewrite therefore remains live in the working tree in its currently broken state for this monitor;
-no revert has been performed. This is a deliberate, recorded choice, not an oversight — do not
-auto-revert or otherwise "clean this up" in a future session without the operator's explicit
-go-ahead.
+**Disposition (operator decision, updated):** The operator initially chose to pause without
+deciding (see prior revision of this section). A follow-up isolated diagnostic was then built and
+run: `tools/DisplayProbe`, a standalone console CLI with zero RigToggle code, zero correction loop,
+and zero retry, calling the identical `PathInfo.ApplyTopology(DisplayConfigTopologyId.Extend,
+allowPersistence: false)` primitive directly. Result: **identical failure** — `SAM7489` was active
+neither before nor after the bare call, across the full 5-attempt settle-poll window, with zero
+newly-active or newly-inactive paths observed at all. This conclusively rules out RigToggle's
+execution context as a contributing factor and confirms the failure is a raw Windows CCD/driver-
+level incompatibility with this monitor. The operator also confirmed the monitor has no
+power-saving settings and is DisplayPort-only, closing off the two alternative workarounds
+`.planning/debug/monitor-position-regre.md` §21.5 had suggested trying.
+
+With that additional, conclusive evidence in hand, the operator chose to **revert**. Commit
+`6b3058b` was reverted via `git revert --no-edit 6b3058b` (revert commit `fd9f49b`), a clean
+revert with no conflicts (no other commit touched `WindowsMonitorController.cs` in between). Post-
+revert: `dotnet build RigToggle.sln -c Debug --nologo` → 0 Error(s), 6 pre-existing baseline
+warnings; `dotnet test src/RigToggle.Tests/...` → `Passed: 249, Failed: 0`;
+`TryBuildScopedActivationPlan` and the rest of the scoped-activation path are back and wired in,
+byte-for-byte matching the pre-Phase-27 architecture. **Phase 27 is closed as REJECTED, not
+completed as originally scoped.** Plans 02 and 03 do not run. Full writeup:
+`.planning/debug/resolved/monitor-position-regre.md`'s CLOSURE section and
+`.planning/debug/knowledge-base.md`'s `monitor-activation-extend-only-redesign-rejected` entry.
 
 ## Deviations from Plan
 

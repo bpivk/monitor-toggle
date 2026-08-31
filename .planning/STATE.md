@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Auto-Update, Single-Instance Guard & Smaller Footprint
 status: Awaiting next milestone
-stopped_at: Phase 27 Plan 01 paused at Task 3 (rig-hardware checkpoint) after Task 2 committed (6b3058b)
-last_updated: "2026-08-31T12:57:00.834Z"
-last_activity: 2026-08-29
-last_activity_desc: Completed and rig-verified quick tasks 260829-fnt (Help>About menu) and 260829-ga9 (consolidate Check-for-Updates entry points + fix silent-feedback bug) - user approved
+stopped_at: Phase 27 closed — Extend-only redesign rig-rejected, reverted (fd9f49b)
+last_updated: "2026-08-31T21:00:00.000Z"
+last_activity: 2026-08-31
+last_activity_desc: Phase 27 (monitor-activation-logic-redesign) executed Plan 01, rig-verified the Extend-only redesign, and rejected it — see Blockers/Concerns for full evidence trail. Reverted to pre-Phase-27 scoped-activation architecture.
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 3
   completed_plans: 1
 current_phase: 27
-current_phase_name: monitor-activation-logic-redesign
+current_phase_name: monitor-activation-logic-redesign (closed — rejected by rig evidence)
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-08-18)
 
 ## Current Position
 
-Phase: 27 - Monitor Activation Logic Redesign
-Plan: 27-01 (paused at Task 3 — rig-hardware checkpoint, blocking)
-Status: In progress — Task 2 committed (6b3058b), awaiting operator rig verification
-Last activity: 2026-08-31 — ActivateMonitorsCore collapsed to single-pass Extend-only shape; solution builds clean, RigToggle.Tests 249/249; Task 3 (real-rig Checks A-E) not yet performed
+Phase: 27 - Monitor Activation Logic Redesign — CLOSED, rejected by rig evidence
+Plan: 27-01 executed and halted at its own designed rig gate; Plans 02/03 never ran
+Status: Closed. Extend-only redesign rig-tested and conclusively rejected (0/6 real-app activation attempts + isolated DisplayProbe CLI confirmed identical failure with zero app code involved). Reverted commit 6b3058b via revert commit fd9f49b. Codebase back to pre-Phase-27 scoped-activation architecture, rig-confirmed working previously. v2.2 milestone remains complete; awaiting next milestone.
+Last activity: 2026-08-31 — Phase 27 closed. See Blockers/Concerns (Resolved) below and `.planning/debug/resolved/monitor-position-regre.md`'s CLOSURE section for full evidence.
 
 ## Performance Metrics
 
@@ -122,22 +122,24 @@ None.
 
 ### Blockers/Concerns
 
-Open (2026-08-31): Phase 27 (monitor-activation-logic-redesign) HALTED at Plan 01 Task 3's real-rig
-verification checkpoint. The Extend-only redesign (whole-topology `PathInfo.ApplyTopology(Extend)`
-as the sole activation mechanism, commit `6b3058b`) reliably FAILS to activate the Samsung Odyssey
-G5 (device path SAM7489) — confirmed on real rig hardware across 6 consecutive attempts, 0
-successes, identical `InvalidOperationException: Monitor enable did not take effect` every time
-(dialog text captured, debug.log captured — see `27-01-SUMMARY.md`'s Task 3 section for full
-detail). This is exactly `root_cause (2)` flagged as a known risk in
-`.planning/debug/monitor-position-regre.md` §22.3, now confirmed rather than hypothetical. Per the
-plan's own acceptance criteria, a Check A/C/D failure halts execution and Plan 02/03 do not run —
-they remain blocked (`27-01-SUMMARY.md` frontmatter `status: halted`). The operator was offered the
-choice to revert commit `6b3058b` (restoring the still-intact scoped-activation path, which
-previously handled this monitor) or leave the Extend-only code in place unresolved, and explicitly
-chose the latter — **no revert has been performed; this is a deliberate pause, not an oversight.**
-Next step is the operator's call: revert and close Phase 27 as "redesign rejected by rig evidence,"
-or investigate further (e.g. whether Extend-only can be salvaged for this specific monitor) before
-deciding. Do not proceed to Plan 02 or auto-revert without further explicit operator direction.
+Resolved 2026-08-31: Phase 27 (monitor-activation-logic-redesign) — Plan 01 Task 3's real-rig
+verification checkpoint FAILED. The Extend-only redesign (whole-topology `PathInfo.ApplyTopology
+(Extend)` as the sole activation mechanism, commit `6b3058b`) reliably FAILED to activate the
+Samsung Odyssey G5 (device path SAM7489) — confirmed on real rig hardware across 6 consecutive
+attempts, 0 successes, identical `InvalidOperationException: Monitor enable did not take effect`
+every time (dialog text and debug.log captured — see `27-01-SUMMARY.md`'s Task 3 section). A
+follow-up standalone diagnostic CLI (`tools/DisplayProbe`, committed to the repo, zero RigToggle
+code involved) reproduced the identical failure calling the bare CCD primitive directly, ruling out
+RigToggle's execution context and confirming a raw Windows CCD/driver-level incompatibility. This
+is exactly `root_cause (2)` flagged as a known risk in `.planning/debug/resolved/monitor-position-
+regre.md` §22.3, now confirmed rather than hypothetical. Per the plan's own acceptance criteria, a
+Check A/C/D failure halts execution and Plan 02/03 do not run — resolved by reverting commit
+`6b3058b` (revert commit `fd9f49b`), restoring the scoped-activation path that previously handled
+this monitor. Build clean, `RigToggle.Tests` 249/249 post-revert. Phase 27 is closed as REJECTED,
+not completed as originally scoped — see `.planning/ROADMAP.md`'s Phase 27 entry and
+`.planning/debug/knowledge-base.md`'s `monitor-activation-extend-only-redesign-rejected` entry for
+the full evidence trail. No further action needed; this is a closed, evidence-backed architectural
+decision, not an open item.
 
 Open: Phase 24 Plan 01 Task 3 (blocking checkpoint) requires real Windows rig hardware verification — not available in this build environment. Operator must build `RigToggle.App.exe` natively on Windows at commit `67f4bfd`, run the six checks in `24-01-PLAN.md` Task 3, and report results to resume execution. PERF-03 is not yet marked complete and Phase 24 is not yet closed pending this.
 

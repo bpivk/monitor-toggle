@@ -89,15 +89,33 @@ Full phase details: `.planning/milestones/v2.2-ROADMAP.md`
 
 Requirements not yet scoped into a milestone. LOG-01 (toggle history/log) was deferred at v1.0, v1.1, v1.2, and v2.0 scoping, then explicitly dropped by the user at v2.1 scoping — no longer tracked as a backlog candidate. CLI trigger/TRIG-02/TRIG-03 was reviewed at v1.1 close and decided permanently out of scope. THEME-07/08/09 (accent-color highlight, custom toggle-switch control, manual theme override), deferred since v1.2, shipped in v2.1 (Phases 20, 21, and 23). UPDATE-08 (richer WM_COPYDATA/named-pipe IPC between instances) and DIST-01 (Velopack/installer packaging reconsideration) are tracked in `.planning/REQUIREMENTS.md`'s Future Requirements section, not currently scoped into any milestone.
 
-### Phase 27: Monitor Activation Logic Redesign
+### Phase 27: Monitor Activation Logic Redesign — REJECTED by rig evidence, 2026-08-31
 
-**Goal:** Replace the fragile scoped-`ApplyPathInfos`-as-primary monitor activation approach with the hardened whole-topology `Extend` path as the sole activation mechanism, backed by one coherent correction loop — removing ~10 overlapping mechanisms (nested correction retries, retry-eligibility gating, poll-until-reachable, multiple independently-added watchdogs) accumulated across 20+ incremental debug rounds. Full redesign proposal: `.planning/debug/monitor-position-regre.md` (Resolution, round 22 addendum; moves to `.planning/debug/resolved/` in Plan 03 once rig-verified).
+**Goal (as originally scoped):** Replace the fragile scoped-`ApplyPathInfos`-as-primary monitor activation approach with the hardened whole-topology `Extend` path as the sole activation mechanism, backed by one coherent correction loop — removing ~10 overlapping mechanisms (nested correction retries, retry-eligibility gating, poll-until-reachable, multiple independently-added watchdogs) accumulated across 20+ incremental debug rounds. Full redesign proposal: `.planning/debug/resolved/monitor-position-regre.md` (Resolution, round 22 addendum).
 **Requirements**: REDESIGN-01, REDESIGN-02, REDESIGN-03, REDESIGN-04 — phase-local IDs defined in `27-01-PLAN.md`'s objective. This phase was scoped ad-hoc post-v2.2 and has no `REQUIREMENTS.md` entry; the authoritative scope source is the debug file's §21.1-21.6 and §22.1-22.5.
 **Depends on:** Phase 26
-**Plans:** 3 plans
+**Plans:** 3 plans (only Plan 01 executed)
+
+**Outcome:** Plan 01's Task 2 landed the Extend-only rewrite (commit `6b3058b`) and Task 3's real-rig
+verification (REDESIGN-04) **conclusively FAILED**: whole-topology `ApplyTopology(Extend)` could
+not activate the Samsung Odyssey G5 (device path `SAM7489`) in 6/6 attempts on the real rig, and a
+follow-up isolated diagnostic (`tools/DisplayProbe`, a standalone CLI bypassing RigToggle entirely)
+reproduced the identical failure with zero app code involved — ruling out anything specific to
+RigToggle's execution context and confirming this is a raw Windows/CCD-driver-level incompatibility
+between whole-topology Extend and this monitor. This matches `root_cause (2)` flagged as a risk in
+the redesign proposal itself, now confirmed rather than hypothetical. Per Plan 01's own decision-
+gate design (Task 1, option-c: staged two-commit removal with a rig gate in between, specifically so
+this outcome could be caught before Plan 02 deleted the fallback), the operator chose to **revert**
+commit `6b3058b` (revert commit `fd9f49b`) rather than proceed. REDESIGN-01/02/03 are not
+implemented; REDESIGN-04 (rig verification) is complete in the sense that it definitively answered
+the question the phase existed to test — the answer was "no." Plans 02 and 03 do not run. The
+codebase is back to the pre-Phase-27 scoped-activation architecture, rig-confirmed working
+(unchanged since the last `monitor-enable-reactivates-others-again` resolution). See
+`.planning/debug/knowledge-base.md`'s `monitor-activation-extend-only-redesign-rejected` entry and
+`.planning/phases/27-monitor-activation-logic-redesign/27-01-SUMMARY.md` for full evidence.
 
 Plans:
 
-- [ ] 27-01-PLAN.md — Tracer: collapse `ActivateMonitorsCore` to the single-pass Extend-only shape and rig-verify it before deleting anything (REDESIGN-01, REDESIGN-04)
-- [ ] 27-02-PLAN.md — Delete the 11 orphaned scoped-activation members and their 23 dead tests; decide the live-mode cache disposition (REDESIGN-02)
-- [ ] 27-03-PLAN.md — Rewrite the architecture docs, correct the debug knowledge base's reversed guidance, close out the debug session, final rig smoke check (REDESIGN-03, REDESIGN-04)
+- [x] 27-01-PLAN.md — Tracer: collapse `ActivateMonitorsCore` to the single-pass Extend-only shape and rig-verify it before deleting anything (REDESIGN-01, REDESIGN-04) — **executed, rig-failed, reverted**
+- [~] 27-02-PLAN.md — Delete the 11 orphaned scoped-activation members and their 23 dead tests; decide the live-mode cache disposition (REDESIGN-02) — **not run, blocked by Plan 01's rig-gate failure; superseded by revert**
+- [~] 27-03-PLAN.md — Rewrite the architecture docs, correct the debug knowledge base's reversed guidance, close out the debug session, final rig smoke check (REDESIGN-03, REDESIGN-04) — **not run; debug session closed directly instead, see knowledge-base.md**
