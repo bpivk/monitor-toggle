@@ -138,12 +138,24 @@ turned Windows' silent substitution attempt into the loud `PathChangeException` 
 origin-collision bug visible in the log at all; kept as a permanent improvement (fail loudly on an
 invalid plan rather than risk a silent, unpredictable substitution). Separately, fixed a real
 Settings UI gap: stale/permanently-gone monitor device paths could never be cleared through the UI
-(only ever re-merged back in on every Save, by design, to protect against transient disconnection)
-— added a "Forget these entries" link to the existing stale-monitor warning (commit `62820f2`).
-**Status: fixes committed, NOT yet rig-verified.** Operator needs to pull latest, rebuild, and
-re-test: (1) the Rig/Normal toggle sequence that previously got the Odyssey G5 stuck, repeated
-several times, to confirm the origin-collision fix holds; (2) Settings' new "Forget" link actually
-clears the stale `SAM748A`/`DELA0B8` entries and Save persists that removal.
+(only ever re-merged back in on every Save, by design, to protect against transient disconnection).
+First attempt (commit `62820f2`) added a "Forget these entries" link to the existing stale-monitor
+warning — rig-tested and rejected: the operator found the label rendered out of the dialog's visible
+bounds, and judged the whole interactive-warning approach unnecessarily complex for what should just
+happen automatically. Superseded same day (commit `249a781`): the warning/link UI was removed
+entirely (`lblMonitorWarning`/`lblMonitorNormalWarning` reverted to plain `Label` — they're shared,
+multi-purpose controls used by several other unrelated Settings messages), replaced with
+`RigToggle.Core.StaleMonitorCleanup.Reconcile`, a pure unit-tested function that tracks when a
+device path was first seen undetected (new `AppSettings.StaleMonitorFirstMissingUtc` field) and
+drops it from every monitor set automatically after 30 days with zero detection, run once at app
+startup (`Program.cs`) — no Settings visit required, no user interaction, nothing to see. 6 new
+tests (`StaleMonitorCleanupTests.cs`), `RigToggle.Tests` 255/255.
+**Status: origin-collision fix + automatic stale-monitor expiry both committed, NOT yet rig-
+verified.** Operator needs to pull latest, rebuild, and re-test: (1) the Rig/Normal toggle sequence
+that previously got the Odyssey G5 stuck, repeated several times, to confirm the origin-collision
+fix holds; (2) Settings no longer shows any stale-monitor warning/link at all (nothing to click —
+this is now silent and automatic); the actual 30-day auto-expiry itself is not practically
+rig-verifiable on a normal timescale and is trusted on unit-test coverage alone.
 
 Resolved 2026-08-31: Phase 27 (monitor-activation-logic-redesign) — Plan 01 Task 3's real-rig
 verification checkpoint FAILED. The Extend-only redesign (whole-topology `PathInfo.ApplyTopology
