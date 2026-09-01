@@ -57,15 +57,6 @@ namespace RigToggle.App
         // second GetAllMonitors() round trip mid-interaction (D-03/D-04/D-05).
         private IReadOnlyList<MonitorInfo> _allMonitors = Array.Empty<MonitorInfo>();
 
-        // Device paths the user has explicitly told Settings to stop preserving (via the
-        // stale-warning's "Forget" link) — a genuinely-gone device path (renamed/
-        // re-enumerated by Windows, not merely unplugged) would otherwise be re-merged back
-        // into MonitorsToDisable/MonitorsToEnable on every Save forever, since the app has
-        // no way to distinguish "temporarily disconnected" from "permanently gone". Session-
-        // scoped only (not persisted itself) — takes effect the moment Save is next clicked.
-        private readonly HashSet<string> _forgottenStaleDevicePaths = new();
-        private readonly HashSet<string> _forgottenStaleDevicePathsNormal = new();
-
         // Reentrancy guard around the D-04 programmatic sibling-checkbox write — without
         // this, unchecking the sibling column would itself re-fire CellValueChanged
         // (06-UI-SPEC.md Grid Spec § D-04 mechanism, RESEARCH.md Pitfall 5).
@@ -158,8 +149,6 @@ namespace RigToggle.App
             dgvMonitors.CellValueChanged += OnMonitorCellValueChanged;
             dgvMonitorsNormal.CurrentCellDirtyStateChanged += DgvMonitorsNormal_CurrentCellDirtyStateChanged;
             dgvMonitorsNormal.CellValueChanged += OnMonitorNormalCellValueChanged;
-            lblMonitorWarning.LinkClicked += LblMonitorWarning_LinkClicked;
-            lblMonitorNormalWarning.LinkClicked += LblMonitorNormalWarning_LinkClicked;
             cboAudioNormal.SelectedIndexChanged += OnPickerChanged;
             cboAudioRig.SelectedIndexChanged += OnPickerChanged;
 
@@ -627,18 +616,6 @@ namespace RigToggle.App
             }
 
             dgvMonitors.CellValueChanged += OnMonitorCellValueChanged;
-
-            // Grid Spec § Stale saved-monitor handling (Open Question 3, resolved): a
-            // saved device path GetAllMonitors() no longer enumerates at all (physically
-            // disconnected — distinct from "currently OS-disabled but still connected",
-            // which DOES get a row) has no grid row to show it in. Surface it via a
-            // non-blocking warning here; ValidateSettingsForm re-checks this on every
-            // interaction so the warning persists/clears appropriately.
-            var staleDevicePaths = GetStaleSavedDevicePaths();
-            if (staleDevicePaths.Count > 0)
-            {
-                ShowStaleMonitorWarning(staleDevicePaths.ToList());
-            }
         }
 
         // 16-02: PopulateMonitorGridNormal's self-analog — reuses the ALREADY-populated
@@ -684,12 +661,6 @@ namespace RigToggle.App
             }
 
             dgvMonitorsNormal.CellValueChanged += OnMonitorNormalCellValueChanged;
-
-            var staleDevicePathsNormal = GetStaleSavedDevicePathsNormal();
-            if (staleDevicePathsNormal.Count > 0)
-            {
-                ShowStaleMonitorWarningNormal(staleDevicePathsNormal.ToList());
-            }
         }
 
         // Pitfall 5: a DataGridViewCheckBoxColumn cell doesn't commit its Value until the
@@ -838,80 +809,6 @@ namespace RigToggle.App
             return (disable, enable);
         }
 
-        // Saved device paths (either set) that GetAllMonitors() no longer enumerates at
-        // all — physically disconnected, not merely OS-disabled-but-connected. Excludes
-        // anything the user has already explicitly forgotten this session (see
-        // _forgottenStaleDevicePaths) even though it is still physically present in
-        // _settings until the next Save actually removes it.
-        private HashSet<string> GetStaleSavedDevicePaths()
-        {
-            var enumeratedPaths = new HashSet<string>(_allMonitors.Select(m => m.DevicePath));
-            IEnumerable<string> saved = (_settings.MonitorsToDisable ?? new List<string>())
-                .Concat(_settings.MonitorsToEnable ?? new List<string>());
-            return new HashSet<string>(saved.Where(p => !enumeratedPaths.Contains(p) && !_forgottenStaleDevicePaths.Contains(p)));
-        }
-
-        // 16-02: Normal-grid self-analog of GetStaleSavedDevicePaths above.
-        private HashSet<string> GetStaleSavedDevicePathsNormal()
-        {
-            var enumeratedPaths = new HashSet<string>(_allMonitors.Select(m => m.DevicePath));
-            IEnumerable<string> saved = (_settings.NormalMonitorsToDisable ?? new List<string>())
-                .Concat(_settings.NormalMonitorsToEnable ?? new List<string>());
-            return new HashSet<string>(saved.Where(p => !enumeratedPaths.Contains(p) && !_forgottenStaleDevicePathsNormal.Contains(p)));
-        }
-
-        private static string FormatMonitorNames(IEnumerable<string> names) =>
-            string.Join(", ", names.Select(n => $"\"{n}\""));
-
-        // Non-blocking (Grid Spec § Stale saved-monitor handling) — deliberately does NOT
-        // call errMonitor.SetError/disable Save, unlike the old single-ComboBox stale-pick
-        // warning (ShowStaleWarning below). Blocking Save here would prevent the user from
-        // saving an unrelated change (e.g. a new audio device) while the rig monitor
-        // happens to be merely disconnected/powered off.
-        //
-        // A genuinely-gone device path (renamed/re-enumerated by Windows, not just
-        // unplugged) can never clear on its own — the app has no way to tell "temporarily
-        // disconnected" from "permanently gone", so the stale-preserving merge in
-        // BtnSaveSettings_Click keeps re-adding it on every Save. The trailing "Forget"
-        // link lets the user say explicitly "this one is not coming back" instead of
-        // hand-editing settings.json.
-        private void ShowStaleMonitorWarning(IReadOnlyList<string> staleDevicePaths)
-        {
-            string prefix = $"Previously configured monitor(s) not currently detected: {FormatMonitorNames(staleDevicePaths)} — settings preserved; reconnect the display to manage it here. ";
-            const string linkText = "Forget these entries";
-            lblMonitorWarning.Text = prefix + linkText;
-            lblMonitorWarning.LinkArea = new LinkArea(prefix.Length, linkText.Length);
-            lblMonitorWarning.Visible = true;
-        }
-
-        // 16-02: Normal-grid self-analog of ShowStaleMonitorWarning above.
-        private void ShowStaleMonitorWarningNormal(IReadOnlyList<string> staleDevicePaths)
-        {
-            string prefix = $"Previously configured monitor(s) not currently detected: {FormatMonitorNames(staleDevicePaths)} — settings preserved; reconnect the display to manage it here. ";
-            const string linkText = "Forget these entries";
-            lblMonitorNormalWarning.Text = prefix + linkText;
-            lblMonitorNormalWarning.LinkArea = new LinkArea(prefix.Length, linkText.Length);
-            lblMonitorNormalWarning.Visible = true;
-        }
-
-        // Marks the currently-shown stale device paths as explicitly forgotten (session-
-        // scoped) and hides the warning immediately. The actual removal from
-        // MonitorsToDisable/MonitorsToEnable happens in BtnSaveSettings_Click the next
-        // time the user clicks Save — Discard still discards it, consistent with every
-        // other pending change in this form.
-        private void LblMonitorWarning_LinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
-        {
-            _forgottenStaleDevicePaths.UnionWith(GetStaleSavedDevicePaths());
-            lblMonitorWarning.Visible = false;
-        }
-
-        // 16-02: Normal-grid self-analog of LblMonitorWarning_LinkClicked above.
-        private void LblMonitorNormalWarning_LinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
-        {
-            _forgottenStaleDevicePathsNormal.UnionWith(GetStaleSavedDevicePathsNormal());
-            lblMonitorNormalWarning.Visible = false;
-        }
-
         private void PopulateAudioPickers()
         {
             IReadOnlyList<AudioDeviceInfo> devices;
@@ -1047,8 +944,13 @@ namespace RigToggle.App
         // lblMonitorWarning/errMonitor message is shown (only one is visible at a time):
         //   1. DISPLAY-06 gate (highest priority, blocking)
         //   2. D-07 non-empty gate (blocking)
-        //   3. Stale-saved-monitor warning (lowest priority, non-blocking)
-        //   4. Clear the warning entirely
+        //   3. Clear the warning entirely
+        //
+        // Stale-saved-monitor handling no longer surfaces a Settings warning at all —
+        // a device path GetAllMonitors() can't currently see is silently preserved (in
+        // case it's just temporarily unplugged) and automatically dropped after
+        // StaleMonitorCleanup.DefaultExpiry with no detection at app startup
+        // (Program.cs), never requiring a Settings visit either way.
         private void ValidateSettingsForm()
         {
             bool audioNormalOk = cboAudioNormal.SelectedItem is PickerItem;
@@ -1092,18 +994,7 @@ namespace RigToggle.App
                 else
                 {
                     errMonitor.SetError(dgvMonitors, string.Empty);
-
-                    var staleDevicePaths = GetStaleSavedDevicePaths();
-                    if (staleDevicePaths.Count > 0)
-                    {
-                        // Non-blocking (Grid Spec) — informational only, does not affect monitorOk.
-                        ShowStaleMonitorWarning(staleDevicePaths.ToList());
-                    }
-                    else
-                    {
-                        lblMonitorWarning.Visible = false;
-                    }
-
+                    lblMonitorWarning.Visible = false;
                     monitorOk = true;
                 }
             }
@@ -1122,12 +1013,7 @@ namespace RigToggle.App
             {
                 var (disableSelectedNormal, enableSelectedNormal) = GetGridSelectionNormal();
 
-                var staleDevicePathsNormal = GetStaleSavedDevicePathsNormal();
-                if (staleDevicePathsNormal.Count > 0)
-                {
-                    ShowStaleMonitorWarningNormal(staleDevicePathsNormal.ToList());
-                }
-                else if (rigGridHasSelection && disableSelectedNormal.Count == 0 && enableSelectedNormal.Count == 0)
+                if (rigGridHasSelection && disableSelectedNormal.Count == 0 && enableSelectedNormal.Count == 0)
                 {
                     // CR-02 (code review): D-01 deliberately allows an all-empty Normal
                     // config (nothing to undo — a monitor not listed is left untouched),
@@ -1259,19 +1145,19 @@ namespace RigToggle.App
             }
 
             // Grid Spec § Stale saved-monitor handling: persisted sets = (previously-saved
-            // entries GetAllMonitors() no longer enumerates at all, MINUS anything the user
-            // explicitly forgot via the stale-warning's "Forget" link) UNION (currently-
+            // entries GetAllMonitors() no longer enumerates at all) UNION (currently-
             // checked rows' device paths). Stale/disconnected entries pass through
-            // untouched — a temporarily-unplugged rig monitor must not lose its
+            // untouched here — a temporarily-unplugged rig monitor must not lose its
             // configuration just because Settings was opened and saved for something
-            // unrelated (06-UI-SPEC.md, generalizes D-10). The forgotten-paths exclusion is
-            // what actually makes "Forget" stick past this Save — without it, a genuinely-
-            // gone device path would be re-merged back in here forever.
+            // unrelated (06-UI-SPEC.md, generalizes D-10). A genuinely-gone device path
+            // is eventually dropped by StaleMonitorCleanup at app startup
+            // (Program.cs) after DefaultExpiry with no detection, independently of
+            // whether Settings is ever opened.
             var enumeratedPaths = new HashSet<string>(_allMonitors.Select(m => m.DevicePath));
             IEnumerable<string> staleDisable = (_settings.MonitorsToDisable ?? new List<string>())
-                .Where(p => !enumeratedPaths.Contains(p) && !_forgottenStaleDevicePaths.Contains(p));
+                .Where(p => !enumeratedPaths.Contains(p));
             IEnumerable<string> staleEnable = (_settings.MonitorsToEnable ?? new List<string>())
-                .Where(p => !enumeratedPaths.Contains(p) && !_forgottenStaleDevicePaths.Contains(p));
+                .Where(p => !enumeratedPaths.Contains(p));
 
             var mergedDisable = new HashSet<string>(staleDisable);
             mergedDisable.UnionWith(disableSelected);
@@ -1281,9 +1167,9 @@ namespace RigToggle.App
 
             // 16-02: same stale-preserving merge for the Normal grid's sets.
             IEnumerable<string> staleDisableNormal = (_settings.NormalMonitorsToDisable ?? new List<string>())
-                .Where(p => !enumeratedPaths.Contains(p) && !_forgottenStaleDevicePathsNormal.Contains(p));
+                .Where(p => !enumeratedPaths.Contains(p));
             IEnumerable<string> staleEnableNormal = (_settings.NormalMonitorsToEnable ?? new List<string>())
-                .Where(p => !enumeratedPaths.Contains(p) && !_forgottenStaleDevicePathsNormal.Contains(p));
+                .Where(p => !enumeratedPaths.Contains(p));
 
             var mergedDisableNormal = new HashSet<string>(staleDisableNormal);
             mergedDisableNormal.UnionWith(disableSelectedNormal);

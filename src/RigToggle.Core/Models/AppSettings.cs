@@ -24,6 +24,13 @@ namespace RigToggle.Core.Models;
 /// strictly newer than that tag (via UpdateVersionComparer, never a string match)
 /// still prompts on the next automatic launch -- a skip suppresses exactly one
 /// version, never every future one.
+/// StaleMonitorFirstMissingUtc tracks, per device path referenced in any of the four
+/// monitor sets below, the UTC instant RigToggle.Core.StaleMonitorCleanup first
+/// observed it undetected by GetAllMonitors(). Reconciled at every app startup
+/// (Program.cs): a path that reappears has its entry cleared; one that stays
+/// undetected past StaleMonitorCleanup.DefaultExpiry is dropped from every monitor
+/// set AND this dictionary. Null/absent = nothing currently stale. Session-local
+/// bookkeeping only — never read or written by the UI directly.
 /// </summary>
 public sealed class AppSettings
 {
@@ -33,6 +40,7 @@ public sealed class AppSettings
     public List<string>? MonitorsToEnable { get; set; }
     public List<string>? NormalMonitorsToDisable { get; set; }
     public List<string>? NormalMonitorsToEnable { get; set; }
+    public Dictionary<string, DateTime>? StaleMonitorFirstMissingUtc { get; set; }
     public string? NormalAudioDeviceId { get; set; }
     public string? NormalAudioDeviceName { get; set; }
     public string? RigAudioDeviceId { get; set; }

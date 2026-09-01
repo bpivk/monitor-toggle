@@ -284,6 +284,30 @@ namespace RigToggle.App
             var appController = new WindowsAppController();
             var autostartConfigurator = new WindowsAutostartConfigurator();
 
+            // Ages out monitor device paths the four MonitorsTo*/NormalMonitorsTo* sets
+            // reference but this machine no longer detects at all -- a renamed/
+            // re-enumerated device path never coming back under its old ID, as opposed
+            // to a merely-unplugged monitor (which SettingsForm's own Save-time merge
+            // preserves indefinitely, unaffected by this). Runs once per launch,
+            // best-effort: a failure here must never block startup, and per this file's
+            // existing idiom, silent swallow-and-continue is correct for a
+            // background-hygiene step with no user-facing effect either way.
+            try
+            {
+                var detectedDevicePaths = monitorController.GetAllMonitors()
+                    .Select(m => m.DevicePath)
+                    .ToHashSet();
+
+                if (StaleMonitorCleanup.Reconcile(settings, detectedDevicePaths, DateTime.UtcNow, StaleMonitorCleanup.DefaultExpiry))
+                {
+                    settingsStore.Save(settings);
+                }
+            }
+            catch
+            {
+                // Best-effort -- see remark above.
+            }
+
             // UPDATE-01..04: composition-root-only construction (Anti-Pattern 2), same
             // flat sequential-var style as the Windows adapters immediately above. No
             // new NuGet packages -- HttpClient + System.Text.Json only (STACK.md §1).

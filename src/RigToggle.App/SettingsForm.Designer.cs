@@ -84,7 +84,7 @@ namespace RigToggle.App
             this.colMonitorName = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.colDisable = new System.Windows.Forms.DataGridViewCheckBoxColumn();
             this.colEnable = new System.Windows.Forms.DataGridViewCheckBoxColumn();
-            this.lblMonitorWarning = new System.Windows.Forms.LinkLabel();
+            this.lblMonitorWarning = new System.Windows.Forms.Label();
             this.lblMonitorExplain = new System.Windows.Forms.Label();
 
             this.pnlMonitorNormal = new System.Windows.Forms.Panel();
@@ -93,7 +93,7 @@ namespace RigToggle.App
             this.colMonitorNameNormal = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.colDisableNormal = new System.Windows.Forms.DataGridViewCheckBoxColumn();
             this.colEnableNormal = new System.Windows.Forms.DataGridViewCheckBoxColumn();
-            this.lblMonitorNormalWarning = new System.Windows.Forms.LinkLabel();
+            this.lblMonitorNormalWarning = new System.Windows.Forms.Label();
             this.lblMonitorNormalExplain = new System.Windows.Forms.Label();
 
             this.lblAudioNormalCaption = new System.Windows.Forms.Label();
@@ -1133,7 +1133,7 @@ namespace RigToggle.App
         private System.Windows.Forms.DataGridViewTextBoxColumn colMonitorName;
         private System.Windows.Forms.DataGridViewCheckBoxColumn colDisable;
         private System.Windows.Forms.DataGridViewCheckBoxColumn colEnable;
-        private System.Windows.Forms.LinkLabel lblMonitorWarning;
+        private System.Windows.Forms.Label lblMonitorWarning;
         private System.Windows.Forms.Label lblMonitorExplain;
 
         private System.Windows.Forms.Panel pnlMonitorNormal;
@@ -1142,7 +1142,7 @@ namespace RigToggle.App
         private System.Windows.Forms.DataGridViewTextBoxColumn colMonitorNameNormal;
         private System.Windows.Forms.DataGridViewCheckBoxColumn colDisableNormal;
         private System.Windows.Forms.DataGridViewCheckBoxColumn colEnableNormal;
-        private System.Windows.Forms.LinkLabel lblMonitorNormalWarning;
+        private System.Windows.Forms.Label lblMonitorNormalWarning;
         private System.Windows.Forms.Label lblMonitorNormalExplain;
 
         private System.Windows.Forms.Label lblAudioNormalCaption;
