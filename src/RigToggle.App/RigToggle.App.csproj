@@ -35,7 +35,7 @@
          stripped of its leading v, so the shipped exe's embedded version always
          matches the git tag it was actually released from — this checked-in "2.2.1"
          is only what a local (non-release-pipeline) build carries. -->
-    <Version>2.2.2</Version>
+    <Version>2.2.3</Version>
   </PropertyGroup>
 
   <ItemGroup>
