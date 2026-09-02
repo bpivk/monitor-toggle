@@ -674,22 +674,15 @@ namespace RigToggle.App
                         "deliberately-intended one; leaving any previously-armed guard in place.");
                 }
 
-                // Debug session monitor-position-regre, round 18 (item 1a): a stale
-                // device path is not itself a step failure (the Monitor step still records
-                // Succeeded for whatever remained live) -- so this is a separate,
-                // non-blocking informational note, shown regardless of result.Success,
-                // naming exactly which previously-configured monitor(s) were skipped
-                // because they are no longer detected. See ToggleService.LiveFilterMonitorSets
-                // for the full round-17/18 rationale.
-                if (result is not null && result.StaleMonitorsSkipped.Count > 0)
-                {
-                    MessageBox.Show(
-                        this,
-                        ToggleResultFormatter.FormatStaleMonitorNote(result.StaleMonitorsSkipped),
-                        "Rig Toggle",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information);
-                }
+                // A stale device path (ToggleResult.StaleMonitorsSkipped, populated by
+                // ToggleService.LiveFilterMonitorSets) is not itself a step failure -- the
+                // Monitor step still records Succeeded for whatever remained live, and the
+                // toggle proceeds normally. This used to also show a per-toggle
+                // informational popup naming the skipped path(s); removed as of
+                // RigToggle.Core.StaleMonitorCleanup (runs automatically at app startup) --
+                // a popup on every single toggle for up to 30 days, for something requiring
+                // no user action, was pure noise. LiveFilterMonitorSets' graceful-skip
+                // behavior itself is unchanged; only this UI surfacing of it is gone.
 
                 if (result is not null && !result.Success)
                 {
