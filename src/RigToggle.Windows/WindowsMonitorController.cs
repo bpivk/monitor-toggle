@@ -1562,7 +1562,23 @@ public sealed class WindowsMonitorController : IMonitorController
     // so a rig trial's debug.log directly shows whether/when the snapshot changed
     // between attempts.
     private static readonly TimeSpan SettlePollDelay = TimeSpan.FromMilliseconds(150);
-    private const int MaxSettlePollAttempts = 5;
+
+    // Tuning experiment (2026-09-01, reporter's rig): the Odyssey G5 visibly flashes
+    // on/off during activation on a noticeable fraction of toggles. Rig-log correlation
+    // shows this coincides with round 14 fix-A's automatic retry re-applying the whole
+    // topology a SECOND time after the original 5-attempt/750ms-per-round settle window
+    // (3 rounds, ~2.25s worst case) gave up without ever observing two consecutive
+    // stable reads -- plausible given this monitor's own DisplayPort wake-time
+    // reputation (corroborated by external Samsung-community reports researched during
+    // the original investigation). Doubling this to 10/~1.5s-per-round (~4.5s worst
+    // case across 3 rounds) only changes tail latency for a monitor that keeps
+    // reporting a CHANGING active-path set -- PollUntilStableActiveDevicePaths already
+    // exits after the first two CONSECUTIVE agreeing reads (typically ~1 attempt,
+    // ~150ms) for the common already-settled case, so this is a no-op cost-wise for
+    // every monitor that isn't hitting this specific slow-wake pattern. Not proven to
+    // eliminate the flash -- rig-verify by repeating the exact toggle sequence that
+    // reproduced it.
+    private const int MaxSettlePollAttempts = 10;
 
     // Debug session monitor-enable-reactivates-others-again, round 2: bounds how many
     // times ActivateMonitors re-runs the settle-poll-then-correct cycle after Extend.
