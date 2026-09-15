@@ -5,6 +5,7 @@ using RigToggle.Windows;
 using WindowsDisplayAPI;
 using WindowsDisplayAPI.DisplayConfig;
 using WindowsDisplayAPI.Native.DisplayConfig;
+using WindowsDisplayAPI.Native.Structures;
 using Xunit;
 
 namespace RigToggle.Windows.Tests;
@@ -694,5 +695,102 @@ public class WindowsMonitorControllerTests
             isNestedCorrectionCall: true, requestedStillInactiveCount: 1, attemptNumber: 2, maxRetryAttempts: 2);
 
         Assert.True(result);
+    }
+
+    // Debug session monitor-pos-no-persist: ToCachedMonitorMode/ToPathInfo are the pure
+    // conversion seams between a live-captured PathInfo and its on-disk CachedMonitorMode
+    // shape -- the exact mapping a restart-survival bug (a swapped X/Y, a dropped
+    // AdapterId part, a wrong PixelFormat cast) could hide in silently, since neither
+    // direction ever throws on a "wrong but plausible" value. Same "public,
+    // hardware-independent PathDisplaySource/PathDisplayAdapter/LUID constructors, no
+    // live CCD hardware needed" discipline as Source(uint)/WithMode above -- LUID's own
+    // constructor (LowPart: uint, HighPart: int) is exercised directly here, unlike
+    // Source(uint)'s existing `default` LUID shortcut, so a genuinely non-zero adapter
+    // identity round-trips too.
+    private static readonly DateTimeOffset SampleCachedAtUtc = new(2026, 9, 15, 19, 6, 33, TimeSpan.Zero);
+
+    private static CachedMonitorMode SampleCachedMonitorMode(string devicePath = "DELA0BC", int x = -1920, int y = 0) =>
+        new(
+            DevicePath: devicePath,
+            AdapterIdLowPart: 4242,
+            AdapterIdHighPart: 3,
+            SourceId: 1,
+            PositionX: x,
+            PositionY: y,
+            ResolutionWidth: 1920,
+            ResolutionHeight: 1200,
+            PixelFormat: (int)DisplayConfigPixelFormat.PixelFormat32Bpp,
+            LastCachedUtc: SampleCachedAtUtc);
+
+    [Fact]
+    public void ToCachedMonitorMode_FromLiveModeWithMode_MapsEveryFieldCorrectly()
+    {
+        PathInfo mode = WithMode(sourceId: 7, x: -1920, y: 0, width: 1920, height: 1200);
+
+        CachedMonitorMode result = WindowsMonitorController.ToCachedMonitorMode("DELA0BC", mode, SampleCachedAtUtc);
+
+        Assert.Equal("DELA0BC", result.DevicePath);
+        Assert.Equal(0u, result.AdapterIdLowPart); // Source(uint) fixture uses `default` LUID
+        Assert.Equal(0, result.AdapterIdHighPart);
+        Assert.Equal(7u, result.SourceId);
+        Assert.Equal(-1920, result.PositionX);
+        Assert.Equal(0, result.PositionY);
+        Assert.Equal(1920, result.ResolutionWidth);
+        Assert.Equal(1200, result.ResolutionHeight);
+        Assert.Equal((int)DisplayConfigPixelFormat.PixelFormat32Bpp, result.PixelFormat);
+        Assert.Equal(SampleCachedAtUtc, result.LastCachedUtc);
+    }
+
+    [Fact]
+    public void ToPathInfo_ThenToCachedMonitorMode_RoundTripsExactly()
+    {
+        // The regression this bug actually needs: a value that survives being written to
+        // disk (CachedMonitorMode), reconstructed into a live-shaped PathInfo (ToPathInfo,
+        // exactly what the constructor does on load), and read back out via the exact
+        // properties TryBuildScopedActivationPlan consults (.DisplaySource/.Position/
+        // .Resolution/.PixelFormat) must reproduce the original entry byte-for-byte -- a
+        // non-zero, distinguishable adapter LUID (not the `default` shortcut) so a
+        // dropped/swapped AdapterId part cannot hide.
+        CachedMonitorMode original = SampleCachedMonitorMode();
+
+        PathInfo reconstructed = WindowsMonitorController.ToPathInfo(original);
+        CachedMonitorMode roundTripped = WindowsMonitorController.ToCachedMonitorMode(
+            original.DevicePath, reconstructed, original.LastCachedUtc);
+
+        Assert.Equal(original, roundTripped);
+    }
+
+    [Fact]
+    public void ToPathInfo_ThenToCachedMonitorMode_RoundTripsOriginPosition()
+    {
+        // Boundary neighbor: (0,0) is the origin PromoteToOriginIfNeeded's IsAtOrigin
+        // check treats specially -- must not be confused with "no mode info" (which is a
+        // structurally different, IsModeInformationAvailable=false state, not a
+        // position value at all).
+        CachedMonitorMode original = SampleCachedMonitorMode(x: 0, y: 0);
+
+        PathInfo reconstructed = WindowsMonitorController.ToPathInfo(original);
+
+        Assert.True(reconstructed.IsModeInformationAvailable);
+        Assert.Equal(new Point(0, 0), reconstructed.Position);
+        Assert.Equal(original, WindowsMonitorController.ToCachedMonitorMode(
+            original.DevicePath, reconstructed, original.LastCachedUtc));
+    }
+
+    [Fact]
+    public void ToPathInfo_PreservesDisplaySourceIdentity_ForSelectSourceForActivationPreference()
+    {
+        // A restart-survived cache entry must still let SelectSourceForActivation's
+        // existing source-reclaim preference (round 14 fix B) match it against a live
+        // GetAllPaths() candidate -- this only works if ToPathInfo's DisplaySource
+        // equals a live PathDisplaySource built from the same adapter/source identity.
+        CachedMonitorMode original = SampleCachedMonitorMode();
+        PathInfo reconstructed = WindowsMonitorController.ToPathInfo(original);
+
+        var liveEquivalentSource = new PathDisplaySource(
+            new PathDisplayAdapter(new LUID(original.AdapterIdLowPart, original.AdapterIdHighPart)),
+            original.SourceId);
+
+        Assert.Equal(liveEquivalentSource, reconstructed.DisplaySource);
     }
 }

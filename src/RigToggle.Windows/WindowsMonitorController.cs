@@ -8,6 +8,7 @@ using RigToggle.Core.Models;
 using WindowsDisplayAPI;
 using WindowsDisplayAPI.DisplayConfig;
 using WindowsDisplayAPI.Native.DisplayConfig;
+using WindowsDisplayAPI.Native.Structures;
 
 namespace RigToggle.Windows;
 
@@ -297,21 +298,149 @@ namespace RigToggle.Windows;
 /// the user their own request already succeeded and only a side-effect restoration failed --
 /// instead of naming a monitor they never touched with no context. Neither item claims
 /// root_cause (8)'s underlying OS/driver mechanism is understood or eliminated.
+///
+/// Debug session monitor-pos-no-persist: a user rig debug.log showed the SAME defect
+/// Symptom 1 above already fixed (position reset to a driver default) recur in a NEW
+/// shape none of the prior rounds covered -- DeactivateMonitors ran in one OS process
+/// (pid=13292), and ~23 minutes later, after the app was closed and relaunched, a
+/// DIFFERENT process (pid=22056) ran ActivateMonitors for the same device path.
+/// _lastKnownActiveModeByDevicePath is, and always was (see that field's own remarks
+/// below), scoped to a single controller INSTANCE's process lifetime by deliberate,
+/// evidence-based design (monitor-position-resets-to-de's own resolution record: "no
+/// cross-process persistence... no cross-process repro had been reported" at the
+/// time) -- this log is the first evidence that gap is actually reachable in the
+/// user's real workflow (close/reopen the app between disabling and re-enabling a
+/// monitor), not a bug in the caching or consumption logic itself, both of which this
+/// log confirms are still working correctly WITHIN a process (the surviving monitor in
+/// the same pid=22056 call shows a correct, cached, non-blank position). Fixed with a
+/// small, additive on-disk JSON persistence layer (RigToggle.Core.Persistence.
+/// JsonMonitorModeCacheStore, following the exact same convention already used for
+/// mode.json/settings.json/toggle-in-progress.json): the constructor now loads any
+/// previously-persisted entries into _lastKnownActiveModeByDevicePath, and
+/// CacheLiveModes now persists the current in-memory cache (bounded to the
+/// MaxPersistedMonitorModeCacheEntries most-recently-cached entries, so a permanently
+/// unplugged monitor's entry does not accumulate on disk forever) every time it runs
+/// -- i.e. at BOTH of its existing call sites (DeactivateMonitors' own capture and
+/// ActivateMonitors' swap-exclusion capture), unchanged. Does not touch
+/// TryBuildScopedActivationPlan, PromoteToOriginIfNeeded, SelectSourceForActivation, the
+/// settle-poll-then-correct loop, ComputeUnexpectedlyActivated/Deactivated, or any other
+/// part of this file's CCD-activation machinery -- those already correctly CONSUME
+/// whatever is in _lastKnownActiveModeByDevicePath regardless of whether an entry was
+/// populated this session or loaded from disk; only the cache's own lifetime changes.
+/// Persisting the PathDisplaySource identity (adapter LUID + source id) alongside
+/// Position/Resolution/PixelFormat -- not just position -- means SelectSourceForActivation's
+/// existing source-reclaim preference (round 14 fix B) also survives a restart; a
+/// stale/no-longer-present adapter identity after a reboot simply fails that method's
+/// existing Contains() check and falls back to today's greedy first-unclaimed pick,
+/// exactly as a missing cache entry already does -- this can only improve on today's
+/// restart behavior, never regress the already rig-verified same-session behavior. Still
+/// rig-unverified (this sandbox cannot execute real Windows CCD calls or exercise an
+/// actual %LocalAppData% write across a real process restart) -- self-verified via build,
+/// the existing test suite, and new unit/property tests for the pure serialization
+/// round-trip and the bounded-cap seam.
 /// </summary>
 public sealed class WindowsMonitorController : IMonitorController
 {
-    // Debug session monitor-position-resets-to-de: in-memory, per-process cache of each
-    // device path's real, live mode (Position/Resolution/PixelFormat) at the moment it was
-    // last deactivated — populated by DeactivateMonitors AND (round 3) by ActivateMonitors
+    // Debug session monitor-position-resets-to-de: in-memory cache of each device path's
+    // real, live mode (Position/Resolution/PixelFormat) at the moment it was last
+    // deactivated — populated by DeactivateMonitors AND (round 3) by ActivateMonitors
     // itself for a swap's about-to-be-excluded survivors (see CacheLiveModes below),
     // consumed by TryBuildScopedActivationPlan. Scoped to this controller instance, which
     // Program.cs constructs exactly once at the composition root and shares across both the
     // tile dashboard (MainForm) and the Rig/Normal toggle flow (ToggleService) — so a
     // monitor disabled via either path and re-enabled via either path, within the same
-    // running session, gets its position restored. Does NOT survive an app restart (no
-    // cross-session persistence) — a target with no cache entry falls back to round 5's
-    // existing blank-mode (driver-picks) behavior, never an error.
+    // running session, gets its position restored.
+    //
+    // Debug session monitor-pos-no-persist: this cache USED TO be purely process-lifetime
+    // (no cross-session persistence, a deliberate scope decision at the time monitor-
+    // position-resets-to-de was resolved — see that session's own resolution record). A
+    // later user rig log showed that gap actually reached in practice: the app closed and
+    // relaunched between disabling a monitor and re-enabling it, so the re-enabling
+    // process's dictionary started empty. The constructor now loads any previously-
+    // persisted entries via _monitorModeCacheStore, and CacheLiveModes now persists the
+    // current cache on every call — so a target with no cache entry (never seen active by
+    // ANY process, ever, or evicted by the bounded persisted-entry cap) still falls back to
+    // round 5's original blank-mode (driver-picks) behavior, never an error, exactly as
+    // before this round.
     private readonly Dictionary<string, PathInfo> _lastKnownActiveModeByDevicePath = new();
+
+    // Debug session monitor-pos-no-persist: parallel to _lastKnownActiveModeByDevicePath
+    // above, tracking when each entry was last (re-)cached — used only by
+    // PersistMonitorModeCache's recency-ordered bound, never consulted by
+    // TryBuildScopedActivationPlan/SelectSourceForActivation/PromoteToOriginIfNeeded or any
+    // other CCD-activation logic. Kept as a separate dictionary rather than changing
+    // _lastKnownActiveModeByDevicePath's own value type, so every existing call site that
+    // reads a PathInfo out of that dictionary is completely untouched by this round.
+    private readonly Dictionary<string, DateTimeOffset> _lastKnownActiveModeCachedAtUtc = new();
+
+    // Debug session monitor-pos-no-persist: on-disk persistence for the cache above.
+    // Program.cs (composition root) constructs the concrete JsonMonitorModeCacheStore
+    // pointed at %LocalAppData%\RigToggle\monitor-mode-cache.json, matching the existing
+    // JsonSettingsStore/JsonModeStore/JsonToggleInProgressStore construction pattern for
+    // settings.json/mode.json/toggle-in-progress.json.
+    private readonly IMonitorModeCacheStore _monitorModeCacheStore;
+
+    // Debug session monitor-pos-no-persist: bounds PersistMonitorModeCache's on-disk write
+    // to the most-recently-cached entries only, so a monitor unplugged and never
+    // reconnected does not accumulate a stale entry on disk forever. Generous for this
+    // project's single-user, personal 2-3-monitor rig scope (see PROJECT.md constraints) —
+    // this is headroom for "every physical monitor this rig has ever had connected across
+    // its lifetime," not a tight limit expected to actually bind in practice.
+    private const int MaxPersistedMonitorModeCacheEntries = 32;
+
+    public WindowsMonitorController(IMonitorModeCacheStore monitorModeCacheStore)
+    {
+        _monitorModeCacheStore = monitorModeCacheStore;
+
+        // Debug session monitor-pos-no-persist: reconstructs a PathInfo per persisted
+        // entry using the same public, hardware-independent PathDisplaySource/
+        // PathDisplayAdapter/LUID constructors this file's own test fixtures already rely
+        // on (see WindowsMonitorControllerTests.Source(uint)) and the 4-argument
+        // PathInfo(source, position, resolution, pixelFormat) constructor — the same
+        // overload family TryBuildScopedActivationPlan/PromoteToOriginIfNeeded already use
+        // elsewhere in this file. Only ever read back via .DisplaySource/.Position/
+        // .Resolution/.PixelFormat (confirmed by grep — .TargetsInfo is never accessed on
+        // a _lastKnownActiveModeByDevicePath value), so the reconstructed PathInfo's
+        // absent TargetsInfo is never a problem. A store failure here is not caught —
+        // IMonitorModeCacheStore.Load() itself is documented to never throw (same
+        // contract as JsonSettingsStore.Load()/JsonModeStore.TryLoad()), matching this
+        // codebase's existing convention of trusting that contract at call sites (e.g.
+        // MainForm's own settingsStore reads) rather than re-defending against it
+        // everywhere.
+        foreach (CachedMonitorMode entry in monitorModeCacheStore.Load())
+        {
+            _lastKnownActiveModeByDevicePath[entry.DevicePath] = ToPathInfo(entry);
+            _lastKnownActiveModeCachedAtUtc[entry.DevicePath] = entry.LastCachedUtc;
+        }
+
+        Log($"WindowsMonitorController: loaded {_lastKnownActiveModeByDevicePath.Count} persisted monitor-mode-cache entr{(_lastKnownActiveModeByDevicePath.Count == 1 ? "y" : "ies")} from disk.");
+    }
+
+    // Debug session monitor-pos-no-persist: pure seam (unit-tested, RigToggle.Windows.Tests
+    // — no live CCD hardware needed, same "PathDisplaySource/PathDisplayAdapter/LUID all
+    // have public, hardware-independent constructors" discipline this file's existing
+    // Source(uint)/WithMode test fixtures already rely on) — the exact inverse of
+    // ToCachedMonitorMode below. Extracted from the constructor so the field-mapping
+    // round trip (the part most likely to have an off-by-one/wrong-property bug) is
+    // directly testable in isolation: ToCachedMonitorMode(path, ToPathInfo(entry), ts)
+    // must reproduce entry exactly. Uses the same 4-argument
+    // PathInfo(source, position, resolution, pixelFormat) constructor overload
+    // TryBuildScopedActivationPlan/PromoteToOriginIfNeeded already use elsewhere in this
+    // file — the reconstructed PathInfo carries no TargetsInfo, which is fine, since a
+    // cached mode is only ever read back via .DisplaySource/.Position/.Resolution/
+    // .PixelFormat (confirmed by grep of every `cachedMode.` usage in this file).
+    internal static PathInfo ToPathInfo(CachedMonitorMode entry)
+    {
+        var source = new PathDisplaySource(
+            new PathDisplayAdapter(new LUID(entry.AdapterIdLowPart, entry.AdapterIdHighPart)),
+            entry.SourceId);
+
+        return new PathInfo(
+            source,
+            new Point(entry.PositionX, entry.PositionY),
+            new Size(entry.ResolutionWidth, entry.ResolutionHeight),
+            (DisplayConfigPixelFormat)entry.PixelFormat);
+    }
 
     public IReadOnlyList<MonitorInfo> GetActiveMonitors()
     {
@@ -952,12 +1081,87 @@ public sealed class WindowsMonitorController : IMonitorController
     // at the same live PathInfo.
     private void CacheLiveModes(IEnumerable<PathInfo> paths)
     {
+        // Debug session monitor-pos-no-persist: LastCachedUtc is recorded alongside the
+        // PathInfo itself (parallel dictionary, see _lastKnownActiveModeCachedAtUtc's own
+        // remarks) purely so PersistMonitorModeCache below can bound the on-disk file to
+        // the most-recently-cached entries — this timestamp is never read by
+        // TryBuildScopedActivationPlan or any other consumer of
+        // _lastKnownActiveModeByDevicePath.
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
         foreach (PathInfo path in paths)
         {
             foreach (PathTargetInfo targetInfo in path.TargetsInfo)
             {
                 _lastKnownActiveModeByDevicePath[targetInfo.DisplayTarget.DevicePath] = path;
+                _lastKnownActiveModeCachedAtUtc[targetInfo.DisplayTarget.DevicePath] = now;
             }
+        }
+
+        // Debug session monitor-pos-no-persist: persists on EVERY call, i.e. at both of
+        // this method's existing call sites (DeactivateMonitors' own capture,
+        // ActivateMonitors' swap-exclusion capture) — unchanged from before this round.
+        // Wrapped defensively (see PersistMonitorModeCache's own remarks): a disk failure
+        // here must never abort the in-progress monitor toggle this call is nested inside.
+        PersistMonitorModeCache();
+    }
+
+    // Debug session monitor-pos-no-persist: pure seam (unit-tested, RigToggle.Windows.Tests
+    // — no live CCD hardware or real filesystem needed) converting one live-captured
+    // PathInfo + its DevicePath/cached-at timestamp into the on-disk CachedMonitorMode
+    // shape. Extracted from PersistMonitorModeCache so the field mapping itself (the part
+    // most likely to have an off-by-one/wrong-property bug) is directly testable without
+    // touching IMonitorModeCacheStore at all.
+    internal static CachedMonitorMode ToCachedMonitorMode(string devicePath, PathInfo mode, DateTimeOffset cachedAtUtc) =>
+        new(
+            devicePath,
+            mode.DisplaySource.Adapter.AdapterId.LowPart,
+            mode.DisplaySource.Adapter.AdapterId.HighPart,
+            mode.DisplaySource.SourceId,
+            mode.Position.X,
+            mode.Position.Y,
+            mode.Resolution.Width,
+            mode.Resolution.Height,
+            (int)mode.PixelFormat,
+            cachedAtUtc);
+
+    // Debug session monitor-pos-no-persist: writes the current in-memory cache to disk via
+    // _monitorModeCacheStore, bounded to the MaxPersistedMonitorModeCacheEntries most-
+    // recently-cached entries (see that constant's own remarks) so a permanently-unplugged
+    // monitor's entry does not accumulate on disk forever. Deliberately swallows IOException/
+    // UnauthorizedAccessException — this runs on the CCD-activation hot path (inside
+    // CacheLiveModes, itself inside DeactivateMonitors/ActivateMonitors), and per this
+    // file's own long-established discipline (e.g. Log's own "never throws" contract,
+    // ObservePostApplyStability/PollUntilStableActiveDevicePaths' per-tick try/catch), a
+    // diagnostic/best-effort side channel must never abort the actual monitor toggle. A
+    // save failure here only means this specific update to the on-disk cache is lost —
+    // the in-memory cache for the REST of this running process is completely unaffected,
+    // and the next successful CacheLiveModes call (or the next app launch, reading
+    // whatever the last successful save left on disk) will retry.
+    private void PersistMonitorModeCache()
+    {
+        try
+        {
+            CachedMonitorMode[] entries = _lastKnownActiveModeByDevicePath
+                .Select(kvp => ToCachedMonitorMode(
+                    kvp.Key,
+                    kvp.Value,
+                    _lastKnownActiveModeCachedAtUtc.TryGetValue(kvp.Key, out DateTimeOffset cachedAtUtc)
+                        ? cachedAtUtc
+                        : DateTimeOffset.UtcNow))
+                .OrderByDescending(entry => entry.LastCachedUtc)
+                .Take(MaxPersistedMonitorModeCacheEntries)
+                .ToArray();
+
+            _monitorModeCacheStore.Save(entries);
+        }
+        catch (IOException ex)
+        {
+            Log($"PersistMonitorModeCache: IOException saving monitor-mode-cache.json -- ignored, in-memory cache for this session is unaffected ({ex.Message}).");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log($"PersistMonitorModeCache: UnauthorizedAccessException saving monitor-mode-cache.json -- ignored, in-memory cache for this session is unaffected ({ex.Message}).");
         }
     }
 

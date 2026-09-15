@@ -279,7 +279,14 @@ namespace RigToggle.App
             // best-effort-swallow startup idiom (D-06/D-07).
             StartupRecoveryChecker.Run(modeStore, markerStore);
 
-            var monitorController = new WindowsMonitorController();
+            // Debug session monitor-pos-no-persist: sibling of settings.json/mode.json/
+            // toggle-in-progress.json, same basePath, same JsonXStore-per-file
+            // construction pattern. See WindowsMonitorController's own class remarks and
+            // JsonMonitorModeCacheStore's doc comment for why this exists — an app
+            // restart between disabling and re-enabling a monitor used to lose that
+            // monitor's cached position because the cache was process-lifetime only.
+            var monitorModeCacheStore = new JsonMonitorModeCacheStore(Path.Combine(basePath, "monitor-mode-cache.json"));
+            var monitorController = new WindowsMonitorController(monitorModeCacheStore);
             var audioController = new WindowsAudioController();
             var appController = new WindowsAppController();
             var autostartConfigurator = new WindowsAutostartConfigurator();
